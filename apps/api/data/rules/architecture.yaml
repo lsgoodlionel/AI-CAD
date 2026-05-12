@@ -1,0 +1,109 @@
+engine: rules
+version: "1.0"
+discipline: architecture
+description: "建筑专业规范检查，依据 GB50016-2014、GB50096-2011、GB50352-2019"
+
+rules:
+  - id: ARC-001
+    name: 防火分区面积标注
+    severity: critical
+    category: 消防规范
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:防火分区|分区面积|建筑面积)\\s*[：:]?\\s*\\d+(?:\\.\\d+)?\\s*(?:m²|㎡|平方米)"
+      negate: true
+    message: "未检测到防火分区面积标注，消防设计可能不合规"
+    regulation_ref: "GB50016-2014 第5.3.1条（强条）"
+    suggestion: "在总平面图或防火分区示意图中标注各防火分区的建筑面积"
+
+  - id: ARC-002
+    name: 疏散出口数量
+    severity: critical
+    category: 消防规范
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:疏散出口|安全出口|疏散门)\\s*(?:不少于|≥|不低于|共)\\s*[2-9]"
+      negate: true
+    message: "未明确标注安全疏散出口数量，疏散设计合规性待核查"
+    regulation_ref: "GB50016-2014 第6.4.1条（强条）"
+    suggestion: "在平面图中注明各楼层安全出口的数量和位置"
+
+  - id: ARC-003
+    name: 建筑高度标注
+    severity: major
+    category: 基本设计参数
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:建筑高度|总高度|室外地面)\\s*[：:]?\\s*\\d+(?:\\.\\d+)?\\s*(?:m|米)"
+      negate: true
+    message: "未检测到建筑高度标注，高度分类（多层/高层/超高层）可能无法判断"
+    regulation_ref: "GB50352-2019 第2.0.1条"
+    suggestion: "在设计说明或立面图中注明建筑总高度（室外地面至屋面面层）"
+
+  - id: ARC-004
+    name: 走廊净宽要求
+    severity: major
+    category: 疏散设计
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:走廊|疏散走道|内廊)\\s*净宽\\s*[：:]?\\s*\\d+(?:\\.\\d+)?\\s*(?:m|mm)"
+      negate: true
+    message: "未检测到疏散走道净宽标注"
+    regulation_ref: "GB50016-2014 第6.4.11条"
+    suggestion: "在平面图中标注疏散走道净宽尺寸（住宅≥1.2m，公建≥1.4m）"
+
+  - id: ARC-005
+    name: 无障碍设计说明
+    severity: minor
+    category: 无障碍设计
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:无障碍|残疾人|轮椅坡道|盲道)"
+      negate: true
+    message: "未检测到无障碍设计内容，公共建筑应包含无障碍设施"
+    regulation_ref: "GB50763-2012 无障碍设计规范"
+    suggestion: "在设计说明和平面图中补充无障碍设施（坡道、无障碍卫生间、盲道等）"
+
+  - id: ARC-006
+    name: 层高标注
+    severity: major
+    category: 基本设计参数
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:层高|净高|室内净高)\\s*[：:]?\\s*\\d+(?:\\.\\d+)?\\s*(?:m|mm)"
+      negate: true
+    message: "未检测到层高或室内净高标注"
+    regulation_ref: "GB50096-2011 第3.6.1条"
+    suggestion: "在剖面图或设计说明中标注各功能空间的层高和室内净高"
+
+  - id: ARC-007
+    name: 外墙保温做法
+    severity: minor
+    category: 节能设计
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:外墙保温|保温层|岩棉|聚苯板|挤塑板|XPS|EPS|保温系统)"
+      negate: true
+    message: "未检测到外墙保温做法说明，节能设计可能不完整"
+    regulation_ref: "GB50189-2015 公共建筑节能设计标准"
+    suggestion: "在设计说明或墙身详图中注明外墙保温材料及厚度"
+
+  - id: ARC-008
+    name: 屋面排水设计
+    severity: minor
+    category: 屋面设计
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:屋面排水|天沟|雨水斗|排水坡度|找坡)"
+      negate: true
+    message: "未检测到屋面排水设计内容"
+    regulation_ref: "GB50345-2012 屋面工程技术规范"
+    suggestion: "在屋顶平面图或屋面详图中标注排水坡度和雨水斗位置"

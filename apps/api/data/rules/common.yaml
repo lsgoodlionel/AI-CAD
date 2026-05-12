@@ -1,0 +1,63 @@
+engine: rules
+version: "1.0"
+discipline: common
+description: "通用图纸规范，适用于所有专业"
+
+rules:
+  - id: CMN-001
+    name: 图纸编号格式
+    severity: major
+    category: 元数据规范
+    condition:
+      type: regex
+      field: drawing_no
+      pattern: "^[A-Za-z]{2,4}-\\d{4}-\\d{3}$"
+      negate: true
+    message: "图纸编号「{drawing_no}」格式不符规范，建议使用 XX-YYYY-NNN 格式（如 ST-2025-001）"
+    regulation_ref: "企业制图规范 Q/CAD-001 第3.2条"
+    suggestion: "修改图纸编号为标准格式"
+
+  - id: CMN-002
+    name: 标题字段完整性
+    severity: minor
+    category: 元数据规范
+    condition:
+      type: empty
+      field: title
+    message: "图纸标题为空，影响归档检索效率，建议填写完整标题"
+    suggestion: "在图纸属性中填写完整的图纸标题"
+
+  - id: CMN-003
+    name: 版次规范
+    severity: info
+    category: 元数据规范
+    condition:
+      type: not_in
+      field: version
+      values: ["A", "B", "C", "D", "E", "F", "G", "H"]
+    message: "版次「{version}」不在标准范围内（A-H），请确认版次是否正确"
+    regulation_ref: "企业制图规范 Q/CAD-001 第4.1条"
+
+  - id: CMN-004
+    name: 重大变更预警
+    severity: critical
+    category: 财务合规
+    condition:
+      type: gte
+      field: estimated_impact
+      value: 500000
+    message: "预估影响金额 ≥50万元，属于重大设计变更，需启动集团升级审批流程，财务系统将锁定等待上级批准"
+    regulation_ref: "集团资金管理制度 G/FM-003 第5章"
+    suggestion: "联系项目经理和集团财务部启动重大变更审批程序"
+
+  - id: CMN-005
+    name: 文件格式校验
+    severity: major
+    category: 文件规范
+    condition:
+      type: not_in
+      field: file_ext
+      values: ["pdf", "dwg", "dxf", "ifc"]
+    message: "图纸文件格式「{file_ext}」不在允许范围内（PDF/DWG/DXF/IFC）"
+    regulation_ref: "企业 BIM 实施标准 Q/BIM-002 第2.1条"
+    suggestion: "将图纸转换为标准格式后重新上传"

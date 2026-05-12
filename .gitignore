@@ -1,0 +1,61 @@
+# ── Python ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.cover
+
+# ── Node / pnpm ──────────────────────────────────────────
+node_modules/
+.pnpm-debug.log*
+.npm
+.yarn/
+
+# ── Build outputs ────────────────────────────────────────
+apps/web/dist/
+apps/web/.umi/
+apps/web/.umi-production/
+apps/web/.umi-test/
+
+# ── Secrets & environment ─────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ── IDE ──────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Logs ─────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Docker volumes (local bind mounts) ───────────────────
+infra/data/
+infra/minio-data/
+
+# ── Test artifacts ────────────────────────────────────────
+playwright-report/
+test-results/

@@ -1,0 +1,17 @@
+{
+  "extends": "./.umi/tsconfig.json",
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "commonjs",
+    "lib": ["esnext", "DOM"],
+    "strict": true,
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src/**/*", "config/**/*", "typings.d.ts"]
+}

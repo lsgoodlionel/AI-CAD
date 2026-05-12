@@ -1,0 +1,83 @@
+engine: rules
+version: "1.0"
+discipline: structure
+description: "结构专业规范检查，依据 GB50010-2010、GB50009-2012"
+
+rules:
+  - id: STR-001
+    name: 混凝土强度等级标注
+    severity: major
+    category: 材料规范
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:混凝土|[Cc])\\s*(?:1[5-9]|[23][05]|4[05]|50|55|60)(?!\\d)"
+      negate: true
+    message: "未检测到标准混凝土强度等级标注（C15–C60），图纸设计说明可能不完整"
+    regulation_ref: "GB50010-2010 第4.1条"
+    suggestion: "在设计说明中明确标注各构件的混凝土强度等级"
+
+  - id: STR-002
+    name: 钢筋型号标注
+    severity: major
+    category: 材料规范
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:HRB[34][0-9]{2}|HPB300|HRBF[34][0-9]{2}|[φΦϕ]\\d)"
+      negate: true
+    message: "未检测到钢筋型号标注（HRB335/HRB400/HPB300），配筋说明可能缺失"
+    regulation_ref: "GB50010-2010 第4.2条"
+    suggestion: "在设计说明或配筋大样中注明钢筋规格型号"
+
+  - id: STR-003
+    name: 抗震设防烈度
+    severity: critical
+    category: 抗震设计
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:抗震设防烈度|设防烈度|地震设防)\\s*[六七八九]度"
+      negate: true
+    message: "未检测到抗震设防烈度说明，抗震设计要求可能缺失"
+    regulation_ref: "GB50011-2010 第3.1.1条（强条）"
+    suggestion: "在设计总说明中注明工程所在地的抗震设防烈度"
+
+  - id: STR-004
+    name: 结构安全等级
+    severity: major
+    category: 设计基本参数
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:安全等级|结构安全等级)\\s*[：:]?\\s*[一二三]级"
+      negate: true
+    message: "未检测到结构安全等级说明"
+    regulation_ref: "GB50068-2018 第3.2.1条"
+    suggestion: "在设计总说明中注明结构安全等级"
+
+  - id: STR-005
+    name: 荷载设计值
+    severity: minor
+    category: 荷载规范
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:恒荷载|活荷载|恒载|活载|楼面荷载|屋面荷载)\\s*[：:]"
+      negate: true
+    message: "未检测到楼/屋面荷载取值说明，建议在设计说明中明确荷载标准"
+    regulation_ref: "GB50009-2012 荷载规范"
+    suggestion: "在设计说明中列出各类荷载的设计标准值"
+
+  - id: STR-006
+    name: 钢筋保护层厚度
+    severity: major
+    category: 耐久性要求
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:保护层|混凝土保护层)\\s*厚度"
+      negate: true
+    message: "未检测到钢筋混凝土保护层厚度说明"
+    regulation_ref: "GB50010-2010 第8.2.1条"
+    suggestion: "在设计说明或图纸节点中标注各构件的保护层厚度要求"

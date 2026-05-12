@@ -1,0 +1,109 @@
+engine: rules
+version: "1.0"
+discipline: mep
+description: "机电专业规范检查，依据 GB50736-2012、GB50015-2019、GB50054-2011"
+
+rules:
+  - id: MEP-001
+    name: 管道材质标注
+    severity: major
+    category: 管道规范
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:镀锌钢管|PPR|UPVC|PE管|不锈钢管|铜管|铸铁管|热镀锌|无缝钢管)"
+      negate: true
+    message: "未检测到管道材质标注，给排水材料选择不明确"
+    regulation_ref: "GB50015-2019 建筑给水排水设计标准 第3.6条"
+    suggestion: "在设计说明或系统图中注明各管道的材质及规格"
+
+  - id: MEP-002
+    name: 消防系统类型
+    severity: critical
+    category: 消防给水
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:消火栓|自动喷水|喷淋|消防给水|水泵接合器)"
+      negate: true
+    message: "未检测到消防给水系统标注，消防系统设计可能缺失"
+    regulation_ref: "GB50974-2014 消防给水及消火栓系统技术规范（强条）"
+    suggestion: "在设计说明中明确消防给水系统类型，并在平面图中标注消火栓和喷淋点位"
+
+  - id: MEP-003
+    name: 电气系统接地形式
+    severity: critical
+    category: 电气安全
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:TN-S|TN-C-S|TT系统|接地形式|保护接地|工作接地|重复接地)"
+      negate: true
+    message: "未检测到电气系统接地形式说明"
+    regulation_ref: "GB50054-2011 低压配电设计规范 第5.1.1条（强条）"
+    suggestion: "在电气设计说明中注明低压配电系统的接地形式（TN-S / TT / IT）"
+
+  - id: MEP-004
+    name: 通风换气次数
+    severity: major
+    category: 暖通设计
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:换气次数|新风量|通风量|排风量|送风量)\\s*[：:]?\\s*\\d+(?:\\.\\d+)?\\s*(?:次/h|m³/h|次每小时)"
+      negate: true
+    message: "未检测到通风换气次数或新风量参数"
+    regulation_ref: "GB50736-2012 民用建筑供暖通风与空气调节设计规范"
+    suggestion: "在暖通设计说明中注明各功能区的通风换气次数或新风量标准"
+
+  - id: MEP-005
+    name: 配电箱系统图
+    severity: major
+    category: 电气设计
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:配电箱|配电盘|AP|AL|AW|照明配电|动力配电)\\s*[：:]?\\s*(?:系统图|回路)"
+      negate: true
+    message: "未检测到配电箱系统图信息"
+    regulation_ref: "GB50054-2011 低压配电设计规范"
+    suggestion: "绘制各楼层配电箱的系统图，标明回路编号、负荷容量和断路器规格"
+
+  - id: MEP-006
+    name: 防雷等级说明
+    severity: major
+    category: 防雷设计
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:防雷等级|防雷类别|一类防雷|二类防雷|三类防雷|雷电防护)"
+      negate: true
+    message: "未检测到建筑防雷等级说明"
+    regulation_ref: "GB50057-2010 建筑物防雷设计规范 第3.0.1条"
+    suggestion: "在电气设计说明中注明建筑物的防雷等级（一/二/三类）及相应措施"
+
+  - id: MEP-007
+    name: 管道综合净高
+    severity: major
+    category: 管道综合
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:管底标高|梁底标高|净高|管道综合|机电综合|净空)\\s*[≥≦><=]?\\s*\\d+(?:\\.\\d+)?\\s*(?:m|mm)"
+      negate: true
+    message: "未检测到管道综合净高控制标注"
+    regulation_ref: "企业机电深化设计标准"
+    suggestion: "在机电综合图中标注各区域的净高控制线和主要管线标高"
+
+  - id: MEP-008
+    name: 给水管道压力标注
+    severity: minor
+    category: 给排水设计
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:工作压力|试验压力|供水压力|水压)\\s*[：:]?\\s*\\d+(?:\\.\\d+)?\\s*(?:MPa|kPa|bar)"
+      negate: true
+    message: "未检测到给水管道工作压力标注"
+    regulation_ref: "GB50015-2019 第3.4条"
+    suggestion: "在给水系统图中标注各分区的工作压力，超压区域应设置减压阀"

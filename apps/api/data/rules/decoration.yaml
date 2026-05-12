@@ -1,0 +1,95 @@
+engine: rules
+version: "1.0"
+discipline: decoration
+description: "精装修专业规范检查，依据 GB50210-2018、GB50327-2001、JGJ/T 29"
+
+rules:
+  - id: DEC-001
+    name: 装饰材料防火等级
+    severity: critical
+    category: 消防安全
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:燃烧性能|防火等级|A级|B1级|难燃|不燃材料|防火涂料)"
+      negate: true
+    message: "未检测到装饰材料燃烧性能等级标注，防火合规性待核查"
+    regulation_ref: "GB50222-2017 建筑内部装修设计防火规范（强条）"
+    suggestion: "在材料说明表中注明各装饰材料的燃烧性能等级（A/B1/B2级）"
+
+  - id: DEC-002
+    name: 面层材料厚度
+    severity: major
+    category: 材料规范
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:面砖厚度|石材厚度|木地板厚度|瓷砖|地砖|墙砖)\\s*[：:]?\\s*\\d+(?:\\.\\d+)?\\s*(?:mm|厚)"
+      negate: true
+    message: "未检测到地面/墙面面层材料厚度标注"
+    regulation_ref: "GB50210-2018 建筑装饰装修工程质量验收标准"
+    suggestion: "在节点详图或材料表中注明面层材料规格及铺贴厚度"
+
+  - id: DEC-003
+    name: 防水做法说明
+    severity: major
+    category: 防水设计
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:防水涂膜|防水卷材|聚氨酯|JS防水|防水层|上翻高度)\\s*\\d*"
+      negate: true
+    message: "未检测到卫生间/厨房防水做法说明"
+    regulation_ref: "JGJ 298-2013 住宅室内防水工程技术规范"
+    suggestion: "在卫生间、厨房详图中注明防水材料类型、涂刷遍数和上翻高度（墙面≥300mm，淋浴区≥1800mm）"
+
+  - id: DEC-004
+    name: 吊顶龙骨间距
+    severity: minor
+    category: 构造做法
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:龙骨间距|主龙骨|次龙骨|吊筋间距|吊顶做法)\\s*[：:]?\\s*\\d+(?:\\.\\d+)?\\s*mm"
+      negate: true
+    message: "未检测到吊顶龙骨间距标注"
+    regulation_ref: "GB50210-2018 第6.2条"
+    suggestion: "在吊顶节点详图中注明龙骨间距和吊筋间距（通常主龙骨≤1200mm，次龙骨≤600mm）"
+
+  - id: DEC-005
+    name: 色彩方案说明
+    severity: info
+    category: 设计完整性
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:色彩|颜色|色号|RAL|NCS|面漆颜色|乳胶漆)"
+      negate: true
+    message: "未检测到色彩方案说明，建议提供色彩选型依据"
+    suggestion: "在设计说明或材料样板表中注明主要面层颜色及色号"
+
+  - id: DEC-006
+    name: 地面找坡排水
+    severity: major
+    category: 排水设计
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:地漏|排水坡度|找坡|地面坡向|坡度[%‰]?\\s*[≥>]?\\s*[0-9])"
+      negate: true
+    message: "未检测到卫生间/厨房地面找坡排水说明"
+    regulation_ref: "JGJ 298-2013 第4.1.3条"
+    suggestion: "在地面详图中注明找坡方向和坡度（地漏处≥1%），保证排水顺畅"
+
+  - id: DEC-007
+    name: 门槛石高差处理
+    severity: minor
+    category: 无障碍细节
+    condition:
+      type: regex
+      field: extracted_text
+      pattern: "(?:门槛|高差|过门石|踢脚线|踢脚板)\\s*(?:厚度|高度)?\\s*\\d+\\s*mm"
+      negate: true
+    message: "未检测到门槛石高差处理说明"
+    regulation_ref: "GB50763-2012 无障碍设计规范"
+    suggestion: "在节点详图中注明各功能区交界处的高差处理方式（门槛石厚度、坡面过渡）"
