@@ -342,7 +342,7 @@ AI 审图（四引擎）:
 - [ ] 测试套件（Pytest 单元测试 + Playwright E2E，目标覆盖率 80%）
   - 三审状态机：100% 状态边界覆盖（含非法跳转）
   - AI 服务：离线 mock 用于 CI 测试
-- [ ] Docker Compose 开发环境（PostgreSQL+AGE / Redis / MinIO / Chroma / Ollama）
+- [x] Docker Compose 开发环境（`infra/docker-compose.yml`：PG+AGE / Redis / MinIO 3桶 / Chroma / minio-init）
 - [ ] 性能优化（慢查询 / 缓存策略 / 图纸 CDN）
 - [ ] 安全审计（依赖漏洞扫描 / SQL 注入测试 / 日志审查）
 - [ ] 用户操作手册（管理员 / 项目总工 / 经济师 / 设计师 / 施工员 / 班组）
@@ -356,24 +356,49 @@ AI 审图（四引擎）:
 
 按优先级排列（已完成项已移除）：
 
-1. **Phase 2E 经济测算层** — GB50010-2010 锚固/搭接计算 + 遗传算法下料优化（`core/economic/` 待创建）
-2. **Phase 4B 数据看板** — 集团 + 项目两个视角（`routers/dashboard.py` + `pages/dashboard/` 待创建）
-3. **Phase 4A 规范知识库管理** — KG NLP 提取流水线已实现（`services/regulation_importer.py`）；后台管理页面已实现（`pages/admin/RegulationManagement/`）；待实现：外部 API 定时同步 Celery beat 任务
-4. **Docker Compose** — 统一开发环境
-5. **测试套件** — Pytest + Playwright，目标 80% 覆盖率
-6. **PWA 配置** — Service Worker + Manifest
+1. **Phase 2E 经济测算层** — GB50010-2010 锚固/搭接计算 + 遗传算法下料优化
+   - 创建 `apps/api/core/economic/rebar_calculator.py`
+   - 公式：LaE = ζaE × α × (fy/ft) × d，抗震系数从 `engine_params` 读取
+   - 遗传算法：目标废料率 ≤ 1.5%，`standard_bar_lengths` 可配置
+   - 前端：`DrawingDetail/EconomicCalcPanel.tsx` 对比展示
+2. **Phase 4B 数据看板** — 集团 + 项目两个视角
+   - 创建 `apps/api/routers/dashboard.py`（年度创效总额 / KPI 预警 / AI 调用成本）
+   - 创建 `apps/web/src/pages/dashboard/`（ProLayout 看板页）
+3. **外部规范 API 定时同步** — 已有 `api_sources` 表和配置前端，需补充 Celery beat 定时同步任务
+4. **测试套件** — `pytest` 单元测试 + `playwright` E2E，目标覆盖率 80%；三审状态机 100% 状态边界覆盖
+5. **PWA 配置** — `apps/web/public/manifest.json` + Service Worker
+6. **CI/CD** — GitHub Actions（lint + test + build）
+7. **K8s 生产部署** — `infra/k8s/` 配置（含 Nginx / Prometheus / Grafana）
 
-已完成（本轮新增）：
-- ✅ `data/rules/architecture.yaml` / `mep.yaml` / `decoration.yaml`（规则引擎 YAML 全部专业）
-- ✅ `services/ai_report_generator.py`（AI 审图 PDF 批注版 + Excel 清单）
-- ✅ `routers/drawings.py` AI 报告 API（/issues / /report-pdf / /report-excel）
-- ✅ `pages/drawings/DrawingDetail/AIReviewPanel.tsx`（前端 AI 报告展示）
-- ✅ `services/certificate_generator.py`（兑现凭证 PDF）
-- ✅ `tasks/proposal_notice.py`（公示期自动推进 Celery beat）
-- ✅ `services/regulation_importer.py`（规范 NLP 提取流水线）
-- ✅ `tasks/regulation_import.py`（规范文件异步导入 Celery 任务）
-- ✅ `routers/regulations.py`（三途径规范知识库 API）
-- ✅ `pages/admin/RegulationManagement/`（规范知识库管理前端，3 个子页面）
+---
+
+## 已完成工作记录
+
+### 第二轮（2026-05-12 ~ 2026-05-13）
+
+- ✅ `data/rules/architecture.yaml`（ARC-001~008，建筑专业：防火分区/疏散/走廊净宽等）
+- ✅ `data/rules/mep.yaml`（MEP-001~008，机电专业：管道材质/消防/电气接地等）
+- ✅ `data/rules/decoration.yaml`（DEC-001~007，装修专业：防火等级/面层厚度等）
+- ✅ `services/ai_report_generator.py`（PyMuPDF 批注版 PDF + openpyxl 多页 Excel，260 行）
+- ✅ `routers/drawings.py` 新增 AI 报告 API（`/issues`、`/report-pdf`、`/report-excel`，MinIO 缓存）
+- ✅ `pages/drawings/DrawingDetail/AIReviewPanel.tsx`（253 行，Tab 过滤/统计/下载/强条红色预警）
+- ✅ `services/certificate_generator.py`（PyMuPDF A4 兑现凭证 PDF，177 行）
+- ✅ `tasks/proposal_notice.py`（Celery beat 扫描到期公示 → 自动推进至 distributing，60 行）
+- ✅ `services/regulation_importer.py`（规范 NLP 提取流水线，417 行：pymupdf4llm → Haiku 分类 → Sonnet 提取 → DB/AGE/Chroma 优雅降级）
+- ✅ `tasks/regulation_import.py`（规范文件异步导入 Celery 任务，MinIO → NLP → DB）
+- ✅ `routers/regulations.py`（522 行，规范书/条文/API源 CRUD + 文件导入 + 搜索）
+- ✅ `services/regulations.ts`（前端 API 封装，14 个函数）
+- ✅ `pages/admin/RegulationManagement/`（BookList / ArticleList / ApiSourceList / RegulationSearch 4 个组件）
+- ✅ `config/routes.ts` 新增规范知识库路由
+- ✅ `infra/docker-compose.yml`（PG+AGE / Redis / MinIO 3桶 / Chroma / minio-init 健康检查）
+
+### 本轮收尾（2026-05-13）
+
+- ✅ `README.md`（完整入门文档：项目简介/快速启动/API文档/实现状态/开发指南）
+- ✅ `.gitignore`（Python + Node/pnpm + 构建产物 + 密钥文件）
+- ✅ `.env.example`（完整环境变量模板）
+- ✅ CLAUDE.md / PLAN.md 同步更新至最新实现状态
+- ✅ Git 初始化 + 推送 `https://github.com/lsgoodlionel/AI-CAD.git`（105 文件，14533 行）
 
 ---
 
@@ -382,11 +407,13 @@ AI 审图（四引擎）:
 ```
 第 1 优先: 三审工作流状态机 + 二审强制约束（Phase 1 核心，业务价值最高）✅ 已完成
 第 2 优先: 模型路由层 + 管理后台（Phase 0，横切所有 AI 引擎）✅ 已完成
-第 3 优先: AI 审图规则引擎兜底（硬编码强条规则）✅ 已完成（待补充专业 YAML）
-第 4 优先: KG 引擎（条件合规推理）[~] 部分完成（查询实现；NLP 提取待实现）
-第 5 优先: RAG 引擎 [~] 部分完成（基础链路实现；LangGraph 待实现）
-第 6 优先: 经济测算层（钢筋翻样 + 下料优化）[ ] 未实现
-第 7 优先: 创效激励系统（Phase 3）[~] 基本完成（PDF 凭证和 KPI 待实现）
+第 3 优先: AI 审图规则引擎兜底（5 专业 YAML + 报告生成）✅ 已完成
+第 4 优先: 规范知识库（三途径导入 + NLP 流水线 + 管理前端）✅ 已完成
+第 5 优先: 创效激励系统（铁三角 + 签字 + 凭证 + 公示）✅ 已完成（KPI 看板待）
+第 6 优先: KG 引擎（条件合规推理）[~] 部分完成（查询实现；导入 30 本规范测试待）
+第 7 优先: RAG 引擎 [~] 部分完成（基础链路实现；LangGraph 多轮待）
+第 8 优先: 经济测算层（钢筋翻样 + 遗传算法下料）[ ] 待实现
+第 9 优先: 数据看板（集团 + 项目两视角）[ ] 待实现
 ```
 
 ---

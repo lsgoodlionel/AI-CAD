@@ -166,9 +166,10 @@ CAD/
 │   ├── shared-types/          # 共享 TypeScript 类型（待创建）
 │   └── ui-components/         # 公共 UI 组件库（待创建）
 ├── infra/
-│   ├── docker-compose.yml     # 开发环境编排（待配置）
-│   └── k8s/                   # 生产部署配置（待配置）
-└── scripts/                   # 构建与运维脚本
+│   ├── docker-compose.yml     # 开发环境编排（✅ 已配置：PG+AGE/Redis/MinIO/Chroma/minio-init）
+│   └── k8s/                   # 生产部署配置（待创建）
+├── scripts/                   # 构建与运维脚本（待创建）
+└── packages/                  # 共享包（待创建：shared-types / ui-components）
 ```
 
 ---
