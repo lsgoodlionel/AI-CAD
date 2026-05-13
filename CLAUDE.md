@@ -122,7 +122,7 @@ CAD/
 │   │               ├── EngineParams/    # 引擎业务参数配置
 │   │               └── RegulationManagement/ # 规范知识库（文件/条文/API源/搜索）
 │   ├── api/                   # 后端 FastAPI 应用（已实现）
-│   │   ├── main.py            # 12 个 Router 注册
+│   │   ├── main.py            # 15 个 Router 注册
 │   │   ├── core/
 │   │   │   ├── auth.py        # JWT 签发/验证（Access 24h + Refresh 30d）
 │   │   │   ├── storage.py     # MinIO 封装（presigned URL 5min）
@@ -134,8 +134,10 @@ CAD/
 │   │   │       ├── base.py    # DrawingContext / AIIssue / BaseEngine
 │   │   │       ├── rules_engine.py  # YAML DSL 规则引擎
 │   │   │       ├── kg_engine.py     # AGE Cypher + SQL 降级
-│   │   │       ├── rag_engine.py    # Chroma + ModelRouter
-│   │   │       ├── vision_engine.py # ezdxf/fitz/PaddleOCR
+│   │   │       ├── rag_engine.py    # Chroma + LangGraph 三步推理
+│   │   │       ├── vision_engine.py # ezdxf/fitz/PaddleOCR + YOLO
+│   │   │       ├── yolo_detector.py # YOLOv8 图元检测（graceful degradation）
+│   │   │       ├── langgraph_agent.py # LangGraph 三步推理代理
 │   │   │       └── orchestrator.py  # Vision串行 → [Rules/KG/RAG]并行
 │   │   ├── routers/
 │   │   │   ├── auth.py
@@ -154,9 +156,10 @@ CAD/
 │   │   │   ├── audit.py
 │   │   │   └── notification.py
 │   │   ├── tasks/
-│   │   │   ├── ai_review.py         # Celery 任务驱动四引擎
-│   │   │   ├── proposal_notice.py   # 公示期到期自动推进状态
-│   │   │   └── regulation_import.py # MinIO → NLP 流水线 → DB/AGE/Chroma
+│   │   │   ├── ai_review.py             # Celery 任务驱动四引擎
+│   │   │   ├── proposal_notice.py       # 公示期到期自动推进状态
+│   │   │   ├── regulation_import.py     # MinIO → NLP 流水线 → DB/AGE/Chroma
+│   │   │   └── regulation_api_sync.py   # 外部规范 API 定时同步（每小时 beat）
 │   │   ├── data/rules/
 │   │   │   ├── common.yaml          # 通用规则（CMN-001~005）
 │   │   │   ├── structure.yaml       # 结构专业规则（STR-001~006）
@@ -173,8 +176,10 @@ CAD/
 │   ├── shared-types/          # 共享 TypeScript 类型（待创建）
 │   └── ui-components/         # 公共 UI 组件库（待创建）
 ├── infra/
-│   ├── docker-compose.yml     # 开发环境编排（✅ 已配置：PG+AGE/Redis/MinIO/Chroma/minio-init）
-│   └── k8s/                   # 生产部署配置（待创建）
+│   ├── docker-compose.yml     # 开发环境编排（✅ PG+AGE/Redis/MinIO/Chroma/minio-init）
+│   └── k8s/                   # 生产部署配置（✅ 已完成）
+│       ├── base/              # Kustomize 基础层（namespace/configmap/所有 Deployment/Service/Ingress/监控）
+│       └── overlays/production/ # 生产 overlay（3副本 + 生产镜像 ${IMAGE_TAG}）
 ├── scripts/                   # 构建与运维脚本（待创建）
 └── packages/                  # 共享包（待创建：shared-types / ui-components）
 ```
