@@ -3,10 +3,20 @@
  * - getInitialState：启动时读取 JWT → 获取当前用户信息
  * - request：全局请求配置（Auth 头、401 重定向、错误提示）
  * - layout：ProLayout 运行时配置（头像、用户名、退出）
+ * - PWA：注册 Service Worker
  */
 import type { RequestConfig, RunTimeLayoutConfig } from '@umijs/max'
 import { history } from '@umijs/max'
 import { message } from 'antd'
+
+// ── PWA Service Worker 注册 ───────────────────────────────────────
+if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // SW 注册失败不影响主应用功能
+    })
+  })
+}
 
 // ──────────────────────────────────────────────────────────────
 // JWT 解析（不验证签名，仅提取 payload 用于本地展示）

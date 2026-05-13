@@ -520,3 +520,22 @@ async def _do_vectorize(article_id: str) -> None:
         await vectorize_articles(db, [article_id])
     finally:
         await db.disconnect()
+
+
+# ── 手动触发 API 数据源同步 ─────────────────────────────────────
+
+@router.post("/api-sources/{source_id}/sync", status_code=202)
+async def trigger_api_source_sync(
+    source_id: str,
+    db=Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    """手动触发单个数据源立即同步（异步，返回任务 ID）"""
+    from tasks.regulation_api_sync import sync_single_source_task
+    source = await db.fetch_one(
+        "SELECT id FROM regulation_api_sources WHERE id=$1", source_id
+    )
+    if not source:
+        raise HTTPException(404, "数据源不存在")
+    task = sync_single_source_task.apply_async(kwargs={"source_id": source_id})
+    return {"task_id": task.id, "status": "queued"}

@@ -7,7 +7,12 @@ celery_app = Celery(
     "cad",
     broker=settings.redis_url,
     backend=settings.redis_url,
-    include=["tasks.ai_review", "tasks.proposal_notice"],
+    include=[
+        "tasks.ai_review",
+        "tasks.proposal_notice",
+        "tasks.regulation_import",
+        "tasks.regulation_api_sync",
+    ],
 )
 
 celery_app.conf.update(
@@ -23,7 +28,11 @@ celery_app.conf.update(
     beat_schedule={
         "advance-expired-notices": {
             "task": "tasks.proposal_notice.advance_expired_notices",
-            "schedule": crontab(minute=0),   # 每小时整点执行
+            "schedule": crontab(minute=0),       # 每小时整点执行
+        },
+        "sync-regulation-api-sources": {
+            "task": "tasks.regulation_api_sync.sync_due_sources_task",
+            "schedule": crontab(minute=5),       # 每小时 :05 执行，错开整点高峰
         },
     },
 )

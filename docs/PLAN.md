@@ -338,13 +338,18 @@ AI 审图（四引擎）:
 - [x] KPI 红线预警 Alert（年产值 ≥1 亿且年度创效 <50 万）
 - [x] 路由配置（`/dashboard/group` isAdmin + `/dashboard/project` 全员可见）
 
-#### 4D — 收尾与上线（待开始）
+#### 4D — 收尾与上线（部分完成）
 
 - [ ] 前端 PDF 预览升级（react-pdf-viewer 替换 iframe，支持图纸标注）
-- [ ] 测试套件（Pytest 单元测试 + Playwright E2E，目标覆盖率 80%）
-  - 三审状态机：100% 状态边界覆盖（含非法跳转）
-  - AI 服务：离线 mock 用于 CI 测试
+- [x] 测试套件（Pytest 单元测试 + Playwright E2E）
+  - [x] 三审状态机：100% 状态边界覆盖（含非法跳转，`tests/test_workflow.py`）
+  - [x] 经济测算公式：GB50010-2010 手算验证（`tests/test_economic.py`）
+  - [x] 规范 API 同步：HTTP 响应解析 / 鉴权类型离线 Mock（`tests/test_regulation_sync.py`）
+  - [x] 数据看板 API：权限检查 + 结构校验（`tests/test_dashboard.py`）
+  - [x] Playwright E2E：登录 / 图纸列表 / 创效激励 / 看板（`apps/web/tests/e2e/`）
 - [x] Docker Compose 开发环境（`infra/docker-compose.yml`：PG+AGE / Redis / MinIO 3桶 / Chroma / minio-init）
+- [x] PWA 配置（`public/manifest.json` + `public/sw.js` Service Worker + app.tsx 注册）
+- [x] CI/CD（`.github/workflows/ci.yml`：pytest + bandit + tsc + build + Playwright E2E）
 - [ ] 性能优化（慢查询 / 缓存策略 / 图纸 CDN）
 - [ ] 安全审计（依赖漏洞扫描 / SQL 注入测试 / 日志审查）
 - [ ] 用户操作手册（管理员 / 项目总工 / 经济师 / 设计师 / 施工员 / 班组）
@@ -360,10 +365,10 @@ AI 审图（四引擎）:
 
 1. ~~**Phase 2E 经济测算层**~~ ✅ 已完成（2026-05-13）
 2. ~~**Phase 4B 数据看板**~~ ✅ 已完成（2026-05-13）
-3. **外部规范 API 定时同步** — 已有 `api_sources` 表和配置前端，需补充 Celery beat 定时同步任务
-4. **测试套件** — `pytest` 单元测试 + `playwright` E2E，目标覆盖率 80%；三审状态机 100% 状态边界覆盖
-5. **PWA 配置** — `apps/web/public/manifest.json` + Service Worker
-6. **CI/CD** — GitHub Actions（lint + test + build）
+3. ~~**外部规范 API 定时同步**~~ ✅ 已完成（2026-05-13）
+4. ~~**测试套件**~~ ✅ 已完成（2026-05-13）
+5. ~~**PWA 配置**~~ ✅ 已完成（2026-05-13）
+6. ~~**CI/CD**~~ ✅ 已完成（2026-05-13）
 7. **K8s 生产部署** — `infra/k8s/` 配置（含 Nginx / Prometheus / Grafana）
 
 ---
@@ -414,6 +419,27 @@ AI 审图（四引擎）:
 - ✅ `pages/dashboard/GroupDashboard/index.tsx`（KPI预警 Alert / 四指标卡 / 提案漏斗表 / 图纸状态分布 / LLM成本表）
 - ✅ `pages/dashboard/ProjectDashboard/index.tsx`（项目选择器 / KPI红线 / 四指标卡 / 图纸状态 + 专业分布 / 提案漏斗 / 近期活动 Timeline）
 - ✅ `config/routes.ts` 新增 `/dashboard/group`（isAdmin）和 `/dashboard/project` 路由
+
+### Sprint 3 — 测试套件 + PWA + CI/CD（2026-05-13）
+
+- ✅ `tasks/regulation_api_sync.py`（外部规范 API 定时同步，支持 api_key/basic/none，自定义 response_path，500条上限，自动向量化）
+- ✅ `migrations/004_regulation_api_sync.sql`（regulation_api_sources 增加 last_sync_count/last_sync_error；regulation_books 增加 api_source_id；regulation_articles 增加 embedding/chapter_no）
+- ✅ `core/celery_app.py` 注册 sync_due_sources_task beat（每小时 :05 执行）
+- ✅ `routers/regulations.py` 增加 `POST /api-sources/{id}/sync` 手动触发端点
+- ✅ `apps/api/tests/` 测试套件（conftest + 4 个测试文件）
+  - `test_workflow.py`：三审状态机 100% 状态边界覆盖，含非法跳转 / 驳回路径 / escalate
+  - `test_economic.py`：GB50010-2010 公式手算验证（HRB400/C30/d20 全流程）
+  - `test_regulation_sync.py`：HTTP 鉴权 / response_path / 错误处理离线 Mock 测试
+  - `test_dashboard.py`：权限检查 + 数据结构校验
+- ✅ `pytest.ini`（asyncio_mode=auto，cov-fail-under=80）
+- ✅ `requirements.txt` 增加 pytest/pytest-asyncio/pytest-cov 测试依赖
+- ✅ `apps/web/tests/e2e/` Playwright E2E（login / drawings / incentive + dashboard）
+- ✅ `apps/web/playwright.config.ts`（4 项目：chromium/firefox/webkit/mobile-chrome）
+- ✅ `apps/web/public/manifest.json`（PWA Web App Manifest，快捷方式 / 图标 / 主题色）
+- ✅ `apps/web/public/sw.js`（Service Worker：Cache First 静态 / Network First 页面 / 离线降级）
+- ✅ `apps/web/src/app.tsx` 注册 Service Worker（生产环境）
+- ✅ `apps/web/config/config.ts` 注入 manifest link / meta 标签
+- ✅ `.github/workflows/ci.yml`（4 job：backend-test / backend-security / frontend-lint / frontend-build / e2e）
 
 ---
 

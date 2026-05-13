@@ -31,7 +31,10 @@
 | 公示期自动推进 | ✅ | `tasks/proposal_notice.py` |
 | 经济测算引擎（钢筋翻样）| ✅ | `core/economic/rebar_calculator.py`, `routers/economic_calc.py` |
 | 数据看板 | ✅ | `routers/dashboard.py`, `pages/dashboard/GroupDashboard/`, `pages/dashboard/ProjectDashboard/` |
-| 测试套件 | ❌ | 待实现 |
+| 外部规范 API 定时同步 | ✅ | `tasks/regulation_api_sync.py`, `core/celery_app.py` |
+| 测试套件（pytest + E2E）| ✅ | `apps/api/tests/`, `apps/web/tests/e2e/` |
+| PWA 配置 | ✅ | `public/manifest.json`, `public/sw.js`, `app.tsx` |
+| CI/CD | ✅ | `.github/workflows/ci.yml` |
 
 ---
 

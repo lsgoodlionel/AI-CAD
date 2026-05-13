@@ -1,0 +1,57 @@
+{
+  "name": "图纸深化全过程管理平台",
+  "short_name": "图纸管理",
+  "description": "覆盖三审三算全流程的图纸深化管理与创效激励平台",
+  "start_url": "/drawings",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#1677ff",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["productivity", "business"],
+  "shortcuts": [
+    {
+      "name": "图纸列表",
+      "url": "/drawings",
+      "description": "快速进入图纸管理"
+    },
+    {
+      "name": "创效提案",
+      "url": "/incentive",
+      "description": "快速进入创效激励"
+    }
+  ]
+}

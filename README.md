@@ -200,10 +200,12 @@ pnpm dev
 | 创效激励系统 | ✅ | 铁三角分配 / 签字顺序约束 / 凭证 PDF |
 | AI 审图报告生成 | ✅ | PyMuPDF 批注版 PDF + openpyxl Excel |
 | 规范知识库管理 | ✅ | NLP 流水线 + 三途径导入 + 管理前端 |
-| 数据看板 | ❌ | 待实现 |
-| 经济测算引擎 | ❌ | 钢筋翻样 / 遗传算法下料优化待实现 |
-| 测试套件 | ❌ | Pytest + Playwright 待实现 |
-| PWA | ❌ | Service Worker + Manifest 待实现 |
+| 经济测算引擎 | ✅ | GB50010-2010 La/LaE/Ll + FFD+2-opt 下料优化（废料率≤1.5%）|
+| 外部规范 API 定时同步 | ✅ | Celery beat 每小时，支持 api_key/basic/自定义 response_path |
+| 数据看板 | ✅ | 集团级（KPI 预警 / LLM 成本）+ 项目级（流转状态 / 活动 Timeline）|
+| 测试套件 | ✅ | pytest（状态机/公式/API）+ Playwright E2E（登录/图纸/激励/看板）|
+| PWA | ✅ | manifest.json + Service Worker（Cache First / Network First）|
+| CI/CD | ✅ | GitHub Actions：pytest + bandit + tsc + build + Playwright E2E |
 
 ---
 
@@ -253,23 +255,11 @@ pnpm dev
 
 ## 待实现功能（下一步）
 
-优先级排序：
-
-1. **经济测算引擎**（`core/economic/rebar_calculator.py`）
-   - GB50010-2010 锚固/搭接公式，抗震系数从 engine_params 读取
-   - 遗传算法下料优化，目标废料率 ≤ 1.5%
-
-2. **数据看板**（`routers/dashboard.py` + `pages/dashboard/`）
-   - 集团级：年度创效总额 / KPI 预警 / 模型调用成本
-   - 项目级：三审通过率 / 提案漏斗 / 图纸覆盖率
-
-3. **外部规范 API 定时同步**（Celery beat 任务，已有 `api_sources` 表和前端配置入口）
-
-4. **测试套件**（Pytest + Playwright，目标 80% 覆盖率）
-
-5. **PWA 配置**（Service Worker + Web App Manifest）
-
-6. **K8s 生产部署配置**
+1. **前端 PDF 预览升级**：react-pdf-viewer 替换 iframe，支持图纸批注标注
+2. **YOLOv8 图元检测**：钢筋符号 / 预留洞标识训练，提升视觉引擎检出率
+3. **LangGraph 多轮推理**：RAG 引擎升级为 Agent 多步推理，提升复杂条文理解
+4. **性能优化**：慢查询分析 / Redis 缓存策略 / 图纸 CDN 加速
+5. **K8s 生产部署**：`infra/k8s/`（Nginx + Prometheus + Grafana）
 
 ---
 

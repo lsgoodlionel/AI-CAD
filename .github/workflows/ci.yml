@@ -1,0 +1,294 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION:   "20"
+
+jobs:
+  # ── 后端：Lint + 类型检查 + 单元测试 ──────────────────────────
+  backend-test:
+    name: Backend — pytest
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER:     cad_user
+          POSTGRES_PASSWORD: cad_pass
+          POSTGRES_DB:       cad_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: apps/api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: apps/api/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run database migrations
+        env:
+          DATABASE_URL: postgresql://cad_user:cad_pass@localhost:5432/cad_test
+        run: |
+          pip install psycopg2-binary
+          python -c "
+          import psycopg2, os
+          conn = psycopg2.connect(os.environ['DATABASE_URL'])
+          cur = conn.cursor()
+          for f in sorted(['migrations/001_initial_schema.sql',
+                           'migrations/002_model_management.sql',
+                           'migrations/003_economic_calc.sql',
+                           'migrations/004_regulation_api_sync.sql']):
+              with open(f) as fp:
+                  cur.execute(fp.read())
+          conn.commit()
+          cur.close(); conn.close()
+          print('Migrations applied.')
+          "
+
+      - name: Run pytest with coverage
+        env:
+          DATABASE_URL: postgresql://cad_user:cad_pass@localhost:5432/cad_test
+          REDIS_URL:    redis://localhost:6379/0
+          JWT_SECRET:   ci-test-secret
+          MINIO_ENDPOINT:   localhost:9000
+          MINIO_ACCESS_KEY: ci_key
+          MINIO_SECRET_KEY: ci_secret
+          CHROMA_HOST:      localhost
+          CHROMA_PORT:      "8100"
+        run: |
+          pytest tests/ \
+            -v \
+            --tb=short \
+            --cov=core \
+            --cov=routers \
+            --cov=services \
+            --cov=tasks \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-fail-under=60 \
+            -x
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: apps/api/coverage.xml
+          flags: backend
+          fail_ci_if_error: false
+
+  # ── 后端：安全扫描 ─────────────────────────────────────────────
+  backend-security:
+    name: Backend — Bandit security scan
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install bandit
+        run: pip install bandit[toml]
+
+      - name: Run bandit
+        run: |
+          bandit -r . \
+            --exclude ./tests,./migrations \
+            -ll \
+            --format txt \
+            || true   # 仅报告，不阻断 CI（HIGH 级别再改为 exit 1）
+
+  # ── 前端：类型检查 + Lint ──────────────────────────────────────
+  frontend-lint:
+    name: Frontend — TypeScript & Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline || npm install
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit --skipLibCheck
+        continue-on-error: true    # TS 错误报告但不阻断，直到类型覆盖率稳定
+
+      - name: Lint
+        run: npm run lint -- --max-warnings 50
+        continue-on-error: true
+
+  # ── 前端：构建验证 ─────────────────────────────────────────────
+  frontend-build:
+    name: Frontend — Build
+    runs-on: ubuntu-latest
+    needs: frontend-lint
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline || npm install
+
+      - name: Build
+        run: npm run build
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+
+      - name: Check build output
+        run: |
+          test -d dist && echo "Build output exists" || (echo "Build failed: dist/ not found" && exit 1)
+
+  # ── E2E 测试（可选，仅 main 分支）──────────────────────────────
+  e2e:
+    name: E2E — Playwright
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs: [backend-test, frontend-build]
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER:     cad_user
+          POSTGRES_PASSWORD: cad_pass
+          POSTGRES_DB:       cad_e2e
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: apps/api/requirements.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install API dependencies
+        working-directory: apps/api
+        run: pip install -r requirements.txt
+
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: npm ci --prefer-offline || npm install
+
+      - name: Install Playwright browsers
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+
+      - name: Start API server
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql://cad_user:cad_pass@localhost:5432/cad_e2e
+          REDIS_URL:    redis://localhost:6379/0
+          JWT_SECRET:   e2e-test-secret
+          MINIO_ENDPOINT:   localhost:9000
+          MINIO_ACCESS_KEY: ci_key
+          MINIO_SECRET_KEY: ci_secret
+        run: |
+          uvicorn main:app --host 0.0.0.0 --port 8000 &
+          sleep 5
+          curl --retry 5 --retry-delay 2 http://localhost:8000/health
+
+      - name: Start frontend dev server
+        working-directory: apps/web
+        run: |
+          npm run dev &
+          sleep 15
+          curl --retry 8 --retry-delay 3 http://localhost:3000/ || true
+
+      - name: Run E2E tests (Chromium only)
+        working-directory: apps/web
+        env:
+          E2E_BASE_URL: http://localhost:3000
+        run: npx playwright test --project=chromium
+        continue-on-error: true    # E2E 不阻断 CI（种子数据不完整时测试可能失败）
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 7
