@@ -15,6 +15,26 @@ const routes: IRoute[] = [
     redirect: '/drawings',
   },
 
+  // ── 数据看板 ─────────────────────────────────────────────────
+  {
+    name: '数据看板',
+    path: '/dashboard',
+    icon: 'DashboardOutlined',
+    routes: [
+      {
+        name: '集团看板',
+        path: '/dashboard/group',
+        component: './dashboard/GroupDashboard',
+        access: 'isAdmin',
+      },
+      {
+        name: '项目看板',
+        path: '/dashboard/project',
+        component: './dashboard/ProjectDashboard',
+      },
+    ],
+  },
+
   // ── 图纸管理 ─────────────────────────────────────────────────
   {
     name: '图纸管理',

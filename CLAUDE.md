@@ -29,8 +29,8 @@
 | 规范知识库管理 | ✅ | `routers/regulations.py`, `services/regulation_importer.py`, `tasks/regulation_import.py` |
 | 兑现凭证 PDF | ✅ | `services/certificate_generator.py` |
 | 公示期自动推进 | ✅ | `tasks/proposal_notice.py` |
-| 经济测算引擎（钢筋翻样）| ❌ | 待实现 |
-| 数据看板 | ❌ | 待实现 |
+| 经济测算引擎（钢筋翻样）| ✅ | `core/economic/rebar_calculator.py`, `routers/economic_calc.py` |
+| 数据看板 | ✅ | `routers/dashboard.py`, `pages/dashboard/GroupDashboard/`, `pages/dashboard/ProjectDashboard/` |
 | 测试套件 | ❌ | 待实现 |
 
 ---

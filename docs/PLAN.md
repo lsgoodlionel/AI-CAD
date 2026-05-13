@@ -15,7 +15,7 @@
 | Phase 2 | AI 智能审图四引擎 | 部分完成 | 88% |
 | Phase 3 | 创效激励系统 | 基本完成 | 95% |
 | Phase 4A | 规范知识库管理 | 已完成 | 100% |
-| Phase 4B | 数据看板 | 未开始 | 0% |
+| Phase 4B | 数据看板 | 已完成 | 100% |
 | Phase 4C | UmiJS 路由配置 | 已完成 | 100% |
 | Phase 4D | 收尾与上线 | 未开始 | 0% |
 
@@ -331,11 +331,12 @@ AI 审图（四引擎）:
 - [x] 输入方式 3：外部 API 接入（`ApiSourceList.tsx` + `/api-sources` CRUD；定时同步 Celery beat 待接入）
 - [x] 规范管理后台：规范书 CRUD / 发布下线控制 / 条文级 CRUD / 规范搜索（4 个前端组件）
 
-#### 4B — 数据看板（待开始）
+#### 4B — 数据看板（已完成）
 
-- [ ] 集团级看板（年度创效总额 / KPI 预警热力图 / AI 审图使用率）
-- [ ] 项目级看板（三审通过率 / 提案漏斗 / 图纸覆盖率）
-- [ ] 模型调用成本看板（复用管理后台 `/logs/daily` API）
+- [x] 集团级看板（年度创效总额 / KPI 预警 / 图纸 AI 覆盖率 / 一审通过率 / 规范知识库统计 / LLM 30日成本）
+- [x] 项目级看板（图纸流转状态 / AI 审图质量 / 提案漏斗 / 近期活动 Timeline）
+- [x] KPI 红线预警 Alert（年产值 ≥1 亿且年度创效 <50 万）
+- [x] 路由配置（`/dashboard/group` isAdmin + `/dashboard/project` 全员可见）
 
 #### 4D — 收尾与上线（待开始）
 
@@ -358,11 +359,7 @@ AI 审图（四引擎）:
 按优先级排列（已完成项已移除）：
 
 1. ~~**Phase 2E 经济测算层**~~ ✅ 已完成（2026-05-13）
-   - `core/economic/rebar_calculator.py`，`routers/economic_calc.py`，`EconomicCalcPanel.tsx`
-   - 待补充：`rebar_annotation_parser` 接 AI 自动读取图纸钢筋标注
-2. **Phase 4B 数据看板** — 集团 + 项目两个视角
-   - 创建 `apps/api/routers/dashboard.py`（年度创效总额 / KPI 预警 / AI 调用成本）
-   - 创建 `apps/web/src/pages/dashboard/`（ProLayout 看板页）
+2. ~~**Phase 4B 数据看板**~~ ✅ 已完成（2026-05-13）
 3. **外部规范 API 定时同步** — 已有 `api_sources` 表和配置前端，需补充 Celery beat 定时同步任务
 4. **测试套件** — `pytest` 单元测试 + `playwright` E2E，目标覆盖率 80%；三审状态机 100% 状态边界覆盖
 5. **PWA 配置** — `apps/web/public/manifest.json` + Service Worker
@@ -409,6 +406,15 @@ AI 审图（四引擎）:
 - ✅ `DrawingDetail/EconomicCalcPanel.tsx`（钢筋录入 / 锚固长度表 / 切割方案表 / 节约汇总 / 创效提案跳转）
 - ✅ `DrawingDetail/index.tsx` 二审后阶段挂载 EconomicCalcPanel
 
+### Sprint 2 — 数据看板（2026-05-13）
+
+- ✅ `routers/dashboard.py`（集团看板 + 项目看板两端点，聚合查询，~160 行）
+- ✅ `main.py` 注册第 14/15 个路由（dashboard_router）
+- ✅ `services/dashboard.ts`（getGroupDashboard / getProjectDashboard 2 个前端调用封装）
+- ✅ `pages/dashboard/GroupDashboard/index.tsx`（KPI预警 Alert / 四指标卡 / 提案漏斗表 / 图纸状态分布 / LLM成本表）
+- ✅ `pages/dashboard/ProjectDashboard/index.tsx`（项目选择器 / KPI红线 / 四指标卡 / 图纸状态 + 专业分布 / 提案漏斗 / 近期活动 Timeline）
+- ✅ `config/routes.ts` 新增 `/dashboard/group`（isAdmin）和 `/dashboard/project` 路由
+
 ---
 
 ## 开发顺序优先级（V4.0）
@@ -421,8 +427,8 @@ AI 审图（四引擎）:
 第 5 优先: 创效激励系统（铁三角 + 签字 + 凭证 + 公示）✅ 已完成（KPI 看板待）
 第 6 优先: KG 引擎（条件合规推理）[~] 部分完成（查询实现；导入 30 本规范测试待）
 第 7 优先: RAG 引擎 [~] 部分完成（基础链路实现；LangGraph 多轮待）
-第 8 优先: 经济测算层（钢筋翻样 + 遗传算法下料）[ ] 待实现
-第 9 优先: 数据看板（集团 + 项目两视角）[ ] 待实现
+第 8 优先: 经济测算层（钢筋翻样 + FFD+2-opt 下料）✅ 已完成
+第 9 优先: 数据看板（集团 + 项目两视角）✅ 已完成
 ```
 
 ---
