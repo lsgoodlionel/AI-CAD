@@ -128,3 +128,25 @@ export const getAiReviewReportPdfUrl = (drawingId: string) =>
 
 export const getAiReviewReportExcelUrl = (drawingId: string) =>
   `${BASE}/drawings/${drawingId}/ai-review/report-excel`
+
+// ── 经济测算（钢筋翻样）───────────────────────────────────────
+
+export type BarItemInput = {
+  diameter: number
+  steel_grade: string
+  required_length: number
+  count: number
+}
+
+export type EconomicCalcRequest = {
+  concrete_grade: string
+  seismic_grade: number
+  steel_price_per_ton: number
+  bars: BarItemInput[]
+}
+
+export const runEconomicCalc = (drawingId: string, data: EconomicCalcRequest) =>
+  request(`${BASE}/drawings/${drawingId}/economic-calc`, { method: 'POST', data })
+
+export const getEconomicCalc = (drawingId: string) =>
+  request(`${BASE}/drawings/${drawingId}/economic-calc`)

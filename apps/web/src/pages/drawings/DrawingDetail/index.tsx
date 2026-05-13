@@ -10,6 +10,7 @@ import AIReviewPanel from './AIReviewPanel'
 import TechnicalReviewPanel from './TechnicalReviewPanel'
 import EconomicReviewPanel from './EconomicReviewPanel'
 import SettlementReviewPanel from './SettlementReviewPanel'
+import EconomicCalcPanel from './EconomicCalcPanel'
 
 const STATUS_LABEL: Record<string, string> = {
   draft: '草稿',
@@ -195,6 +196,14 @@ export default function DrawingDetail() {
 
       {status === 'published' && (
         <Alert type="success" showIcon message="图纸已发布至班组，三审流程完成" />
+      )}
+
+      {/* 经济测算面板（二审及之后阶段始终可用） */}
+      {['economic_review', 'settlement_review', 'published'].includes(status) && (
+        <EconomicCalcPanel
+          drawingId={id!}
+          drawingNo={drawing.drawing_no}
+        />
       )}
 
       {status === 'rejected' && (

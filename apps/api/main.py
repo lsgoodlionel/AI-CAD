@@ -18,6 +18,7 @@ from routers.economic_review import router as economic_review_router
 from routers.settlement_review import router as settlement_review_router
 from routers.incentive import router as incentive_router
 from routers.regulations import router as regulations_router
+from routers.economic_calc import router as economic_calc_router
 
 
 @asynccontextmanager
@@ -55,8 +56,9 @@ app.include_router(drawings_router,       prefix=API_V1)
 app.include_router(technical_review_router, prefix=API_V1)
 app.include_router(economic_review_router,  prefix=API_V1)
 app.include_router(settlement_review_router, prefix=API_V1)
-app.include_router(incentive_router,       prefix=API_V1)
-app.include_router(regulations_router,     prefix=API_V1)
+app.include_router(incentive_router,        prefix=API_V1)
+app.include_router(regulations_router,      prefix=API_V1)
+app.include_router(economic_calc_router,    prefix=API_V1)
 
 
 @app.get("/health")
