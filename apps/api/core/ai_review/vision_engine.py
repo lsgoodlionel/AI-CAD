@@ -78,7 +78,7 @@ def _extract_ocr(data: bytes) -> str:
     return "\n".join(lines)[:MAX_TEXT_CHARS]
 
 
-def _sync_extract(file_key: str, file_ext: str, file_size_kb: int) -> tuple[str, dict, list[AIIssue]]:
+def _sync_extract(file_key: str, file_ext: str, file_size_kb: int) -> tuple[str, dict, list[AIIssue], bytes]:
     """
     同步提取主函数（在线程池中调用）。
     返回 (extracted_text, ocr_metadata, preliminary_issues)
@@ -86,6 +86,7 @@ def _sync_extract(file_key: str, file_ext: str, file_size_kb: int) -> tuple[str,
     issues: list[AIIssue] = []
     metadata: dict = {"file_ext": file_ext, "file_size_kb": file_size_kb}
     extracted = ""
+    raw_data: bytes = b""
 
     # ── 基础文件校验（始终运行）────────────────────────────────
     if file_size_kb < MIN_FILE_SIZE_KB:
@@ -108,8 +109,9 @@ def _sync_extract(file_key: str, file_ext: str, file_size_kb: int) -> tuple[str,
             description=f"图纸文件下载失败，无法执行 AI 审查（{e}）",
             category="文件访问",
         ))
-        return extracted, metadata, issues
+        return extracted, metadata, issues, b""
 
+    raw_data = data
     metadata["actual_size_bytes"] = len(data)
 
     # ── DWG/DXF 路径 ───────────────────────────────────────────
@@ -166,6 +168,13 @@ def _sync_extract(file_key: str, file_ext: str, file_size_kb: int) -> tuple[str,
         except Exception as e:
             logger.warning("[VisionEngine] PDF 解析失败: %s", e)
 
+    # ── YOLOv8 图元检测（PDF / 图像文件）─────────────────────────
+    if file_ext in ("pdf", "png", "jpg", "jpeg", "tif", "tiff") and raw_data:
+        from .yolo_detector import detect_drawing_elements
+        _, yolo_issues = detect_drawing_elements(raw_data, file_ext)
+        issues.extend(yolo_issues)
+        metadata["yolo_ran"] = True
+
     # ── 文本质量检查 ───────────────────────────────────────────
     if extracted:
         if len(extracted.strip()) < 100:
@@ -190,7 +199,7 @@ def _sync_extract(file_key: str, file_ext: str, file_size_kb: int) -> tuple[str,
                 suggestion="补充完整标题栏信息（设计人、审核、日期、比例等）",
             ))
 
-    return extracted, metadata, issues
+    return extracted, metadata, issues, raw_data
 
 
 class VisionEngine(BaseEngine):
@@ -208,7 +217,7 @@ class VisionEngine(BaseEngine):
 
         loop = asyncio.get_event_loop()
         try:
-            extracted, metadata, issues = await loop.run_in_executor(
+            extracted, metadata, issues, _ = await loop.run_in_executor(
                 _executor,
                 _sync_extract,
                 ctx.file_key, ctx.file_ext, file_size_kb,

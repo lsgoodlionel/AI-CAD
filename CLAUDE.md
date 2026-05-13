@@ -1,6 +1,6 @@
 # CAD — 图纸深化全过程管理平台
 
-> 最后更新：2026-05-12 | 实现进度：Phase 0~3 基本完成，Phase 4A 已完成，Phase 4B/2E 待实现
+> 最后更新：2026-05-13 | 实现进度：Phase 0~4B 全部完成，Phase 2C/2D 进阶引擎已实现，K8s 生产配置完成
 
 ## 项目概述
 
@@ -35,6 +35,10 @@
 | 测试套件（pytest + E2E）| ✅ | `apps/api/tests/`, `apps/web/tests/e2e/` |
 | PWA 配置 | ✅ | `public/manifest.json`, `public/sw.js`, `app.tsx` |
 | CI/CD | ✅ | `.github/workflows/ci.yml` |
+| K8s 生产部署 | ✅ | `infra/k8s/base/`, `infra/k8s/overlays/production/` |
+| PDF 内嵌预览 | ✅ | `DrawingDetail/PdfViewer.tsx`, `DrawingDetail/index.tsx` |
+| YOLOv8 图元检测 | ✅ | `core/ai_review/yolo_detector.py`, `vision_engine.py` |
+| LangGraph 多轮推理 | ✅ | `core/ai_review/langgraph_agent.py`, `rag_engine.py` |
 
 ---
 

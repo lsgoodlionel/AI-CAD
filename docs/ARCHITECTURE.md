@@ -1,6 +1,6 @@
 # 系统架构设计 — 图纸深化全过程管理平台
 
-> 版本：V2.1 | 日期：2026-05-12
+> 版本：V2.2 | 日期：2026-05-13
 >
 > **实现标注**: `✅ 已实现` · `🔶 部分实现` · `❌ 未实现`
 >
@@ -8,12 +8,13 @@
 >
 > | 层次 | 已实现 | 待实现 |
 > |------|--------|--------|
-> | 客户端 | Web 应用（UmiJS Max）✅ | PWA 移动端 ❌、大屏看板 ❌ |
-> | API 服务 | 三审 API、创效 API、Auth API、Admin API ✅ | 规范知识库 API ❌、看板 API ❌ |
-> | AI 审图 | 四引擎框架、ModelRouter、断路器 ✅ | NLP 提取流水线 ❌、报告生成 ❌、经济测算引擎 ❌ |
-> | 数据层 | PostgreSQL Schema（001+002 Migration）✅ | AGE 图建图 ❌ |
+> | 客户端 | Web 应用（UmiJS Max）✅、PWA 配置 ✅、PDF 内嵌预览 ✅ | 大屏看板 ❌ |
+> | API 服务 | 三审 API、创效 API、Auth API、Admin API、规范 API、看板 API ✅ | — |
+> | AI 审图 | 四引擎框架、ModelRouter、断路器、NLP 提取、报告生成 ✅、LangGraph ✅、YOLOv8 ✅ | — |
+> | 数据层 | PostgreSQL Schema（001~004 Migration）✅ | — |
 > | 文件存储 | MinIO（上传/presigned URL）✅ | — |
-> | 向量存储 | Chroma 集成（优雅降级）✅ | 规范文本批量向量化 ❌ |
+> | 向量存储 | Chroma 集成（优雅降级）✅、规范文本向量化 ✅ | — |
+> | 基础设施 | Docker Compose（开发）✅、K8s Kustomize（生产）✅、CI/CD GitHub Actions ✅ | — |
 
 ---
 

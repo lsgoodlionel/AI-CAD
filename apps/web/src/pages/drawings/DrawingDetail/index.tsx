@@ -3,7 +3,7 @@ import { useParams, useNavigate, useModel } from '@umijs/max'
 import {
   Card, Descriptions, Button, Spin, Space, Alert, Divider, Tag, Badge,
 } from 'antd'
-import { ArrowLeftOutlined, DownloadOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, DownloadOutlined, EyeOutlined, EyeInvisibleOutlined } from '@ant-design/icons'
 import { getDrawing, getDownloadUrl } from '@/services/drawings'
 import StatusTimeline from './StatusTimeline'
 import AIReviewPanel from './AIReviewPanel'
@@ -11,6 +11,7 @@ import TechnicalReviewPanel from './TechnicalReviewPanel'
 import EconomicReviewPanel from './EconomicReviewPanel'
 import SettlementReviewPanel from './SettlementReviewPanel'
 import EconomicCalcPanel from './EconomicCalcPanel'
+import PdfViewer from './PdfViewer'
 
 const STATUS_LABEL: Record<string, string> = {
   draft: '草稿',
@@ -44,6 +45,8 @@ export default function DrawingDetail() {
   const [drawing, setDrawing] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [pdfVisible, setPdfVisible] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
 
   const fetchDrawing = async () => {
     if (!id) return
@@ -58,11 +61,29 @@ export default function DrawingDetail() {
 
   useEffect(() => { fetchDrawing() }, [id])
 
+  const handleTogglePdf = async () => {
+    if (pdfVisible) {
+      setPdfVisible(false)
+      return
+    }
+    if (!id) return
+    if (!pdfUrl) {
+      setPdfLoading(true)
+      try {
+        const res = await getDownloadUrl(id)
+        setPdfUrl(res.url)
+      } finally {
+        setPdfLoading(false)
+      }
+    }
+    setPdfVisible(true)
+  }
+
   const handleDownload = async () => {
     if (!id) return
-    const res = await getDownloadUrl(id)
-    setPdfUrl(res.url)
-    window.open(res.url, '_blank')
+    const url = pdfUrl ?? (await getDownloadUrl(id)).url
+    if (!pdfUrl) setPdfUrl(url)
+    window.open(url, '_blank')
   }
 
   if (loading) return <Spin style={{ display: 'block', marginTop: 80 }} />
@@ -77,8 +98,15 @@ export default function DrawingDetail() {
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/drawings')}>
           返回列表
         </Button>
+        <Button
+          icon={pdfVisible ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+          loading={pdfLoading}
+          onClick={handleTogglePdf}
+        >
+          {pdfVisible ? '收起图纸' : '查看图纸'}
+        </Button>
         <Button icon={<DownloadOutlined />} onClick={handleDownload}>
-          下载原图纸
+          下载图纸
         </Button>
       </Space>
 
@@ -148,6 +176,13 @@ export default function DrawingDetail() {
           </>
         )}
       </Card>
+
+      {/* 图纸内嵌预览 */}
+      {pdfVisible && pdfUrl && (
+        <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: 12 }}>
+          <PdfViewer url={pdfUrl} />
+        </Card>
+      )}
 
       {/* 状态时间轴 */}
       <Card style={{ marginBottom: 16 }}>

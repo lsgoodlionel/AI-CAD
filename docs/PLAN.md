@@ -12,7 +12,7 @@
 |-------|------|------|--------|
 | Phase 0 | 基础建设 + 模型管理 | 基本完成 | 80% |
 | Phase 1 | 三审三算核心流程 | 基本完成 | 85% |
-| Phase 2 | AI 智能审图四引擎 | 部分完成 | 88% |
+| Phase 2 | AI 智能审图四引擎 | 部分完成 | 95% |
 | Phase 3 | 创效激励系统 | 基本完成 | 95% |
 | Phase 4A | 规范知识库管理 | 已完成 | 100% |
 | Phase 4B | 数据看板 | 已完成 | 100% |
@@ -253,13 +253,13 @@ AI 审图（四引擎）:
 
 - [x] 规范文本向量化（Chroma HttpClient，向量检索，优雅降级）
 - [x] RAG 链路（Chroma 语义检索 → 上下文 → ModelRouter `rag_qa` 引擎 → JSON 结构化输出）
-- [ ] LangGraph Agent 多轮推理
+- [x] LangGraph Agent 三步推理（identify → lookup → synthesize，graceful degradation 自动降级）
 - [ ] 与 KG 引擎结果合并（KG 高置信度优先，RAG 补充低置信度条文）
 
 #### 2D — 引擎 4：视觉/OCR 引擎（Week 4-6）
 
 - [x] PaddleOCR 集成（扫描版 PDF 文字识别，作为 PyMuPDF 失败后的降级）
-- [ ] YOLOv8 图元检测（训练/微调，目标：钢筋符号、预留洞标识）
+- [x] YOLOv8 图元检测（`yolo_detector.py`，graceful degradation，标题栏检查 + 钢筋密度预警）
 - [x] VisionEngine 完整实现：ezdxf（DXF/DWG）+ PyMuPDF fitz（PDF）+ PaddleOCR（扫描图）
   - 标题栏完整性检查（图纸编号/设计人/审核/日期/比例/工程名称）
   - 结果填充 `ctx.extracted_text` + `ctx.ocr_metadata` 供下游引擎使用
@@ -340,7 +340,7 @@ AI 审图（四引擎）:
 
 #### 4D — 收尾与上线（部分完成）
 
-- [ ] 前端 PDF 预览升级（react-pdf-viewer 替换 iframe，支持图纸标注）
+- [x] 前端 PDF 预览升级（`@react-pdf-viewer/core` 内嵌预览，替换 `window.open`，`PdfViewer.tsx`）
 - [x] 测试套件（Pytest 单元测试 + Playwright E2E）
   - [x] 三审状态机：100% 状态边界覆盖（含非法跳转，`tests/test_workflow.py`）
   - [x] 经济测算公式：GB50010-2010 手算验证（`tests/test_economic.py`）
@@ -353,7 +353,7 @@ AI 审图（四引擎）:
 - [ ] 性能优化（慢查询 / 缓存策略 / 图纸 CDN）
 - [ ] 安全审计（依赖漏洞扫描 / SQL 注入测试 / 日志审查）
 - [ ] 用户操作手册（管理员 / 项目总工 / 经济师 / 设计师 / 施工员 / 班组）
-- [ ] 生产环境部署（K8s + Nginx + Prometheus + Grafana）
+- [x] 生产环境 K8s 部署配置（`infra/k8s/`：base Kustomize + production overlay + Prometheus + Grafana）
 - [ ] 试点上线（2 个项目：高层住宅 + 大型公建）
 - [ ] 培训（分角色，≥ 3 场，每场 ≥ 4 学时）
 
@@ -369,7 +369,10 @@ AI 审图（四引擎）:
 4. ~~**测试套件**~~ ✅ 已完成（2026-05-13）
 5. ~~**PWA 配置**~~ ✅ 已完成（2026-05-13）
 6. ~~**CI/CD**~~ ✅ 已完成（2026-05-13）
-7. **K8s 生产部署** — `infra/k8s/` 配置（含 Nginx / Prometheus / Grafana）
+7. ~~**K8s 生产部署**~~ ✅ 已完成（2026-05-13）
+8. ~~**PDF 预览升级**~~ ✅ 已完成（2026-05-13）
+9. ~~**YOLOv8 图元检测**~~ ✅ 已完成（2026-05-13）
+10. ~~**LangGraph 多轮推理**~~ ✅ 已完成（2026-05-13）
 
 ---
 
@@ -419,6 +422,20 @@ AI 审图（四引擎）:
 - ✅ `pages/dashboard/GroupDashboard/index.tsx`（KPI预警 Alert / 四指标卡 / 提案漏斗表 / 图纸状态分布 / LLM成本表）
 - ✅ `pages/dashboard/ProjectDashboard/index.tsx`（项目选择器 / KPI红线 / 四指标卡 / 图纸状态 + 专业分布 / 提案漏斗 / 近期活动 Timeline）
 - ✅ `config/routes.ts` 新增 `/dashboard/group`（isAdmin）和 `/dashboard/project` 路由
+
+### Sprint 4 — K8s + PDF 预览 + YOLOv8 + LangGraph（2026-05-13）
+
+- ✅ `infra/k8s/base/` 生产 Kustomize 基础层（namespace/configmap/secret.example/postgres/redis/minio/chroma/api/web/celery/ingress/monitoring）
+- ✅ `infra/k8s/overlays/production/` 生产 overlay（3副本/registry镜像/ConfigMap合并）
+- ✅ `infra/k8s/base/monitoring/` Prometheus（RBAC + scrape_configs）+ Grafana（Datasource ConfigMap + Deployment + Service）
+- ✅ `core/ai_review/yolo_detector.py`（YOLOv8 图元检测，graceful degradation，标题栏/钢筋密度校验）
+- ✅ `core/ai_review/vision_engine.py` 集成 yolo_detector（PDF/图像文件自动触发）
+- ✅ `core/ai_review/langgraph_agent.py`（三步推理 StateGraph：identify→lookup→synthesize，graceful degradation）
+- ✅ `core/ai_review/rag_engine.py` 集成 langgraph_agent（替换单次 LLM 调用）
+- ✅ `apps/web/src/pages/drawings/DrawingDetail/PdfViewer.tsx`（@react-pdf-viewer + defaultLayoutPlugin，内嵌预览）
+- ✅ `apps/web/src/pages/drawings/DrawingDetail/index.tsx` 升级（查看/收起切换 + 内嵌 PdfViewer Card）
+- ✅ `apps/web/package.json` 新增 @react-pdf-viewer/core + @react-pdf-viewer/default-layout + pdfjs-dist
+- ✅ `requirements.txt` 新增 langgraph/langchain-core 可选注释（graceful degradation）
 
 ### Sprint 3 — 测试套件 + PWA + CI/CD（2026-05-13）
 

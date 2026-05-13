@@ -100,35 +100,22 @@ class RAGEngine(BaseEngine):
         # ── 1. 向量检索 ───────────────────────────────────────
         regulations = await _query_chroma(ctx)
 
-        # ── 2. 构造 LLM prompt ────────────────────────────────
-        messages = [
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": _build_user_prompt(ctx, regulations)},
-        ]
-
-        # ── 3. 调用 LLM（通过 ModelRouter）───────────────────
+        # ── 2. LangGraph 三步推理（或直接 LLM 降级）──────────
+        drawing_info = _build_user_prompt(ctx, regulations)
         try:
-            router = self._get_router()
-            response = await router.route("rag_analysis", messages)
-            raw = response.content.strip()
+            from .langgraph_agent import run_langgraph_agent
+            raw_issues, _ = await run_langgraph_agent(
+                drawing_info=drawing_info,
+                regulations=regulations,
+                router=self._get_router(),
+            )
         except Exception as e:
-            logger.warning("[RAGEngine] LLM 调用失败，跳过: %s", e)
+            logger.warning("[RAGEngine] LangGraph 调用失败，跳过: %s", e)
             return []
 
-        # ── 4. 解析 JSON 响应 ─────────────────────────────────
-        try:
-            # 去除可能的 markdown code fence
-            if raw.startswith("```"):
-                raw = raw.split("```")[1]
-                if raw.startswith("json"):
-                    raw = raw[4:]
-            data = json.loads(raw)
-        except json.JSONDecodeError as e:
-            logger.warning("[RAGEngine] 响应 JSON 解析失败: %s\n原始内容: %s", e, raw[:200])
-            return []
-
+        # ── 3. 转换为 AIIssue ─────────────────────────────────
         issues: list[AIIssue] = []
-        for item in data.get("issues", []):
+        for item in raw_issues:
             issues.append(AIIssue(
                 engine=self.engine_name,
                 severity=_SEVERITY_MAP.get(item.get("severity", "info"), IssueSeverity.INFO),
@@ -138,5 +125,5 @@ class RAGEngine(BaseEngine):
                 suggestion=item.get("suggestion", ""),
             ))
 
-        logger.info("[RAGEngine] LLM 返回 %d 条语义问题", len(issues))
+        logger.info("[RAGEngine] LangGraph 返回 %d 条语义问题", len(issues))
         return issues
