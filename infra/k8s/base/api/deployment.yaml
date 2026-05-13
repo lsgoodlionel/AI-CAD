@@ -1,0 +1,116 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cad-api
+  namespace: cad
+  labels:
+    app: cad-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cad-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: cad-api
+    spec:
+      containers:
+        - name: api
+          image: cad-api:latest    # 替换为实际 Registry 地址
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              value: postgresql://cad_user:$(DB_PASSWORD)@postgres-svc:5432/cad_db
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cad-secret
+                  key: DB_PASSWORD
+            - name: REDIS_URL
+              value: redis://redis-svc:6379/0
+            - name: MINIO_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: cad-config
+                  key: MINIO_ENDPOINT
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cad-secret
+                  key: MINIO_ACCESS_KEY
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cad-secret
+                  key: MINIO_SECRET_KEY
+            - name: CHROMA_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: cad-config
+                  key: CHROMA_HOST
+            - name: CHROMA_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: cad-config
+                  key: CHROMA_PORT
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: cad-secret
+                  key: JWT_SECRET
+            - name: JWT_EXPIRE_MINUTES
+              valueFrom:
+                configMapKeyRef:
+                  name: cad-config
+                  key: JWT_EXPIRE_MINUTES
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cad-secret
+                  key: ANTHROPIC_API_KEY
+                  optional: true
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cad-secret
+                  key: OPENAI_API_KEY
+                  optional: true
+            - name: DEEPSEEK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cad-secret
+                  key: DEEPSEEK_API_KEY
+                  optional: true
+            - name: WECHAT_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cad-secret
+                  key: WECHAT_WEBHOOK_URL
+                  optional: true
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1.5Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5

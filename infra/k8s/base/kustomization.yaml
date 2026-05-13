@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cad
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - postgres/deployment.yaml
+  - postgres/service.yaml
+  - redis/deployment.yaml
+  - minio/deployment.yaml
+  - chroma/deployment.yaml
+  - api/deployment.yaml
+  - api/service.yaml
+  - web/deployment.yaml
+  - celery/deployment.yaml
+  - ingress.yaml
+  - monitoring/prometheus.yaml
+  - monitoring/grafana.yaml
+
+# secret.yaml 不加入版本控制，部署前手动 apply：
+#   kubectl apply -f infra/k8s/base/secret.yaml

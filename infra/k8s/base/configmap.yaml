@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cad-config
+  namespace: cad
+data:
+  # 应用配置（非敏感，可明文）
+  APP_ENV: "production"
+  APP_TITLE: "CAD 图纸深化全过程管理平台"
+  CORS_ORIGINS: "https://cad.example.com"
+
+  # 数据库（主机部分，密码见 Secret）
+  DB_HOST: "postgres-svc"
+  DB_PORT: "5432"
+  DB_NAME: "cad_db"
+
+  # Redis
+  REDIS_HOST: "redis-svc"
+  REDIS_PORT: "6379"
+
+  # MinIO
+  MINIO_ENDPOINT: "minio-svc:9000"
+  MINIO_USE_SSL: "false"
+  MINIO_BUCKET_DRAWINGS: "drawings"
+  MINIO_BUCKET_REPORTS: "reports"
+  MINIO_BUCKET_ATLASES: "atlases"
+
+  # Chroma
+  CHROMA_HOST: "chroma-svc"
+  CHROMA_PORT: "8000"
+
+  # JWT（过期时间，密钥见 Secret）
+  JWT_EXPIRE_MINUTES: "1440"
+  JWT_REFRESH_EXPIRE_DAYS: "30"
+
+  # Celery
+  MODEL_ROUTER_CACHE_TTL_SEC: "30"

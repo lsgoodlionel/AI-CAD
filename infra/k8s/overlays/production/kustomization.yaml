@@ -1,0 +1,53 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+bases:
+  - ../../base
+
+# 生产环境覆盖：扩大副本数 + 使用生产镜像
+patches:
+  - target:
+      kind: Deployment
+      name: cad-api
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: registry.example.com/cad/cad-api:${IMAGE_TAG}
+  - target:
+      kind: Deployment
+      name: cad-web
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: registry.example.com/cad/cad-web:${IMAGE_TAG}
+  - target:
+      kind: Deployment
+      name: celery-worker
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: registry.example.com/cad/cad-api:${IMAGE_TAG}
+  - target:
+      kind: Deployment
+      name: celery-beat
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: registry.example.com/cad/cad-api:${IMAGE_TAG}
+
+# 生产环境 ConfigMap 覆盖
+configMapGenerator:
+  - name: cad-config
+    behavior: merge
+    literals:
+      - APP_ENV=production
+      - CORS_ORIGINS=https://cad.example.com
