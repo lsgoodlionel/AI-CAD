@@ -68,7 +68,7 @@ CREATE TABLE engine_params (
 
 -- ── 调用日志 ──────────────────────────────────────────────────
 CREATE TABLE llm_call_logs (
-    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id                UUID DEFAULT gen_random_uuid(),
     engine_name       VARCHAR(100),
     model_db_id       UUID REFERENCES llm_models(id),
     prompt_tokens     INTEGER DEFAULT 0,
@@ -77,7 +77,8 @@ CREATE TABLE llm_call_logs (
     cost_usd          NUMERIC(12,8) DEFAULT 0,
     success           BOOLEAN NOT NULL,
     error_type        VARCHAR(200),
-    created_at        TIMESTAMPTZ DEFAULT now()
+    created_at        TIMESTAMPTZ DEFAULT now(),
+    PRIMARY KEY (id, created_at)
 ) PARTITION BY RANGE (created_at);
 
 -- 按月分区（生产环境建议改为按周）
@@ -110,7 +111,7 @@ INSERT INTO llm_providers (name, provider_type, base_url, api_key_env) VALUES
     ('Claude API',  'anthropic',     null,                         'ANTHROPIC_API_KEY'),
     ('OpenAI',      'openai_compat', 'https://api.openai.com/v1',  'OPENAI_API_KEY'),
     ('DeepSeek',    'openai_compat', 'https://api.deepseek.com/v1','DEEPSEEK_API_KEY'),
-    ('Ollama 本地', 'ollama',        'http://localhost:11434',     null);
+    ('Ollama 本地', 'ollama',        'http://host.docker.internal:11434', null);
 
 -- ── 初始数据：内置模型 ────────────────────────────────────────
 INSERT INTO llm_models (provider_id, model_id, display_name, context_window, supports_vision, input_price_per_1m, output_price_per_1m)

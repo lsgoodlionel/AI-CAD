@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   Card, Table, Tag, Space, Button, Tabs, Alert, Statistic, Row, Col,
-  Typography, Tooltip, message,
+  Typography, Tooltip,
 } from 'antd'
 import {
   FileExcelOutlined, FilePdfOutlined, ReloadOutlined,
@@ -160,6 +160,7 @@ export default function AIReviewPanel({ drawingId, aiReport }: Props) {
 
   return (
     <Card
+      data-testid="ai-review-panel"
       title="AI 审查报告"
       size="small"
       style={{ marginTop: 16 }}

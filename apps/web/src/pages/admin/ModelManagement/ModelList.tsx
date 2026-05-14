@@ -13,6 +13,7 @@ import {
 import { PlusOutlined, EyeOutlined } from '@ant-design/icons'
 import {
   listProviders, listModels, createModel, updateModel, deleteModel,
+  listProviderAvailableModels,
 } from '@/services/modelManagement'
 
 type Model = {
@@ -31,6 +32,12 @@ type Model = {
 }
 
 type Provider = { id: string; name: string; provider_type: string }
+type AvailableModel = {
+  model_id: string
+  name: string
+  size?: number
+  details?: { parameter_size?: string; quantization_level?: string; family?: string }
+}
 
 export default function ModelList() {
   const actionRef = useRef<ActionType>()
@@ -39,6 +46,9 @@ export default function ModelList() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [providers, setProviders] = useState<Provider[]>([])
   const [filterProvider, setFilterProvider] = useState<string | undefined>()
+  const [selectedProviderId, setSelectedProviderId] = useState<string | undefined>()
+  const [availableModels, setAvailableModels] = useState<AvailableModel[]>([])
+  const [loadingAvailableModels, setLoadingAvailableModels] = useState(false)
 
   useEffect(() => {
     listProviders().then(setProviders)
@@ -47,6 +57,8 @@ export default function ModelList() {
   const openCreate = () => {
     setEditingId(null)
     form.resetFields()
+    setSelectedProviderId(undefined)
+    setAvailableModels([])
     setModalOpen(true)
   }
 
@@ -56,8 +68,27 @@ export default function ModelList() {
       ...row,
       provider_id: row.provider_id,
     })
+    setSelectedProviderId(row.provider_id)
     setModalOpen(true)
   }
+
+  const selectedProvider = providers.find(p => p.id === selectedProviderId)
+  const selectedProviderIsOllama = selectedProvider?.provider_type === 'ollama'
+
+  useEffect(() => {
+    if (!selectedProviderId || !selectedProviderIsOllama) {
+      setAvailableModels([])
+      return
+    }
+    setLoadingAvailableModels(true)
+    listProviderAvailableModels(selectedProviderId)
+      .then(res => setAvailableModels(res.models ?? []))
+      .catch(() => {
+        message.error('读取 Ollama 已安装模型失败')
+        setAvailableModels([])
+      })
+      .finally(() => setLoadingAvailableModels(false))
+  }, [selectedProviderId, selectedProviderIsOllama])
 
   const handleSubmit = useCallback(async () => {
     const values = await form.validateFields()
@@ -203,11 +234,43 @@ export default function ModelList() {
             <Select
               options={providers.map(p => ({ value: p.id, label: p.name }))}
               placeholder="选择提供商"
+              onChange={value => {
+                setSelectedProviderId(value)
+                form.setFieldsValue({ model_id: undefined, display_name: undefined })
+              }}
             />
           </Form.Item>
-          <Form.Item name="model_id" label="模型 ID" rules={[{ required: true }]}
-            extra="如 claude-sonnet-4-6、gpt-4o、deepseek-chat">
-            <Input placeholder="模型 API 标识符" />
+          <Form.Item
+            name="model_id"
+            label="模型 ID"
+            rules={[{ required: true }]}
+            extra={
+              selectedProviderIsOllama
+                ? '来自 Ollama /api/tags 的本地已安装模型'
+                : '如 claude-sonnet-4-6、gpt-4o、deepseek-chat'
+            }
+          >
+            {selectedProviderIsOllama ? (
+              <Select
+                showSearch
+                loading={loadingAvailableModels}
+                placeholder="选择本地已安装模型"
+                notFoundContent={loadingAvailableModels ? '读取中...' : '未读取到已安装模型'}
+                options={availableModels.map(m => ({
+                  value: m.model_id,
+                  label: `${m.name}${m.details?.parameter_size ? ` · ${m.details.parameter_size}` : ''}${m.details?.quantization_level ? ` · ${m.details.quantization_level}` : ''}`,
+                }))}
+                onChange={value => {
+                  const model = availableModels.find(m => m.model_id === value)
+                  form.setFieldsValue({ display_name: model?.name ?? value })
+                }}
+                filterOption={(input, opt) =>
+                  String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+              />
+            ) : (
+              <Input placeholder="模型 API 标识符" />
+            )}
           </Form.Item>
           <Form.Item name="display_name" label="显示名称" rules={[{ required: true }]}>
             <Input placeholder="Claude Sonnet 4.6" />

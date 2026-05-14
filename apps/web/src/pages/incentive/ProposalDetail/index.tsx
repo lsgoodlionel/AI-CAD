@@ -37,7 +37,6 @@ export default function ProposalDetail() {
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState(false)
   const [calcForm] = Form.useForm()
-  const [distForm] = Form.useForm()
   const [rejectForm] = Form.useForm()
   const [teamRows, setTeamRows] = useState<{ display_name: string; amount: number }[]>([])
 
@@ -158,7 +157,7 @@ export default function ProposalDetail() {
             {proposal.raw_saving_est ? `¥${Number(proposal.raw_saving_est).toLocaleString()}` : '未填写'}
           </Descriptions.Item>
           <Descriptions.Item label="商务核算净节约" span={2}>
-            {proposal.net_saving != null
+            {proposal.net_saving !== null && proposal.net_saving !== undefined
               ? <strong style={{ color: '#389e0d', fontSize: 16 }}>¥{Number(proposal.net_saving).toLocaleString()}</strong>
               : '待核算'}
           </Descriptions.Item>

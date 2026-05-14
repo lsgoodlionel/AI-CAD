@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react'
 import {
   Row, Col, Card, Statistic, Table, Tag, Progress,
-  Alert, Spin, Space, Badge, Typography, Divider,
+  Alert, Spin, Space, Badge, Typography,
 } from 'antd'
 import {
   TrophyOutlined, FileTextOutlined, RobotOutlined,

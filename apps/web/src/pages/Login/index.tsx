@@ -56,11 +56,11 @@ export default function LoginPage() {
 
         <Form layout="vertical" onFinish={handleLogin} size="large">
           <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>
-            <Input prefix={<UserOutlined />} placeholder="用户名" autoComplete="username" />
+            <Input name="username" prefix={<UserOutlined />} placeholder="用户名" autoComplete="username" />
           </Form.Item>
 
           <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
-            <Input.Password prefix={<LockOutlined />} placeholder="密码" autoComplete="current-password" />
+            <Input.Password name="password" prefix={<LockOutlined />} placeholder="密码" autoComplete="current-password" />
           </Form.Item>
 
           <Button

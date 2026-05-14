@@ -80,11 +80,11 @@ async def error_list(
     engine_name: str | None = None,
     db=Depends(get_db), _=Depends(require_admin),
 ):
-    where = "AND engine_name=$2" if engine_name else ""
+    where = "AND cl.engine_name=$2" if engine_name else ""
     args = [limit, engine_name] if engine_name else [limit]
     rows = await db.fetch_all(
         f"""
-        SELECT id, engine_name, error_type, latency_ms, created_at,
+        SELECT cl.id, cl.engine_name, cl.error_type, cl.latency_ms, cl.created_at,
                lm.model_id, lp.name AS provider_name
         FROM llm_call_logs cl
         JOIN llm_models lm ON cl.model_db_id = lm.id

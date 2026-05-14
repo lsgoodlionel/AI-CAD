@@ -66,7 +66,7 @@ class DrawingWorkflow:
 
     def can_trigger(self, trigger: str) -> bool:
         """检查当前状态是否允许该触发器"""
-        return trigger in [t.trigger for t in self.machine.get_triggers(self.state)]  # type: ignore
+        return trigger in self.machine.get_triggers(self.state)
 
 
 def assert_valid_transition(current_state: str, trigger: str) -> None:

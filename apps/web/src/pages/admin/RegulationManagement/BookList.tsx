@@ -16,7 +16,7 @@ import {
 } from '@ant-design/icons'
 import {
   listBooks, createBook, updateBook, deleteBook,
-  publishBook, unpublishBook, importBookFile,
+  publishBook, unpublishBook, importBookFile, createBookFromPdf,
 } from '@/services/regulations'
 import ArticleList from './ArticleList'
 
@@ -60,6 +60,8 @@ export default function BookList() {
   const [drawerBook, setDrawerBook] = useState<Book | null>(null)
   const [saving, setSaving] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [autoImportOpen, setAutoImportOpen] = useState(false)
+  const [autoImporting, setAutoImporting] = useState(false)
 
   const openCreate = () => { setEditing(null); form.resetFields(); setModalOpen(true) }
   const openEdit   = (b: Book) => { setEditing(b); form.setFieldsValue(b); setModalOpen(true) }
@@ -118,6 +120,22 @@ export default function BookList() {
     } finally {
       setImporting(false)
       setImportTarget(null)
+    }
+    return false
+  }
+
+  const handleAutoImport = async (file: File) => {
+    setAutoImporting(true)
+    try {
+      const res = await createBookFromPdf(file)
+      const meta = res.metadata ?? {}
+      message.success(`PDF 已上传并自动建档：${meta.title ?? file.name}`)
+      actionRef.current?.reload()
+      setAutoImportOpen(false)
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail ?? 'PDF 上传失败')
+    } finally {
+      setAutoImporting(false)
     }
     return false
   }
@@ -221,6 +239,9 @@ export default function BookList() {
           return { data: res.items ?? [], total: res.total ?? 0, success: true }
         }}
         toolBarRender={() => [
+          <Button key="upload-pdf" icon={<UploadOutlined />} onClick={() => setAutoImportOpen(true)}>
+            上传 PDF 自动导入
+          </Button>,
           <Button key="add" type="primary" icon={<PlusOutlined />} onClick={openCreate}>
             新建规范
           </Button>,
@@ -260,6 +281,28 @@ export default function BookList() {
         </Form>
       </Modal>
 
+      <Modal
+        title="上传 PDF 自动导入规范"
+        open={autoImportOpen}
+        footer={null}
+        onCancel={() => setAutoImportOpen(false)}
+        width={520}
+      >
+        <Upload.Dragger
+          accept=".pdf,application/pdf"
+          beforeUpload={handleAutoImport}
+          showUploadList={false}
+          disabled={autoImporting}
+          style={{ padding: 24 }}
+        >
+          <p className="ant-upload-drag-icon"><InboxOutlined /></p>
+          <p className="ant-upload-text">点击或拖拽 PDF 规范文件到此处上传</p>
+          <p className="ant-upload-hint">
+            系统会自动识别规范名称、编号、版本、专业、发布机构和实施日期，并启动条文解析导入。
+          </p>
+        </Upload.Dragger>
+      </Modal>
+
       {/* 文件导入弹窗 */}
       <Modal
         title={`导入规范文件 — ${importTarget?.title ?? ''}`}
@@ -277,7 +320,7 @@ export default function BookList() {
         >
           <p className="ant-upload-drag-icon"><InboxOutlined /></p>
           <p className="ant-upload-text">点击或拖拽文件到此处上传</p>
-          <p className="ant-upload-hint">支持 PDF / Word / Excel，上传后自动触发 NLP 提取流水线</p>
+          <p className="ant-upload-hint">支持 PDF / Word，上传后自动触发条文提取流水线并回填规范字段</p>
         </Upload.Dragger>
       </Modal>
 

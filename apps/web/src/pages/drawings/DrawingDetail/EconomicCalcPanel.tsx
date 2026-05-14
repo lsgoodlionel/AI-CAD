@@ -53,7 +53,7 @@ interface Props {
   onProposal?: (savingYuan: number) => void
 }
 
-export default function EconomicCalcPanel({ drawingId, drawingNo, onProposal }: Props) {
+export default function EconomicCalcPanel({ drawingId, onProposal }: Props) {
   const [form] = Form.useForm()
   const [bars, setBars] = useState<BarItemInput[]>([
     { diameter: 20, steel_grade: 'HRB400', required_length: 3000, count: 10 },

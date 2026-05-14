@@ -10,6 +10,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  security-events: write
+
 env:
   PYTHON_VERSION: "3.12"
   NODE_VERSION:   "20"
@@ -197,6 +201,55 @@ jobs:
       - name: Check build output
         run: |
           test -d dist && echo "Build output exists" || (echo "Build failed: dist/ not found" && exit 1)
+
+  # ── Docker：生产镜像构建缓存 + 镜像扫描 ─────────────────────────
+  docker-images:
+    name: Docker — build cache & scan
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-build]
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: cad-api
+            context: apps/api
+            dockerfile: apps/api/Dockerfile
+          - name: cad-web
+            context: apps/web
+            dockerfile: apps/web/Dockerfile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.image.name }} with GitHub cache
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.dockerfile }}
+          push: false
+          load: true
+          tags: ${{ matrix.image.name }}:ci
+          cache-from: type=gha,scope=${{ matrix.image.name }}
+          cache-to: type=gha,scope=${{ matrix.image.name }},mode=max
+
+      - name: Scan ${{ matrix.image.name }} image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ matrix.image.name }}:ci
+          format: sarif
+          output: trivy-${{ matrix.image.name }}.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-${{ matrix.image.name }}.sarif
 
   # ── E2E 测试（可选，仅 main 分支）──────────────────────────────
   e2e:

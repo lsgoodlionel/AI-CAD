@@ -1,6 +1,8 @@
 import { defineConfig } from '@umijs/max'
 import routes from './routes'
 
+const apiProxyTarget = process.env.API_PROXY_TARGET || 'http://localhost:8000'
+
 export default defineConfig({
   // ── 基础 ────────────────────────────────────────────────────
   antd: {},
@@ -28,7 +30,7 @@ export default defineConfig({
   // ── 代理（开发时转发到 FastAPI）──────────────────────────────
   proxy: {
     '/api': {
-      target: 'http://localhost:8000',
+      target: apiProxyTarget,
       changeOrigin: true,
     },
   },

@@ -3,12 +3,12 @@
  * 每行 = 一个引擎 × 一个任务类型（primary / fallback_1 / fallback_2 / batch）
  * 支持行内直接编辑温度、max_tokens 等推理参数，变更后路由器 30s 内热更新。
  */
-import { useEffect, useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import {
   ProTable, ProColumns, ActionType,
 } from '@ant-design/pro-components'
 import {
-  Button, Popconfirm, Select, Slider, InputNumber,
+  Button, Popconfirm, Slider, InputNumber,
   Tag, Space, message, Tooltip, Badge,
 } from 'antd'
 import {

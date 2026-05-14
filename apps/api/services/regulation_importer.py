@@ -15,6 +15,7 @@ import json
 import logging
 import re
 import uuid
+from datetime import date
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -96,6 +97,84 @@ _ARTICLE_PATTERN = re.compile(
     r"(?:^|\n)(\d+(?:\.\d+){0,3})\s+(.{0,100})\n([\s\S]*?)(?=\n\d+(?:\.\d+){0,3}\s|\Z)",
     re.MULTILINE,
 )
+_ARTICLE_LINE_PATTERN = re.compile(r"^\s*\d+(?:\.\d+){1,4}\s+")
+
+_STD_NO_PATTERN = re.compile(
+    r"\b((?:GB|GB/T|JGJ|CJJ|CECS|DBJ|T/CECS)\s*[\dA-Z./-]+(?:\s*[-—]\s*\d{4})?)\b",
+    re.IGNORECASE,
+)
+
+_DATE_PATTERN = re.compile(r"(\d{4})[年/-](\d{1,2})[月/-](\d{1,2})")
+
+
+def _parse_date(value: str | date | None) -> date | None:
+    if not value or isinstance(value, date):
+        return value
+    return date.fromisoformat(value)
+
+
+def infer_book_metadata(text: str, filename: str = "") -> dict[str, Any]:
+    """Infer regulation book fields from PDF text and filename."""
+    head = "\n".join(line.strip() for line in text.splitlines()[:80] if line.strip())
+    source = f"{head}\n{filename}"
+
+    std_match = _STD_NO_PATTERN.search(source)
+    std_no = re.sub(r"\s+", "", std_match.group(1)) if std_match else None
+
+    title = None
+    for line in head.splitlines()[:30]:
+        clean = re.sub(r"\s+", "", line)
+        if not clean or len(clean) < 4:
+            continue
+        if std_no and std_no.replace(" ", "") in clean:
+            continue
+        if any(token in clean for token in ("规范", "标准", "规程", "规定")):
+            title = line.strip()
+            break
+    if not title:
+        title = re.sub(r"\.[Pp][Dd][Ff]$", "", filename).strip() or "未命名规范"
+
+    version_match = re.search(r"(\d{4}\s*年版|\d{4}\s*版|第[一二三四五六七八九十]+版)", source)
+    date_match = _DATE_PATTERN.search(source)
+    effective_at = None
+    if date_match:
+        y, m, d = date_match.groups()
+        effective_at = f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
+
+    publisher = None
+    for line in head.splitlines()[:80]:
+        if any(token in line for token in ("住房和城乡建设部", "国家市场监督管理总局", "国家质量监督检验检疫总局")):
+            publisher = line.strip()
+            break
+
+    discipline = "general"
+    discipline_keywords = [
+        ("消防", "fire"),
+        ("防火", "fire"),
+        ("混凝土", "structure"),
+        ("钢结构", "structure"),
+        ("结构", "structure"),
+        ("建筑", "architecture"),
+        ("给水", "mep"),
+        ("排水", "mep"),
+        ("暖通", "mep"),
+        ("电气", "mep"),
+        ("装修", "decoration"),
+        ("装饰", "decoration"),
+    ]
+    for keyword, value in discipline_keywords:
+        if keyword in source:
+            discipline = value
+            break
+
+    return {
+        "title": title[:300],
+        "std_no": std_no[:100] if std_no else None,
+        "version": version_match.group(1).replace(" ", "")[:50] if version_match else None,
+        "discipline": discipline,
+        "publisher": publisher[:200] if publisher else None,
+        "effective_at": effective_at,
+    }
 
 
 def split_into_paragraphs(text: str) -> list[dict[str, str]]:
@@ -112,11 +191,67 @@ def split_into_paragraphs(text: str) -> list[dict[str, str]]:
             if len(body) > 20:
                 paras.append({"index": len(paras), "text": body})
     else:
-        chunks = [c.strip() for c in re.split(r"\n{2,}", text) if len(c.strip()) > 30]
-        for i, chunk in enumerate(chunks):
-            paras.append({"index": i, "text": chunk})
+        current: list[str] = []
+        for line in (line.strip() for line in text.splitlines()):
+            if not line:
+                continue
+            if _ARTICLE_LINE_PATTERN.match(line):
+                if current and len("\n".join(current)) > 20:
+                    paras.append({"index": len(paras), "text": "\n".join(current)})
+                current = [line]
+            elif current:
+                current.append(line)
+        if current and len("\n".join(current)) > 20:
+            paras.append({"index": len(paras), "text": "\n".join(current)})
+
+        if not paras:
+            chunks = [c.strip() for c in re.split(r"\n{2,}", text) if len(c.strip()) > 30]
+            for chunk in chunks:
+                paras.append({"index": len(paras), "text": chunk})
 
     return paras
+
+
+def local_classify_paragraph(paragraph: dict[str, str]) -> dict[str, Any]:
+    text = paragraph["text"]
+    is_mandatory = any(word in text for word in ("必须", "严禁", "不得", "不应"))
+    has_rule_word = any(word in text for word in ("应", "宜", "可", "必须", "不得", "严禁", "不应"))
+    has_article_no = re.match(r"^\s*\d+(?:\.\d+){0,4}", text) is not None
+    return {
+        "index": paragraph["index"],
+        "type": "simple_rule" if has_rule_word or has_article_no else "other",
+        "is_mandatory": is_mandatory,
+    }
+
+
+def local_extract_article(paragraph: dict[str, str], classify_result: dict[str, Any]) -> dict[str, Any]:
+    text = paragraph["text"].strip()
+    first_line = text.splitlines()[0] if text else ""
+    match = re.match(r"^\s*(\d+(?:\.\d+){0,4})\s*(.*)$", first_line)
+    article_no = match.group(1) if match else None
+    title = (match.group(2).strip() if match and match.group(2).strip() else None)
+
+    if "严禁" in text or "不得" in text or "不应" in text:
+        obligation = "MUST_NOT"
+    elif "必须" in text:
+        obligation = "MUST"
+    elif "应" in text:
+        obligation = "SHOULD"
+    elif "宜" in text or "可" in text:
+        obligation = "MAY"
+    else:
+        obligation = "SHOULD"
+
+    return {
+        "article_no": article_no,
+        "title": title[:300] if title else None,
+        "obligation_level": obligation,
+        "is_mandatory": bool(classify_result.get("is_mandatory")),
+        "conditions": [],
+        "key_params": {},
+        "raw_text": text,
+        "article_type": classify_result.get("type", "simple_rule"),
+    }
 
 
 # ── LLM 分类 ─────────────────────────────────────────────────
@@ -154,6 +289,8 @@ async def classify_paragraphs(
         except Exception as exc:
             logger.warning("classify_paragraphs batch %d failed: %s", start, exc)
 
+    if not any(results):
+        return [local_classify_paragraph(p) for p in paragraphs]
     return results
 
 
@@ -191,7 +328,7 @@ async def extract_article(
         return parsed
     except Exception as exc:
         logger.warning("extract_article failed: %s", exc)
-        return _fallback_article(text, is_mandatory_hint)
+        return local_extract_article(paragraph, classify_result)
 
 
 def _fallback_article(text: str, is_mandatory: bool) -> dict[str, Any]:
@@ -387,6 +524,9 @@ async def import_regulation_file(
     返回 {"total": N, "saved": M, "skipped": K, "article_ids": [...]}
     """
     text = extract_text(file_bytes, filename)
+    metadata = infer_book_metadata(text, filename)
+    await _update_book_metadata(db, book_id, metadata)
+
     paragraphs = split_into_paragraphs(text)
     logger.info("book %s: split %d paragraphs from %s", book_id, len(paragraphs), filename)
 
@@ -397,6 +537,12 @@ async def import_regulation_file(
         (p, c) for p, c in zip(paragraphs, classify_results)
         if c.get("type", "other") != "other"
     ]
+    if not to_extract and paragraphs:
+        classify_results = [local_classify_paragraph(p) for p in paragraphs]
+        to_extract = [
+            (p, c) for p, c in zip(paragraphs, classify_results)
+            if c.get("type", "other") != "other"
+        ]
     logger.info("book %s: %d/%d paragraphs to extract", book_id, len(to_extract), len(paragraphs))
 
     articles = []
@@ -414,4 +560,26 @@ async def import_regulation_file(
         "saved": len(article_ids),
         "skipped": len(paragraphs) - len(to_extract),
         "article_ids": article_ids,
+        "metadata": metadata,
     }
+
+
+async def _update_book_metadata(db: Any, book_id: str, metadata: dict[str, Any]) -> None:
+    fields = {
+        key: value
+        for key, value in metadata.items()
+        if value and key in {"title", "std_no", "version", "discipline", "publisher", "effective_at"}
+    }
+    if "effective_at" in fields:
+        fields["effective_at"] = _parse_date(fields["effective_at"])
+    if not fields:
+        return
+    sets = ", ".join(f"{key}=${idx + 2}" for idx, key in enumerate(fields))
+    try:
+        await db.execute(
+            f"UPDATE regulation_books SET {sets}, updated_at=now() WHERE id=$1",
+            book_id,
+            *fields.values(),
+        )
+    except Exception as exc:
+        logger.warning("update regulation book metadata failed: %s", exc)

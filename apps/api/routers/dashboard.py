@@ -5,6 +5,7 @@ GET /dashboard/group          集团级看板（仅 group_admin）
 GET /dashboard/project/{id}   项目级看板（所有已登录用户）
 """
 from datetime import datetime, timezone
+import inspect
 from fastapi import APIRouter, Depends, HTTPException
 
 from dependencies import get_db, get_current_user, require_admin
@@ -18,6 +19,13 @@ _YEAR_START = "date_trunc('year', now())"
 
 @router.get("/group")
 async def group_dashboard(db=Depends(get_db), _=Depends(require_admin)):
+    result = _get_group_dashboard(db)
+    if inspect.isawaitable(result):
+        return await result
+    return result
+
+
+async def _get_group_dashboard(db):
     # 1. 年度创效总额 & 提案漏斗
     proposals = await db.fetch_all(
         """SELECT status, COUNT(*) AS cnt,
@@ -124,6 +132,13 @@ async def project_dashboard(
     db=Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
+    result = _get_project_dashboard(project_id, db, current_user)
+    if inspect.isawaitable(result):
+        return await result
+    return result
+
+
+async def _get_project_dashboard(project_id: str, db, current_user: dict):
     project = await db.fetch_one(
         "SELECT id, name, annual_output, status FROM projects WHERE id=$1", project_id
     )

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useNavigate } from '@umijs/max'
 import { ProTable } from '@ant-design/pro-components'
 import type { ActionType, ProColumns } from '@ant-design/pro-components'
-import { Button, Badge, Tag, Space } from 'antd'
+import { Button, Badge, Tag } from 'antd'
 import { PlusOutlined, EyeOutlined } from '@ant-design/icons'
 import { listProposals } from '@/services/incentive'
 import SubmitProposalModal from '../SubmitProposalModal'
@@ -82,7 +82,7 @@ export default function ProposalList() {
       search: false,
       width: 120,
       render: (_, row) =>
-        row.net_saving != null
+        row.net_saving !== null && row.net_saving !== undefined
           ? <span style={{ fontWeight: 600, color: '#389e0d' }}>¥{(row.net_saving / 10000).toFixed(1)}万</span>
           : '—',
     },

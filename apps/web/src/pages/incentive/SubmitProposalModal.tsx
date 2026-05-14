@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Modal, Form, Input, Select, InputNumber, Radio, message } from 'antd'
+import { Modal, Form, Input, InputNumber, Radio, message } from 'antd'
 import { submitProposal } from '@/services/incentive'
 
 interface Props {

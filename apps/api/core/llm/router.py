@@ -171,7 +171,7 @@ class ModelRouter:
             case "openai_compat":
                 return OpenAICompatProvider(api_key=api_key, base_url=config.base_url or "https://api.openai.com/v1")
             case "ollama":
-                return OllamaProvider(base_url=config.base_url or "http://localhost:11434")
+                return OllamaProvider(base_url=config.base_url or "http://host.docker.internal:11434")
             case "custom_http":
                 extra = config.params.extra or {}
                 return CustomHTTPProvider(

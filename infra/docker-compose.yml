@@ -1,8 +1,6 @@
-version: "3.9"
-
 services:
   postgres:
-    image: apache/age:PG16
+    image: apache/age:release_PG16_1.5.0
     container_name: cad_postgres
     environment:
       POSTGRES_DB: cad_db
@@ -11,7 +9,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_pg16_data:/var/lib/postgresql/data
       - ./init-age.sql:/docker-entrypoint-initdb.d/01-init-age.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U cad_user -d cad_db"]
@@ -78,6 +76,97 @@ services:
       "
     restart: "no"
 
+  api:
+    build:
+      context: ../apps/api
+    image: cad-api:local
+    container_name: cad_api
+    profiles: ["app"]
+    environment:
+      DATABASE_URL: postgresql://cad_user:cad_pass@postgres:5432/cad_db
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: cad_minio
+      MINIO_SECRET_KEY: cad_minio_pass
+      CHROMA_HOST: chroma
+      CHROMA_PORT: "8000"
+      JWT_SECRET: change-me-in-production
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      chroma:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 300s
+
+  celery-worker:
+    image: cad-api:local
+    container_name: cad_celery_worker
+    profiles: ["app"]
+    environment:
+      DATABASE_URL: postgresql://cad_user:cad_pass@postgres:5432/cad_db
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: cad_minio
+      MINIO_SECRET_KEY: cad_minio_pass
+      CHROMA_HOST: chroma
+      CHROMA_PORT: "8000"
+      JWT_SECRET: change-me-in-production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      celery -A core.celery_app worker --loglevel=info -Q default,ai_review,regulation_import
+
+  celery-beat:
+    image: cad-api:local
+    container_name: cad_celery_beat
+    profiles: ["app"]
+    environment:
+      DATABASE_URL: postgresql://cad_user:cad_pass@postgres:5432/cad_db
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: cad_minio
+      MINIO_SECRET_KEY: cad_minio_pass
+      CHROMA_HOST: chroma
+      CHROMA_PORT: "8000"
+      JWT_SECRET: change-me-in-production
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: >
+      celery -A core.celery_app beat --loglevel=info
+
+  web:
+    build:
+      context: ../apps/web
+    image: cad-web:local
+    container_name: cad_web
+    profiles: ["app"]
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000 >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
   # 可选：本地 Ollama（用于测试本地模型）
   # ollama:
   #   image: ollama/ollama:latest
@@ -88,7 +177,7 @@ services:
   #     - ollama_data:/root/.ollama
 
 volumes:
-  postgres_data:
+  postgres_pg16_data:
   redis_data:
   minio_data:
   chroma_data:

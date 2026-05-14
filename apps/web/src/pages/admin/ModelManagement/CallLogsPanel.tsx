@@ -5,7 +5,7 @@
  * - 最近错误日志
  */
 import { useEffect, useState, useCallback } from 'react'
-import { Card, Row, Col, Select, Table, Tag, Spin, Button, Statistic, Alert } from 'antd'
+import { Card, Row, Col, Select, Table, Tag, Spin, Button, Statistic, Alert, message } from 'antd'
 import { ReloadOutlined, WarningOutlined } from '@ant-design/icons'
 import { getCostSummary, getRecentErrors, getCBStatus } from '@/services/modelManagement'
 
@@ -43,15 +43,20 @@ export default function CallLogsPanel() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [c, e, cb] = await Promise.all([
-      getCostSummary(days),
-      getRecentErrors(30),
-      getCBStatus(),
-    ])
-    setCosts(c)
-    setErrors(e)
-    setCbs((cb as CBEntry[]).filter(b => b.state !== 'closed'))
-    setLoading(false)
+    try {
+      const [c, e, cb] = await Promise.all([
+        getCostSummary(days),
+        getRecentErrors(30),
+        getCBStatus(),
+      ])
+      setCosts(c)
+      setErrors(e)
+      setCbs((cb as CBEntry[]).filter(b => b.state !== 'closed'))
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail ?? '调用日志加载失败')
+    } finally {
+      setLoading(false)
+    }
   }, [days])
 
   useEffect(() => { load() }, [load])

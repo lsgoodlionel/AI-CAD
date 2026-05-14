@@ -21,6 +21,16 @@ export const createBook = (data: {
 }) =>
   request(`${BASE}/books`, { method: 'POST', data })
 
+export const createBookFromPdf = (file: File) => {
+  const fd = new FormData()
+  fd.append('file', file)
+  return request(`${BASE}/books/import`, {
+    method: 'POST',
+    data: fd,
+    requestType: 'form',
+  })
+}
+
 export const updateBook = (id: string, data: object) =>
   request(`${BASE}/books/${id}`, { method: 'PATCH', data })
 

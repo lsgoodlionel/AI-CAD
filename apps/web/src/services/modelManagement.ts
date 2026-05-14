@@ -14,6 +14,8 @@ export const checkProviderHealth = (id: string) =>
   request(`${BASE}/providers/${id}/health-check`, { method: 'POST' })
 export const checkAllHealth = () =>
   request(`${BASE}/providers/health-all`)
+export const listProviderAvailableModels = (id: string) =>
+  request(`${BASE}/providers/${id}/available-models`)
 
 // ── 模型 ──────────────────────────────────────────────────────────
 export const listModels = (providerId?: string) =>

@@ -1,4 +1,6 @@
 """FastAPI 全局依赖注入"""
+import re
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import redis.asyncio as aioredis
@@ -12,8 +14,44 @@ _bearer = HTTPBearer()
 
 # ── 数据库 ───────────────────────────────────────────────────
 
+class DatabaseAdapter:
+    def __init__(self, db):
+        self._db = db
+
+    @staticmethod
+    def _normalize(query: str, args: tuple, kwargs: dict):
+        if kwargs:
+            return query, kwargs
+        if not args:
+            return query, None
+        values = {f"p{i}": value for i, value in enumerate(args, start=1)}
+        normalized = re.sub(r"\$(\d+)", lambda m: f":p{m.group(1)}", query)
+        return normalized, values
+
+    async def fetch_one(self, query: str, *args, **kwargs):
+        query, values = self._normalize(query, args, kwargs)
+        return await self._db.fetch_one(query, values)
+
+    async def fetch_all(self, query: str, *args, **kwargs):
+        query, values = self._normalize(query, args, kwargs)
+        return await self._db.fetch_all(query, values)
+
+    async def fetch_val(self, query: str, *args, **kwargs):
+        row = await self.fetch_one(query, *args, **kwargs)
+        if row is None:
+            return None
+        return next(iter(row.values()))
+
+    async def execute(self, query: str, *args, **kwargs):
+        query, values = self._normalize(query, args, kwargs)
+        return await self._db.execute(query, values)
+
+
+_database_adapter = DatabaseAdapter(database)
+
+
 async def get_db():
-    return database
+    return _database_adapter
 
 
 # ── Redis ────────────────────────────────────────────────────

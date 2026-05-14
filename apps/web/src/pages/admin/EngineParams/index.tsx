@@ -7,11 +7,11 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Tabs, Form, Slider, InputNumber, Select, Button,
-  Tag, Input, Tooltip, Space, Badge, Spin, message, Popconfirm,
+  Tabs, Slider, InputNumber, Select, Button,
+  Input, Space, Badge, Spin, message, Popconfirm,
 } from 'antd'
-import { SaveOutlined, RollbackOutlined, InfoCircleOutlined } from '@ant-design/icons'
-import { getParamSchema, getParams, updateParam, resetParam } from '@/services/engineParams'
+import { SaveOutlined, RollbackOutlined } from '@ant-design/icons'
+import { getParams, updateParam, resetParam } from '@/services/engineParams'
 
 type ParamItem = {
   key: string; label: string; type: string

@@ -27,11 +27,13 @@ class FakeDB:
         self.execute = AsyncMock(return_value=None)
         self.fetch_one = AsyncMock(return_value=None)
         self.fetch_all = AsyncMock(return_value=[])
+        self.fetch_val = AsyncMock(return_value=0)
 
     def reset(self):
         self.execute.reset_mock()
         self.fetch_one.reset_mock()
         self.fetch_all.reset_mock()
+        self.fetch_val.reset_mock()
 
 
 @pytest.fixture

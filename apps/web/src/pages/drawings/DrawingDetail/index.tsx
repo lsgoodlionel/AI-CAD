@@ -92,7 +92,7 @@ export default function DrawingDetail() {
   const status: string = drawing.status
 
   return (
-    <div style={{ padding: 24, maxWidth: 1100 }}>
+    <div data-testid="drawing-detail-page" style={{ padding: 24, maxWidth: 1100 }}>
       {/* 顶部导航 */}
       <Space style={{ marginBottom: 16 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/drawings')}>

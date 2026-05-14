@@ -161,7 +161,7 @@ export default function EconomicReviewPanel({ drawingId, userRole, onRefresh }: 
             {review.selected_option
               ? <Tag color="blue">{review.selected_option}</Tag>
               : <Tag>未选定</Tag>}
-            {review.total_saving_est != null && (
+            {review.total_saving_est !== null && review.total_saving_est !== undefined && (
               <span>预估节约：¥{review.total_saving_est.toLocaleString()}</span>
             )}
             {!review.economist_signed && (

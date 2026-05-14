@@ -13,6 +13,7 @@ import databases
 from core.celery_app import celery_app
 from core.config import settings
 from core.llm.router import ModelRouter
+from dependencies import DatabaseAdapter
 from services.audit import write_audit
 from services.regulation_importer import import_regulation_file
 
@@ -28,8 +29,9 @@ def import_regulation_file_task(self, book_id: str, file_key: str, filename: str
 
 
 async def _do_import(book_id: str, file_key: str, filename: str) -> dict:
-    db = databases.Database(settings.database_url)
-    await db.connect()
+    raw_db = databases.Database(settings.database_url)
+    db = DatabaseAdapter(raw_db)
+    await raw_db.connect()
 
     result: dict = {}
     try:
@@ -70,7 +72,6 @@ async def _do_import(book_id: str, file_key: str, filename: str) -> dict:
             resource="regulation_book",
             resource_id=book_id,
             new_state=result,
-            ip_address="celery",
         )
         logger.info("regulation_book %s import done: %s", book_id, result)
 
@@ -82,6 +83,6 @@ async def _do_import(book_id: str, file_key: str, filename: str) -> dict:
         )
         result = {"error": str(exc)}
     finally:
-        await db.disconnect()
+        await raw_db.disconnect()
 
     return result

@@ -100,6 +100,17 @@ async def create_engine_config(
     model_router: ModelRouter = Depends(get_router),
     _=Depends(require_admin),
 ):
+    existing = await db.fetch_one(
+        "SELECT id FROM engine_model_configs WHERE engine_name=$1 AND task_type=$2",
+        body.engine_name,
+        body.task_type,
+    )
+    if existing:
+        raise HTTPException(
+            409,
+            f"{body.engine_name} 的 {body.task_type} 配置已存在，请编辑现有配置或选择其他任务类型",
+        )
+
     row = await db.fetch_one(
         """INSERT INTO engine_model_configs
            (engine_name, task_type, model_id, temperature, max_tokens, top_p,

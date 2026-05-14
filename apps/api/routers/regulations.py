@@ -11,6 +11,7 @@ CRUD：规范文件（books）、条文（articles）、外部 API 配置（api-
 """
 import uuid
 import mimetypes
+from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
@@ -20,11 +21,19 @@ from core.config import settings
 from core.storage import upload_file, presigned_get_url
 from dependencies import get_db, get_current_user, require_admin
 from services.audit import write_audit
+from services.regulation_importer import extract_text, infer_book_metadata
 from tasks.regulation_import import import_regulation_file_task
 
 router = APIRouter(prefix="/regulations", tags=["regulations"])
 
-ALLOWED_IMPORT_TYPES = {"pdf", "docx", "doc", "xlsx"}
+ALLOWED_IMPORT_TYPES = {"pdf", "docx", "doc"}
+AUTO_CREATE_TYPES = {"pdf"}
+
+
+def _parse_date(value: str | date | None) -> date | None:
+    if not value or isinstance(value, date):
+        return value
+    return date.fromisoformat(value)
 
 
 # ── 规范文件（Books） ─────────────────────────────────────────
@@ -101,6 +110,82 @@ async def create_book(
         body.publisher, body.effective_at, current_user["id"],
     )
     return {"id": str(row["id"])}
+
+
+@router.post("/books/import", status_code=201)
+async def create_book_from_pdf(
+    file: UploadFile = File(...),
+    db=Depends(get_db),
+    current_user: dict = Depends(require_admin),
+):
+    """上传 PDF，自动识别规范元数据并创建规范文件，再触发条文导入。"""
+    ext = (file.filename or "").rsplit(".", 1)[-1].lower()
+    if ext not in AUTO_CREATE_TYPES:
+        raise HTTPException(400, "自动建档仅支持 PDF 文件")
+
+    content = await file.read()
+    if len(content) > 50 * 1024 * 1024:
+        raise HTTPException(413, "文件超过 50MB 限制")
+
+    try:
+        text = extract_text(content, file.filename or "regulation.pdf")
+        metadata = infer_book_metadata(text, file.filename or "regulation.pdf")
+    except Exception:
+        metadata = {
+            "title": (file.filename or "未命名规范").rsplit(".", 1)[0],
+            "std_no": None,
+            "version": None,
+            "discipline": "general",
+            "publisher": None,
+            "effective_at": None,
+        }
+
+    std_no = metadata.get("std_no")
+    if std_no:
+        existing_book_id = await db.fetch_val(
+            "SELECT id FROM regulation_books WHERE std_no=$1",
+            std_no,
+        )
+        if existing_book_id:
+            raise HTTPException(409, f"规范编号 {std_no} 已存在，请在现有规范中导入文件")
+
+    row = await db.fetch_one(
+        """
+        INSERT INTO regulation_books
+            (title, std_no, version, discipline, publisher, effective_at,
+             status, source_type, created_by)
+        VALUES ($1,$2,$3,$4,$5,$6,'processing','file_import',$7)
+        RETURNING id
+        """,
+        metadata["title"],
+        metadata.get("std_no"),
+        metadata.get("version"),
+        metadata.get("discipline") or "general",
+        metadata.get("publisher"),
+        _parse_date(metadata.get("effective_at")),
+        current_user["id"],
+    )
+    book_id = str(row["id"])
+
+    content_type = (
+        file.content_type
+        or mimetypes.guess_type(file.filename or "")[0]
+        or "application/pdf"
+    )
+    file_key = f"regulations/{book_id}/{uuid.uuid4()}.{ext}"
+    upload_file(content, file_key, content_type)
+    await db.execute(
+        "UPDATE regulation_books SET file_key=$1, updated_at=now() WHERE id=$2",
+        file_key, book_id,
+    )
+    import_regulation_file_task.delay(book_id, file_key, file.filename or f"file.{ext}")
+
+    await write_audit(
+        db, user_id=current_user["id"],
+        action="regulation_pdf_uploaded", resource="regulation_book",
+        resource_id=book_id, new_state={"file_key": file_key, "metadata": metadata},
+    )
+    return {"id": book_id, "file_key": file_key, "status": "processing", "metadata": metadata}
 
 
 @router.patch("/books/{book_id}")

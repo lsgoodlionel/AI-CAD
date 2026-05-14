@@ -395,9 +395,9 @@ CREATE INDEX idx_audit_user ON audit_logs (user_id, created_at DESC);
 INSERT INTO organizations (name, code, org_type)
 VALUES ('集团总部', 'HQ', 'group');
 
--- 密码使用 bcrypt hash，明文为 "Admin@2026!" 仅供初始化
+-- 密码使用 bcrypt hash，明文为 "admin123" 仅供本地初始化
 INSERT INTO users (org_id, username, email, hashed_password, display_name, role)
 SELECT id, 'admin', 'admin@cad.local',
-       '$2b$12$placeholder_hash_replace_on_first_login',
+       '$2b$12$XEZ2jE5fSqhi.RtuViEoPeGNXl9b2TikBXM8ce6BiWi5XOMpDHrdC',
        '系统管理员', 'group_admin'
 FROM organizations WHERE code = 'HQ';

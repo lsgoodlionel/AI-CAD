@@ -24,6 +24,13 @@ celery_app.conf.update(
     task_track_started=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
+    task_default_queue="default",
+    task_routes={
+        "tasks.ai_review.*": {"queue": "ai_review"},
+        "tasks.regulation_import.*": {"queue": "regulation_import"},
+        "tasks.regulation_api_sync.*": {"queue": "regulation_import"},
+        "tasks.proposal_notice.*": {"queue": "default"},
+    },
     # Celery beat 定时任务
     beat_schedule={
         "advance-expired-notices": {

@@ -78,7 +78,7 @@ async def submit_technical_review(
             if open_critical and open_critical > 0:
                 raise HTTPException(
                     status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    f"还有 {open_critical} 个 critical/major 问题未处理，请全部关闭或标注"已知风险"",
+                    f'还有 {open_critical} 个 critical/major 问题未处理，请全部关闭或标注"已知风险"',
                 )
 
         assert_valid_transition(drawing["status"], "approve_technical")

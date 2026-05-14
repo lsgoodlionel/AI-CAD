@@ -5,7 +5,7 @@ from .base import LLMProvider, LLMResponse, ModelParams
 
 
 class OllamaProvider(LLMProvider):
-    def __init__(self, base_url: str = "http://localhost:11434"):
+    def __init__(self, base_url: str = "http://host.docker.internal:11434"):
         self.base_url = base_url.rstrip("/")
 
     async def complete(self, messages: list[dict], params: ModelParams) -> LLMResponse:
@@ -43,3 +43,10 @@ class OllamaProvider(LLMProvider):
                 return r.status_code == 200
         except Exception:
             return False
+
+    async def list_models(self) -> list[dict]:
+        async with httpx.AsyncClient(timeout=5) as client:
+            response = await client.get(f"{self.base_url}/api/tags")
+            response.raise_for_status()
+            data = response.json()
+        return data.get("models", [])

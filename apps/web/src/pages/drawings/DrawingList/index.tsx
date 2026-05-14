@@ -3,7 +3,7 @@ import { useNavigate } from '@umijs/max'
 import { ProTable } from '@ant-design/pro-components'
 import type { ActionType, ProColumns } from '@ant-design/pro-components'
 import {
-  Button, Tag, Space, Modal, Form, Input, Select, InputNumber,
+  Button, Space, Modal, Form, Input, Select, InputNumber,
   Upload, message, Badge,
 } from 'antd'
 import {

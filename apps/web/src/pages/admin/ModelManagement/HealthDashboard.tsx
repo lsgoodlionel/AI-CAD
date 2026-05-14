@@ -2,11 +2,10 @@
  * 健康状态看板：提供商连通性 + 断路器状态 + 实时成本摘要
  */
 import { useEffect, useState } from 'react'
-import { Card, Row, Col, Badge, Statistic, Table, Alert, Spin, Button } from 'antd'
+import { Card, Row, Col, Badge, Table, Alert, Spin, Button, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { checkAllHealth, getCostSummary, getCBStatus } from '@/services/modelManagement'
 
-type ProviderHealth = { name: string; healthy: boolean }
 type CBEntry = { key: string; state: string; failures: number; opened_at?: number }
 type CostRow = {
   engine_name: string; model_name: string; provider_name: string
@@ -22,15 +21,20 @@ export default function HealthDashboard() {
 
   const refresh = async () => {
     setLoading(true)
-    const [h, c, cb] = await Promise.all([
-      checkAllHealth(),
-      getCostSummary(7),
-      getCBStatus(),
-    ])
-    setHealth(h)
-    setCosts(c)
-    setCbs(cb.filter((e: CBEntry) => e.state !== 'closed'))
-    setLoading(false)
+    try {
+      const [h, c, cb] = await Promise.all([
+        checkAllHealth(),
+        getCostSummary(7),
+        getCBStatus(),
+      ])
+      setHealth(h)
+      setCosts(c)
+      setCbs(cb.filter((e: CBEntry) => e.state !== 'closed'))
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail ?? '健康状态加载失败')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { refresh() }, [])

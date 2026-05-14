@@ -132,7 +132,7 @@ export default function SettlementReviewPanel({ drawingId, userRole, onRefresh }
   const nodeColumns = [
     { title: '节点名称', dataIndex: 'node_name' },
     { title: '说明', dataIndex: 'description', ellipsis: true },
-    { title: '金额（元）', dataIndex: 'amount', render: (v?: number) => v != null ? v.toLocaleString() : '—' },
+    { title: '金额（元）', dataIndex: 'amount', render: (v?: number) => v !== null && v !== undefined ? v.toLocaleString() : '—' },
   ]
 
   return (

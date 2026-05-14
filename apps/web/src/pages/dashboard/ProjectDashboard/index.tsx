@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react'
 import {
   Row, Col, Card, Statistic, Select, Table, Tag,
-  Alert, Spin, Space, Timeline, Typography, Divider,
+  Alert, Spin, Space, Timeline, Typography,
 } from 'antd'
 import {
   FileTextOutlined, TrophyOutlined, RobotOutlined, WarningOutlined,

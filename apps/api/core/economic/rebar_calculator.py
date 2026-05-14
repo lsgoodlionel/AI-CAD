@@ -8,6 +8,7 @@
 """
 import math
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import NamedTuple
 
 
@@ -119,22 +120,25 @@ def calc_anchor_lengths(
 # ── FFD 下料优化 ────────────────────────────────────────────────
 
 def _ffd_cut(pieces: list[int], std_len: int) -> list[list[int]]:
-    """首次适应递减（FFD）：返回每根定尺料的切割方案列表"""
+    """最佳适应递减：返回每根定尺料的切割方案列表"""
     sorted_pieces = sorted(pieces, reverse=True)
     bins: list[list[int]] = []
     remainders: list[int] = []
 
     for piece in sorted_pieces:
-        placed = False
+        best_idx = None
+        best_remainder = std_len + 1
         for i, rem in enumerate(remainders):
-            if rem >= piece:
-                bins[i].append(piece)
-                remainders[i] -= piece
-                placed = True
-                break
-        if not placed:
+            after = rem - piece
+            if 0 <= after < best_remainder:
+                best_idx = i
+                best_remainder = after
+        if best_idx is None:
             bins.append([piece])
             remainders.append(std_len - piece)
+        else:
+            bins[best_idx].append(piece)
+            remainders[best_idx] -= piece
 
     return bins
 
@@ -157,6 +161,167 @@ def _local_search(bins: list[list[int]], remainders: list[int], std_len: int) ->
                             remainders.pop(i)
                         improved = True
                         return              # 重新搜索
+
+
+def _dp_cut(pieces: list[int], std_len: int) -> list[list[int]]:
+    """用 0/1 背包反复选择最高填充组合，适合中小批量下料。"""
+    remaining = sorted(pieces, reverse=True)
+    bins: list[list[int]] = []
+
+    while remaining:
+        reachable = [False] * (std_len + 1)
+        parent: list[tuple[int, int] | None] = [None] * (std_len + 1)
+        reachable[0] = True
+
+        for idx, piece in enumerate(remaining):
+            for total in range(std_len - piece, -1, -1):
+                nxt = total + piece
+                if reachable[total] and not reachable[nxt]:
+                    reachable[nxt] = True
+                    parent[nxt] = (total, idx)
+
+        best_total = max(i for i, ok in enumerate(reachable) if ok)
+        selected: set[int] = set()
+        cursor = best_total
+        while cursor and parent[cursor] is not None:
+            prev, idx = parent[cursor]
+            selected.add(idx)
+            cursor = prev
+
+        bins.append([piece for idx, piece in enumerate(remaining) if idx in selected])
+        remaining = [piece for idx, piece in enumerate(remaining) if idx not in selected]
+
+    return bins
+
+
+def _counted_cut(pieces: list[int], std_len: int) -> list[list[int]]:
+    """按长度计数做精确组合搜索，优先最少用料根数、其次最小废料。"""
+    lengths = sorted(set(pieces), reverse=True)
+    if len(lengths) > 8:
+        return _dp_cut(pieces, std_len)
+
+    target_counts = tuple(pieces.count(length) for length in lengths)
+    patterns: list[tuple[tuple[int, ...], int]] = []
+
+    def build_patterns(pos: int, current: list[int], used: int) -> None:
+        if pos == len(lengths):
+            if used:
+                patterns.append((tuple(current), std_len - used))
+            return
+        max_count = (std_len - used) // lengths[pos]
+        for count in range(max_count, -1, -1):
+            current.append(count)
+            build_patterns(pos + 1, current, used + count * lengths[pos])
+            current.pop()
+
+    build_patterns(0, [], 0)
+    patterns.sort(key=lambda item: item[1])
+
+    @lru_cache(maxsize=None)
+    def solve(state: tuple[int, ...]) -> tuple[int, int, tuple[tuple[int, ...], ...]]:
+        if all(count == 0 for count in state):
+            return 0, 0, ()
+
+        first_needed = next(i for i, count in enumerate(state) if count > 0)
+        best: tuple[int, int, tuple[tuple[int, ...], ...]] | None = None
+        for pattern, waste in patterns:
+            if pattern[first_needed] == 0:
+                continue
+            if any(pattern[i] > state[i] for i in range(len(state))):
+                continue
+
+            next_state = tuple(state[i] - pattern[i] for i in range(len(state)))
+            bars, child_waste, child_patterns = solve(next_state)
+            candidate = (bars + 1, waste + child_waste, (pattern,) + child_patterns)
+            if best is None or candidate[:2] < best[:2]:
+                best = candidate
+
+        if best is None:
+            raise ValueError("无法生成下料组合")
+        return best
+
+    _, _, selected_patterns = solve(target_counts)
+    return [
+        [length for length, count in zip(lengths, pattern) for _ in range(count)]
+        for pattern in selected_patterns
+    ]
+
+
+def _mixed_counted_patterns(pieces: list[int], standard_lengths: list[int]) -> list[CuttingPattern]:
+    """跨多个定尺长度做计数型组合搜索。"""
+    lengths = sorted(set(pieces), reverse=True)
+    if len(lengths) > 8:
+        best_patterns: list[CuttingPattern] = []
+        best_waste_rate = 1.0
+        for std_len in sorted(standard_lengths):
+            if std_len < max(pieces):
+                continue
+            bins = _counted_cut(pieces, std_len)
+            patterns = _compress_patterns(bins, std_len)
+            total_used = sum(p.standard_length * p.repeat for p in patterns)
+            waste_rate = 1.0 - sum(pieces) / total_used if total_used else 1.0
+            if waste_rate < best_waste_rate:
+                best_waste_rate = waste_rate
+                best_patterns = patterns
+        return best_patterns
+
+    target_counts = tuple(pieces.count(length) for length in lengths)
+    raw_patterns: list[tuple[tuple[int, ...], int]] = []
+
+    for std_len in sorted(standard_lengths):
+        if std_len < max(pieces):
+            continue
+
+        def build(pos: int, current: list[int], used: int) -> None:
+            if pos == len(lengths):
+                if used:
+                    raw_patterns.append((tuple(current), std_len))
+                return
+            max_count = (std_len - used) // lengths[pos]
+            for count in range(max_count, -1, -1):
+                current.append(count)
+                build(pos + 1, current, used + count * lengths[pos])
+                current.pop()
+
+        build(0, [], 0)
+
+    @lru_cache(maxsize=None)
+    def solve(state: tuple[int, ...]) -> tuple[int, int, tuple[tuple[tuple[int, ...], int], ...]]:
+        if all(count == 0 for count in state):
+            return 0, 0, ()
+
+        first_needed = next(i for i, count in enumerate(state) if count > 0)
+        best: tuple[int, int, tuple[tuple[tuple[int, ...], int], ...]] | None = None
+        for pattern, std_len in raw_patterns:
+            if pattern[first_needed] == 0:
+                continue
+            if any(pattern[i] > state[i] for i in range(len(state))):
+                continue
+
+            next_state = tuple(state[i] - pattern[i] for i in range(len(state)))
+            used, bars, child_patterns = solve(next_state)
+            candidate = (
+                used + std_len,
+                bars + 1,
+                ((pattern, std_len),) + child_patterns,
+            )
+            if best is None or candidate[:2] < best[:2]:
+                best = candidate
+
+        if best is None:
+            raise ValueError("无法生成下料组合")
+        return best
+
+    _, _, selected = solve(target_counts)
+    bins_by_std: dict[int, list[list[int]]] = {}
+    for pattern, std_len in selected:
+        cuts = [length for length, count in zip(lengths, pattern) for _ in range(count)]
+        bins_by_std.setdefault(std_len, []).append(cuts)
+
+    patterns: list[CuttingPattern] = []
+    for std_len, bins in bins_by_std.items():
+        patterns.extend(_compress_patterns(bins, std_len))
+    return patterns
 
 
 def _compress_patterns(bins: list[list[int]], std_len: int) -> list[CuttingPattern]:
@@ -203,22 +368,7 @@ def optimize_cutting(
         if not pieces:
             continue
 
-        # 选最优定尺长度（废料率最低）
-        best_patterns: list[CuttingPattern] = []
-        best_waste_rate = 1.0
-        for std_len in sorted(standard_lengths):
-            if std_len < max(pieces):
-                continue
-            bins = _ffd_cut(pieces, std_len)
-            remainders = [std_len - sum(b) for b in bins]
-            _local_search(bins, remainders, std_len)
-            patterns = _compress_patterns(bins, std_len)
-            total_used = sum(p.standard_length * p.repeat for p in patterns)
-            total_req = sum(pieces)
-            waste_rate = 1.0 - total_req / total_used if total_used else 1.0
-            if waste_rate < best_waste_rate:
-                best_waste_rate = waste_rate
-                best_patterns = patterns
+        best_patterns = _mixed_counted_patterns(pieces, standard_lengths)
 
         all_patterns.extend(best_patterns)
 

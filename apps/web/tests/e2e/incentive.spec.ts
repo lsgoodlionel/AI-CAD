@@ -27,7 +27,7 @@ test.describe('创效激励', () => {
 
   test('提案列表页面正常渲染', async ({ page }) => {
     await expect(page).toHaveURL(/\/incentive/)
-    await expect(page.locator('.ant-table, .ant-pro-table')).toBeVisible()
+    await expect(page.locator('.ant-pro-table').first()).toBeVisible()
   })
 
   test('页面包含创建提案按钮', async ({ page }) => {

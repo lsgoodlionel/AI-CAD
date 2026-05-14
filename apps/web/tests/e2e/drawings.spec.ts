@@ -18,13 +18,23 @@ async function login(page: Page) {
   await expect(page).toHaveURL(/\/drawings/, { timeout: 8000 })
 }
 
+async function openFirstDrawing(page: Page) {
+  await expect(page.locator('.ant-pro-table').first()).toBeVisible()
+
+  const rows = page.locator('.ant-table-tbody tr:not(.ant-table-placeholder)')
+  await expect(rows.first()).toBeVisible({ timeout: 8000 })
+
+  await rows.first().getByRole('button', { name: /查看/ }).click()
+  await expect(page).toHaveURL(/\/drawings\/[a-z0-9-]+/)
+}
+
 test.describe('图纸列表', () => {
   test.beforeEach(async ({ page }) => {
     await login(page)
   })
 
   test('图纸列表页面正常渲染', async ({ page }) => {
-    await expect(page.locator('.ant-table, .ant-pro-table')).toBeVisible()
+    await expect(page.locator('.ant-pro-table').first()).toBeVisible()
     // 至少显示列头
     await expect(page.locator('th').filter({ hasText: /图纸|状态|专业/ }).first()).toBeVisible()
   })
@@ -35,14 +45,9 @@ test.describe('图纸列表', () => {
   })
 
   test('点击图纸进入详情页', async ({ page }) => {
-    // 如果有图纸数据，点击第一行；无数据时跳过
-    const rows = page.locator('.ant-table-tbody tr')
-    const count = await rows.count()
-    test.skip(count === 0, '暂无图纸数据，跳过详情页测试')
-
-    await rows.first().click()
-    await expect(page).toHaveURL(/\/drawings\/[a-z0-9-]+/)
-    await expect(page.locator('.ant-page-header, h4').first()).toBeVisible()
+    await openFirstDrawing(page)
+    await expect(page.getByTestId('drawing-detail-page')).toBeVisible()
+    await expect(page.getByText('E2E-ARCH-001')).toBeVisible()
   })
 })
 
@@ -52,17 +57,11 @@ test.describe('图纸详情 - 审批面板', () => {
   })
 
   test('详情页展示 AI 审图面板', async ({ page }) => {
-    const rows = page.locator('.ant-table-tbody tr')
-    const count = await rows.count()
-    test.skip(count === 0, '暂无图纸数据')
-
-    await rows.first().click()
-    await expect(page).toHaveURL(/\/drawings\/[a-z0-9-]+/)
+    await openFirstDrawing(page)
 
     // AI 审图 Tab 或面板应存在
-    const aiPanel = page.locator('[data-testid="ai-review-panel"], .ant-tabs-tab').filter({
-      hasText: /AI|审图/,
-    })
-    await expect(aiPanel.first()).toBeVisible({ timeout: 5000 })
+    const aiPanel = page.getByTestId('ai-review-panel')
+    await expect(aiPanel).toBeVisible({ timeout: 5000 })
+    await expect(aiPanel.getByText('AI 审查报告')).toBeVisible()
   })
 })

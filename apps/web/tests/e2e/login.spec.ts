@@ -21,7 +21,7 @@ test.describe('登录页', () => {
     await page.click('button[type="submit"]')
 
     await expect(page).toHaveURL(/\/drawings/, { timeout: 8000 })
-    await expect(page.locator('h4, .ant-pro-page-container-title')).toBeVisible()
+    await expect(page.getByRole('main').getByText('图纸列表')).toBeVisible()
   })
 
   test('错误密码显示错误提示', async ({ page }) => {

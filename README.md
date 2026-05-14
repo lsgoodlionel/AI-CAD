@@ -4,6 +4,37 @@
 
 ---
 
+## 当前版本：v0.2.0
+
+本版本完成了本地 Docker 生产式部署、模型路由管理、规范知识库 PDF 自动导入、测试覆盖率提升、前端依赖安全治理和 E2E 种子数据等一组基础能力增强。
+
+### v0.2.0 更新摘要
+
+| 类别 | 更新内容 |
+|------|----------|
+| Docker 部署 | API/Web 增加生产式 Dockerfile，依赖安装移入镜像构建阶段；Compose app profile 使用生产式启动；Web nginx 支持 Docker DNS 动态解析，避免 API 重建后代理 502 |
+| CI / 镜像安全 | GitHub Actions 增加 Docker Buildx 缓存和 Trivy 镜像扫描，减少重复构建耗时并补齐镜像安全检查 |
+| 后端测试覆盖率 | 覆盖 router/task 集成测试与核心服务测试，后端覆盖率达到 80% 以上 |
+| 前端依赖安全 | 处理 npm audit 的 critical/high 漏洞链路；剩余 moderate/low 归入 Umi 框架升级批次评估 |
+| E2E 测试 | 增加种子数据、图纸详情稳定用例和 admin/pm/designer/economist 角色 smoke matrix |
+| 模型路由管理 | 修复提供商健康检查、调用日志 500、Ollama 本地模型发现；模型管理可从已配置供应商中选择模型，本地 Ollama 可显示已安装模型 |
+| 引擎配置 | 引擎名称下拉 hover 显示中文说明；选择引擎后自动带入推荐模型和推荐参数；推荐模型不可用时回退到本地可用 Ollama 模型；重复配置返回中文提示而非 500 |
+| 规范知识库 | 支持 PDF 一键上传自动建档，自动识别规范名称、编号、版本、专业、发布机构、实施日期，并触发条文导入 |
+| 规范导入稳定性 | 增加无 LLM 时的本地条文分类/提取兜底；修复导入状态、审计 JSON、日期字段、Celery 队列路由和 DB adapter 问题 |
+
+### 版本回滚
+
+每个发布版本使用语义化 Git tag 标记。回滚到本版本：
+
+```bash
+git fetch --tags
+git checkout v0.2.0
+cd infra
+docker compose --profile app up -d --build
+```
+
+---
+
 ## 核心能力
 
 | 能力 | 说明 | 状态 |
@@ -11,13 +42,13 @@
 | 三审三算工作流 | 技术规范化 → 经济最优化 → 结算合规化，经济师未签字系统层面硬拦截 | ✅ |
 | AI 智能审图（四引擎）| 规则引擎 + 知识图谱 + LangGraph 三步推理 + YOLOv8 图元检测 | ✅ |
 | 经济测算引擎 | GB50010-2010 钢筋翻样 + FFD+2-opt 下料优化（废料率 ≤ 1.5%）| ✅ |
-| 规范知识库 | 三途径导入（手动/文件/外部 API），NLP 流水线，AGE 图谱，Chroma 语义搜索 | ✅ |
+| 规范知识库 | 手动录入 / PDF 自动导入 / 外部 API，同步回填字段，AGE 图谱，Chroma 语义搜索 | ✅ |
 | 创效激励闭环 | 在线提案 → 商务测算 → 三方签字 → 铁三角分配 → 凭证 PDF | ✅ |
 | 数据看板 | 集团级（KPI 预警/成本看板）+ 项目级（流转状态/活动 Timeline）| ✅ |
-| 模型路由管理 | 运行时热切换 Claude/OpenAI/DeepSeek/Ollama，断路器保护，调用日志 | ✅ |
+| 模型路由管理 | 热切换 Claude/OpenAI/DeepSeek/Ollama，Ollama 本地模型发现，断路器保护，调用日志 | ✅ |
 | PWA / 移动端 | Service Worker（Cache First 静态/Network First 页面）+ manifest | ✅ |
 | K8s 生产部署 | Kustomize base + production overlay + Prometheus + Grafana | ✅ |
-| CI/CD | GitHub Actions：pytest + bandit + tsc + build + Playwright E2E | ✅ |
+| CI/CD | GitHub Actions：pytest + bandit + tsc + build + Playwright E2E + Docker 缓存 + Trivy 扫描 | ✅ |
 
 ---
 
@@ -44,7 +75,7 @@
 - **引擎 4 — 视觉/OCR**: [ezdxf](https://github.com/mozman/ezdxf) + [PyMuPDF](https://github.com/pymupdf/PyMuPDF) + PaddleOCR + [YOLOv8](https://github.com/ultralytics/ultralytics)（graceful degradation）
 
 ### 数据与基础设施
-- **主库**: PostgreSQL 16（含 Apache AGE 扩展，4 个迁移脚本）
+- **主库**: PostgreSQL 16（含 Apache AGE 扩展，5 个迁移脚本）
 - **缓存/队列**: Redis 7（Celery + 断路器分布式状态）
 - **向量库**: Chroma（规范语义检索）
 - **容器**: Docker Compose（开发）→ Kubernetes + Kustomize（生产）
@@ -136,7 +167,7 @@ CAD/
 
 - Docker Desktop（含 Compose v2）
 - Python 3.12+
-- Node.js 20+ + pnpm 9+
+- Node.js 20+ + npm 10+
 
 ### 1. 克隆并配置环境变量
 
@@ -147,16 +178,17 @@ cp .env.example .env
 # 编辑 .env，填写 JWT_SECRET 和 LLM API Keys
 ```
 
-### 2. 启动基础服务
+### 2. 启动本地 Docker 部署
 
 ```bash
 cd infra
-docker compose up -d
-# PostgreSQL+AGE、Redis、MinIO（3 个桶：drawings/reports/atlases）、Chroma
-# 等待所有服务健康（约 30 秒）
+docker compose --profile app up -d --build
+# PostgreSQL+AGE、Redis、MinIO、Chroma、FastAPI、Celery Worker、Celery Beat、Web nginx
+# Web: http://127.0.0.1:3000
+# API: http://127.0.0.1:8000
 ```
 
-### 3. 初始化数据库
+### 3. 初始化数据库（首次部署或新库）
 
 ```bash
 cd apps/api
@@ -168,6 +200,7 @@ psql $DATABASE_URL -f migrations/001_initial_schema.sql
 psql $DATABASE_URL -f migrations/002_model_management.sql
 psql $DATABASE_URL -f migrations/003_economic_calc.sql
 psql $DATABASE_URL -f migrations/004_regulation_api_sync.sql
+psql $DATABASE_URL -f migrations/005_regulation_import_status.sql
 ```
 
 ### 4. 启动后端
@@ -187,8 +220,8 @@ celery -A core.celery_app beat --loglevel=info
 
 ```bash
 cd apps/web
-pnpm install
-pnpm dev
+npm install
+npm run dev
 # 访问 http://localhost:3000
 ```
 
@@ -198,21 +231,50 @@ pnpm dev
 
 | 字段 | 值 |
 |------|----|
-| 账号 | `admin@example.com` |
-| 密码 | `Admin@123456` |
+| 账号 | `admin` |
+| 密码 | `admin123` |
 | 角色 | `group_admin` |
+
+E2E 种子脚本还会创建：
+
+| 账号 | 角色 |
+|------|------|
+| `pm` | `project_manager` |
+| `economist` | `economist` |
+| `designer` | `designer` |
 
 ### 运行测试
 
 ```bash
-# 后端单元测试
+# 后端单元测试与覆盖率
 cd apps/api
 pytest tests/ -v
+pytest tests/ --cov=. --cov-report=term-missing
 
 # 前端 E2E 测试（需先启动 dev server）
 cd apps/web
 npx playwright test
 ```
+
+### 规范 PDF 自动导入
+
+管理员进入 `系统管理 → 规范知识库 → 规范文件`，点击 **上传 PDF 自动导入**。系统会：
+
+1. 从 PDF 文本识别规范名称、编号、版本、专业、发布机构、实施日期。
+2. 自动创建规范文件，状态置为 `processing`。
+3. 将 PDF 上传到 MinIO。
+4. 触发 Celery 规范导入任务。
+5. 优先使用模型路由做条文分类和提取；模型不可用时使用本地规则兜底。
+6. 导入完成后状态置为 `active`，可在条文列表中查看结构化条文。
+
+### 模型路由与本地 Ollama
+
+管理员进入 `系统管理 → 模型路由管理`：
+
+- **提供商管理**：配置 Claude/OpenAI/DeepSeek/Ollama 等供应商，支持健康检查。
+- **模型列表**：选择已配置供应商新增模型；Ollama 本地供应商会读取本机 `http://host.docker.internal:11434/api/tags`，显示本地已安装模型。
+- **引擎配置**：为不同业务引擎配置主模型、备用模型和批量模型。引擎名称下拉会显示中文说明，并自动带入推荐模型和参数。
+- **调用日志**：查看调用成本、错误、断路器状态和按日统计。
 
 ---
 
@@ -235,11 +297,11 @@ npx playwright test
 | `/api/v1/incentive` | 创效提案全生命周期 |
 | `/api/v1/regulations` | 规范知识库（书/条文/API源/搜索）|
 | `/api/v1/dashboard` | 集团级 + 项目级看板 |
-| `/api/v1/admin/providers` | LLM 提供商管理 |
-| `/api/v1/admin/models` | LLM 模型管理 |
-| `/api/v1/admin/engine-configs` | 引擎配置（模型/温度/tokens）|
+| `/api/v1/admin/llm/providers` | LLM 提供商管理 |
+| `/api/v1/admin/llm/models` | LLM 模型管理 |
+| `/api/v1/admin/llm/engine-configs` | 引擎配置（模型/温度/tokens）|
 | `/api/v1/admin/engine-params` | 引擎业务参数（KG + 经济测算）|
-| `/api/v1/admin/call-logs` | 调用日志与成本统计 |
+| `/api/v1/admin/llm/logs` | 调用日志与成本统计 |
 
 ---
 
