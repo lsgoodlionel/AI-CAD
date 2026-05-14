@@ -4,11 +4,23 @@
 
 ---
 
-## 当前版本：v0.2.0
+## 当前版本：v0.3.0
 
-本版本完成了本地 Docker 生产式部署、模型路由管理、规范知识库 PDF 自动导入、测试覆盖率提升、前端依赖安全治理和 E2E 种子数据等一组基础能力增强。
+本版本在 `v0.2.0` 平台基础能力之上，补齐项目管理与人员管理后台，形成从组织、人员、项目、项目成员到图纸和创效提案的主数据闭环。
+
+### v0.3.0 更新摘要
+
+| 类别 | 更新内容 |
+|------|----------|
+| 项目管理 | 新增项目档案、项目成员、工作分区管理；项目列表展示组织、负责人、成员数、图纸数和状态 |
+| 人员管理 | 新增人员 CRUD、启用/停用、重置密码、组织架构管理 |
+| 项目级权限 | 新增 `project_members`，非管理员按项目成员关系查看项目；项目经理/项目总工可维护项目成员和分区 |
+| 业务改造 | 图纸上传、创效提案提交、项目看板改为项目下拉选择，不再要求手填项目 UUID |
+| 数据迁移 | 新增 `006_project_user_management.sql`，扩展 `projects/users` 字段并补齐既有项目成员关系 |
 
 ### v0.2.0 更新摘要
+
+`v0.2.0` 完成了本地 Docker 生产式部署、模型路由管理、规范知识库 PDF 自动导入、测试覆盖率提升、前端依赖安全治理和 E2E 种子数据等一组基础能力增强。
 
 | 类别 | 更新内容 |
 |------|----------|
@@ -28,7 +40,7 @@
 
 ```bash
 git fetch --tags
-git checkout v0.2.0
+git checkout v0.3.0
 cd infra
 docker compose --profile app up -d --build
 ```
@@ -44,6 +56,7 @@ docker compose --profile app up -d --build
 | 经济测算引擎 | GB50010-2010 钢筋翻样 + FFD+2-opt 下料优化（废料率 ≤ 1.5%）| ✅ |
 | 规范知识库 | 手动录入 / PDF 自动导入 / 外部 API，同步回填字段，AGE 图谱，Chroma 语义搜索 | ✅ |
 | 创效激励闭环 | 在线提案 → 商务测算 → 三方签字 → 铁三角分配 → 凭证 PDF | ✅ |
+| 项目与人员管理 | 组织架构、人员账号、项目档案、项目成员、工作分区 | ✅ |
 | 数据看板 | 集团级（KPI 预警/成本看板）+ 项目级（流转状态/活动 Timeline）| ✅ |
 | 模型路由管理 | 热切换 Claude/OpenAI/DeepSeek/Ollama，Ollama 本地模型发现，断路器保护，调用日志 | ✅ |
 | PWA / 移动端 | Service Worker（Cache First 静态/Network First 页面）+ manifest | ✅ |
@@ -75,7 +88,7 @@ docker compose --profile app up -d --build
 - **引擎 4 — 视觉/OCR**: [ezdxf](https://github.com/mozman/ezdxf) + [PyMuPDF](https://github.com/pymupdf/PyMuPDF) + PaddleOCR + [YOLOv8](https://github.com/ultralytics/ultralytics)（graceful degradation）
 
 ### 数据与基础设施
-- **主库**: PostgreSQL 16（含 Apache AGE 扩展，5 个迁移脚本）
+- **主库**: PostgreSQL 16（含 Apache AGE 扩展，6 个迁移脚本）
 - **缓存/队列**: Redis 7（Celery + 断路器分布式状态）
 - **向量库**: Chroma（规范语义检索）
 - **容器**: Docker Compose（开发）→ Kubernetes + Kustomize（生产）
@@ -201,6 +214,7 @@ psql $DATABASE_URL -f migrations/002_model_management.sql
 psql $DATABASE_URL -f migrations/003_economic_calc.sql
 psql $DATABASE_URL -f migrations/004_regulation_api_sync.sql
 psql $DATABASE_URL -f migrations/005_regulation_import_status.sql
+psql $DATABASE_URL -f migrations/006_project_user_management.sql
 ```
 
 ### 4. 启动后端
@@ -297,6 +311,9 @@ npx playwright test
 | `/api/v1/incentive` | 创效提案全生命周期 |
 | `/api/v1/regulations` | 规范知识库（书/条文/API源/搜索）|
 | `/api/v1/dashboard` | 集团级 + 项目级看板 |
+| `/api/v1/projects` | 项目档案、项目成员、工作分区管理 |
+| `/api/v1/admin/users` | 人员管理、启停账号、重置密码 |
+| `/api/v1/admin/organizations` | 组织架构管理 |
 | `/api/v1/admin/llm/providers` | LLM 提供商管理 |
 | `/api/v1/admin/llm/models` | LLM 模型管理 |
 | `/api/v1/admin/llm/engine-configs` | 引擎配置（模型/温度/tokens）|

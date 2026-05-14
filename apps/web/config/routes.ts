@@ -83,6 +83,18 @@ const routes: IRoute[] = [
     access: 'isAdmin',
     routes: [
       {
+        name: '项目管理',
+        path: '/admin/projects',
+        component: './admin/ProjectManagement',
+        icon: 'ProjectOutlined',
+      },
+      {
+        name: '人员管理',
+        path: '/admin/users',
+        component: './admin/UserManagement',
+        icon: 'TeamOutlined',
+      },
+      {
         name: '模型路由管理',
         path: '/admin/model-management',
         component: './admin/ModelManagement',

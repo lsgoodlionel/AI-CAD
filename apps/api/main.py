@@ -12,6 +12,8 @@ from routers.admin.models import router as models_router
 from routers.admin.engine_configs import router as engine_configs_router
 from routers.admin.engine_params import router as engine_params_router
 from routers.admin.call_logs import router as call_logs_router
+from routers.admin.users import router as admin_users_router
+from routers.projects import router as projects_router
 from routers.drawings import router as drawings_router
 from routers.technical_review import router as technical_review_router
 from routers.economic_review import router as economic_review_router
@@ -53,6 +55,8 @@ app.include_router(models_router,         prefix=API_V1)
 app.include_router(engine_configs_router, prefix=API_V1)
 app.include_router(engine_params_router,  prefix=API_V1)
 app.include_router(call_logs_router,      prefix=API_V1)
+app.include_router(admin_users_router,    prefix=API_V1)
+app.include_router(projects_router,       prefix=API_V1)
 app.include_router(drawings_router,       prefix=API_V1)
 app.include_router(technical_review_router, prefix=API_V1)
 app.include_router(economic_review_router,  prefix=API_V1)

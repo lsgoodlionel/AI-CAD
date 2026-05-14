@@ -158,6 +158,7 @@ async def list_drawings(
         SELECT d.id, d.drawing_no, d.title, d.discipline, d.version, d.status,
                d.current_stage, d.estimated_impact, d.created_at, d.updated_at,
                u.display_name AS creator_name,
+               p.id AS project_id,
                p.name AS project_name
         FROM drawings d
         JOIN users u ON d.created_by = u.id

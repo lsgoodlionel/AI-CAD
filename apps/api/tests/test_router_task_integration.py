@@ -15,6 +15,70 @@ def _row(**values):
 
 
 @pytest.mark.asyncio
+async def test_projects_list_returns_admin_visible_projects(client, fake_db):
+    now = datetime.now(timezone.utc)
+    fake_db.fetch_all.return_value = [
+        _row(
+            id="project-1",
+            name="示范项目",
+            code="DEMO",
+            project_type="高层住宅",
+            annual_output=120000000,
+            status="active",
+            description=None,
+            start_date=None,
+            end_date=None,
+            created_at=now,
+            updated_at=now,
+            org_name="集团总部",
+            manager_name="项目经理",
+            member_count=3,
+            drawing_count=2,
+        )
+    ]
+    fake_db.fetch_val.return_value = 1
+
+    resp = await client.get("/api/v1/projects")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+    assert data["items"][0]["name"] == "示范项目"
+
+
+@pytest.mark.asyncio
+async def test_admin_users_list_returns_user_rows(client, fake_db):
+    now = datetime.now(timezone.utc)
+    fake_db.fetch_all.return_value = [
+        _row(
+            id="user-1",
+            org_id="org-1",
+            username="designer",
+            email="designer@cad.local",
+            display_name="深化设计师",
+            role="designer",
+            phone=None,
+            position="设计",
+            employee_no=None,
+            is_active=True,
+            last_login_at=None,
+            created_at=now,
+            updated_at=now,
+            org_name="集团总部",
+            project_count=1,
+        )
+    ]
+    fake_db.fetch_val.return_value = 1
+
+    resp = await client.get("/api/v1/admin/users")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+    assert data["items"][0]["username"] == "designer"
+
+
+@pytest.mark.asyncio
 async def test_engine_config_duplicate_returns_conflict(client, fake_db):
     fake_db.fetch_one.return_value = _row(id="existing-config")
 

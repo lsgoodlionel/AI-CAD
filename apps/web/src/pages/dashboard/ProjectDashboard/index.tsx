@@ -11,7 +11,7 @@ import {
   FileTextOutlined, TrophyOutlined, RobotOutlined, WarningOutlined,
 } from '@ant-design/icons'
 import { getProjectDashboard } from '@/services/dashboard'
-import { listDrawings } from '@/services/drawings'
+import { listProjects } from '@/services/projects'
 
 const { Text } = Typography
 
@@ -49,17 +49,9 @@ export default function ProjectDashboard() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
 
-  // 从图纸列表接口获取去重项目列表（简易实现）
   useEffect(() => {
-    listDrawings({ limit: 200 }).then((res: any) => {
-      const seen = new Set<string>()
-      const list: { id: string; name: string }[] = []
-      for (const d of (res.items ?? [])) {
-        if (!seen.has(d.project_id)) {
-          seen.add(d.project_id)
-          list.push({ id: d.project_id, name: d.project_name ?? d.project_id })
-        }
-      }
+    listProjects({ limit: 200 }).then((res: any) => {
+      const list = (res.items ?? []).map((p: any) => ({ id: p.id, name: p.name }))
       setProjects(list)
       if (list.length > 0) setProjectId(list[0].id)
     })

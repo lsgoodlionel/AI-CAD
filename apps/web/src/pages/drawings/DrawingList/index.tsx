@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@umijs/max'
 import { ProTable } from '@ant-design/pro-components'
 import type { ActionType, ProColumns } from '@ant-design/pro-components'
@@ -10,6 +10,7 @@ import {
   UploadOutlined, PlusOutlined, EyeOutlined,
 } from '@ant-design/icons'
 import { listDrawings, uploadDrawing } from '@/services/drawings'
+import { listProjects } from '@/services/projects'
 
 const STATUS_MAP: Record<string, { color: string; text: string }> = {
   draft:              { color: 'default',    text: '草稿' },
@@ -55,6 +56,11 @@ export default function DrawingList() {
   const [form] = Form.useForm()
   const [uploading, setUploading] = useState(false)
   const [fileList, setFileList] = useState<any[]>([])
+  const [projects, setProjects] = useState<{ id: string; name: string; code?: string }[]>([])
+
+  useEffect(() => {
+    listProjects({ limit: 200 }).then((res: any) => setProjects(res.items ?? []))
+  }, [])
 
   const columns: ProColumns<DrawingRow>[] = [
     {
@@ -207,8 +213,13 @@ export default function DrawingList() {
         width={560}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="project_id" label="项目 ID" rules={[{ required: true }]}>
-            <Input placeholder="项目 UUID" />
+          <Form.Item name="project_id" label="所属项目" rules={[{ required: true }]}>
+            <Select
+              showSearch
+              optionFilterProp="label"
+              placeholder="选择项目"
+              options={projects.map(p => ({ label: `${p.name}${p.code ? ` (${p.code})` : ''}`, value: p.id }))}
+            />
           </Form.Item>
           <Form.Item name="drawing_no" label="图纸编号" rules={[{ required: true }]}>
             <Input placeholder="如 ST-2025-001" />

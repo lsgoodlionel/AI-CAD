@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { Modal, Form, Input, InputNumber, Radio, message } from 'antd'
+import { useEffect, useState } from 'react'
+import { Modal, Form, Input, InputNumber, Radio, Select, message } from 'antd'
 import { submitProposal } from '@/services/incentive'
+import { listProjects } from '@/services/projects'
 
 interface Props {
   open: boolean
@@ -17,6 +18,12 @@ const TYPE_OPTIONS = [
 export default function SubmitProposalModal({ open, onClose, onSuccess, defaultProjectId }: Props) {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
+  const [projects, setProjects] = useState<{ id: string; name: string; code?: string }[]>([])
+
+  useEffect(() => {
+    if (!open) return
+    listProjects({ limit: 200 }).then((res: any) => setProjects(res.items ?? []))
+  }, [open])
 
   const handleOk = async () => {
     const values = await form.validateFields()
@@ -67,8 +74,13 @@ export default function SubmitProposalModal({ open, onClose, onSuccess, defaultP
           </Radio.Group>
         </Form.Item>
 
-        <Form.Item name="project_id" label="项目 ID" rules={[{ required: true }]}>
-          <Input placeholder="项目 UUID（后续改为下拉选择）" />
+        <Form.Item name="project_id" label="所属项目" rules={[{ required: true }]}>
+          <Select
+            showSearch
+            optionFilterProp="label"
+            placeholder="选择项目"
+            options={projects.map(p => ({ label: `${p.name}${p.code ? ` (${p.code})` : ''}`, value: p.id }))}
+          />
         </Form.Item>
 
         <Form.Item name="drawing_id" label="关联图纸 ID（可选）">
