@@ -2,9 +2,15 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate, useModel } from '@umijs/max'
 import {
   Card, Descriptions, Button, Spin, Space, Alert, Divider, Tag, Badge,
+  Progress, Timeline, Typography, message,
 } from 'antd'
 import { ArrowLeftOutlined, DownloadOutlined, EyeOutlined, EyeInvisibleOutlined } from '@ant-design/icons'
-import { getDrawing, getDownloadUrl } from '@/services/drawings'
+import {
+  getDrawing,
+  getDownloadUrl,
+  retryAiReview,
+  startTechnicalReview,
+} from '@/services/drawings'
 import StatusTimeline from './StatusTimeline'
 import AIReviewPanel from './AIReviewPanel'
 import TechnicalReviewPanel from './TechnicalReviewPanel'
@@ -12,6 +18,8 @@ import EconomicReviewPanel from './EconomicReviewPanel'
 import SettlementReviewPanel from './SettlementReviewPanel'
 import EconomicCalcPanel from './EconomicCalcPanel'
 import PdfViewer from './PdfViewer'
+
+const { Text } = Typography
 
 const STATUS_LABEL: Record<string, string> = {
   draft: '草稿',
@@ -35,6 +43,94 @@ const STATUS_COLOR: Record<string, string> = {
   rejected: 'error',
 }
 
+const formatDuration = (seconds?: number) => {
+  const total = Math.max(0, Math.round(seconds ?? 0))
+  const mins = Math.floor(total / 60)
+  const secs = total % 60
+  if (mins <= 0) return `${secs}秒`
+  return `${mins}分${secs.toString().padStart(2, '0')}秒`
+}
+
+function AIReviewProgressCard({ progress }: { progress: any }) {
+  if (!progress) return null
+  const timelineItems = [
+    ...(progress.completed_parts ?? []).map((item: any) => ({
+      color: 'green',
+      children: (
+        <Space direction="vertical" size={0}>
+          <Text strong>{item.name}</Text>
+          <Text type="secondary">{item.description}</Text>
+        </Space>
+      ),
+    })),
+    ...(progress.active_parts ?? []).map((item: any) => ({
+      color: 'blue',
+      children: (
+        <Space direction="vertical" size={0}>
+          <Text strong>{item.name}</Text>
+          <Text type="secondary">{item.description}</Text>
+        </Space>
+      ),
+    })),
+    ...(progress.pending_parts ?? []).map((item: any) => ({
+      color: 'gray',
+      children: (
+        <Space direction="vertical" size={0}>
+          <Text type="secondary">{item.name}</Text>
+          <Text type="secondary">{item.description}</Text>
+        </Space>
+      ),
+    })),
+  ]
+
+  return (
+    <Card title="AI 审图过程" style={{ marginBottom: 16 }}>
+      <Space direction="vertical" size={16} style={{ width: '100%' }}>
+        <Space align="center" wrap>
+          <Progress
+            type="circle"
+            percent={progress.percent ?? 0}
+            size={88}
+            status={progress.status === 'failed' ? 'exception' : progress.status === 'done' ? 'success' : 'active'}
+          />
+          <Descriptions size="small" column={2}>
+            <Descriptions.Item label="当前阶段">
+              <Badge
+                status={progress.status === 'failed' ? 'error' : progress.status === 'done' ? 'success' : 'processing'}
+                text={progress.stage_name}
+              />
+            </Descriptions.Item>
+            <Descriptions.Item label="阶段说明">
+              {progress.stage_description}
+            </Descriptions.Item>
+            <Descriptions.Item label="已耗时">
+              {formatDuration(progress.elapsed_seconds)}
+            </Descriptions.Item>
+            <Descriptions.Item label="预计剩余">
+              {progress.status === 'done' ? '已完成' : formatDuration(progress.estimated_remaining_seconds)}
+            </Descriptions.Item>
+            <Descriptions.Item label="预计总时长">
+              {formatDuration(progress.estimated_total_seconds)}
+            </Descriptions.Item>
+            <Descriptions.Item label="更新时间">
+              {progress.updated_at ? new Date(progress.updated_at).toLocaleString('zh-CN') : '—'}
+            </Descriptions.Item>
+          </Descriptions>
+        </Space>
+
+        {(progress.warnings ?? []).map((warning: string) => (
+          <Alert key={warning} type="warning" showIcon message={warning} />
+        ))}
+
+        <div>
+          <Text strong>已完成 / 进行中 / 待完成</Text>
+          <Timeline style={{ marginTop: 12 }} items={timelineItems} />
+        </div>
+      </Space>
+    </Card>
+  )
+}
+
 export default function DrawingDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -47,19 +143,27 @@ export default function DrawingDetail() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [pdfVisible, setPdfVisible] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
 
-  const fetchDrawing = async () => {
+  const fetchDrawing = async (silent = false) => {
     if (!id) return
-    setLoading(true)
+    if (!silent) setLoading(true)
     try {
       const data = await getDrawing(id)
       setDrawing(data)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
   useEffect(() => { fetchDrawing() }, [id])
+
+  useEffect(() => {
+    const aiStatus = drawing?.ai_report?.status
+    if (drawing?.status !== 'ai_reviewing' && aiStatus !== 'processing' && aiStatus !== 'pending') return undefined
+    const timer = window.setInterval(() => fetchDrawing(true), 5000)
+    return () => window.clearInterval(timer)
+  }, [drawing?.status, drawing?.ai_report?.status, id])
 
   const handleTogglePdf = async () => {
     if (pdfVisible) {
@@ -84,6 +188,34 @@ export default function DrawingDetail() {
     const url = pdfUrl ?? (await getDownloadUrl(id)).url
     if (!pdfUrl) setPdfUrl(url)
     window.open(url, '_blank')
+  }
+
+  const handleRetryAiReview = async () => {
+    if (!id) return
+    setActionLoading('retry-ai')
+    try {
+      await retryAiReview(id)
+      message.success('AI 审图任务已重新触发')
+      await fetchDrawing(true)
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail ?? '重新触发失败')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleStartTechnicalReview = async () => {
+    if (!id) return
+    setActionLoading('start-technical')
+    try {
+      await startTechnicalReview(id)
+      message.success('已开启一审')
+      await fetchDrawing(true)
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail ?? '开启一审失败')
+    } finally {
+      setActionLoading(null)
+    }
   }
 
   if (loading) return <Spin style={{ display: 'block', marginTop: 80 }} />
@@ -177,6 +309,10 @@ export default function DrawingDetail() {
         )}
       </Card>
 
+      {drawing.ai_report?.progress && (
+        <AIReviewProgressCard progress={drawing.ai_report.progress} />
+      )}
+
       {/* 图纸内嵌预览 */}
       {pdfVisible && pdfUrl && (
         <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: 12 }}>
@@ -198,7 +334,17 @@ export default function DrawingDetail() {
         <Alert
           type="info"
           showIcon
-          message="AI 审图已完成，等待开启一审（项目总工操作）"
+          message="AI 审图已完成"
+          description="可开启一审，进入技术规范化审批。"
+          action={
+            <Button
+              type="primary"
+              loading={actionLoading === 'start-technical'}
+              onClick={handleStartTechnicalReview}
+            >
+              开启一审
+            </Button>
+          }
           style={{ marginTop: 16 }}
         />
       )}
@@ -251,7 +397,17 @@ export default function DrawingDetail() {
           showIcon
           message={
             status === 'draft' ? '图纸处于草稿状态'
-            : 'AI 审图进行中，请等待完成后开始一审'
+            : 'AI 审图进行中，可在上方查看阶段进度、已完成内容和预计剩余时间'
+          }
+          action={
+            status === 'ai_reviewing' ? (
+              <Button
+                loading={actionLoading === 'retry-ai'}
+                onClick={handleRetryAiReview}
+              >
+                重新触发审图
+              </Button>
+            ) : undefined
           }
         />
       )}

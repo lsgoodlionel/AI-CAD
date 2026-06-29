@@ -42,6 +42,11 @@ export const submitTechnicalReview = (
     data,
   })
 
+export const startTechnicalReview = (drawingId: string) =>
+  request(`${BASE}/drawings/${drawingId}/technical-review/start`, {
+    method: 'POST',
+  })
+
 // ── 二审 ────────────────────────────────────────────────────
 
 export const getEconomicReview = (drawingId: string) =>
@@ -122,6 +127,14 @@ export const getAiReviewIssues = (
   drawingId: string,
   params?: { severity?: string; status?: string; limit?: number; offset?: number },
 ) => request(`${BASE}/drawings/${drawingId}/ai-review/issues`, { params })
+
+export const getAiReviewProgress = (drawingId: string) =>
+  request(`${BASE}/drawings/${drawingId}/ai-review/progress`)
+
+export const retryAiReview = (drawingId: string) =>
+  request(`${BASE}/drawings/${drawingId}/ai-review/retry`, {
+    method: 'POST',
+  })
 
 export const getAiReviewReportPdfUrl = (drawingId: string) =>
   `${BASE}/drawings/${drawingId}/ai-review/report-pdf`

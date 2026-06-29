@@ -209,7 +209,8 @@ class VisionEngine(BaseEngine):
         file_size_kb = 0
         try:
             row = await db.fetch_one(
-                "SELECT file_size_kb FROM drawings WHERE id=$1", ctx.drawing_id
+                "SELECT file_size_kb FROM drawings WHERE id=:drawing_id",
+                {"drawing_id": ctx.drawing_id},
             )
             file_size_kb = row["file_size_kb"] if row else 0
         except Exception:

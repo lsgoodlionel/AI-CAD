@@ -5,6 +5,7 @@ AI 审图报告生成器
 - generate_excel_report:  生成按严重程度分 Sheet 的 Excel 清单，返回 xlsx 字节
 """
 import io
+import json
 from datetime import datetime
 from typing import Any
 
@@ -169,6 +170,11 @@ def generate_excel_report(
         if sev_issues:
             _build_issue_sheet(wb, sev_issues, sev, drawing_no, date_str)
 
+    # 会审问题单 Sheet（仅当存在会审审查引擎问题时）
+    review_issues = [i for i in issues if i.get("engine") == "review"]
+    if review_issues:
+        _build_review_sheet(wb, review_issues)
+
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
@@ -258,3 +264,82 @@ def _build_issue_sheet(
             cell.border = _THIN_BORDER
             if col_idx > 1:
                 cell.fill = row_fill
+
+
+# ── 会审问题单（会审审查引擎 engine=='review'）─────────────────────
+
+_REVIEW_COLUMNS: list[tuple[str, int]] = [
+    ("序号", 6), ("专业", 16), ("风险等级", 10), ("问题归类", 18),
+    ("标准问题", 60), ("接口复核", 20), ("证据缺口", 30),
+    # ── V2 列（向后兼容：旧 issue 无 V2 字段时留空）──
+    ("场景", 12), ("对象", 18), ("主问题", 60), ("补充问题", 60),
+]
+
+
+def _as_list(value: Any) -> list:
+    """JSONB 字段经 DB 驱动可能为 list 或 JSON 文本，统一为 list。"""
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, list) else [parsed]
+        except (json.JSONDecodeError, ValueError):
+            return [value] if value else []
+    return [value]
+
+
+def _as_dict(value: Any) -> dict:
+    """JSONB 字段经 DB 驱动可能为 dict 或 JSON 文本，统一为 dict；解析失败返回空 dict。"""
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {}
+        except (json.JSONDecodeError, ValueError):
+            return {}
+    return {}
+
+
+def _build_review_sheet(wb: openpyxl.Workbook, issues: list[dict]) -> None:
+    """汇总会审审查问题为「会审问题单」工作表。"""
+    ws = wb.create_sheet("会审问题单")
+    for col_idx, (name, width) in enumerate(_REVIEW_COLUMNS, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=name)
+        cell.font = _HEADER_FONT
+        cell.fill = PatternFill("solid", fgColor="0E7490")
+        cell.alignment = _HEADER_ALIGN
+        cell.border = _THIN_BORDER
+        ws.column_dimensions[cell.column_letter].width = width
+    ws.row_dimensions[1].height = 28
+
+    for row_idx, issue in enumerate(issues, start=2):
+        iface = "、".join(
+            x for x in [issue.get("interface_primary", "")] + _as_list(issue.get("interface_related"))
+            if x
+        )
+        question_pack = _as_dict(issue.get("question_pack"))
+        row_data = [
+            row_idx - 1,
+            issue.get("discipline_code", "") or "未分类",
+            issue.get("risk_level", "") or "—",
+            "/".join(str(x) for x in _as_list(issue.get("issue_class"))),
+            issue.get("standard_question", "") or issue.get("description", ""),
+            iface,
+            "；".join(str(x) for x in _as_list(issue.get("evidence_gap"))),
+            # ── V2 列（缺失字段留空，不报错）──
+            issue.get("scenario", "") or "",
+            issue.get("object_name", "") or "",
+            question_pack.get("主问题", "") or "",
+            question_pack.get("补充问题", "") or "",
+        ]
+        ws.row_dimensions[row_idx].height = 42
+        for col_idx, value in enumerate(row_data, start=1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+            cell.border = _THIN_BORDER

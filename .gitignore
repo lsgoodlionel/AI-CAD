@@ -28,6 +28,7 @@ node_modules/
 # ── Build outputs ────────────────────────────────────────
 apps/web/dist/
 apps/web/.umi/
+apps/web/src/.umi/
 apps/web/.umi-production/
 apps/web/.umi-test/
 

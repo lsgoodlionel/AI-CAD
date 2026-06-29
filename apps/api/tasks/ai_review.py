@@ -9,7 +9,9 @@ AI 审图 Celery 异步任务 — Phase 2 四引擎实现。
   5. 失败时回退至 draft，最多重试 3 次
 """
 import asyncio
+import json
 import logging
+from datetime import datetime, timezone
 
 import databases
 from redis.asyncio import Redis
@@ -17,6 +19,7 @@ from redis.asyncio import Redis
 from core.celery_app import celery_app
 from core.config import settings
 from core.ai_review import DrawingContext, Orchestrator
+from services.ai_review_progress import estimate_total_seconds, progress_payload
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +47,9 @@ async def _do_review(drawing_id: str) -> dict:
             """
             SELECT d.id, d.drawing_no, d.discipline, d.title, d.version,
                    d.file_key, d.file_size_kb, d.estimated_impact, d.project_id
-            FROM drawings d WHERE d.id=$1
+            FROM drawings d WHERE d.id=:drawing_id
             """,
-            drawing_id,
+            {"drawing_id": drawing_id},
         )
         if not row:
             raise ValueError(f"图纸不存在: {drawing_id}")
@@ -69,26 +72,80 @@ async def _do_review(drawing_id: str) -> dict:
         # ── 2. 获取或创建审查报告记录 ──────────────────────────
         report = await db.fetch_one(
             """
-            SELECT id FROM ai_review_reports
-            WHERE drawing_id=$1 AND status IN ('pending','processing')
+            SELECT id, created_at, engine_results FROM ai_review_reports
+            WHERE drawing_id=:drawing_id AND status IN ('pending','processing')
             ORDER BY created_at DESC LIMIT 1
             """,
-            drawing_id,
+            {"drawing_id": drawing_id},
         )
         if report is None:
             report = await db.fetch_one(
-                "INSERT INTO ai_review_reports (drawing_id, status) VALUES ($1,'processing') RETURNING id",
-                drawing_id,
+                """
+                INSERT INTO ai_review_reports (drawing_id, status)
+                VALUES (:drawing_id,'processing')
+                RETURNING id, created_at
+                """,
+                {"drawing_id": drawing_id},
             )
         else:
             await db.execute(
-                "UPDATE ai_review_reports SET status='processing' WHERE id=$1",
-                report["id"],
+                "UPDATE ai_review_reports SET status='processing' WHERE id=:report_id",
+                {"report_id": report["id"]},
             )
         report_id = str(report["id"])
+        report_started_at = report["created_at"] if "created_at" in report else datetime.now(timezone.utc)
+        try:
+            engine_results = report["engine_results"] if "engine_results" in report else {}
+            if isinstance(engine_results, str):
+                engine_results = json.loads(engine_results)
+            progress_started_at = (engine_results or {}).get("progress", {}).get("started_at")
+            if progress_started_at:
+                report_started_at = datetime.fromisoformat(progress_started_at.replace("Z", "+00:00"))
+        except Exception:
+            pass
+        recent_avg_ms = await db.fetch_val(
+            """
+            SELECT AVG(processing_ms)::int
+            FROM ai_review_reports
+            WHERE status='done' AND processing_ms IS NOT NULL
+              AND created_at > now() - interval '30 days'
+            """
+        )
+        estimated_total_seconds = estimate_total_seconds(row["file_size_kb"], recent_avg_ms)
+
+        async def update_progress(payload: dict) -> None:
+            progress = progress_payload(
+                status=payload.get("status", "processing"),
+                stage_key=payload["stage_key"],
+                started_at=report_started_at,
+                updated_at=datetime.now(timezone.utc),
+                completed_keys=payload.get("completed_keys", []),
+                active_keys=payload.get("active_keys"),
+                estimated_total_seconds=estimated_total_seconds,
+                warnings=payload.get("warnings"),
+                metrics=payload.get("metrics"),
+            )
+            await db.execute(
+                """
+                UPDATE ai_review_reports
+                SET engine_results = COALESCE(engine_results, '{}'::jsonb)
+                    || jsonb_build_object('progress', CAST(:progress AS jsonb))
+                WHERE id=:report_id
+                """,
+                {
+                    "report_id": report_id,
+                    "progress": json.dumps(progress, ensure_ascii=False),
+                },
+            )
+
+        await update_progress({
+            "stage_key": "prepare",
+            "completed_keys": ["queued"],
+            "active_keys": ["prepare"],
+        })
 
         # ── 3. 运行四引擎协调器 ────────────────────────────────
-        orchestrator = Orchestrator(db, redis)
+        orchestrator = Orchestrator(db, redis, progress_callback=update_progress)
         summary = await orchestrator.run(ctx, report_id)
 
         # ── 4. 更新图纸状态 ────────────────────────────────────
@@ -96,9 +153,9 @@ async def _do_review(drawing_id: str) -> dict:
             """
             UPDATE drawings
             SET status='ai_done', current_stage='technical_review', updated_at=now()
-            WHERE id=$1
+            WHERE id=:drawing_id
             """,
-            drawing_id,
+            {"drawing_id": drawing_id},
         )
 
         logger.info(
@@ -120,16 +177,22 @@ async def _mark_failed(drawing_id: str, error: str) -> None:
     await db.connect()
     try:
         await db.execute(
-            "UPDATE drawings SET status='draft', updated_at=now() WHERE id=$1 AND status='ai_reviewing'",
-            drawing_id,
+            """
+            UPDATE drawings
+            SET status='draft', updated_at=now()
+            WHERE id=:drawing_id AND status='ai_reviewing'
+            """,
+            {"drawing_id": drawing_id},
         )
         await db.execute(
             """
             UPDATE ai_review_reports
-            SET status='failed', engine_results=jsonb_build_object('error', $2::text)
-            WHERE drawing_id=$1 AND status='processing'
+            SET status='failed',
+                engine_results = COALESCE(engine_results, '{}'::jsonb)
+                    || jsonb_build_object('error', CAST(:error AS text))
+            WHERE drawing_id=:drawing_id AND status='processing'
             """,
-            drawing_id, error[:500],
+            {"drawing_id": drawing_id, "error": error[:500]},
         )
     finally:
         await db.disconnect()

@@ -1,0 +1,25 @@
+services:
+  postgres:
+    ports: !override
+      - "5434:5432"
+
+  redis:
+    ports: !override
+      - "6380:6379"
+
+  minio:
+    ports: !override
+      - "9002:9000"
+      - "9003:9001"
+
+  chroma:
+    ports: !override
+      - "8102:8000"
+
+  api:
+    ports: !override
+      - "8002:8000"
+
+  web:
+    ports: !override
+      - "3002:3000"
