@@ -4,9 +4,24 @@
 
 ---
 
-## 当前版本：v0.3.0
+## 当前版本：v0.4.0
 
-本版本在 `v0.2.0` 平台基础能力之上，补齐项目管理与人员管理后台，形成从组织、人员、项目、项目成员到图纸和创效提案的主数据闭环。
+本版本在 `v0.3.0` 之上接入**会审审查引擎（第 5 引擎）**——将 1909 条真实图纸会审/设计交底记录、覆盖 19 个专业的认知蒸馏协议工程化落地，把 AI 审图从"规范条文合规"扩展到"会审经验驱动的问题发现 + 闭环追问"。
+
+### v0.4.0 更新摘要
+
+| 类别 | 更新内容 |
+|------|----------|
+| 会审审查第 5 引擎 | 新增 `ReviewAuditEngine`，接入四引擎 Orchestrator（复用 vision OCR 文本，与规则/KG/RAG 并行）；专业体系全量扩展到 **19 个专业**（ZH/JG/WH/JZ/ZJ/RF/GJG/JDQ/GPS/ZS/DQ/NT/MQ/SWT/JGUAN/JN/JK/RD/XF），保留到 5 粗专业映射 |
+| 独立图纸会审模块 | 新增 `/api/v1/drawing-review` 文本审查模块：对会审记录/设计交底/问题单纯文本做结构化审查，产出闭环问题单（audit / audit-batch / records / document）|
+| V2 四维输出 | **对象识别**（部位级/系统级/节点级 + 推定依据）、**场景识别**（图间冲突>施工落地>验收风险>正常审图）、**问题包**（主问题/补充问题/证据缺口）、**文书化输出**（会审纪要口径 + 设计答复口径）|
+| 知识资产 | `data/review_protocol/`：disciplines / question_templates / concern_keywords / location_patterns / scenario_templates / question_pack_templates / document_templates（逐专业誊录自认知蒸馏，非杜撰）|
+| 前端 | 新增「图纸会审」独立录入页（对象/场景/问题包/文书 Tab）；图纸详情 AIReviewPanel 新增「会审审查」分区（按专业分组 + 风险/场景标签 + 问题单导出）|
+| 报告 | AI 审图 Excel 报告新增「会审问题单」工作表（专业/风险/场景/对象/主问题/补充问题/接口/证据缺口）|
+| 数据迁移 | 新增 `007_review_audit.sql`（issues +10 列、新表 review_audit_records/findings）与 `008_review_audit_v2.sql`（issues/findings +7 V2 列）|
+| 测试 | `tests/test_review_audit_*`：87 passed，review_audit 包覆盖率 89.4% |
+
+> 设计原则：模板填空为默认，无 pyyaml / 无 LLM / 无文本均优雅降级，绝不阻断既有四引擎；V1 字段全部向后兼容。会审引擎做初步归类/证据组织/接口前置/闭环表达，最终结论仍以图纸 + 设计答复 + 专业负责人确认为准。
 
 ### v0.3.0 更新摘要
 
@@ -52,7 +67,8 @@ docker compose --profile app up -d --build
 | 能力 | 说明 | 状态 |
 |------|------|------|
 | 三审三算工作流 | 技术规范化 → 经济最优化 → 结算合规化，经济师未签字系统层面硬拦截 | ✅ |
-| AI 智能审图（四引擎）| 规则引擎 + 知识图谱 + LangGraph 三步推理 + YOLOv8 图元检测 | ✅ |
+| AI 智能审图（五引擎）| 规则引擎 + 知识图谱 + LangGraph 三步推理 + YOLOv8 图元检测 + 会审审查引擎 | ✅ |
+| 会审审查引擎（19 专业）| 1909 条会审经验蒸馏：专业路由 + 对象/场景识别 + 问题包 + 会审纪要/设计答复文书化输出 | ✅ |
 | 经济测算引擎 | GB50010-2010 钢筋翻样 + FFD+2-opt 下料优化（废料率 ≤ 1.5%）| ✅ |
 | 规范知识库 | 手动录入 / PDF 自动导入 / 外部 API，同步回填字段，AGE 图谱，Chroma 语义搜索 | ✅ |
 | 创效激励闭环 | 在线提案 → 商务测算 → 三方签字 → 铁三角分配 → 凭证 PDF | ✅ |
@@ -81,14 +97,15 @@ docker compose --profile app up -d --build
 - **文件存储**: [MinIO](https://min.io)（图纸/报告/图集，AES-256，预签名 URL 5min TTL）
 - **测试**: pytest + pytest-asyncio + pytest-cov（cov-fail-under=80）
 
-### AI 审图（四引擎）
+### AI 审图（五引擎）
 - **引擎 1 — 规则引擎**: YAML DSL（5 个专业：common/structure/architecture/mep/decoration）
 - **引擎 2 — 知识图谱**: [Apache AGE](https://github.com/apache/age)（PostgreSQL 扩展，Cypher 查询 + SQL 降级）
 - **引擎 3 — RAG + LangGraph**: [Chroma](https://github.com/chroma-core/chroma) 向量检索 + [LangGraph](https://github.com/langchain-ai/langgraph) 三步推理（graceful degradation）
 - **引擎 4 — 视觉/OCR**: [ezdxf](https://github.com/mozman/ezdxf) + [PyMuPDF](https://github.com/pymupdf/PyMuPDF) + PaddleOCR + [YOLOv8](https://github.com/ultralytics/ultralytics)（graceful degradation）
+- **引擎 5 — 会审审查**: 1909 条真实会审记录蒸馏的 19 专业审查协议（`core/ai_review/review_audit/`，模板填空 + 可选 LLM 润色），复用 vision 抽取文本，产出对象/场景/问题包/文书化输出
 
 ### 数据与基础设施
-- **主库**: PostgreSQL 16（含 Apache AGE 扩展，6 个迁移脚本）
+- **主库**: PostgreSQL 16（含 Apache AGE 扩展，8 个迁移脚本）
 - **缓存/队列**: Redis 7（Celery + 断路器分布式状态）
 - **向量库**: Chroma（规范语义检索）
 - **容器**: Docker Compose（开发）→ Kubernetes + Kustomize（生产）
@@ -144,14 +161,23 @@ CAD/
 │       │   │   ├── vision_engine.py  # ezdxf + fitz + PaddleOCR + YOLO
 │       │   │   ├── yolo_detector.py  # YOLOv8 图元检测（graceful degradation）
 │       │   │   ├── langgraph_agent.py # LangGraph 三步推理代理
-│       │   │   └── orchestrator.py   # Vision串行 → [Rules/KG/RAG]并行
+│       │   │   ├── review_audit/      # 会审审查第5引擎（19专业蒸馏协议）
+│       │   │   │   ├── engine.py             # audit_text + ReviewAuditEngine
+│       │   │   │   ├── discipline_router.py  # 19 专业识别/路由
+│       │   │   │   ├── object_identifier.py  # 对象识别（部位/系统/节点级）
+│       │   │   │   ├── scenario_router.py    # 场景识别（图间冲突/施工落地/验收风险/正常审图）
+│       │   │   │   ├── question_pack_builder.py # 问题包（主/补充/证据缺口）
+│       │   │   │   └── document_writer.py    # 会审纪要口径 + 设计答复口径
+│       │   │   └── orchestrator.py   # Vision串行 → [Rules/KG/RAG/Review]并行
 │       │   └── workflow/       # 三审状态机（transitions）
 │       ├── routers/            # API 路由（15 个模块）
 │       ├── services/           # 业务逻辑（报告/规范导入/奖金/凭证等）
 │       ├── tasks/              # Celery 任务（ai_review/proposal_notice/regulation_import/regulation_api_sync）
 │       ├── tests/              # pytest 测试套件（状态机/公式/API/规范同步）
 │       ├── data/rules/         # YAML 规则文件（5 个专业）
-│       └── migrations/         # SQL 迁移脚本（001~004）
+│       ├── data/review_protocol/ # 会审审查知识资产（19 专业：路由/模板/场景/问题包/文书）
+│       ├── docs/skills/        # drawing-review-auditor 技能资产（SKILL/prompt-template）
+│       └── migrations/         # SQL 迁移脚本（001~008）
 ├── infra/
 │   ├── docker-compose.yml      # 开发环境（PG+AGE/Redis/MinIO/Chroma/minio-init）
 │   └── k8s/
@@ -215,6 +241,8 @@ psql $DATABASE_URL -f migrations/003_economic_calc.sql
 psql $DATABASE_URL -f migrations/004_regulation_api_sync.sql
 psql $DATABASE_URL -f migrations/005_regulation_import_status.sql
 psql $DATABASE_URL -f migrations/006_project_user_management.sql
+psql $DATABASE_URL -f migrations/007_review_audit.sql        # 会审审查引擎 V1
+psql $DATABASE_URL -f migrations/008_review_audit_v2.sql     # 会审审查引擎 V2（须在 007 之后）
 ```
 
 ### 4. 启动后端
@@ -304,6 +332,7 @@ npx playwright test
 |------|------|
 | `/api/v1/auth` | 登录/刷新 Token |
 | `/api/v1/drawings` | 图纸上传/审图/AI 报告（PDF/Excel）|
+| `/api/v1/drawing-review` | 会审审查（文本审查 audit/audit-batch/records/document）|
 | `/api/v1/technical-review` | 一审（技术规范化）|
 | `/api/v1/economic-review` | 二审（经济最优化，含签字强制）|
 | `/api/v1/settlement-review` | 三审（结算合规化）|
@@ -330,7 +359,9 @@ npx playwright test
 | 三审工作流状态机 | ✅ | transitions 库，二审强制签字 HTTP 403，100% 状态边界测试 |
 | MinIO 文件存储 | ✅ | 预签名 URL，5min TTL，AES-256 |
 | Celery 异步任务 | ✅ | AI 审图 / 规范导入 / 公示期推进 / 外部 API 同步（每小时 beat）|
-| 四引擎 AI 审图框架 | ✅ | 规则/KG/RAG/视觉 Orchestrator，各引擎 30s 超时 |
+| 五引擎 AI 审图框架 | ✅ | 规则/KG/RAG/视觉/会审 Orchestrator，各引擎 30s 超时 |
+| 会审审查引擎（19 专业）| ✅ | 专业路由 + 对象/场景识别 + 问题包 + 文书化输出；测试 87 passed，覆盖率 89.4% |
+| 独立图纸会审模块 | ✅ | `/api/v1/drawing-review` 文本审查 + 闭环问题单导出 + 会审纪要/设计答复生成 |
 | YAML 规则引擎 | ✅ | 5 个专业（common/structure/architecture/mep/decoration）|
 | LangGraph 三步推理 | ✅ | identify → lookup → synthesize，graceful degradation |
 | YOLOv8 图元检测 | ✅ | 标题栏缺失/钢筋密度预警，graceful degradation |

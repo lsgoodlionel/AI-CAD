@@ -2,7 +2,7 @@
 四引擎协调器：顺序运行视觉引擎（填充 OCR 文本），
 再并行运行规则/知识图谱/RAG/会审审查引擎，汇总结果写入数据库。
 
-注意：会审审查引擎（review）的扩展列由 migrations/003 创建，
+注意：会审审查引擎（review）的扩展列由 migrations/007 与 008 创建，
 写库前请确保已执行该迁移（见下方 INSERT）。
 """
 import asyncio
@@ -150,13 +150,13 @@ class Orchestrator:
         processing_ms = int((time.monotonic() - t0) * 1000)
 
         # ── 写入 ai_review_issues ──────────────────────────────
-        # 会审审查引擎（review）扩展列由 migrations/003 创建：
+        # 会审审查引擎（review）扩展列由 migrations/007 创建：
         #   discipline_code, location_json(jsonb), concerns(jsonb), issue_class(jsonb),
         #   interface_primary, interface_related(jsonb), risk_level, object_level,
         #   standard_question, evidence_gap(jsonb)
         # V2 扩展列（object_name, object_basis, scenario, scenario_reason,
-        #   question_pack(jsonb), doc_minutes(jsonb), doc_reply(jsonb)）由 migrations/004 创建。
-        # 部署时必须先执行 migrations/003 与 migrations/004，否则下方 INSERT 因缺列报错。
+        #   question_pack(jsonb), doc_minutes(jsonb), doc_reply(jsonb)）由 migrations/008 创建。
+        # 部署时必须先执行 migrations/007 与 migrations/008，否则下方 INSERT 因缺列报错。
         for issue in all_issues:
             await self._db.execute(
                 """
@@ -200,7 +200,7 @@ class Orchestrator:
                     "object_level": issue.object_level or None,
                     "standard_question": issue.standard_question or None,
                     "evidence_gap": json.dumps(issue.evidence_gap, ensure_ascii=False) if issue.evidence_gap else None,
-                    # ── V2 扩展列（需先执行 migrations/004）──
+                    # ── V2 扩展列（需先执行 migrations/008）──
                     "object_name": issue.object_name or None,
                     "object_basis": issue.object_basis or None,
                     "scenario": issue.scenario or None,

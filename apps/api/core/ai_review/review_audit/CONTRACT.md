@@ -184,7 +184,7 @@ def write(discipline_code, obj, question_pack, interface) -> dict             # 
 - `/audit` data 直接含 V2 section。
 - 新增 `POST /api/v1/drawing-review/document`：`{title, body, discipline?, doc_kind:"minutes"|"reply"}` → 返回对应文书口径。
 
-## V2-6. 数据库 migration 004
+## V2-6. 数据库 migration 008（V1 列在 migration 007）
 `ai_review_issues` 与 `review_audit_findings` 各 `ADD COLUMN IF NOT EXISTS`：
 object_name varchar(64), object_basis varchar(32), scenario varchar(16), scenario_reason text,
 question_pack jsonb, doc_minutes jsonb, doc_reply jsonb。

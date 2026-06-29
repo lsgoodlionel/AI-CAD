@@ -39,7 +39,7 @@
 | PDF 内嵌预览 | ✅ | `DrawingDetail/PdfViewer.tsx`, `DrawingDetail/index.tsx` |
 | YOLOv8 图元检测 | ✅ | `core/ai_review/yolo_detector.py`, `vision_engine.py` |
 | LangGraph 多轮推理 | ✅ | `core/ai_review/langgraph_agent.py`, `rag_engine.py` |
-| 会审审查第5引擎（19专业蒸馏协议）| ✅ | `core/ai_review/review_audit/`, `data/review_protocol/`, `migrations/003+004` |
+| 会审审查第5引擎（19专业蒸馏协议）| ✅ | `core/ai_review/review_audit/`, `data/review_protocol/`, `migrations/007+008` |
 | 会审 V2：对象识别+场景+问题包+文书化输出 | ✅ | `review_audit/{object_identifier,scenario_router,question_pack_builder,document_writer}.py` |
 | 独立图纸会审模块（文本审查）| ✅ | `routers/drawing_review.py`, `pages/drawing-review/`, `services/drawingReview.ts` |
 
