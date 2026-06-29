@@ -9,6 +9,7 @@ import {
   CheckCircleOutlined,
 } from '@ant-design/icons'
 import { getAiReviewIssues, getAiReviewReportPdfUrl, getAiReviewReportExcelUrl } from '@/services/drawings'
+import ReviewFindings from './ReviewFindings'
 
 const { Text } = Typography
 
@@ -40,10 +41,12 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 }
 
 const ENGINE_LABEL: Record<string, string> = {
-  rule: '规则引擎',
-  kg:   '知识图谱',
-  rag:  'RAG检索',
-  ocr:  '视觉OCR',
+  rule:   '规则引擎',
+  rules:  '规则引擎',
+  kg:     '知识图谱',
+  rag:    'RAG检索',
+  ocr:    '视觉OCR',
+  review: '会审审查',
 }
 
 const COLUMNS = [
@@ -110,6 +113,7 @@ export default function AIReviewPanel({ drawingId, aiReport }: Props) {
 
   const fetchIssues = async (pageNum = page) => {
     if (!aiReport || aiReport.status !== 'done') return
+    if (activeTab === 'review') return  // 会审 Tab 由 ReviewFindings 自行取数
     setLoading(true)
     try {
       const res = await getAiReviewIssues(drawingId, {
@@ -148,7 +152,10 @@ export default function AIReviewPanel({ drawingId, aiReport }: Props) {
       const cfg = SEVERITY_CONFIG[sev]
       return { key: sev, label: <Tag color={cfg.color}>{cfg.label}</Tag> }
     }),
+    { key: 'review', label: <Tag color="cyan">会审审查</Tag> },
   ]
+
+  const isReviewTab = activeTab === 'review'
 
   const handleDownloadPdf = () => {
     window.open(getAiReviewReportPdfUrl(drawingId), '_blank')
@@ -230,6 +237,9 @@ export default function AIReviewPanel({ drawingId, aiReport }: Props) {
         size="small"
       />
 
+      {isReviewTab ? (
+        <ReviewFindings drawingId={drawingId} reportStatus={aiReport.status} />
+      ) : (
       <Table
         size="small"
         loading={loading}
@@ -247,6 +257,7 @@ export default function AIReviewPanel({ drawingId, aiReport }: Props) {
         }}
         rowClassName={row => row.severity === 'critical' ? 'row-critical' : ''}
       />
+      )}
 
       <style>{`.row-critical td { background: #fff1f0 !important; }`}</style>
     </Card>

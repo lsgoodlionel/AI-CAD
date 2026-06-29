@@ -94,15 +94,17 @@ class KGEngine(BaseEngine):
         try:
             rows = await db.fetch_all(
                 """
-                SELECT ra.article_no, ra.title, rb.standard_code, ra.content
+                SELECT ra.article_no, ra.title, rb.std_no AS standard_code, ra.content
                 FROM regulation_articles ra
                 JOIN regulation_books rb ON ra.book_id = rb.id
-                WHERE $1 = ANY(ra.tags)
-                   OR 'common' = ANY(ra.tags)
-                ORDER BY rb.standard_code, ra.article_no
+                WHERE rb.discipline = :discipline
+                   OR rb.discipline = 'general'
+                   OR rb.discipline IS NULL
+                   OR ra.is_mandatory = true
+                ORDER BY rb.std_no, ra.article_no
                 LIMIT 30
                 """,
-                ctx.discipline,
+                {"discipline": ctx.discipline},
             )
         except Exception as e:
             logger.error("[KGEngine] SQL 查询失败: %s", e)

@@ -7,6 +7,8 @@
 """
 import uuid
 import mimetypes
+import json
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request, Query
 from fastapi import status as http_status
 from fastapi.responses import Response
@@ -18,6 +20,7 @@ from core.workflow.drawing_state_machine import assert_valid_transition
 from dependencies import get_db, get_current_user
 from services.audit import write_audit
 from services.ai_report_generator import generate_annotated_pdf, generate_excel_report
+from services.ai_review_progress import estimate_total_seconds, normalize_report_progress, progress_payload
 from tasks.ai_review import run_ai_review
 
 router = APIRouter(prefix="/drawings", tags=["drawings"])
@@ -89,9 +92,23 @@ async def upload_drawing(
         "UPDATE drawings SET status='ai_reviewing', updated_at=now() WHERE id=$1",
         str(drawing_uuid),
     )
+    initial_progress = progress_payload(
+        status="processing",
+        stage_key="queued",
+        started_at=datetime.now(timezone.utc),
+        completed_keys=[],
+        active_keys=["queued"],
+        estimated_total_seconds=estimate_total_seconds(len(content) // 1024),
+    )
     await db.execute(
-        "UPDATE ai_review_reports SET status='processing' WHERE id=$1",
+        """
+        UPDATE ai_review_reports
+        SET status='processing',
+            engine_results=jsonb_build_object('progress', CAST($2 AS jsonb))
+        WHERE id=$1
+        """,
         report["id"],
+        json.dumps(initial_progress, ensure_ascii=False),
     )
 
     # 写审计日志
@@ -199,13 +216,118 @@ async def get_drawing(
 
     # 附加 AI 审查报告状态
     report = await db.fetch_one(
-        "SELECT id, status, total_issues, critical_issues, completed_at "
+        "SELECT id, status, engine_results, total_issues, critical_issues, "
+        "processing_ms, created_at, completed_at "
         "FROM ai_review_reports WHERE drawing_id=$1 ORDER BY created_at DESC LIMIT 1",
         drawing_id,
     )
     result = dict(row)
-    result["ai_report"] = dict(report) if report else None
+    if report:
+        ai_report = dict(report)
+        ai_report["progress"] = normalize_report_progress(ai_report, result.get("file_size_kb"))
+        result["ai_report"] = ai_report
+    else:
+        result["ai_report"] = None
     return result
+
+
+@router.get("/{drawing_id}/ai-review/progress")
+async def get_ai_review_progress(
+    drawing_id: str,
+    db=Depends(get_db),
+    _=Depends(get_current_user),
+):
+    row = await db.fetch_one(
+        "SELECT file_size_kb FROM drawings WHERE id=$1",
+        drawing_id,
+    )
+    if not row:
+        raise HTTPException(404, "图纸不存在")
+    report = await db.fetch_one(
+        """
+        SELECT id, status, engine_results, total_issues, critical_issues,
+               processing_ms, created_at, completed_at
+        FROM ai_review_reports
+        WHERE drawing_id=$1
+        ORDER BY created_at DESC LIMIT 1
+        """,
+        drawing_id,
+    )
+    if not report:
+        raise HTTPException(404, "AI 审图任务不存在")
+    ai_report = dict(report)
+    return {
+        "report_id": str(ai_report["id"]),
+        "status": ai_report["status"],
+        "progress": normalize_report_progress(ai_report, dict(row).get("file_size_kb")),
+    }
+
+
+@router.post("/{drawing_id}/ai-review/retry")
+async def retry_ai_review(
+    drawing_id: str,
+    request: Request,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    drawing = await db.fetch_one(
+        "SELECT id, status, file_size_kb, drawing_no FROM drawings WHERE id=$1",
+        drawing_id,
+    )
+    if not drawing:
+        raise HTTPException(404, "图纸不存在")
+    if drawing["status"] not in ("draft", "ai_reviewing"):
+        raise HTTPException(409, f"当前状态 {drawing['status']} 不允许重新触发 AI 审图")
+
+    report = await db.fetch_one(
+        """
+        SELECT id FROM ai_review_reports
+        WHERE drawing_id=$1 AND status IN ('pending','processing','failed')
+        ORDER BY created_at DESC LIMIT 1
+        """,
+        drawing_id,
+    )
+    if report is None:
+        report = await db.fetch_one(
+            "INSERT INTO ai_review_reports (drawing_id, status) VALUES ($1,'processing') RETURNING id",
+            drawing_id,
+        )
+
+    initial_progress = progress_payload(
+        status="processing",
+        stage_key="queued",
+        started_at=datetime.now(timezone.utc),
+        completed_keys=[],
+        active_keys=["queued"],
+        estimated_total_seconds=estimate_total_seconds(drawing["file_size_kb"]),
+    )
+    await db.execute(
+        """
+        UPDATE ai_review_reports
+        SET status='processing',
+            engine_results=jsonb_build_object('progress', CAST($2 AS jsonb)),
+            completed_at=NULL
+        WHERE id=$1
+        """,
+        report["id"],
+        json.dumps(initial_progress, ensure_ascii=False),
+    )
+    await db.execute(
+        "UPDATE drawings SET status='ai_reviewing', current_stage='ai_reviewing', updated_at=now() WHERE id=$1",
+        drawing_id,
+    )
+    await write_audit(
+        db,
+        user_id=current_user["id"],
+        action="retry_ai_review",
+        resource="drawing",
+        resource_id=drawing_id,
+        old_state={"status": drawing["status"]},
+        new_state={"status": "ai_reviewing"},
+        ip_address=request.client.host if request.client else None,
+    )
+    run_ai_review.delay(drawing_id)
+    return {"ok": True, "status": "ai_reviewing", "message": "AI 审图任务已重新触发"}
 
 
 # ── 图纸下载签名 URL ──────────────────────────────────────────
@@ -268,7 +390,12 @@ async def list_ai_review_issues(
         f"""
         SELECT i.id, i.engine, i.severity, i.category, i.description,
                i.regulation_ref, i.location_x, i.location_y, i.suggestion, i.status,
-               i.closed_at, i.created_at
+               i.closed_at, i.created_at,
+               i.discipline_code, i.location_json, i.concerns,
+               i.issue_class, i.interface_primary, i.interface_related,
+               i.risk_level, i.object_level, i.standard_question, i.evidence_gap,
+               i.object_name, i.object_basis, i.scenario, i.scenario_reason,
+               i.question_pack, i.doc_minutes, i.doc_reply
         FROM ai_review_issues i
         WHERE {where}
         ORDER BY

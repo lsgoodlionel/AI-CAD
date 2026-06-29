@@ -132,17 +132,19 @@ class RulesEngine(BaseEngine):
             except Exception as e:
                 logger.warning("规则 %s 评估失败: %s", rule.get("id", "?"), e)
 
-        # ── 2. DB 规则（regulation_articles 中有 rule_condition 字段的条目）──
+        # ── 2. DB 规范参考（优先强条和对应专业规范）──
         try:
             db_rules = await db.fetch_all(
                 """
-                SELECT article_no, title, content, tags
-                FROM regulation_articles
-                WHERE rule_condition IS NOT NULL
-                  AND ($1 = ANY(tags) OR 'common' = ANY(tags))
+                SELECT ra.article_no, ra.title, ra.content, rb.std_no
+                FROM regulation_articles ra
+                JOIN regulation_books rb ON ra.book_id = rb.id
+                WHERE ra.is_mandatory = true
+                   OR rb.discipline = :discipline
+                   OR rb.discipline = 'general'
                 LIMIT 50
                 """,
-                ctx.discipline,
+                {"discipline": ctx.discipline},
             )
             for row in db_rules:
                 issues.append(AIIssue(
@@ -150,7 +152,7 @@ class RulesEngine(BaseEngine):
                     severity=IssueSeverity.INFO,
                     description=f"[规范参考] {row['title']}",
                     category="规范引用",
-                    regulation_ref=row["article_no"],
+                    regulation_ref=f"{row['std_no'] or ''} {row['article_no']}".strip(),
                 ))
         except Exception as e:
             logger.debug("DB 规则查询失败（可忽略）: %s", e)

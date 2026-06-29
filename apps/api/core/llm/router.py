@@ -124,6 +124,16 @@ class ModelRouter:
 
     # ──────────────────────────── private ───────────────────────────
 
+    async def _fetch_all(self, query: str, values: dict | None = None):
+        if values and self._db.__class__.__name__ == "DatabaseAdapter":
+            return await self._db.fetch_all(query, **values)
+        return await self._db.fetch_all(query, values) if values else await self._db.fetch_all(query)
+
+    async def _execute(self, query: str, values: dict | None = None):
+        if values and self._db.__class__.__name__ == "DatabaseAdapter":
+            return await self._db.execute(query, **values)
+        return await self._db.execute(query, values) if values else await self._db.execute(query)
+
     async def _try_next(self, engine_name, messages, task_type, depth) -> LLMResponse:
         idx = TASK_PRIORITY.index(task_type) if task_type in TASK_PRIORITY else 0
         if idx + 1 < len(TASK_PRIORITY):
@@ -137,7 +147,7 @@ class ModelRouter:
         if cached and datetime.now() - cached[0] < self.CACHE_TTL:
             return cached[1][0] if cached[1] else None
 
-        rows = await self._db.fetch_all(
+        rows = await self._fetch_all(
             """
             SELECT emc.engine_name, emc.task_type, emc.id AS model_db_id,
                    emc.temperature, emc.max_tokens, emc.top_p,
@@ -147,10 +157,10 @@ class ModelRouter:
             FROM engine_model_configs emc
             JOIN llm_models lm ON emc.model_id = lm.id
             JOIN llm_providers lp ON lm.provider_id = lp.id
-            WHERE emc.engine_name = $1 AND emc.task_type = $2
+            WHERE emc.engine_name = :engine_name AND emc.task_type = :task_type
               AND emc.is_enabled = true AND lp.is_active = true AND lm.is_active = true
             """,
-            engine_name, task_type,
+            {"engine_name": engine_name, "task_type": task_type},
         )
         configs = [EngineConfig(dict(r)) for r in rows]
         self._config_cache[cache_key] = (datetime.now(), configs)
@@ -203,21 +213,24 @@ class ModelRouter:
                 response.prompt_tokens / 1_000_000 * config.input_price_per_1m +
                 response.completion_tokens / 1_000_000 * config.output_price_per_1m
             )
-        await self._db.execute(
+        await self._execute(
             """
             INSERT INTO llm_call_logs
               (engine_name, model_db_id, prompt_tokens, completion_tokens,
                latency_ms, cost_usd, success, error_type)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+            VALUES (:engine_name,:model_db_id,:prompt_tokens,:completion_tokens,
+                    :latency_ms,:cost_usd,:success,:error_type)
             """,
-            engine_name,
-            config.model_db_id,
-            response.prompt_tokens if response else 0,
-            response.completion_tokens if response else 0,
-            response.latency_ms if response else 0,
-            cost,
-            success,
-            (error[:200] if error else None),
+            {
+                "engine_name": engine_name,
+                "model_db_id": config.model_db_id,
+                "prompt_tokens": response.prompt_tokens if response else 0,
+                "completion_tokens": response.completion_tokens if response else 0,
+                "latency_ms": response.latency_ms if response else 0,
+                "cost_usd": cost,
+                "success": success,
+                "error_type": error[:200] if error else None,
+            },
         )
 
     async def _check_provider_health(self, row: dict) -> bool:

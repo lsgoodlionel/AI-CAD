@@ -55,6 +55,14 @@ const routes: IRoute[] = [
     ],
   },
 
+  // ── 图纸会审（会审记录/设计交底文本审查）─────────────────────
+  {
+    name: '图纸会审',
+    path: '/drawing-review',
+    icon: 'AuditOutlined',
+    component: './drawing-review',
+  },
+
   // ── 创效激励 ─────────────────────────────────────────────────
   {
     name: '创效激励',

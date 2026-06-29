@@ -1,0 +1,309 @@
+# disciplines.yaml — 19 专业全量知识资产
+#
+# 自动生成自「图纸会审认知蒸馏」（1909 条真实会审记录，19 专业）。
+# 来源：
+#   - ~/work/031 图纸会审/03 整理数据库/06_认知蒸馏/06_Agent技能规范.md（第7节 专业路由规则，最权威）
+#   - ~/work/031 图纸会审/03 整理数据库/06_认知蒸馏/05_专业审图清单SOP.md（高频入口/主要接口/对象级模板）
+# schema 见 core/ai_review/review_audit/CONTRACT.md 第1节。
+# 严禁手工杜撰；如需修订请回到蒸馏源文件同步。
+#
+# 字段说明：
+#   code               专业代码
+#   name_cn            专业中文名
+#   coarse             映射现有5粗专业: structure|architecture|mep|decoration|general
+#   priority_concerns  该专业「优先检查」的 concern（取前3项）
+#   default_interfaces 该专业「默认联查」专业
+#   risk_triggers      该专业「风险提醒」原文拆条
+#   objects            对象级模板对象名与级别（level: 部位级|系统级|节点级）
+
+disciplines:
+  - code: ZH
+    name_cn: 综合协调
+    coarse: general
+    priority_concerns: [标高, 做法, 尺寸]
+    default_interfaces: [结构, 建筑, 给排水]
+    risk_triggers:
+      - 两个及以上专业图纸互相矛盾
+      - 责任边界不清
+      - 设计答复互相打架
+      - 现场无法判定先后施工
+    objects:
+      - {name: 跨专业冲突点, level: 部位级}
+      - {name: 责任边界, level: 部位级}
+
+  - code: JG
+    name_cn: 结构
+    coarse: structure
+    priority_concerns: [标高, 做法, 详图]
+    default_interfaces: [结构, 建筑, 给排水]
+    risk_triggers:
+      - 标高冲突
+      - 节点缺失
+      - 洞口削弱构件
+      - 构件尺寸与建筑机电不匹配
+    objects:
+      - {name: 梁、柱、板、墙、核心筒, level: 部位级}
+      - {name: 节点锚固, level: 节点级}
+      - {name: 洞口与预埋, level: 节点级}
+      - {name: 结构标高与轴线, level: 部位级}
+
+  - code: WH
+    name_cn: 围护
+    coarse: structure
+    priority_concerns: [标高, 节点, 连接]
+    default_interfaces: [结构, 给排水, 建筑]
+    risk_triggers:
+      - 基坑安全
+      - 止水体系不闭合
+      - 支撑节点不清
+      - 围护与主体结构冲突
+      - 施工阶段无法实施
+    objects:
+      - {name: 支护体系, level: 部位级}
+      - {name: 围檩/支撑/立柱桩, level: 部位级}
+
+  - code: JZ
+    name_cn: 建筑
+    coarse: architecture
+    priority_concerns: [标高, 做法, 防水]
+    default_interfaces: [建筑, 结构, 给排水]
+    risk_triggers:
+      - 防火疏散
+      - 功能净高
+      - 门窗洞口尺寸
+      - 防水收口
+      - 幕墙收边
+    objects:
+      - {name: 门窗洞口, level: 部位级}
+      - {name: 楼梯坡道, level: 部位级}
+      - {name: 屋面排水, level: 系统级}
+      - {name: 卫生间与防水做法, level: 部位级}
+
+  - code: ZJ
+    name_cn: 桩基
+    coarse: structure
+    priority_concerns: [标高, 详图, 连接]
+    default_interfaces: [给排水, 建筑, 结构]
+    risk_triggers:
+      - 桩位冲突
+      - 桩顶标高与基础底标高不符
+      - 桩型参数不清
+      - 承台锚固关系不明确
+      - 成桩施工条件不足
+    objects:
+      - {name: 桩位与桩型, level: 部位级}
+      - {name: 桩顶标高, level: 部位级}
+
+  - code: RF
+    name_cn: 人防
+    coarse: structure
+    priority_concerns: [详图, 标高, 尺寸]
+    default_interfaces: [结构, 建筑, 给排水]
+    risk_triggers:
+      - 口部尺寸不满足规范
+      - 防护密闭做法不满足规范
+      - 穿墙套管不满足规范
+      - 人防机电接口不满足规范
+    objects:
+      - {name: 防护密闭门, level: 部位级}
+      - {name: 口部与染毒区, level: 部位级}
+
+  - code: GJG
+    name_cn: 钢结构
+    coarse: structure
+    priority_concerns: [节点, 标高, 连接]
+    default_interfaces: [结构, 建筑, 暖通]
+    risk_triggers:
+      - 节点不可施工
+      - 焊栓冲突
+      - 吊装分段不成立
+      - 防火防腐做法不闭环
+    objects:
+      - {name: 钢梁钢柱, level: 部位级}
+      - {name: 连接板与螺栓, level: 节点级}
+      - {name: 焊缝与加劲肋, level: 部位级}
+      - {name: 防腐防火做法, level: 部位级}
+
+  - code: JDQ
+    name_cn: 机电综合
+    coarse: mep
+    priority_concerns: [系统, 标高, 预留]
+    default_interfaces: [给排水, 电气, 暖通]
+    risk_triggers:
+      - 机房排布不成立
+      - 综合标高冲突
+      - 主干管线与桥架打架
+      - 预留预埋条件不足
+      - 安装顺序无法落地
+    objects:
+      - {name: 综合标高, level: 部位级}
+      - {name: 机电主干路径, level: 部位级}
+      - {name: 预留预埋, level: 节点级}
+      - {name: 机房设备排布, level: 部位级}
+
+  - code: GPS
+    name_cn: 给排水
+    coarse: mep
+    priority_concerns: [系统, 管道, 喷淋]
+    default_interfaces: [给排水, 建筑, 暖通]
+    risk_triggers:
+      - 消防系统数量不一致
+      - 管线标高打架
+      - 机房套管无法施工
+      - 排水坡度失控
+    objects:
+      - {name: 管道与阀件, level: 系统级}
+      - {name: 套管与预留洞, level: 节点级}
+      - {name: 泵房设备接口, level: 部位级}
+      - {name: 管线标高与坡度, level: 部位级}
+
+  - code: ZS
+    name_cn: 装饰装修
+    coarse: decoration
+    priority_concerns: [做法, 材料, 尺寸]
+    default_interfaces: [建筑, 结构, 电气]
+    risk_triggers:
+      - 材料做法缺失
+      - 末端点位错位
+      - 净高不足
+      - 湿区防水收口不清
+      - 成品效果无法落地
+    objects:
+      - {name: 饰面收口, level: 节点级}
+      - {name: 天花末端点位, level: 部位级}
+
+  - code: DQ
+    name_cn: 电气
+    coarse: mep
+    priority_concerns: [系统, 配电, 回路]
+    default_interfaces: [电气, 给排水, 建筑]
+    risk_triggers:
+      - 回路缺项
+      - 供电路径不闭合
+      - 桥架规格不明
+      - 防雷接地做法不清
+      - 与机电或建筑空间冲突
+    objects:
+      - {name: 回路与供电路径, level: 系统级}
+      - {name: 配电箱柜, level: 部位级}
+      - {name: 桥架电缆, level: 系统级}
+      - {name: 防雷接地, level: 部位级}
+
+  - code: NT
+    name_cn: 暖通
+    coarse: mep
+    priority_concerns: [风管, 系统, 尺寸]
+    default_interfaces: [暖通, 结构, 给排水]
+    risk_triggers:
+      - 防排烟功能不满足
+      - 风管净高冲突
+      - 机房检修空间不足
+      - 冷凝水与排水接口不清
+    objects:
+      - {name: 风管水管, level: 系统级}
+      - {name: 百叶风口, level: 部位级}
+
+  - code: MQ
+    name_cn: 幕墙
+    coarse: architecture
+    priority_concerns: [节点, 可施工性, 连接]
+    default_interfaces: [建筑, 结构, 暖通]
+    risk_triggers:
+      - 埋件定位不明
+      - 收口防水不闭合
+      - 分格与主体冲突
+      - 开启维护条件不足
+    objects:
+      - {name: 分格与开启扇, level: 部位级}
+      - {name: 埋件与连接件, level: 节点级}
+      - {name: 收边收口, level: 节点级}
+
+  - code: SWT
+    name_cn: 室外总体
+    coarse: architecture
+    priority_concerns: [做法, 标高, 管道]
+    default_interfaces: [给排水, 结构, 电气]
+    risk_triggers:
+      - 场地标高倒坡
+      - 室外排水不成立
+      - 道路与出入口高差冲突
+      - 市政接口不闭合
+    objects:
+      - {name: 场地标高, level: 部位级}
+      - {name: 道路与铺装, level: 部位级}
+
+  - code: JGUAN
+    name_cn: 景观
+    coarse: architecture
+    priority_concerns: [做法, 标高, 系统]
+    default_interfaces: [给排水, 建筑, 结构]
+    risk_triggers:
+      - 景观标高冲突
+      - 排水不畅
+      - 铺装与构筑物收口不清
+      - 与建筑或室外机电接口不闭合
+    objects:
+      - {name: 景观标高, level: 部位级}
+      - {name: 铺装与小品, level: 部位级}
+      - {name: 绿化种植, level: 部位级}
+      - {name: 景观排水, level: 系统级}
+
+  - code: JN
+    name_cn: 节能
+    coarse: architecture
+    priority_concerns: [保温, 做法, 材料]
+    default_interfaces: [建筑, 结构, 暖通]
+    risk_triggers:
+      - 节能构造缺失
+      - 材料参数不符
+      - 节能专篇与施工图不一致
+      - 关键部位热工性能无法满足
+    objects:
+      - {name: 保温构造, level: 部位级}
+      - {name: 门窗节能参数, level: 部位级}
+      - {name: 热桥处理, level: 部位级}
+      - {name: 节能材料替代, level: 部位级}
+
+  - code: JK
+    name_cn: 基坑
+    coarse: structure
+    priority_concerns: [尺寸, 轴线, 可施工性]
+    default_interfaces: [结构, 给排水]
+    risk_triggers:
+      - 开挖分层不合理
+      - 降排水路径不清
+      - 监测布点不足
+      - 坑边荷载无法控制
+    objects:
+      - {name: 开挖分层, level: 部位级}
+      - {name: 降排水系统, level: 系统级}
+      - {name: 监测点布置, level: 部位级}
+      - {name: 坑边荷载控制, level: 部位级}
+
+  - code: RD
+    name_cn: 弱电
+    coarse: mep
+    priority_concerns: [回路, 尺寸, 系统]
+    default_interfaces: [电气, 建筑, 暖通]
+    risk_triggers:
+      - 桥架路径不清
+      - 点位漏项
+      - 机房空间不足
+      - 与强电消防抢位
+    objects:
+      - {name: 桥架与线槽, level: 系统级}
+      - {name: 机柜与端接, level: 部位级}
+
+  - code: XF
+    name_cn: 消防
+    coarse: mep
+    priority_concerns: [系统, 做法, 回路]
+    default_interfaces: [建筑, 暖通, 电气]
+    risk_triggers:
+      - 消防系统缺项
+      - 联动逻辑不闭合
+      - 设备供电或管线路径不成立
+      - 影响消防验收
+    objects:
+      - {name: 消火栓/喷淋/报警系统, level: 系统级}
+      - {name: 消防设备供电, level: 部位级}

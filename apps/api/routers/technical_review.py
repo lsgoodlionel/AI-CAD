@@ -41,6 +41,40 @@ async def _get_drawing_or_404(drawing_id: str, db):
     return dict(row)
 
 
+@router.post("/start")
+async def start_technical_review(
+    drawing_id: str,
+    request: Request,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    if current_user["role"] not in (
+        "project_chief_engineer", "group_admin", "group_chief_engineer"
+    ):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "需要项目总工权限")
+
+    drawing = await _get_drawing_or_404(drawing_id, db)
+    assert_valid_transition(drawing["status"], "start_technical")
+    new_status = next_state("start_technical")
+
+    await db.execute(
+        "UPDATE drawings SET status=$2, current_stage=$2, updated_at=now() WHERE id=$1",
+        drawing_id, new_status,
+    )
+    await write_audit(
+        db,
+        user_id=current_user["id"],
+        action="start_technical_review",
+        resource="drawing",
+        resource_id=drawing_id,
+        old_state={"status": drawing["status"]},
+        new_state={"status": new_status},
+        ip_address=request.client.host if request.client else None,
+    )
+    await notify_review_task(drawing["drawing_no"], "一审（技术规范化）", "项目总工")
+    return {"ok": True, "new_status": new_status}
+
+
 @router.post("", status_code=201)
 async def submit_technical_review(
     drawing_id: str,
