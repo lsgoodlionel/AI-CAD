@@ -188,3 +188,63 @@ def write(discipline_code, obj, question_pack, interface) -> dict             # 
 `ai_review_issues` 与 `review_audit_findings` 各 `ADD COLUMN IF NOT EXISTS`：
 object_name varchar(64), object_basis varchar(32), scenario varchar(16), scenario_reason text,
 question_pack jsonb, doc_minutes jsonb, doc_reply jsonb。
+
+---
+
+# 契约 V3（SOP 逐项清单核查）+ 模块归并
+
+来源升级：`06_认知蒸馏/05_专业审图清单SOP.md`（19 专业 × 1909 条会审记录蒸馏，每专业含
+审图目标 / 未来实施后果链 / 逐项清单 / 行动与闭环规则）。
+
+## V3-0. 模块归并（会审审查并入 AI 审图）
+- **独立 `/drawing-review` 模块已删除**：前端独立页（`pages/drawing-review/*`）、顶部导航、
+  后端 `routers/drawing_review.py` 全部移除。会审审查仅作为 AI 审图编排器第 5 引擎（`review`）
+  运行，结果随 `ai_review_issues` 落库，在图纸详情「AI 审查报告 → 会审审查」Tab 呈现。
+- `review_audit_records / review_audit_findings` 表成为历史孤表（仅旧独立 router 写入），**未 DROP**。
+- 前端共享类型/helper 由 `services/drawingReview.ts` 裁剪重命名为 `services/reviewAudit.ts`
+  （仅保留类型 + `disciplineLabel/riskColor/scenarioColor`，去掉失效 API 调用）。
+
+## V3-1. 新增数据资产（`apps/api/data/review_protocol/review_checklists.yaml`）
+由 `scripts/build_review_checklists.py` 从 05 SOP 自动蒸馏（19 专业、133 清单项）：
+```yaml
+checklists:
+  JG:
+    name: 结构
+    protected_result: "通过审查 结构 的 …界面，提前识别会导致返工…的高代价问题。"
+    consequence_chain: ["设计依据不统一→提资/下料错误→预留偏差", "现场返工/材料浪费", "调试/验收失败"]
+    checklist:
+      - {检查项, 判断依据, 核查方法, 常见冲突, 必问问题, 输出口径, 升级: true|false}
+    closure_rules: [...]
+```
+`升级=true` 标记高价值/可升级项（每专业 3 个：接口联合 / 施工可落地 / 风险分级）。
+
+## V3-2. AIIssue 扩展字段（`core/ai_review/base.py`）
+```
+review_sop:dict = {protected_result, why_now,
+                   future_impact:{stage,effect},
+                   checklist:{ratio,checked,covered,items:[...],uncovered:[...]}}
+```
+仅主 finding 挂载；追加的 SOP 清单 finding（category=`会审审查·SOP清单`）不重复挂载。
+
+## V3-3. audit_text 输出 schema V3（在 V1+V2 基础上新增）
+```json
+{
+  "审图目标": {"protected_result":"", "why_now":""},
+  "未来影响": {"stage":"设计深化|提资/下料|预留预埋|安装穿插|调试验收|运营维护", "effect":""},
+  "逐项清单": {"ratio":0.0,"checked":0,"covered":0,"items":[...],"uncovered":[...]}
+}
+```
+旧 key 全部保留，向后兼容。
+
+## V3-4. 引擎模块入口
+```python
+# protocol_loader.py
+def load_review_checklists() -> dict[str, dict]   # {code:{name,protected_result,consequence_chain,checklist,closure_rules}}
+# checklist_runner.py
+def run(discipline_code, text, concerns, location, scenario, issue_class, risk) -> dict
+# ReviewAuditEngine(redis=None)：主 finding + 对「命中∧未覆盖∧升级」清单项追加 ≤3 条紧凑 finding；
+#   review_question_writer 经 ModelRouter 润色主问题（模板优先，无 db/redis/配置时跳过）。
+```
+
+## V3-5. 数据库 migration 009
+`ai_review_issues ADD COLUMN IF NOT EXISTS review_sop JSONB;`（依赖 007/008）。

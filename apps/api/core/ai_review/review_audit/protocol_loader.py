@@ -8,6 +8,7 @@
 - scenario_templates.yaml    —— V2 场景模板（每专业 × 主对象 × 场景）
 - question_pack_templates.yaml —— V2 问题包模板（主问题/补充问题/证据缺口）
 - document_templates.yaml    —— V2 文书口径模板（纪要口径/答复口径）
+- review_checklists.yaml     —— V3 SOP 逐项清单（审图目标/后果链/逐项清单/闭环规则）
 
 设计约束：
 - 全部以 lru_cache 缓存，避免重复 IO/解析。
@@ -37,6 +38,7 @@ _LOCATION_PATTERNS_FILE = "location_patterns.yaml"
 _SCENARIO_TEMPLATES_FILE = "scenario_templates.yaml"
 _QUESTION_PACK_TEMPLATES_FILE = "question_pack_templates.yaml"
 _DOCUMENT_TEMPLATES_FILE = "document_templates.yaml"
+_REVIEW_CHECKLISTS_FILE = "review_checklists.yaml"
 
 
 def _load_yaml(filename: str) -> dict:
@@ -152,3 +154,18 @@ def load_document_templates() -> dict[str, dict]:
     if not isinstance(documents, dict):
         return {}
     return {str(code): doc for code, doc in documents.items() if isinstance(doc, dict)}
+
+
+@lru_cache(maxsize=1)
+def load_review_checklists() -> dict[str, dict]:
+    """加载 SOP 逐项清单（V3，蒸馏自 05_专业审图清单SOP）。
+
+    返回 ``{discipline_code: {name, protected_result, consequence_chain,
+    checklist:[{检查项,判断依据,核查方法,常见冲突,必问问题,输出口径,升级}],
+    closure_rules}}``，缺失/无 pyyaml 时降级返回 ``{}``。
+    """
+    raw = _load_yaml(_REVIEW_CHECKLISTS_FILE)
+    checklists = raw.get("checklists", {}) if isinstance(raw, dict) else {}
+    if not isinstance(checklists, dict):
+        return {}
+    return {str(code): cl for code, cl in checklists.items() if isinstance(cl, dict)}

@@ -1,6 +1,6 @@
 # CAD — 图纸深化全过程管理平台
 
-> 最后更新：2026-05-13 | 实现进度：Phase 0~4B 全部完成，Phase 2C/2D 进阶引擎已实现，K8s 生产配置完成
+> 最后更新：2026-06-30 | 实现进度：Phase 0~4B 全部完成，Phase 2C/2D 进阶引擎已实现，K8s 生产配置完成；会审审查 V3（SOP 逐项清单）已并入 AI 审图
 
 ## 项目概述
 
@@ -41,7 +41,8 @@
 | LangGraph 多轮推理 | ✅ | `core/ai_review/langgraph_agent.py`, `rag_engine.py` |
 | 会审审查第5引擎（19专业蒸馏协议）| ✅ | `core/ai_review/review_audit/`, `data/review_protocol/`, `migrations/007+008` |
 | 会审 V2：对象识别+场景+问题包+文书化输出 | ✅ | `review_audit/{object_identifier,scenario_router,question_pack_builder,document_writer}.py` |
-| 独立图纸会审模块（文本审查）| ✅ | `routers/drawing_review.py`, `pages/drawing-review/`, `services/drawingReview.ts` |
+| 会审 V3：SOP 逐项清单核查（蒸馏 05 SOP）| ✅ | `review_audit/checklist_runner.py`, `data/review_protocol/review_checklists.yaml`, `scripts/build_review_checklists.py`, `migrations/009` |
+| 会审审查并入 AI 审图（删除独立模块）| ✅ | 第5引擎 `review` + AI审图面板「会审审查」Tab（`ReviewFindings.tsx`）；`services/reviewAudit.ts`（共享类型）|
 
 ---
 
