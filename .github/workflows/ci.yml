@@ -235,18 +235,32 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.image.name }}
           cache-to: type=gha,scope=${{ matrix.image.name }},mode=max
 
-      # 镜像扫描为「告警型」：漏洞与 setup-trivy 安装偶发失败均不阻断 CI，
-      # 结果仍上传 Security 面板。安装失败的根因见 issue #4。
+      # Trivy 经官方 APT 源安装：绕开 trivy-action 内置 setup-trivy 必现的二进制
+      # 下载失败（见 #4），改用可靠的 deb 渠道，安装失败会有明确报错。
+      - name: Install Trivy (APT)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key \
+            | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" \
+            | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+          trivy --version
+
+      # 镜像扫描为「告警型」：漏洞不阻断 CI（--exit-code 0 + continue-on-error），
+      # 结果仍上传 Security 面板。
       - name: Scan ${{ matrix.image.name }} image
-        uses: aquasecurity/trivy-action@v0.33.1
         continue-on-error: true
-        with:
-          image-ref: ${{ matrix.image.name }}:ci
-          format: sarif
-          output: trivy-${{ matrix.image.name }}.sarif
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: "0"
+        run: |
+          trivy image \
+            --format sarif \
+            --output "trivy-${{ matrix.image.name }}.sarif" \
+            --severity CRITICAL,HIGH \
+            --ignore-unfixed \
+            --exit-code 0 \
+            "${{ matrix.image.name }}:ci"
 
       - name: Upload Trivy SARIF
         uses: github/codeql-action/upload-sarif@v3
