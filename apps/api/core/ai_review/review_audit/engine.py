@@ -10,6 +10,7 @@ import logging
 
 from ..base import AIIssue, BaseEngine, DrawingContext, IssueSeverity
 from . import (
+    checklist_runner,
     classifier,
     concern_extractor,
     document_writer,
@@ -122,6 +123,17 @@ def audit_text(
         code, obj, scenario, concerns, question_pack, classification["interface"]
     )
 
+    # ── V3 流水线：SOP 逐项清单核查（审图目标/未来影响/清单覆盖）──
+    sop = checklist_runner.run(
+        code,
+        text,
+        concerns,
+        location,
+        scenario,
+        classification["issue_class"],
+        classification["risk"],
+    )
+
     # 标准问题 = 问题包.主问题 +（如有）补充问题；问题包缺失时回退 V1 标准问题
     standard_questions = _standard_questions(question_pack, v1_questions)
 
@@ -143,6 +155,16 @@ def audit_text(
         "场景识别": scenario,
         "问题包": question_pack,
         "文书输出": document,
+        # ── V3 section（SOP 逐项清单）──
+        "审图目标": {
+            "protected_result": sop.get("protected_result", ""),
+            "why_now": sop.get("why_now", ""),
+        },
+        "未来影响": sop.get("future_impact", {"stage": "", "effect": ""}),
+        "逐项清单": sop.get(
+            "coverage",
+            {"ratio": 0.0, "checked": 0, "covered": 0, "items": [], "uncovered": []},
+        ),
     }
 
 
@@ -185,10 +207,74 @@ def _map_severity(risk_level: str, text: str) -> IssueSeverity:
     return _RISK_SEVERITY.get(risk_level, IssueSeverity.INFO)
 
 
+def _build_review_sop(result: dict) -> dict:
+    """从 audit_text 结果组装挂到主 finding 的 SOP 增强结构。"""
+    goal = result.get("审图目标", {}) or {}
+    return {
+        "protected_result": goal.get("protected_result", ""),
+        "why_now": goal.get("why_now", ""),
+        "future_impact": result.get("未来影响", {}) or {},
+        "checklist": result.get("逐项清单", {}) or {},
+    }
+
+
+def _extra_findings(result: dict) -> list[AIIssue]:
+    """对「命中且未覆盖且可升级」的 SOP 清单项追加紧凑高价值 finding（≤3 条）。"""
+    coverage = result.get("逐项清单", {}) or {}
+    uncovered = [u for u in coverage.get("uncovered", []) if u.get("升级")]
+    if not uncovered:
+        return []
+
+    judgement = result["专业判断"]
+    risk = result["风险等级"]
+    interface = result["接口复核"]
+    severity = IssueSeverity.MAJOR if risk.get("level") == "高" else IssueSeverity.MINOR
+
+    findings: list[AIIssue] = []
+    for item in uncovered[:_MAX_EXTRA_FINDINGS]:
+        question = str(item.get("必问问题", "")).strip()
+        if not question:
+            continue
+        findings.append(
+            AIIssue(
+                engine="review",
+                severity=severity,
+                description=question,
+                category="会审审查·SOP清单",
+                suggestion=str(item.get("输出口径", "")),
+                discipline_code=judgement["code"],
+                discipline_name=judgement["name"],
+                location=result["定位信息"],
+                risk_level=str(risk.get("level", "")),
+                interface_primary=interface.get("primary", ""),
+                interface_related=interface.get("related", []),
+                standard_question=question,
+            )
+        )
+    return findings
+
+
+# 追加 SOP 高价值 finding 上限（遵循 SKILL.md「compact question pack」，不堆砌低密度问题）
+_MAX_EXTRA_FINDINGS = 3
+
+_POLISH_SYSTEM = (
+    "你是工程图纸会审问题润色助手。请把给定的会审问题改写为一句可直接进会审问题单的"
+    "闭环问法：保留对象、定位与待明确事项，明确责任与图纸依据，不杜撰原文没有的实体。"
+    "只输出改写后的一句话，不要解释。"
+)
+
+
 class ReviewAuditEngine(BaseEngine):
-    """会审审查引擎（接入协调器并行层）。"""
+    """会审审查引擎（接入协调器并行层）。
+
+    ``redis`` 可选：提供后启用 ``review_question_writer`` LLM 润色（模板优先、失败回退）。
+    """
 
     engine_name = "review"
+
+    def __init__(self, redis=None):
+        self._redis = redis
+        self._router = None
 
     async def analyze(self, ctx: DrawingContext, db) -> list[AIIssue]:
         try:
@@ -196,10 +282,50 @@ class ReviewAuditEngine(BaseEngine):
             if not text.strip():
                 return []
             result = audit_text(ctx.title or "", text, discipline=ctx.discipline)
-            return [self._to_issue(result, text)]
+            main = self._to_issue(result, text)
+            main.review_sop = _build_review_sop(result)
+
+            # LLM 可选润色（仅主问题，1 次调用；任何失败回退模板原句）
+            polished = await self._maybe_polish(main.standard_question, text, db)
+            if polished and polished != main.standard_question:
+                main.standard_question = polished
+                main.description = polished
+
+            return [main, *_extra_findings(result)]
         except Exception as exc:  # noqa: BLE001 - 引擎异常返回空列表，不影响其他引擎
             logger.error("[ReviewAuditEngine] 审查失败: %s", exc)
             return []
+
+    def _get_router(self, db):
+        """惰性构造 ModelRouter；缺 db/redis 时返回 None（润色降级跳过）。"""
+        if db is None or self._redis is None:
+            return None
+        if self._router is None:
+            try:
+                from core.llm.router import ModelRouter
+                self._router = ModelRouter(db, self._redis)
+            except Exception as exc:  # noqa: BLE001 - 导入/构造失败则不润色
+                logger.debug("[ReviewAuditEngine] ModelRouter 不可用，跳过润色: %s", exc)
+                return None
+        return self._router
+
+    async def _maybe_polish(self, question: str, context: str, db) -> str:
+        if not question:
+            return question
+        router = self._get_router(db)
+        if router is None:
+            return question
+        try:
+            messages = [
+                {"role": "system", "content": _POLISH_SYSTEM},
+                {"role": "user", "content": f"原问题：{question}\n记录背景：{context[:500]}"},
+            ]
+            resp = await router.route("review_question_writer", messages)
+            out = (getattr(resp, "content", "") or "").strip()
+            return out or question
+        except Exception as exc:  # noqa: BLE001 - 润色失败回退模板原句
+            logger.debug("[ReviewAuditEngine] 问题润色跳过: %s", exc)
+            return question
 
     def _to_issue(self, result: dict, text: str) -> AIIssue:
         judgement = result["专业判断"]

@@ -2,7 +2,7 @@
 四引擎协调器：顺序运行视觉引擎（填充 OCR 文本），
 再并行运行规则/知识图谱/RAG/会审审查引擎，汇总结果写入数据库。
 
-注意：会审审查引擎（review）的扩展列由 migrations/007 与 008 创建，
+注意：会审审查引擎（review）的扩展列由 migrations/007、008、009 创建，
 写库前请确保已执行该迁移（见下方 INSERT）。
 """
 import asyncio
@@ -93,7 +93,7 @@ class Orchestrator:
             RulesEngine(),
             KGEngine(),
             RAGEngine(self._db, self._redis),
-            ReviewAuditEngine(),
+            ReviewAuditEngine(self._redis),
         ]
         active_parallel = [engine.engine_name for engine in parallel_engines]
         await self._emit_progress({
@@ -156,7 +156,8 @@ class Orchestrator:
         #   standard_question, evidence_gap(jsonb)
         # V2 扩展列（object_name, object_basis, scenario, scenario_reason,
         #   question_pack(jsonb), doc_minutes(jsonb), doc_reply(jsonb)）由 migrations/008 创建。
-        # 部署时必须先执行 migrations/007 与 migrations/008，否则下方 INSERT 因缺列报错。
+        # V3 扩展列（review_sop(jsonb)，SOP 逐项清单核查）由 migrations/009 创建。
+        # 部署时必须先执行 migrations/007、008、009，否则下方 INSERT 因缺列报错。
         for issue in all_issues:
             await self._db.execute(
                 """
@@ -167,7 +168,7 @@ class Orchestrator:
                      interface_primary, interface_related, risk_level, object_level,
                      standard_question, evidence_gap,
                      object_name, object_basis, scenario, scenario_reason,
-                     question_pack, doc_minutes, doc_reply)
+                     question_pack, doc_minutes, doc_reply, review_sop)
                 VALUES (:report_id,:engine,:severity,:category,:description,
                         :regulation_ref,:suggestion,:location_x,:location_y,'open',
                         :discipline_code,
@@ -178,7 +179,7 @@ class Orchestrator:
                         :standard_question, CAST(:evidence_gap AS jsonb),
                         :object_name, :object_basis, :scenario, :scenario_reason,
                         CAST(:question_pack AS jsonb), CAST(:doc_minutes AS jsonb),
-                        CAST(:doc_reply AS jsonb))
+                        CAST(:doc_reply AS jsonb), CAST(:review_sop AS jsonb))
                 """,
                 {
                     "report_id": report_id,
@@ -208,6 +209,8 @@ class Orchestrator:
                     "question_pack": json.dumps(issue.question_pack, ensure_ascii=False) if issue.question_pack else None,
                     "doc_minutes": json.dumps(issue.doc_minutes, ensure_ascii=False) if issue.doc_minutes else None,
                     "doc_reply": json.dumps(issue.doc_reply, ensure_ascii=False) if issue.doc_reply else None,
+                    # ── V3 扩展列（需先执行 migrations/009）──
+                    "review_sop": json.dumps(issue.review_sop, ensure_ascii=False) if issue.review_sop else None,
                 },
             )
 

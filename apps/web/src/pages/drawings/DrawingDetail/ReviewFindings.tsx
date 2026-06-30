@@ -9,7 +9,8 @@ import {
   riskColor,
   scenarioColor,
   type QuestionPack,
-} from '@/services/drawingReview'
+  type ReviewSop,
+} from '@/services/reviewAudit'
 
 const { Text, Paragraph } = Typography
 
@@ -33,6 +34,8 @@ interface ReviewIssue {
   object_name?: string
   scenario?: string
   question_pack?: unknown
+  // 契约 V3 透传字段（SOP 逐项清单核查）
+  review_sop?: unknown
 }
 
 interface Props {
@@ -161,6 +164,9 @@ export default function ReviewFindings({ drawingId, reportStatus }: Props) {
             const related = coerce<string[]>(it.interface_related, [])
             const gap = coerce<string[]>(it.evidence_gap, [])
             const pack = coerce<Partial<QuestionPack>>(it.question_pack, {})
+            const sop = coerce<Partial<ReviewSop>>(it.review_sop, {})
+            const cov = sop.checklist
+            const upgradeGaps = (cov?.uncovered ?? []).filter((u) => u.升级)
             const locText = locationLine(loc)
             return (
               <div key={it.id}>
@@ -185,6 +191,27 @@ export default function ReviewFindings({ drawingId, reportStatus }: Props) {
                   {it.standard_question || it.description}
                 </Paragraph>
                 <Descriptions size="small" column={1} colon>
+                  {sop.protected_result && (
+                    <Descriptions.Item label="受保护结果">{sop.protected_result}</Descriptions.Item>
+                  )}
+                  {sop.future_impact?.stage && (
+                    <Descriptions.Item label="未来影响">
+                      <Tag color="gold">{sop.future_impact.stage}</Tag>
+                      {sop.future_impact.effect}
+                    </Descriptions.Item>
+                  )}
+                  {cov && cov.checked > 0 && (
+                    <Descriptions.Item label="SOP 清单覆盖">
+                      <Space wrap>
+                        <Tag color={cov.ratio >= 0.8 ? 'green' : cov.ratio >= 0.5 ? 'orange' : 'red'}>
+                          {Math.round(cov.ratio * 100)}%（{cov.covered}/{cov.checked}）
+                        </Tag>
+                        {upgradeGaps.map((u) => (
+                          <Tag key={u.检查项} color="volcano">待核：{u.检查项}</Tag>
+                        ))}
+                      </Space>
+                    </Descriptions.Item>
+                  )}
                   {pack.主问题 && (
                     <Descriptions.Item label="主问题">{pack.主问题}</Descriptions.Item>
                   )}

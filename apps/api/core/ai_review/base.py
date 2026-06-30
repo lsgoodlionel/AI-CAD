@@ -79,6 +79,11 @@ class AIIssue:
     doc_minutes:        list = field(default_factory=list)  # 会审纪要口径条目
     doc_reply:          list = field(default_factory=list)  # 设计答复口径条目
 
+    # ── V3 扩展：SOP 逐项清单核查（蒸馏自 05_专业审图清单SOP，可选、向后兼容）──
+    review_sop:         dict = field(default_factory=dict)
+    # review_sop = {protected_result, why_now, future_impact:{stage,effect},
+    #               checklist:{ratio, checked, covered, items:[...], uncovered:[...]}}
+
 
 class BaseEngine(ABC):
     """所有引擎的抽象基类。"""
