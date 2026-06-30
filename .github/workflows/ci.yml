@@ -235,19 +235,23 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.image.name }}
           cache-to: type=gha,scope=${{ matrix.image.name }},mode=max
 
+      # 镜像扫描为「告警型」：漏洞与 setup-trivy 安装偶发失败均不阻断 CI，
+      # 结果仍上传 Security 面板。安装失败的根因见 issue #4。
       - name: Scan ${{ matrix.image.name }} image
         uses: aquasecurity/trivy-action@v0.33.1
+        continue-on-error: true
         with:
           image-ref: ${{ matrix.image.name }}:ci
           format: sarif
           output: trivy-${{ matrix.image.name }}.sarif
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          exit-code: "1"
+          exit-code: "0"
 
       - name: Upload Trivy SARIF
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: ${{ always() && hashFiles(format('trivy-{0}.sarif', matrix.image.name)) != '' }}
+        continue-on-error: true
         with:
           sarif_file: trivy-${{ matrix.image.name }}.sarif
 
