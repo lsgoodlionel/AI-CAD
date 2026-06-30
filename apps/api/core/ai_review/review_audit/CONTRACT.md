@@ -200,7 +200,7 @@ question_pack jsonb, doc_minutes jsonb, doc_reply jsonb。
 - **独立 `/drawing-review` 模块已删除**：前端独立页（`pages/drawing-review/*`）、顶部导航、
   后端 `routers/drawing_review.py` 全部移除。会审审查仅作为 AI 审图编排器第 5 引擎（`review`）
   运行，结果随 `ai_review_issues` 落库，在图纸详情「AI 审查报告 → 会审审查」Tab 呈现。
-- `review_audit_records / review_audit_findings` 表成为历史孤表（仅旧独立 router 写入），**未 DROP**。
+- `review_audit_records / review_audit_findings` 历史孤表（仅旧独立 router 写入）由 **migration 010** 归档（重命名为 `_deprecated_*`，**保留数据**、可逆）。
 - 前端共享类型/helper 由 `services/drawingReview.ts` 裁剪重命名为 `services/reviewAudit.ts`
   （仅保留类型 + `disciplineLabel/riskColor/scenarioColor`，去掉失效 API 调用）。
 
