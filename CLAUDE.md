@@ -1,6 +1,6 @@
 # CAD — 图纸深化全过程管理平台
 
-> 最后更新：2026-06-30 | 实现进度：Phase 0~4B 全部完成，Phase 2C/2D 进阶引擎已实现，K8s 生产配置完成；会审审查 V3（SOP 逐项清单）已并入 AI 审图
+> 最后更新：2026-07-06 | 实现进度：Phase 0~4B 全部完成；会审审查 V4（方法论）已并入 AI 审图；Phase 5 批量读图与整套审图完成；Phase 6 工程 3D 模型基座完成（模型成为全平台成果展示主通道之一）
 
 ## 项目概述
 
@@ -42,7 +42,11 @@
 | 会审审查第5引擎（19专业蒸馏协议）| ✅ | `core/ai_review/review_audit/`, `data/review_protocol/`, `migrations/007+008` |
 | 会审 V2：对象识别+场景+问题包+文书化输出 | ✅ | `review_audit/{object_identifier,scenario_router,question_pack_builder,document_writer}.py` |
 | 会审 V3：SOP 逐项清单核查（蒸馏 05 SOP）| ✅ | `review_audit/checklist_runner.py`, `data/review_protocol/review_checklists.yaml`, `scripts/build_review_checklists.py`, `migrations/009` |
+| 会审 V4：方法论升级（六步控制链+五维审查+闭环不足判定+结构化处理建议）| ✅ | `review_audit/{control_chain,dimension_checker,action_recommender}.py`, `data/review_protocol/review_methodology.yaml`, `migrations/011` |
 | 会审审查并入 AI 审图（删除独立模块）| ✅ | 第5引擎 `review` + AI审图面板「会审审查」Tab（`ReviewFindings.tsx`）；`services/reviewAudit.ts`（共享类型）|
+| Phase 5：批量上传/ZIP 整套导入 + 文件名解析 + DWG→DXF（ODA）| ✅ | `routers/drawings.py`（/batch、/import-zip）、`services/drawing_filename_parser.py`、`core/ai_review/dwg_support.py` |
+| Phase 5：套图审图（单张/多张/整套）+ 跨图分析 | ✅ | `routers/review_batches.py`、`tasks/batch_review.py`、`core/ai_review/cross_drawing.py`、`migrations/012`；前端 `pages/drawings/ReviewBatch/` |
+| Phase 6：工程 3D 模型基座（楼层堆叠+图纸贴图+IFC glTF+成果标记）| ✅ | `services/{floor_parser,model_builder}.py`、`tasks/model_build.py`、`routers/project_models.py`、`migrations/013`；前端 `pages/model/ProjectModel/`（three.js）+ 四处平台入口 |
 
 ---
 

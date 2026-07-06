@@ -12,6 +12,8 @@ celery_app = Celery(
         "tasks.proposal_notice",
         "tasks.regulation_import",
         "tasks.regulation_api_sync",
+        "tasks.batch_review",
+        "tasks.model_build",
     ],
 )
 
@@ -30,6 +32,8 @@ celery_app.conf.update(
         "tasks.regulation_import.*": {"queue": "regulation_import"},
         "tasks.regulation_api_sync.*": {"queue": "regulation_import"},
         "tasks.proposal_notice.*": {"queue": "default"},
+        "tasks.batch_review.*": {"queue": "default"},
+        "tasks.model_build.*": {"queue": "default"},
     },
     # Celery beat 定时任务
     beat_schedule={

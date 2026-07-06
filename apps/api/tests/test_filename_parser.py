@@ -1,0 +1,104 @@
+"""文件名解析器测试（蓝图 4.2：专业前缀 / 图号 / 版本 / 兜底各分支）"""
+import pytest
+
+from services.drawing_filename_parser import parse_drawing_filename
+
+
+# ── 规则 1：专业前缀 ─────────────────────────────────────────────
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "filename,expected",
+    [
+        ("结施-01_一层梁配筋图_B.dxf", "structure"),
+        ("GS-101 基础平面图.pdf", "structure"),
+        ("建施-02 二层平面图.pdf", "architecture"),
+        ("JS_03.dwg", "architecture"),
+        ("水施-03 给排水平面.dwg", "mep"),
+        ("电施-05 配电干线图B版.pdf", "mep"),
+        ("暖施-01.pdf", "mep"),
+        ("机施-02.pdf", "mep"),
+        ("SS-07 喷淋平面.pdf", "mep"),
+        ("DS-08.dxf", "mep"),
+        ("NS-12", "mep"),
+        ("装施-04 吊顶大样.pdf", "decoration"),
+        ("ZS-09.pdf", "decoration"),
+        ("项目总说明.pdf", "general"),
+    ],
+)
+def test_discipline_prefix_mapping(filename, expected):
+    assert parse_drawing_filename(filename)["discipline"] == expected
+
+
+@pytest.mark.unit
+def test_lowercase_letter_prefix_is_recognized():
+    assert parse_drawing_filename("gs-101.pdf")["discipline"] == "structure"
+
+
+# ── 规则 2：图号 ────────────────────────────────────────────────
+
+@pytest.mark.unit
+def test_drawing_no_extracted_from_first_match():
+    result = parse_drawing_filename("结施-01_一层梁配筋图_B.dxf")
+    assert result["drawing_no"] == "结施-01"
+
+
+@pytest.mark.unit
+def test_drawing_no_with_letter_prefix():
+    assert parse_drawing_filename("GS-101 基础平面图.pdf")["drawing_no"] == "GS-101"
+
+
+@pytest.mark.unit
+def test_drawing_no_falls_back_to_stem_when_no_match():
+    result = parse_drawing_filename("项目总说明.pdf")
+    assert result["drawing_no"] == "项目总说明"
+
+
+# ── 规则 3：版本 ────────────────────────────────────────────────
+
+@pytest.mark.unit
+def test_version_from_underscore_suffix():
+    assert parse_drawing_filename("结施-01_一层梁配筋图_B.dxf")["version"] == "B"
+
+
+@pytest.mark.unit
+def test_version_from_ban_marker():
+    assert parse_drawing_filename("电施-05 配电干线图B版.pdf")["version"] == "B"
+
+
+@pytest.mark.unit
+def test_version_with_v_prefix():
+    assert parse_drawing_filename("JS-102_VC.pdf")["version"] == "C"
+
+
+@pytest.mark.unit
+def test_version_defaults_to_a():
+    assert parse_drawing_filename("GS-101 基础平面图.pdf")["version"] == "A"
+
+
+# ── 规则 4：标题 ────────────────────────────────────────────────
+
+@pytest.mark.unit
+def test_title_strips_drawing_no_and_version():
+    result = parse_drawing_filename("结施-01_一层梁配筋图_B.dxf")
+    assert result["title"] == "一层梁配筋图"
+
+
+@pytest.mark.unit
+def test_title_strips_ban_version_marker():
+    result = parse_drawing_filename("电施-05 配电干线图B版.pdf")
+    assert result["title"] == "配电干线图"
+
+
+# ── 兜底 / 结构 ─────────────────────────────────────────────────
+
+@pytest.mark.unit
+def test_empty_filename_returns_safe_defaults():
+    result = parse_drawing_filename("")
+    assert result == {"drawing_no": "", "discipline": "general", "title": "", "version": "A"}
+
+
+@pytest.mark.unit
+def test_result_contains_exactly_contract_keys():
+    result = parse_drawing_filename("结施-01.pdf")
+    assert set(result) == {"drawing_no", "discipline", "title", "version"}

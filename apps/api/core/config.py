@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     jwt_refresh_expire_days: int = 30
     # AI 服务
     ai_service_url: str = "http://localhost:8001"
+    # ODA File Converter（DWG → DXF 转换，可选；环境变量 ODA_CONVERTER_PATH）
+    oda_converter_path: str = ""
     # 路由器配置
     model_router_cache_ttl_sec: int = 30
     # 企业微信通知（可选）

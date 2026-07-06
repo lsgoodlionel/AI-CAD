@@ -11,10 +11,12 @@
   "dependencies": {
     "@ant-design/icons": "^5.3.7",
     "@ant-design/pro-components": "^2.7.15",
+    "@types/three": "^0.185.0",
     "@umijs/max": "^4.3.12",
     "antd": "^5.19.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",

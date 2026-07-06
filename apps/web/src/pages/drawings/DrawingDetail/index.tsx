@@ -4,7 +4,7 @@ import {
   Card, Descriptions, Button, Spin, Space, Alert, Divider, Tag, Badge,
   Progress, Timeline, Typography, message,
 } from 'antd'
-import { ArrowLeftOutlined, DownloadOutlined, EyeOutlined, EyeInvisibleOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, BuildOutlined, DownloadOutlined, EyeOutlined, EyeInvisibleOutlined } from '@ant-design/icons'
 import {
   getDrawing,
   getDownloadUrl,
@@ -239,6 +239,12 @@ export default function DrawingDetail() {
         </Button>
         <Button icon={<DownloadOutlined />} onClick={handleDownload}>
           下载图纸
+        </Button>
+        <Button
+          icon={<BuildOutlined />}
+          onClick={() => navigate(`/model/${drawing.project_id}?focus=${id}`)}
+        >
+          在工程模型中查看
         </Button>
       </Space>
 

@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from core.storage import get_minio, settings
 from .base import BaseEngine, DrawingContext, AIIssue, IssueSeverity
+from .dwg_support import ensure_dxf
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,42 @@ def _extract_ocr(data: bytes) -> str:
     return "\n".join(lines)[:MAX_TEXT_CHARS]
 
 
+def _extract_cad(data: bytes, file_ext: str, metadata: dict, issues: list[AIIssue]) -> str:
+    """DWG/DXF 提取：DWG 先经 ensure_dxf（ODA 转换），成功按 DXF 解析；
+    未配置/转换失败降级为 INFO 提示，不再对二进制 DWG 盲目 ezdxf.read。"""
+    dxf_data, _effective_ext, warning = ensure_dxf(data, file_ext)
+    if warning:
+        issues.append(AIIssue(
+            engine="ocr", severity=IssueSeverity.INFO,
+            description=warning,
+            category="引擎配置",
+            suggestion="安装 ODA File Converter 并配置 ODA_CONVERTER_PATH，或上传 DXF/PDF 版本图纸",
+        ))
+        return ""
+    try:
+        extracted, _ = _extract_dxf(dxf_data)
+    except ImportError:
+        logger.warning("[VisionEngine] ezdxf 未安装，跳过 DXF 解析")
+        issues.append(AIIssue(
+            engine="ocr", severity=IssueSeverity.INFO,
+            description="ezdxf 未安装，DXF/DWG 文件无法深度解析，建议管理员安装 ezdxf",
+            category="引擎配置",
+        ))
+        return ""
+    except Exception as e:
+        logger.warning("[VisionEngine] DXF 解析失败: %s", e)
+        issues.append(AIIssue(
+            engine="ocr", severity=IssueSeverity.MINOR,
+            description=f"DXF 文件解析遇到问题：{e}",
+            category="文件质量",
+        ))
+        return ""
+    is_converted = file_ext == "dwg" and dxf_data is not data
+    metadata["parser"] = "oda+ezdxf" if is_converted else "ezdxf"
+    logger.info("[VisionEngine] %s 提取 %d 字符", metadata["parser"], len(extracted))
+    return extracted
+
+
 def _sync_extract(file_key: str, file_ext: str, file_size_kb: int) -> tuple[str, dict, list[AIIssue], bytes]:
     """
     同步提取主函数（在线程池中调用）。
@@ -116,24 +153,7 @@ def _sync_extract(file_key: str, file_ext: str, file_size_kb: int) -> tuple[str,
 
     # ── DWG/DXF 路径 ───────────────────────────────────────────
     if file_ext in ("dwg", "dxf"):
-        try:
-            extracted, _ = _extract_dxf(data)
-            metadata["parser"] = "ezdxf"
-            logger.info("[VisionEngine] DXF 提取 %d 字符", len(extracted))
-        except ImportError:
-            logger.warning("[VisionEngine] ezdxf 未安装，跳过 DXF 解析")
-            issues.append(AIIssue(
-                engine="ocr", severity=IssueSeverity.INFO,
-                description="ezdxf 未安装，DXF/DWG 文件无法深度解析，建议管理员安装 ezdxf",
-                category="引擎配置",
-            ))
-        except Exception as e:
-            logger.warning("[VisionEngine] DXF 解析失败: %s", e)
-            issues.append(AIIssue(
-                engine="ocr", severity=IssueSeverity.MINOR,
-                description=f"DXF 文件解析遇到问题：{e}",
-                category="文件质量",
-            ))
+        extracted = _extract_cad(data, file_ext, metadata, issues)
 
     # ── PDF 路径 ───────────────────────────────────────────────
     elif file_ext == "pdf":

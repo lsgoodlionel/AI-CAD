@@ -3,12 +3,13 @@
  * 图纸流转 / AI 审图质量 / 提案漏斗 / 近期活动
  */
 import { useEffect, useState } from 'react'
+import { useNavigate } from '@umijs/max'
 import {
   Row, Col, Card, Statistic, Select, Table, Tag,
-  Alert, Spin, Space, Timeline, Typography,
+  Alert, Spin, Space, Timeline, Typography, Button,
 } from 'antd'
 import {
-  FileTextOutlined, TrophyOutlined, RobotOutlined, WarningOutlined,
+  FileTextOutlined, TrophyOutlined, RobotOutlined, WarningOutlined, BuildOutlined,
 } from '@ant-design/icons'
 import { getProjectDashboard } from '@/services/dashboard'
 import { listProjects } from '@/services/projects'
@@ -44,6 +45,7 @@ const ACTION_LABEL: Record<string, string> = {
 }
 
 export default function ProjectDashboard() {
+  const navigate = useNavigate()
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([])
   const [projectId, setProjectId] = useState<string>('')
   const [data, setData] = useState<any>(null)
@@ -78,6 +80,13 @@ export default function ProjectDashboard() {
           onChange={setProjectId}
           options={projects.map(p => ({ label: p.name, value: p.id }))}
         />
+        <Button
+          icon={<BuildOutlined />}
+          disabled={!projectId}
+          onClick={() => navigate(`/model/${projectId}`)}
+        >
+          工程模型
+        </Button>
       </Space>
 
       {loading && <Spin style={{ display: 'block', marginTop: 60 }} />}

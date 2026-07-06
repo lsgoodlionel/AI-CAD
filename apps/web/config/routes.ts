@@ -47,12 +47,37 @@ const routes: IRoute[] = [
         component: './drawings/DrawingList',
       },
       {
+        name: '套图审查',
+        path: '/drawings/review-batches',
+        component: './drawings/ReviewBatch',
+      },
+      {
+        path: '/drawings/review-batches/:id',
+        component: './drawings/ReviewBatch/Detail',
+        hideInMenu: true,
+        name: '套图详情',
+      },
+      {
         path: '/drawings/:id',
         component: './drawings/DrawingDetail',
         hideInMenu: true,
         name: '图纸详情',
       },
     ],
+  },
+
+  // ── 工程模型 ─────────────────────────────────────────────────
+  {
+    name: '工程模型',
+    path: '/model',
+    icon: 'build',
+    component: './model/ProjectModel',
+  },
+  {
+    path: '/model/:projectId',
+    component: './model/ProjectModel',
+    hideInMenu: true,
+    name: '工程模型详情',
   },
 
   // 会审审查已并入「图纸管理 → AI 审查报告 → 会审审查」Tab，不再独立成模块。
