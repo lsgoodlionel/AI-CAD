@@ -157,7 +157,8 @@ class Orchestrator:
         # V2 扩展列（object_name, object_basis, scenario, scenario_reason,
         #   question_pack(jsonb), doc_minutes(jsonb), doc_reply(jsonb)）由 migrations/008 创建。
         # V3 扩展列（review_sop(jsonb)，SOP 逐项清单核查）由 migrations/009 创建。
-        # 部署时必须先执行 migrations/007、008、009，否则下方 INSERT 因缺列报错。
+        # V4 扩展列（review_method(jsonb)，方法论控制链/五维审查/处理建议）由 migrations/011 创建。
+        # 部署时必须先执行 migrations/007、008、009、011，否则下方 INSERT 因缺列报错。
         for issue in all_issues:
             await self._db.execute(
                 """
@@ -168,7 +169,7 @@ class Orchestrator:
                      interface_primary, interface_related, risk_level, object_level,
                      standard_question, evidence_gap,
                      object_name, object_basis, scenario, scenario_reason,
-                     question_pack, doc_minutes, doc_reply, review_sop)
+                     question_pack, doc_minutes, doc_reply, review_sop, review_method)
                 VALUES (:report_id,:engine,:severity,:category,:description,
                         :regulation_ref,:suggestion,:location_x,:location_y,'open',
                         :discipline_code,
@@ -179,7 +180,8 @@ class Orchestrator:
                         :standard_question, CAST(:evidence_gap AS jsonb),
                         :object_name, :object_basis, :scenario, :scenario_reason,
                         CAST(:question_pack AS jsonb), CAST(:doc_minutes AS jsonb),
-                        CAST(:doc_reply AS jsonb), CAST(:review_sop AS jsonb))
+                        CAST(:doc_reply AS jsonb), CAST(:review_sop AS jsonb),
+                        CAST(:review_method AS jsonb))
                 """,
                 {
                     "report_id": report_id,
@@ -211,6 +213,8 @@ class Orchestrator:
                     "doc_reply": json.dumps(issue.doc_reply, ensure_ascii=False) if issue.doc_reply else None,
                     # ── V3 扩展列（需先执行 migrations/009）──
                     "review_sop": json.dumps(issue.review_sop, ensure_ascii=False) if issue.review_sop else None,
+                    # ── V4 扩展列（需先执行 migrations/011）──
+                    "review_method": json.dumps(issue.review_method, ensure_ascii=False) if issue.review_method else None,
                 },
             )
 

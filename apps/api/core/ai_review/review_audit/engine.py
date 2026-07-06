@@ -10,9 +10,12 @@ import logging
 
 from ..base import AIIssue, BaseEngine, DrawingContext, IssueSeverity
 from . import (
+    action_recommender,
     checklist_runner,
     classifier,
     concern_extractor,
+    control_chain,
+    dimension_checker,
     document_writer,
     location_extractor,
     object_identifier,
@@ -134,6 +137,17 @@ def audit_text(
         classification["risk"],
     )
 
+    # ── V4 流水线：五维审查 → 结构化处理建议 → 六步控制链（含闭环判定）──
+    dimensions = dimension_checker.check(
+        text, location, concerns, classification["issue_class"]
+    )
+    recommendation = action_recommender.recommend(text, classification, scenario, obj)
+    structured_actions = recommendation["处理建议"]
+    chain = control_chain.build(
+        text, classification, scenario, [a["动作"] for a in structured_actions]
+    )
+    priority_objects = dimension_checker.hit_priority_objects(text)
+
     # 标准问题 = 问题包.主问题 +（如有）补充问题；问题包缺失时回退 V1 标准问题
     standard_questions = _standard_questions(question_pack, v1_questions)
 
@@ -165,6 +179,12 @@ def audit_text(
             "coverage",
             {"ratio": 0.0, "checked": 0, "covered": 0, "items": [], "uncovered": []},
         ),
+        # ── V4 section（方法论：控制链/五维审查/结构化处理建议）──
+        "控制链": chain,
+        "五维审查": dimensions,
+        "处理建议": structured_actions,
+        "闭环要求": recommendation["闭环要求"],
+        "优先对象": priority_objects,
     }
 
 
@@ -215,6 +235,17 @@ def _build_review_sop(result: dict) -> dict:
         "why_now": goal.get("why_now", ""),
         "future_impact": result.get("未来影响", {}) or {},
         "checklist": result.get("逐项清单", {}) or {},
+    }
+
+
+def _build_review_method(result: dict) -> dict:
+    """从 audit_text 结果组装挂到主 finding 的方法论增强结构（V4）。"""
+    return {
+        "控制链": result.get("控制链", {}) or {},
+        "五维审查": result.get("五维审查", []) or [],
+        "处理建议": result.get("处理建议", []) or [],
+        "闭环要求": result.get("闭环要求", {}) or {},
+        "优先对象": result.get("优先对象", []) or [],
     }
 
 
@@ -284,6 +315,7 @@ class ReviewAuditEngine(BaseEngine):
             result = audit_text(ctx.title or "", text, discipline=ctx.discipline)
             main = self._to_issue(result, text)
             main.review_sop = _build_review_sop(result)
+            main.review_method = _build_review_method(result)
 
             # LLM 可选润色（仅主问题，1 次调用；任何失败回退模板原句）
             polished = await self._maybe_polish(main.standard_question, text, db)

@@ -9,6 +9,7 @@
 - question_pack_templates.yaml —— V2 问题包模板（主问题/补充问题/证据缺口）
 - document_templates.yaml    —— V2 文书口径模板（纪要口径/答复口径）
 - review_checklists.yaml     —— V3 SOP 逐项清单（审图目标/后果链/逐项清单/闭环规则）
+- review_methodology.yaml    —— V4 方法论资产（五维审查/控制链/动作类型/责任方/闭环要素）
 
 设计约束：
 - 全部以 lru_cache 缓存，避免重复 IO/解析。
@@ -39,6 +40,7 @@ _SCENARIO_TEMPLATES_FILE = "scenario_templates.yaml"
 _QUESTION_PACK_TEMPLATES_FILE = "question_pack_templates.yaml"
 _DOCUMENT_TEMPLATES_FILE = "document_templates.yaml"
 _REVIEW_CHECKLISTS_FILE = "review_checklists.yaml"
+_REVIEW_METHODOLOGY_FILE = "review_methodology.yaml"
 
 
 def _load_yaml(filename: str) -> dict:
@@ -169,3 +171,41 @@ def load_review_checklists() -> dict[str, dict]:
     if not isinstance(checklists, dict):
         return {}
     return {str(code): cl for code, cl in checklists.items() if isinstance(cl, dict)}
+
+
+@lru_cache(maxsize=1)
+def load_review_methodology() -> dict:
+    """加载方法论资产（V4，蒸馏自 06 方法论与AI原则）。
+
+    返回 ``{control_chain_order, dimensions, priority_objects, action_types,
+    action_outputs, action_dictionary, responsible_parties,
+    closure_elements, closure_followups}``；缺失/无 pyyaml 时各 key 降级为空结构。
+    """
+    raw = _load_yaml(_REVIEW_METHODOLOGY_FILE)
+    return {
+        "control_chain_order": [str(s) for s in raw.get("control_chain_order", []) or []],
+        "dimensions": [d for d in raw.get("dimensions", []) or [] if isinstance(d, dict)],
+        "priority_objects": [
+            o for o in raw.get("priority_objects", []) or [] if isinstance(o, dict)
+        ],
+        "action_types": {
+            str(k): [str(w) for w in (v or [])]
+            for k, v in (raw.get("action_types", {}) or {}).items()
+        },
+        "action_outputs": {
+            str(k): str(v) for k, v in (raw.get("action_outputs", {}) or {}).items()
+        },
+        "action_dictionary": [
+            a for a in raw.get("action_dictionary", []) or [] if isinstance(a, dict)
+        ],
+        "responsible_parties": [
+            p for p in raw.get("responsible_parties", []) or [] if isinstance(p, dict)
+        ],
+        "closure_elements": {
+            str(k): [str(w) for w in (v or [])]
+            for k, v in (raw.get("closure_elements", {}) or {}).items()
+        },
+        "closure_followups": {
+            str(k): str(v) for k, v in (raw.get("closure_followups", {}) or {}).items()
+        },
+    }

@@ -248,3 +248,74 @@ def run(discipline_code, text, concerns, location, scenario, issue_class, risk) 
 
 ## V3-5. 数据库 migration 009
 `ai_review_issues ADD COLUMN IF NOT EXISTS review_sop JSONB;`（依赖 007/008）。
+
+---
+
+# 契约 V4（方法论升级：六步控制链 + 五维审查 + 结构化处理建议）
+
+来源升级：`~/work/031 图纸会审/06 方法论与AI原则/`（4123 份工程会议纪要蒸馏）：
+`drawing_review_core_principles.md`（五步审查顺序 + 6 条底层原则）、
+`meeting_ai_agent_principles.md`（触发→边界→风险→责任→动作→闭环 + 闭环不足标记规则）、
+`drawing_review_question_book.md`（五类问题集）、
+`drawing_review_output_template.md`（处理建议表 + 闭环要求）、
+`meeting_pattern_summary.md`（高频对象/动作/责任方先验）。
+
+## V4-1. 新增数据资产（`apps/api/data/review_protocol/review_methodology.yaml`）
+```yaml
+control_chain_order: [触发, 边界, 风险, 责任, 动作, 闭环]
+dimensions:            # 五维审查（固定顺序）：完整性/界面一致性/可施工性/验收可达性/闭环性
+  - {name, principle, signals: [...], question}
+priority_objects:      # 高频审查对象先验 [{name, weight, keywords}]
+action_types:          # 补图|复核|RFI|会签|专题协调 → 触发信号
+action_outputs:        # 动作类型 → 默认输出件
+action_dictionary:     # 高频动作先验 [{name, weight}]
+responsible_parties:   # 高频责任方 [{name, weight, keywords}]
+closure_elements:      # 闭环四要素（责任方/时限/输出件/确认方式）→ 检测词
+closure_followups:     # 要素缺失 → 追问模板
+```
+
+## V4-2. AIIssue 扩展字段（`core/ai_review/base.py`）
+```
+review_method:dict = {控制链:{触发,边界,风险,责任,动作,闭环,闭环判定:{status,缺失项,追问项}},
+                      五维审查:[{维度,状态(存疑|待核),依据,追问}],
+                      处理建议:[{动作,动作类型,责任方,配合方,输出件}],
+                      闭环要求:{是否影响开工,是否影响穿插,是否需要专题会,下次复核节点},
+                      优先对象:[{name,weight,hit}]}
+```
+仅主 finding 挂载；SOP 清单 finding 不重复挂载。
+
+## V4-3. audit_text 输出 schema V4（在 V1+V2+V3 基础上新增，旧 key 全部保留）
+```json
+{
+  "控制链": {"触发":"","边界":"","风险":"","责任":"","动作":[],"闭环":"",
+             "闭环判定":{"status":"闭环完整|闭环不足","缺失项":[],"追问项":[]}},
+  "五维审查": [{"维度":"","状态":"存疑|待核","依据":"","追问":""}],
+  "处理建议": [{"动作":"","动作类型":"补图|复核|RFI|会签|专题协调","责任方":"","配合方":[],"输出件":""}],
+  "闭环要求": {"是否影响开工":false,"是否影响穿插":false,"是否需要专题会":false,"下次复核节点":""},
+  "优先对象": [{"name":"","weight":0,"hit":""}]
+}
+```
+闭环不足判定规则（agent 原则）：正文缺闭环四要素任一 → status=闭环不足 + 按缺失项输出追问模板。
+
+## V4-4. 引擎模块入口
+```python
+# dimension_checker.py —— 五维审查（固定顺序）+ 高频对象命中
+def check(text, location, concerns, issue_class) -> list[dict]
+def hit_priority_objects(text) -> list[dict]
+# control_chain.py —— 六步控制链 + 闭环判定（缺动作/责任必须标记闭环不足）
+def build(text, classification, scenario, action_names) -> dict
+# action_recommender.py —— 结构化处理建议（≤4 条紧凑）+ 闭环要求
+def recommend(text, classification, scenario, obj) -> dict
+```
+补图复合判定：动词（缺/无/补）与图纸表达对象（大样/详图/节点图/做法/说明）同现即触发。
+无任何动作信号时至少产出一条 RFI（问题必须有动作出口）。
+
+## V4-5. 数据库 migration 011
+`ai_review_issues ADD COLUMN IF NOT EXISTS review_method JSONB;`（依赖 007/008/009）。
+同时修复 `routers/drawings.py` 问题列表 SELECT 漏 `review_sop` 列的问题（V3 前端展示依赖）。
+
+## V4-6. 前端
+`services/reviewAudit.ts` 新增 ControlChain/DimensionRow/StructuredAction/ClosureRequirements/
+PriorityObjectHit/ReviewMethod 类型与 `closureColor/dimensionColor` helper；
+`ReviewFindings.tsx` 展示闭环判定 Tag、优先对象 Tag、五维审查、控制链、处理建议、闭环追问、
+闭环要求；导出 TSV 追加「处理建议/闭环判定」两列。

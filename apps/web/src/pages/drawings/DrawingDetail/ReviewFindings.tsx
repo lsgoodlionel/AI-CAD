@@ -5,10 +5,13 @@ import {
 import { CopyOutlined, DownloadOutlined } from '@ant-design/icons'
 import { getAiReviewIssues } from '@/services/drawings'
 import {
+  closureColor,
+  dimensionColor,
   disciplineLabel,
   riskColor,
   scenarioColor,
   type QuestionPack,
+  type ReviewMethod,
   type ReviewSop,
 } from '@/services/reviewAudit'
 
@@ -36,6 +39,8 @@ interface ReviewIssue {
   question_pack?: unknown
   // 契约 V3 透传字段（SOP 逐项清单核查）
   review_sop?: unknown
+  // 契约 V4 透传字段（方法论：控制链/五维审查/处理建议）
+  review_method?: unknown
 }
 
 interface Props {
@@ -72,14 +77,19 @@ function locationLine(loc: Record<string, string[]>): string {
 }
 
 function buildIssueSheet(issues: ReviewIssue[]): string {
-  const header = '序号\t专业\t风险\t问题归类\t标准问题\t接口\t证据缺口'
+  const header = '序号\t专业\t风险\t问题归类\t标准问题\t接口\t证据缺口\t处理建议\t闭环判定'
   const rows = issues.map((it, i) => {
     const cls = coerce<string[]>(it.issue_class, []).join('/')
     const related = coerce<string[]>(it.interface_related, [])
     const iface = [it.interface_primary, ...related].filter(Boolean).join('、')
     const gap = coerce<string[]>(it.evidence_gap, []).join('；')
     const q = it.standard_question || it.description
-    return `${i + 1}\t${disciplineLabel(it.discipline_code)}\t${it.risk_level ?? ''}\t${cls}\t${q}\t${iface}\t${gap}`
+    const method = coerce<Partial<ReviewMethod>>(it.review_method, {})
+    const actions = (method.处理建议 ?? [])
+      .map((a) => `${a.动作类型}：${a.动作}（责任方：${a.责任方}，输出件：${a.输出件}）`)
+      .join('；')
+    const closure = method.控制链?.闭环判定?.status ?? ''
+    return `${i + 1}\t${disciplineLabel(it.discipline_code)}\t${it.risk_level ?? ''}\t${cls}\t${q}\t${iface}\t${gap}\t${actions}\t${closure}`
   })
   return [header, ...rows].join('\n')
 }
@@ -168,6 +178,13 @@ export default function ReviewFindings({ drawingId, reportStatus }: Props) {
             const cov = sop.checklist
             const upgradeGaps = (cov?.uncovered ?? []).filter((u) => u.升级)
             const locText = locationLine(loc)
+            const method = coerce<Partial<ReviewMethod>>(it.review_method, {})
+            const chain = method.控制链
+            const verdict = chain?.闭环判定
+            const suspectDims = (method.五维审查 ?? []).filter((d) => d.状态 === '存疑')
+            const structuredActions = method.处理建议 ?? []
+            const closureReq = method.闭环要求
+            const priorityHits = method.优先对象 ?? []
             return (
               <div key={it.id}>
                 {idx > 0 && <Divider style={{ margin: '12px 0' }} />}
@@ -180,6 +197,12 @@ export default function ReviewFindings({ drawingId, reportStatus }: Props) {
                   {it.object_name && <Tag color="blue">{it.object_name}</Tag>}
                   {cls.map((c) => (
                     <Tag key={c} color="purple">{c}</Tag>
+                  ))}
+                  {verdict?.status && (
+                    <Tag color={closureColor(verdict.status)}>{verdict.status}</Tag>
+                  )}
+                  {priorityHits.map((o) => (
+                    <Tag key={o.name} color="magenta">优先对象：{o.name}</Tag>
                   ))}
                 </Space>
                 <Paragraph
@@ -231,6 +254,74 @@ export default function ReviewFindings({ drawingId, reportStatus }: Props) {
                   {locText && <Descriptions.Item label="定位信息">{locText}</Descriptions.Item>}
                   {gap.length > 0 && (
                     <Descriptions.Item label="证据缺口">{gap.join('；')}</Descriptions.Item>
+                  )}
+                  {(method.五维审查 ?? []).length > 0 && (
+                    <Descriptions.Item label="五维审查">
+                      <Space wrap>
+                        {(method.五维审查 ?? []).map((d) => (
+                          <Tag key={d.维度} color={dimensionColor(d.状态)}>
+                            {d.维度}：{d.状态}
+                          </Tag>
+                        ))}
+                      </Space>
+                    </Descriptions.Item>
+                  )}
+                  {suspectDims.length > 0 && (
+                    <Descriptions.Item label="存疑依据">
+                      {suspectDims.map((d) => `${d.维度}（${d.依据}）`).join('；')}
+                    </Descriptions.Item>
+                  )}
+                  {chain && (chain.触发 || chain.边界 || chain.责任) && (
+                    <Descriptions.Item label="控制链">
+                      {[
+                        chain.触发 && `触发：${chain.触发}`,
+                        chain.边界 && `边界：${chain.边界}`,
+                        chain.风险 && `风险：${chain.风险}`,
+                        chain.责任 && `责任：${chain.责任}`,
+                        chain.闭环 && `闭环：${chain.闭环}`,
+                      ]
+                        .filter(Boolean)
+                        .join(' → ')}
+                    </Descriptions.Item>
+                  )}
+                  {structuredActions.length > 0 && (
+                    <Descriptions.Item label="处理建议">
+                      <div>
+                        {structuredActions.map((a) => (
+                          <div key={`${a.动作类型}-${a.动作}`}>
+                            <Tag color="cyan">{a.动作类型}</Tag>
+                            {a.动作}（责任方：{a.责任方}
+                            {a.配合方.length > 0 && `，配合：${a.配合方.join('、')}`}
+                            ，输出件：{a.输出件}）
+                          </div>
+                        ))}
+                      </div>
+                    </Descriptions.Item>
+                  )}
+                  {verdict && verdict.追问项.length > 0 && (
+                    <Descriptions.Item label="闭环追问">
+                      {verdict.追问项.join('；')}
+                    </Descriptions.Item>
+                  )}
+                  {closureReq && (
+                    <Descriptions.Item label="闭环要求">
+                      <Space wrap>
+                        <Tag color={closureReq.是否影响开工 ? 'red' : 'default'}>
+                          影响开工：{closureReq.是否影响开工 ? '是' : '否'}
+                        </Tag>
+                        <Tag color={closureReq.是否影响穿插 ? 'orange' : 'default'}>
+                          影响穿插：{closureReq.是否影响穿插 ? '是' : '否'}
+                        </Tag>
+                        <Tag color={closureReq.是否需要专题会 ? 'gold' : 'default'}>
+                          需专题会：{closureReq.是否需要专题会 ? '是' : '否'}
+                        </Tag>
+                      </Space>
+                      {closureReq.下次复核节点 && (
+                        <div>
+                          <Text type="secondary">下次复核：{closureReq.下次复核节点}</Text>
+                        </div>
+                      )}
+                    </Descriptions.Item>
                   )}
                 </Descriptions>
               </div>

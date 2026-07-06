@@ -110,6 +110,67 @@ export interface ReviewSop {
   checklist: ChecklistCoverage
 }
 
+// ── 契约 V4 结构（方法论：控制链 / 五维审查 / 结构化处理建议）──────────
+
+export type ClosureStatus = '闭环完整' | '闭环不足'
+
+export interface ClosureVerdict {
+  status: ClosureStatus | string
+  缺失项: string[]
+  追问项: string[]
+}
+
+export interface ControlChain {
+  触发: string
+  边界: string
+  风险: string
+  责任: string
+  动作: string[]
+  闭环: string
+  闭环判定: ClosureVerdict
+}
+
+export type DimensionStatus = '存疑' | '待核'
+
+export interface DimensionRow {
+  维度: string
+  状态: DimensionStatus | string
+  依据: string
+  追问: string
+}
+
+export type ActionType = '补图' | '复核' | 'RFI' | '会签' | '专题协调'
+
+export interface StructuredAction {
+  动作: string
+  动作类型: ActionType | string
+  责任方: string
+  配合方: string[]
+  输出件: string
+}
+
+export interface ClosureRequirements {
+  是否影响开工: boolean
+  是否影响穿插: boolean
+  是否需要专题会: boolean
+  下次复核节点: string
+}
+
+export interface PriorityObjectHit {
+  name: string
+  weight: number
+  hit: string
+}
+
+/** ai_review_issues.review_method 透传结构 */
+export interface ReviewMethod {
+  控制链: ControlChain
+  五维审查: DimensionRow[]
+  处理建议: StructuredAction[]
+  闭环要求: ClosureRequirements
+  优先对象: PriorityObjectHit[]
+}
+
 export interface ReviewAuditResult {
   专业判断: DisciplineJudgement
   定位信息: LocationInfo
@@ -127,6 +188,11 @@ export interface ReviewAuditResult {
   审图目标?: { protected_result: string; why_now: string }
   未来影响?: FutureImpact
   逐项清单?: ChecklistCoverage
+  控制链?: ControlChain
+  五维审查?: DimensionRow[]
+  处理建议?: StructuredAction[]
+  闭环要求?: ClosureRequirements
+  优先对象?: PriorityObjectHit[]
 }
 
 // ── 展示 helper（被 ReviewFindings 复用）──────────────────────────
@@ -181,3 +247,11 @@ export const SCENARIO_COLOR: Record<string, string> = {
 
 export const scenarioColor = (name?: string): string =>
   SCENARIO_COLOR[name ?? ''] ?? 'default'
+
+/** 闭环判定 → Tag 颜色（闭环不足=red, 闭环完整=green） */
+export const closureColor = (status?: string): string =>
+  status === '闭环不足' ? 'red' : status === '闭环完整' ? 'green' : 'default'
+
+/** 五维审查状态 → Tag 颜色（存疑=orange, 待核=default） */
+export const dimensionColor = (status?: string): string =>
+  status === '存疑' ? 'orange' : 'default'

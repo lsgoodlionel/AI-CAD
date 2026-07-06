@@ -84,6 +84,14 @@ class AIIssue:
     # review_sop = {protected_result, why_now, future_impact:{stage,effect},
     #               checklist:{ratio, checked, covered, items:[...], uncovered:[...]}}
 
+    # ── V4 扩展：方法论升级（蒸馏自 06 方法论与AI原则，可选、向后兼容）──
+    review_method:      dict = field(default_factory=dict)
+    # review_method = {控制链:{触发,边界,风险,责任,动作,闭环,闭环判定},
+    #                  五维审查:[{维度,状态,依据,追问}],
+    #                  处理建议:[{动作,动作类型,责任方,配合方,输出件}],
+    #                  闭环要求:{是否影响开工,是否影响穿插,是否需要专题会,下次复核节点},
+    #                  优先对象:[{name,weight,hit}]}
+
 
 class BaseEngine(ABC):
     """所有引擎的抽象基类。"""
