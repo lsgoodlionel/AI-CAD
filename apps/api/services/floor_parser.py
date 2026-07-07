@@ -57,6 +57,11 @@ def _int_to_cn(number: int) -> str:
     return f"{tens_text}{_CN_UNITS[units]}" if units else tens_text
 
 
+# 楼层数值合理范围（超出视为轴号/桩号/编号伪匹配，非真实楼层）
+_MAX_BASEMENT_FLOORS = 9
+_MAX_ABOVE_GROUND_FLOORS = 120
+
+
 def _match_basement(text: str) -> tuple[str, str, int] | None:
     """地下楼层匹配：B2 / 地下二层 / 负二层。"""
     match = _RE_BASEMENT.search(text)
@@ -64,7 +69,7 @@ def _match_basement(text: str) -> tuple[str, str, int] | None:
         return None
     raw = next((g for g in match.groups() if g), "")
     number = _cn_to_int(raw)
-    if not number:
+    if not number or number > _MAX_BASEMENT_FLOORS:
         return None
     return (f"B{number}", f"地下{_int_to_cn(number)}层", -number)
 
@@ -76,7 +81,7 @@ def _match_above_ground(text: str) -> tuple[str, str, int] | None:
         return None
     raw = next((g for g in match.groups() if g), "")
     number = _cn_to_int(raw)
-    if not number:
+    if not number or number > _MAX_ABOVE_GROUND_FLOORS:
         return None
     return (f"F{number}", f"{number}层", number)
 
@@ -96,6 +101,9 @@ def parse_floor(text: str) -> tuple[str, str, int] | None:
     basement = _match_basement(text)
     if basement is not None:
         return basement
+    # 命中地下语境但数值超范围（如"地下八十层"伪匹配）→ 不再降级按地上层解析
+    if _RE_BASEMENT.search(text):
+        return None
     return _match_above_ground(text)
 
 

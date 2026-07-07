@@ -78,3 +78,28 @@ def test_floor_of_drawing_unzoned_when_nothing_matches():
 
 def test_floor_of_drawing_handles_missing_fields():
     assert floor_of_drawing({}, []) == UNZONED_FLOOR
+
+
+# ── 数值合理性钳制（上海大歌剧院实测：图内文本 B80 被误判为地下八十层）──
+
+@pytest.mark.unit
+def test_basement_number_out_of_range_rejected():
+    """地下层超过合理范围（>9）→ 视为非楼层文本（轴号/桩号等伪匹配）"""
+    from services.floor_parser import parse_floor
+    assert parse_floor("B80 钢筋编号") is None
+    assert parse_floor("地下八十层") is None
+
+
+@pytest.mark.unit
+def test_above_ground_number_out_of_range_rejected():
+    """地上层超过 120 层 → 拒绝（编号伪匹配）"""
+    from services.floor_parser import parse_floor
+    assert parse_floor("300层") is None
+
+
+@pytest.mark.unit
+def test_reasonable_floors_still_parse():
+    from services.floor_parser import parse_floor
+    assert parse_floor("B2 平面")[0] == "B2"
+    assert parse_floor("地下二层")[0] == "B2"
+    assert parse_floor("15层平面图")[0] == "F15"
