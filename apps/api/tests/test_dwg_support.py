@@ -26,7 +26,9 @@ def test_dwg_without_magic_treated_as_dxf():
 
 @pytest.mark.unit
 def test_dwg_without_oda_config_degrades(monkeypatch):
+    """ODA 未配置且无 dwg2dxf → 降级提示（屏蔽测试机上真实安装的 dwg2dxf）"""
     monkeypatch.setattr(dwg_support.settings, "oda_converter_path", "")
+    monkeypatch.setattr(dwg_support.shutil, "which", lambda _n: None)
     data, ext, warning = ensure_dxf(DWG_BYTES, "dwg")
     assert data == DWG_BYTES
     assert ext == "dwg"
@@ -55,3 +57,43 @@ def test_dwg_conversion_failure_degrades_with_warning(monkeypatch):
     assert data == DWG_BYTES
     assert ext == "dwg"
     assert warning and "转换失败" in warning
+
+
+# ── GNU LibreDWG dwg2dxf 兜底链路 ────────────────────────────────
+
+@pytest.mark.unit
+def test_dwg_falls_back_to_dwg2dxf_when_oda_missing(monkeypatch):
+    """ODA 未配置但 PATH 有 dwg2dxf → 走 LibreDWG 转换成功"""
+    monkeypatch.setattr(dwg_support.settings, "oda_converter_path", "")
+    monkeypatch.setattr(dwg_support.shutil, "which", lambda _n: "/usr/local/bin/dwg2dxf")
+    monkeypatch.setattr(
+        dwg_support, "_convert_with_dwg2dxf", lambda _exe, _d: b"LIBREDWG_DXF"
+    )
+    data, ext, warning = ensure_dxf(DWG_BYTES, "dwg")
+    assert (data, ext, warning) == (b"LIBREDWG_DXF", "dxf", None)
+
+
+@pytest.mark.unit
+def test_dwg_oda_failure_then_dwg2dxf_success(monkeypatch):
+    """ODA 配置了但转换失败 → 自动降级 dwg2dxf 成功"""
+    monkeypatch.setattr(dwg_support.settings, "oda_converter_path", "/opt/oda/AppRun")
+
+    def _oda_boom(_data: bytes) -> bytes:
+        raise RuntimeError("oda crashed")
+
+    monkeypatch.setattr(dwg_support, "_convert_with_oda", _oda_boom)
+    monkeypatch.setattr(dwg_support.shutil, "which", lambda _n: "/usr/local/bin/dwg2dxf")
+    monkeypatch.setattr(
+        dwg_support, "_convert_with_dwg2dxf", lambda _exe, _d: b"LIBREDWG_DXF"
+    )
+    data, ext, warning = ensure_dxf(DWG_BYTES, "dwg")
+    assert (data, ext, warning) == (b"LIBREDWG_DXF", "dxf", None)
+
+
+@pytest.mark.unit
+def test_dwg_no_converter_at_all_degrades(monkeypatch):
+    monkeypatch.setattr(dwg_support.settings, "oda_converter_path", "")
+    monkeypatch.setattr(dwg_support.shutil, "which", lambda _n: None)
+    data, ext, warning = ensure_dxf(DWG_BYTES, "dwg")
+    assert ext == "dwg"
+    assert warning == ODA_MISSING_WARNING

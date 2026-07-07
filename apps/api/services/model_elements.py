@@ -252,12 +252,29 @@ def totals(floors: list[dict]) -> dict[str, int]:
     return result
 
 
+def _split_elements_by_srcs(elements: dict, src_ids: set[str]) -> dict[str, list]:
+    """按来源图纸集切分楼层构件（构件均携带 src=drawing_id）。
+
+    src 不在任何单体图纸集内的构件（理论不存在）保留在其所属楼层的每个分组中
+    的兜底策略改为：无 src 归入该分组，避免构件凭空丢失。
+    """
+    result: dict[str, list] = {}
+    for kind in EMPTY_ELEMENTS:
+        items = elements.get(kind) or []
+        result[kind] = [
+            item for item in items
+            if not item.get("src") or str(item.get("src")) in src_ids
+        ]
+    return result
+
+
 def group_buildings(
     floors: list[dict], drawings: list[dict], project_name: str,
 ) -> list[dict]:
     """按单体分组楼层（同楼层图纸可能分属多单体 → 楼层按单体拆分）。
 
     输入 floors 为拍平楼层（V1 结构 + elements）；输出蓝图 buildings 数组。
+    楼层构件按 src 来源图纸切分到所属单体（不重复归组）。
     """
     building_of_drawing = {
         str(d["id"]): building_of(d) for d in drawings
@@ -277,11 +294,15 @@ def group_buildings(
                 {"key": key, "label": label or (project_name if key == "main" else key),
                  "origin": [0, 0], "floors": []},
             )
+            src_ids = {str(entry["drawing_id"]) for entry in entries}
+            elements = _split_elements_by_srcs(
+                floor.get("elements") or {}, src_ids
+            )
             building["floors"].append({
                 **{k: floor[k] for k in ("key", "label", "elevation", "order")},
                 "drawings": entries,
-                "elements": floor.get("elements") or {k: [] for k in EMPTY_ELEMENTS},
-                "element_stats": floor.get("element_stats") or element_stats({}),
+                "elements": elements,
+                "element_stats": element_stats(elements),
             })
     for building in buildings.values():
         building["floors"].sort(key=lambda f: f["order"])

@@ -19,6 +19,7 @@ import {
   Drawer,
   Empty,
   List,
+  Progress,
   Row,
   Segmented,
   Space,
@@ -252,12 +253,13 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
     fetchModel()
   }, [fetchModel])
 
-  // building 状态每 5s 轮询直到 ready / failed
+  // building 状态每 5s 轮询直到 ready / failed（deps 用整个 model：
+  // 每次拉取都是新对象，保证链式重排定时器，进度持续刷新）
   useEffect(() => {
     if (model?.status !== 'building') return undefined
     const timer = setTimeout(fetchModel, POLL_INTERVAL_MS)
     return () => clearTimeout(timer)
-  }, [model?.status, model?.version, fetchModel])
+  }, [model, fetchModel])
 
   // 场景变化时初始化专业过滤器为全选
   const availableDisciplines = useMemo(() => {
@@ -405,7 +407,21 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
             style={{ marginTop: 8 }}
             type="info"
             showIcon
-            message="模型构建中，页面将每 5 秒自动刷新…"
+            message={
+              model.progress
+                ? `${model.progress.stage_label}${model.progress.current ? `：${model.progress.current}` : ''}`
+                : '模型构建中，页面将每 5 秒自动刷新…'
+            }
+            description={
+              model.progress && model.progress.total > 1 ? (
+                <Progress
+                  percent={Math.round((model.progress.done / model.progress.total) * 100)}
+                  size="small"
+                  status="active"
+                  format={() => `${model.progress?.done}/${model.progress?.total}`}
+                />
+              ) : undefined
+            }
           />
         ) : null}
         {model.status === 'failed' ? (

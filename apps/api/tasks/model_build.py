@@ -43,12 +43,30 @@ async def _do_build(project_id: str) -> dict:
         await db.execute(
             """
             UPDATE project_models
-            SET status='building', updated_at=now()
+            SET status='building', progress=NULL, updated_at=now()
             WHERE project_id=:project_id
             """,
             {"project_id": project_id},
         )
-        scene, assets = await build_scene(db, project_id)
+
+        async def update_progress(payload: dict) -> None:
+            """实时进度落库（migration 014 progress 列）；失败不影响构建。"""
+            try:
+                await db.execute(
+                    """
+                    UPDATE project_models
+                    SET progress=CAST(:progress AS jsonb), updated_at=now()
+                    WHERE project_id=:project_id
+                    """,
+                    {
+                        "project_id": project_id,
+                        "progress": json.dumps(payload, ensure_ascii=False),
+                    },
+                )
+            except Exception as exc:  # noqa: BLE001 — 进度写入失败仅告警
+                logger.debug("模型进度写入失败: %s", exc)
+
+        scene, assets = await build_scene(db, project_id, progress_cb=update_progress)
         row = await db.fetch_one(
             """
             UPDATE project_models

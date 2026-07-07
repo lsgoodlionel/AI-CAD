@@ -82,19 +82,22 @@ async def get_project_model(
 ):
     row = await db.fetch_one(
         """
-        SELECT status, version, built_at, error, scene
+        SELECT status, version, built_at, error, scene, progress
         FROM project_models WHERE project_id=$1
         """,
         project_id,
     )
     if row is None:
         raise HTTPException(404, "MODEL_NOT_BUILT")
+    record = dict(row)
     return {
-        "status": row["status"],
-        "version": row["version"],
-        "built_at": row["built_at"],
-        "error": row["error"],
-        "scene": _parse_jsonb(row["scene"], None),
+        "status": record["status"],
+        "version": record["version"],
+        "built_at": record["built_at"],
+        "error": record["error"],
+        "scene": _parse_jsonb(record["scene"], None),
+        # 构建实时进度（migration 014；building 状态时前端展示）
+        "progress": _parse_jsonb(record.get("progress"), None),
     }
 
 

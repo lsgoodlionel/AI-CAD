@@ -141,6 +141,36 @@ def test_pick_element_drawings_classification():
 
 
 @pytest.mark.unit
+def test_group_buildings_splits_elements_by_src():
+    """多单体共享楼层时，构件按 src 来源图纸切分到所属单体，不重复归组"""
+    floors = [{
+        "key": "F1", "label": "1层", "elevation": 1, "order": 1,
+        "drawings": [
+            {"drawing_id": D_SOUTH, "drawing_no": "S-1"},
+            {"drawing_id": D_NORTH, "drawing_no": "S-2"},
+        ],
+        "elements": {
+            "columns": [
+                {"outline": [[0, 0]], "src": D_SOUTH},
+                {"outline": [[1, 1]], "src": D_NORTH},
+                {"outline": [[2, 2]], "src": D_NORTH},
+            ],
+            "walls": [], "beams": [], "slabs": [], "pipes": [], "equipment": [],
+        },
+        "element_stats": {"columns": 3, "walls": 0, "beams": 0, "slabs": 0, "pipes": 0, "equipment": 0},
+    }]
+    drawings = [
+        {"id": D_SOUTH, "title": "南区一层墙柱平面", "drawing_no": "S-1"},
+        {"id": D_NORTH, "title": "北区一层墙柱平面", "drawing_no": "S-2"},
+    ]
+    buildings = model_elements.group_buildings(floors, drawings, "项目")
+    south = next(b for b in buildings if b["key"] == "south")
+    north = next(b for b in buildings if b["key"] == "north")
+    assert south["floors"][0]["element_stats"]["columns"] == 1
+    assert north["floors"][0]["element_stats"]["columns"] == 2
+
+
+@pytest.mark.unit
 def test_reconstruction_mode_mixed():
     floors = [
         {"elements": {"columns": [1], "walls": [], "beams": [], "slabs": [], "pipes": [], "equipment": []}},

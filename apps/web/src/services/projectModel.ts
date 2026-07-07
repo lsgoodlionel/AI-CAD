@@ -180,12 +180,23 @@ export interface ModelScene {
 
 export type ProjectModelStatus = 'building' | 'ready' | 'failed'
 
+/** 构建实时进度（building 状态时有值） */
+export interface ModelBuildProgress {
+  stage: 'fetch' | 'render' | 'recognize' | 'assemble' | string
+  stage_label: string
+  current: string
+  done: number
+  total: number
+  updated_at: string
+}
+
 export interface ProjectModelResponse {
   status: ProjectModelStatus
   version: number
   built_at: string | null
   error: string | null
   scene: ModelScene | null
+  progress?: ModelBuildProgress | null
 }
 
 export interface RebuildProjectModelResult {

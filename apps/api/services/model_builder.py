@@ -236,15 +236,43 @@ async def _build_one_asset(
         return _empty_asset(ext or "none"), None, False
 
 
+def _progress_payload(
+    stage: str, stage_label: str, current: str, done: int, total: int
+) -> dict:
+    return {
+        "stage": stage,
+        "stage_label": stage_label,
+        "current": current,
+        "done": done,
+        "total": total,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+async def _notify(progress_cb, payload: dict) -> None:
+    """进度回调（可选）；回调异常绝不影响构建。"""
+    if progress_cb is None:
+        return
+    try:
+        await progress_cb(payload)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[ModelBuilder] 进度回调失败: %s", exc)
+
+
 async def _build_assets(
-    project_id: str, drawings: list[dict]
+    project_id: str, drawings: list[dict], progress_cb=None
 ) -> tuple[dict, list[dict], bool]:
     """全部图纸资产：assets 索引 + ifc_models 列表 + ifc_skipped 标记。"""
     loop = asyncio.get_event_loop()
     assets: dict[str, dict] = {}
     ifc_models: list[dict] = []
     ifc_skipped = False
-    for drawing in drawings:
+    total = len(drawings)
+    for index, drawing in enumerate(drawings):
+        await _notify(progress_cb, _progress_payload(
+            "render", "读取图纸内容并渲染贴图",
+            str(drawing.get("drawing_no") or ""), index, total,
+        ))
         asset, gltf_key, skipped = await _build_one_asset(loop, project_id, drawing)
         assets[str(drawing["id"])] = asset
         if gltf_key:
@@ -449,7 +477,8 @@ async def _fetch_inputs(db, project_id: str) -> tuple[dict, list[dict], dict, di
 
 
 async def _attach_floor_elements(
-    floors: list[dict], drawings: list[dict], floor_of: dict[str, str]
+    floors: list[dict], drawings: list[dict], floor_of: dict[str, str],
+    progress_cb=None,
 ) -> int:
     """为每楼层识别构件（V2）：floor 增 elements/element_stats；返回 YOLO 设备数。"""
     drawings_by_floor: dict[str, list[dict]] = {}
@@ -458,7 +487,11 @@ async def _attach_floor_elements(
         drawings_by_floor.setdefault(key, []).append(drawing)
 
     yolo_total = 0
-    for floor in floors:
+    for index, floor in enumerate(floors):
+        await _notify(progress_cb, _progress_payload(
+            "recognize", "识别楼层构件（柱/墙/梁/板/管线/设备）",
+            str(floor.get("label") or floor["key"]), index, len(floors),
+        ))
         floor_drawings = drawings_by_floor.get(floor["key"], [])
         try:
             elements, yolo_count = await model_elements.build_floor_elements(
@@ -483,12 +516,18 @@ def _marker_building_keys(markers: list[dict], drawings: list[dict]) -> None:
         marker["building_key"] = building_by_drawing.get(drawing_id, "main")
 
 
-async def build_scene(db, project_id: str) -> tuple[dict, dict]:
-    """构建 scene（V1 契约全保留 + schema_version=2 构件层），返回 (scene, assets)。"""
+async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict]:
+    """构建 scene（V1 契约全保留 + schema_version=2 构件层），返回 (scene, assets)。
+
+    ``progress_cb``：可选 async 回调，接收 {stage, stage_label, current, done, total,
+    updated_at}，供构建任务实时写库展示进度。
+    """
+    await _notify(progress_cb, _progress_payload("fetch", "读取项目图纸与审图数据", "", 0, 1))
     project, drawings, issues_by_drawing, cross = await _fetch_inputs(db, project_id)
-    assets, ifc_models, ifc_skipped = await _build_assets(project_id, drawings)
+    assets, ifc_models, ifc_skipped = await _build_assets(project_id, drawings, progress_cb)
     floors, floor_of = _build_floors(drawings, issues_by_drawing, assets)
-    yolo_total = await _attach_floor_elements(floors, drawings, floor_of)
+    yolo_total = await _attach_floor_elements(floors, drawings, floor_of, progress_cb)
+    await _notify(progress_cb, _progress_payload("assemble", "组装场景与统计", "", 0, 1))
 
     ids_by_no: dict[str, list[str]] = {}
     floor_by_no: dict[str, str] = {}
