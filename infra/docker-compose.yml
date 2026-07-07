@@ -91,6 +91,11 @@ services:
       CHROMA_HOST: chroma
       CHROMA_PORT: "8000"
       JWT_SECRET: change-me-in-production
+      # DWG→DXF 转换：手动安装 ODA File Converter（Linux ARM AppImage 解包）后
+      # 挂载到 /opt/oda 并设 ODA_CONVERTER_PATH（见 docs/BATCH_REVIEW_BLUEPRINT.md 4.3）
+      ODA_CONVERTER_PATH: ${ODA_CONVERTER_PATH:-}
+    # volumes:
+    #   - ./oda:/opt/oda:ro   # 放入解包后的 ODAFileConverter 可执行文件
     ports:
       - "8000:8000"
     depends_on:
@@ -122,6 +127,9 @@ services:
       CHROMA_HOST: chroma
       CHROMA_PORT: "8000"
       JWT_SECRET: change-me-in-production
+      ODA_CONVERTER_PATH: ${ODA_CONVERTER_PATH:-}
+    # volumes:
+    #   - ./oda:/opt/oda:ro   # 同 api：DWG 转换需挂载 ODA File Converter
     depends_on:
       postgres:
         condition: service_healthy

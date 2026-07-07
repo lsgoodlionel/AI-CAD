@@ -102,3 +102,54 @@ def test_empty_filename_returns_safe_defaults():
 def test_result_contains_exactly_contract_keys():
     result = parse_drawing_filename("结施-01.pdf")
     assert set(result) == {"drawing_no", "discipline", "title", "version"}
+
+
+# ── 真实工程样本（上海大歌剧院竣工图命名规范）────────────────────
+
+@pytest.mark.unit
+def test_real_sample_structure_multi_segment_no():
+    """结构-竣工图-S-0-11-103C-…：专业全称映射 + 多段图号 + 尾字母版次"""
+    result = parse_drawing_filename(
+        "结构-竣工图-S-0-11-103C-南区（大、中歌剧厅）深台仓结构图（三）.pdf"
+    )
+    assert result["discipline"] == "structure"
+    assert result["drawing_no"] == "S-0-11-103C"
+    assert result["version"] == "C"
+    assert "深台仓结构图" in result["title"]
+
+
+@pytest.mark.unit
+def test_real_sample_dotted_segment_no():
+    result = parse_drawing_filename(
+        "结构-竣工图-S-0-31-102.01C-南区（大、中歌剧厅）一层主梁配筋图（一）.pdf"
+    )
+    assert result["drawing_no"] == "S-0-31-102.01C"
+    assert result["version"] == "C"
+
+
+@pytest.mark.unit
+def test_real_sample_steel_structure_keyword():
+    result = parse_drawing_filename("结构-竣工图-S-0-00-011B-钢结构统一说明（一）.pdf")
+    assert result["discipline"] == "structure"
+    assert result["drawing_no"] == "S-0-00-011B"
+    assert result["version"] == "B"
+
+
+@pytest.mark.unit
+def test_real_sample_mep_full_names():
+    assert parse_drawing_filename("给排水-竣工图-P-1-01-001-地下泵房大样.pdf")["discipline"] == "mep"
+    assert parse_drawing_filename("建筑电气竣工图-E-2-01-001-配电平面.pdf")["discipline"] == "mep"
+
+
+@pytest.mark.unit
+def test_real_sample_architecture_full_name():
+    assert parse_drawing_filename("建筑-竣工图-A-1-01-001-一层平面图.pdf")["discipline"] == "architecture"
+
+
+@pytest.mark.unit
+def test_real_sample_no_standard_number_falls_back():
+    """围护目录样式：02 环境总平图.pdf —— 无标准图号时安全兜底"""
+    result = parse_drawing_filename("02 环境总平图.pdf")
+    assert result["discipline"] == "general"
+    assert result["drawing_no"]
+    assert result["version"] == "A"
