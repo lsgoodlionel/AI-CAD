@@ -54,8 +54,18 @@ interface PlanTransform {
   scale: number
 }
 
-/** 楼层构件包围盒 → 板片空间等比映射（无有效范围返回 null） */
-function planTransform(elements: SceneFloorElements): PlanTransform | null {
+/** 真实坐标渲染选项（Phase 7 V3：统一源坐标点，米=three 单位） */
+export interface RealPlanOptions {
+  /** 场景统一居中点（米，由全楼构件包围盒中心计算） */
+  center: [number, number]
+  /** 该层真实层高（米） */
+  storyHeight: number
+}
+
+/** 收集构件平面坐标范围（跨楼层聚合用），无坐标返回 null */
+export function elementsBounds(
+  elements: SceneFloorElements,
+): { minX: number; maxX: number; minY: number; maxY: number } | null {
   const xs: number[] = []
   const ys: number[] = []
   const push = (points: number[][] | undefined) => {
@@ -73,19 +83,30 @@ function planTransform(elements: SceneFloorElements): PlanTransform | null {
   for (const p of elements.pipes) push(p.path)
   for (const e of elements.equipment) push(e.outline)
   if (xs.length < 2) return null
-  const minX = Math.min(...xs)
-  const maxX = Math.max(...xs)
-  const minY = Math.min(...ys)
-  const maxY = Math.max(...ys)
-  const spanX = Math.max(maxX - minX, 1)
-  const spanY = Math.max(maxY - minY, 1)
+  return {
+    minX: Math.min(...xs), maxX: Math.max(...xs),
+    minY: Math.min(...ys), maxY: Math.max(...ys),
+  }
+}
+
+/** 真实模式：仅居中平移，不缩放（1 three 单位 = 1 米） */
+function realTransform(center: [number, number]): PlanTransform {
+  return { toX: (x) => x - center[0], toZ: (y) => y - center[1], scale: 1 }
+}
+
+/** 归一化模式（旧 V2 行为，兜底）：构件等比压缩进 20×14 板片 */
+function normalizedTransform(elements: SceneFloorElements): PlanTransform | null {
+  const bounds = elementsBounds(elements)
+  if (!bounds) return null
+  const spanX = Math.max(bounds.maxX - bounds.minX, 1)
+  const spanY = Math.max(bounds.maxY - bounds.minY, 1)
   const scale = Math.min(
     (FLOOR_WIDTH * PLAN_MARGIN) / spanX,
     (FLOOR_DEPTH * PLAN_MARGIN) / spanY,
   )
   return {
-    toX: (x) => (x - minX - spanX / 2) * scale,
-    toZ: (y) => (y - minY - spanY / 2) * scale,
+    toX: (x) => (x - bounds.minX - spanX / 2) * scale,
+    toZ: (y) => (y - bounds.minY - spanY / 2) * scale,
     scale,
   }
 }
@@ -184,11 +205,12 @@ export function buildFloorElementMeshes(
   floorY: number,
   floorKey: string,
   buildingKey: string,
+  real?: RealPlanOptions,
 ): THREE.Mesh[] | null {
-  const t = planTransform(elements)
+  const t = real ? realTransform(real.center) : normalizedTransform(elements)
   if (!t) return null
   const baseY = floorY
-  const storyH = ELEMENT_STORY_HEIGHT
+  const storyH = real?.storyHeight ?? ELEMENT_STORY_HEIGHT
   const meshes: THREE.Mesh[] = []
   const meta = (elementType: string, count: number): ElementUserData => ({
     kind: 'element', elementType, floorKey, buildingKey, count,
@@ -252,6 +274,49 @@ export function buildFloorElementMeshes(
   }
   return meshes
 }
+
+const SHELL_COLOR = '#7ec1ff'
+const SHELL_OPACITY = 0.16
+
+/**
+ * 建筑外观壳体：楼层板外轮廓垂直放样至层顶（半透明幕墙质感）。
+ * 无 slab 轮廓时用构件包围盒；返回 null 表示该层无外壳依据。
+ */
+export function buildFloorShell(
+  elements: SceneFloorElements,
+  floorY: number,
+  storyHeight: number,
+  center: [number, number],
+  floorKey: string,
+  buildingKey: string,
+): THREE.Mesh | null {
+  const t = realTransform(center)
+  let outline: number[][] | null = elements.slabs[0]?.outline ?? null
+  if (!outline || outline.length < 3) {
+    const bounds = elementsBounds(elements)
+    if (!bounds) return null
+    outline = [
+      [bounds.minX, bounds.minY], [bounds.maxX, bounds.minY],
+      [bounds.maxX, bounds.maxY], [bounds.minX, bounds.maxY],
+    ]
+  }
+  const shape = outlineShape(outline, t)
+  if (!shape) return null
+  const material = new THREE.MeshLambertMaterial({
+    color: SHELL_COLOR,
+    transparent: true,
+    opacity: SHELL_OPACITY,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  })
+  const mesh = new THREE.Mesh(extrudeUp(shape, storyHeight, floorY), material)
+  const data: ElementUserData = {
+    kind: 'element', elementType: 'shell', floorKey, buildingKey, count: 1,
+  }
+  mesh.userData = data
+  return mesh
+}
+
 
 function buildPipeMeshes(
   elements: SceneFloorElements, t: PlanTransform, baseY: number,

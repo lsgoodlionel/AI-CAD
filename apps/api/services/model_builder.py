@@ -494,16 +494,46 @@ async def _attach_floor_elements(
         ))
         floor_drawings = drawings_by_floor.get(floor["key"], [])
         try:
-            elements, yolo_count = await model_elements.build_floor_elements(
+            elements, yolo_count, meta = await model_elements.build_floor_elements(
                 _executor, floor_drawings, get_file_bytes
             )
         except Exception as exc:  # noqa: BLE001 — 构件层失败回退贴图
             logger.warning("[ModelBuilder] 楼层构件识别失败 %s: %s", floor["key"], exc)
-            elements, yolo_count = {k: [] for k in model_elements.EMPTY_ELEMENTS}, 0
+            elements, yolo_count, meta = (
+                {k: [] for k in model_elements.EMPTY_ELEMENTS}, 0, {},
+            )
         floor["elements"] = elements
         floor["element_stats"] = model_elements.element_stats(elements)
+        floor["_elevation_candidates"] = meta.get("elevations") or []
         yolo_total += yolo_count
+    _apply_real_elevations(floors)
     return yolo_total
+
+
+def _apply_real_elevations(floors: list[dict]) -> None:
+    """由图纸标高文本推导楼层真实标高（米）→ floor.elevation_m。
+
+    贪心单调选择：楼层按 order 升序，逐层从候选标高中选取大于下层标高的最小值；
+    最低层取候选最小值。UNZONED/无候选层为 None（前端回退层序高度）。
+    """
+    ordered = sorted(
+        (f for f in floors if f["key"] != "UNZONED"), key=lambda f: f["order"]
+    )
+    previous: float | None = None
+    for floor in ordered:
+        candidates = sorted(floor.pop("_elevation_candidates", []) or [])
+        chosen: float | None = None
+        if candidates:
+            if previous is None:
+                chosen = candidates[0]
+            else:
+                chosen = next((v for v in candidates if v > previous + 0.5), None)
+        floor["elevation_m"] = chosen
+        if chosen is not None:
+            previous = chosen
+    for floor in floors:
+        floor.pop("_elevation_candidates", None)
+        floor.setdefault("elevation_m", None)
 
 
 def _marker_building_keys(markers: list[dict], drawings: list[dict]) -> None:

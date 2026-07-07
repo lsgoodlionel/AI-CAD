@@ -99,8 +99,10 @@ export interface SceneElementStats {
   equipment: number
 }
 
-/** V2 楼层：V1 字段全保留，追加 elements / element_stats */
+/** V2 楼层：V1 字段全保留，追加 elements / element_stats / 真实标高 */
 export interface SceneFloorV2 extends SceneFloor {
+  /** 图纸标高文本推导的真实标高（米）；无法确定时为 null */
+  elevation_m?: number | null
   elements?: SceneFloorElements
   element_stats?: SceneElementStats
 }

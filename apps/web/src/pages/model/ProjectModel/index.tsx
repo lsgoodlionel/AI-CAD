@@ -120,6 +120,7 @@ function elementFilterOptions(scene: ModelScene): { label: string; value: string
       label: `管线·${system}`, value: `pipes:${system}`,
     })),
     { label: ELEMENT_TYPE_LABEL.equipment, value: 'equipment' },
+    { label: '外观壳体', value: 'shell' },
   ]
 }
 

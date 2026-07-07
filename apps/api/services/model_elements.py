@@ -77,7 +77,7 @@ def pick_element_drawings(floor_drawings: list[dict]) -> dict[str, list[dict]]:
 
 
 def _recognize_sync(data: bytes, ext: str, discipline: str, drawing_id: str) -> dict | None:
-    """线程池内执行：几何提取 + 构件识别 → elements dict；失败返回 None。"""
+    """线程池内执行：几何提取 + 构件识别 → {elements, axes}；失败返回 None。"""
     from core.model3d import extract_dxf_geometry, extract_pdf_geometry, recognize
 
     if ext == "pdf":
@@ -88,7 +88,60 @@ def _recognize_sync(data: bytes, ext: str, discipline: str, drawing_id: str) -> 
         return None
     if geom.primitive_count() == 0:
         return None
-    return recognize(geom, discipline, drawing_id).as_dict()
+    result = recognize(geom, discipline, drawing_id)
+    return {"elements": result.as_dict(), "axes": result.axes}
+
+
+# ── 跨图轴号配准（统一源坐标点）──────────────────────────────
+
+def _labeled_axis_map(axes: dict, direction: str) -> dict[str, float]:
+    return {
+        str(label): float(pos)
+        for label, pos in (axes or {}).get(direction, [])
+        if label
+    }
+
+
+def _axis_offset(ref: dict[str, float], cur: dict[str, float]) -> float:
+    """共有轴号位置差的中位数（cur 平移 delta 后与 ref 对齐）；无共有轴号 → 0。"""
+    deltas = sorted(ref[label] - cur[label] for label in ref.keys() & cur.keys())
+    return deltas[len(deltas) // 2] if deltas else 0.0
+
+
+def register_offset(ref_axes: dict, axes: dict) -> tuple[float, float]:
+    """以参考图轴网为基准，计算当前图构件坐标的 (dx, dy) 平移量。
+
+    对齐依据：两图共有轴号（如同为「5」轴）的位置差中位数——即所有图纸
+    以「最小轴号交点」为统一源坐标点后残余的系统偏移。
+    """
+    dx = _axis_offset(_labeled_axis_map(ref_axes, "x"), _labeled_axis_map(axes, "x"))
+    dy = _axis_offset(_labeled_axis_map(ref_axes, "y"), _labeled_axis_map(axes, "y"))
+    return dx, dy
+
+
+def _shift_elements(elements: dict, dx: float, dy: float) -> dict:
+    """整体平移构件坐标（配准到统一源坐标点）。"""
+    if abs(dx) < 1e-6 and abs(dy) < 1e-6:
+        return elements
+    shifted: dict[str, list] = {}
+    for kind, items in elements.items():
+        out = []
+        for item in items:
+            moved = dict(item)
+            for key in ("outline", "path"):
+                if key in moved:
+                    moved[key] = [
+                        [round(p[0] + dx, 3), round(p[1] + dy, 3)] for p in moved[key]
+                    ]
+            out.append(moved)
+        shifted[kind] = out
+    return shifted
+
+
+def _has_labeled_axes(axes: dict) -> bool:
+    return bool(
+        _labeled_axis_map(axes, "x") or _labeled_axis_map(axes, "y")
+    )
 
 
 async def _recognize_one(
@@ -122,32 +175,51 @@ def _merge_elements(target: dict[str, list], parts: dict | None, kinds: tuple[st
 
 async def build_floor_elements(
     executor, floor_drawings: list[dict], file_getter: Callable[[str], bytes],
-) -> tuple[dict[str, list], int]:
-    """构建单楼层 elements（六类构件合并 + YOLO 设备补充）。
+) -> tuple[dict[str, list], int, dict]:
+    """构建单楼层 elements（识别 → 轴号配准 → 合并 + YOLO 补充）。
 
-    返回 (elements, yolo_count)；core.model3d 缺失时返回 (全空, 0)。
+    返回 (elements, yolo_count, floor_meta)；floor_meta 含
+    ``{"elevations": [标高候选], "registered": 配准图数}``。
+    core.model3d 缺失时返回 (全空, 0, {})。
     """
     empty = {key: [] for key in EMPTY_ELEMENTS}
     try:
         import core.model3d  # noqa: F401 — 探测模块可用性
     except ImportError:
-        return empty, 0
+        return empty, 0, {}
 
     loop = asyncio.get_event_loop()
     picked = pick_element_drawings(floor_drawings)
+    tasks: list[tuple[dict, str, tuple[str, ...]]] = [
+        *[(d, "structure", ("columns", "walls", "slabs")) for d in picked["structure"]],
+        *[(d, "structure", ("beams",)) for d in picked["beam"]],
+        *[(d, "mep", ("pipes", "equipment")) for d in picked["mep"]],
+    ]
+
     elements: dict[str, list] = empty
-    for drawing in picked["structure"]:
-        result = await _recognize_one(loop, executor, drawing, "structure", file_getter)
-        _merge_elements(elements, result, ("columns", "walls", "slabs"))
-    for drawing in picked["beam"]:
-        result = await _recognize_one(loop, executor, drawing, "structure", file_getter)
-        _merge_elements(elements, result, ("beams",))
-    for drawing in picked["mep"]:
-        result = await _recognize_one(loop, executor, drawing, "mep", file_getter)
-        _merge_elements(elements, result, ("pipes", "equipment"))
+    elevations: list[float] = []
+    ref_axes: dict | None = None
+    registered = 0
+    for drawing, discipline, kinds in tasks:
+        result = await _recognize_one(loop, executor, drawing, discipline, file_getter)
+        if not result:
+            continue
+        axes = result.get("axes") or {}
+        elevations.extend(axes.get("elevations") or [])
+        part = result["elements"]
+        # 轴号配准：以本层首张带轴号的图为参考系，其余图按共有轴号平移对齐
+        if _has_labeled_axes(axes):
+            if ref_axes is None:
+                ref_axes = axes
+            else:
+                dx, dy = register_offset(ref_axes, axes)
+                part = _shift_elements(part, dx, dy)
+                registered += 1
+        _merge_elements(elements, part, kinds)
 
     yolo_count = await _yolo_supplement(loop, executor, picked["mep"], elements, file_getter)
-    return elements, yolo_count
+    meta = {"elevations": sorted(set(elevations)), "registered": registered}
+    return elements, yolo_count, meta
 
 
 async def _yolo_supplement(
@@ -300,6 +372,7 @@ def group_buildings(
             )
             building["floors"].append({
                 **{k: floor[k] for k in ("key", "label", "elevation", "order")},
+                "elevation_m": floor.get("elevation_m"),
                 "drawings": entries,
                 "elements": elements,
                 "element_stats": element_stats(elements),

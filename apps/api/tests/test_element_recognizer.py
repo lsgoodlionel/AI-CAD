@@ -131,3 +131,63 @@ def test_recognize_empty_geometry_returns_empty_elements():
         "columns": 0, "walls": 0, "beams": 0, "slabs": 0, "pipes": 0, "equipment": 0,
     }
     assert result.scale > 0
+
+
+# ── V3：轴号识别 + 标高提取 + 源坐标点（跨图配准基础）─────────────
+
+def _plan_with_axis_labels() -> DrawingGeometry:
+    """轴网带轴号标注（竖轴 1/2/3，横轴 A/B）+ 标高文本。"""
+    geom = DrawingGeometry(page_w=PAGE_W, page_h=PAGE_H)
+    span = 8.4 * PT_PER_M
+    ox, oy = 150.0, 150.0
+    for i in range(3):
+        x = ox + i * span
+        geom.lines.append((x, 40.0, x, PAGE_H - 40.0))
+        # 轴号文本位于轴线顶端（页面坐标 y 小端）附近
+        geom.texts.append((x - 3.0, 28.0, str(i + 1)))
+    # 字母轴自下而上（A 在图纸下方 = 页面坐标 y 大端）
+    for j in range(2):
+        y = (PAGE_H - 150.0) - j * span * 0.5
+        geom.lines.append((40.0, y, PAGE_W - 40.0, y))
+        geom.texts.append((26.0, y - 3.0, chr(ord("A") + j)))
+    geom.texts.append((60.0, 40.0, "1:100"))
+    geom.texts.append((500.0, 60.0, "标高 -9.300"))
+    geom.texts.append((500.0, 80.0, "±0.000"))
+    return geom
+
+
+@pytest.mark.unit
+def test_axis_labels_recognized():
+    result = recognize(_plan_with_axis_labels(), "structure", "d1")
+    x_labels = [label for label, _pos in result.axes["x"]]
+    y_labels = [label for label, _pos in result.axes["y"]]
+    assert x_labels == ["1", "2", "3"]
+    assert y_labels == ["A", "B"]
+
+
+@pytest.mark.unit
+def test_origin_at_min_labeled_axis_crossing():
+    """源坐标点=最小轴号交点：1 轴与 A 轴交点应为 (0,0)"""
+    result = recognize(_plan_with_axis_labels(), "structure", "d1")
+    assert result.axes["x"][0][1] == pytest.approx(0.0, abs=0.05)
+    assert result.axes["y"][0][1] == pytest.approx(0.0, abs=0.05)
+    # 2 轴位于 8.4m
+    assert result.axes["x"][1][1] == pytest.approx(8.4, abs=0.3)
+
+
+@pytest.mark.unit
+def test_elevations_extracted():
+    result = recognize(_plan_with_axis_labels(), "structure", "d1")
+    elevations = result.axes.get("elevations", [])
+    assert -9.3 in elevations
+    assert 0.0 in elevations
+
+
+@pytest.mark.unit
+def test_circled_axis_number_normalized():
+    from core.model3d.element_recognizer import _normalize_axis_label
+
+    assert _normalize_axis_label("③") == "3"
+    assert _normalize_axis_label("12") == "12"
+    assert _normalize_axis_label("B") == "B"
+    assert _normalize_axis_label("说明") is None

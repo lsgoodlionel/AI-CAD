@@ -186,7 +186,7 @@ export default function ModelViewer({
       50,
       container.clientWidth / Math.max(container.clientHeight, 1),
       0.1,
-      500,
+      5000, // 真实米坐标模式下建筑包络可达数百米
     )
     camera.position.set(FLOOR_WIDTH * 1.2, 16, FLOOR_DEPTH * 1.6)
 
@@ -292,9 +292,14 @@ export default function ModelViewer({
     threeScene.add(graph.root)
     applyVisibility()
 
-    // 默认取景（有焦点图纸时由 applyFocus 覆盖）
-    controls.target.set(0, graph.totalHeight / 2, 0)
-    camera.position.set(FLOOR_WIDTH * 1.2, graph.totalHeight + 10, FLOOR_DEPTH * 1.6)
+    // 默认取景（有焦点图纸时由 applyFocus 覆盖）：按取景半径与楼层跨度适配
+    const ys = [...graph.floorYByKey.values()]
+    const midY = ys.length
+      ? (Math.min(...ys) + Math.max(...ys)) / 2
+      : graph.totalHeight / 2
+    const radius = Math.max(graph.fitRadius, 16)
+    controls.target.set(0, midY, 0)
+    camera.position.set(radius * 1.15, midY + radius * 0.85, radius * 1.45)
     controls.update()
     applyFocus()
 

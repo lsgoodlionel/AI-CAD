@@ -42,6 +42,47 @@ _SYSTEM_KEYWORDS = (
     ("暖通", ("暖通", "风管", "空调", "通风")),
 )
 
+# 轴号标注：①-⑳ 圈号 / 1~2 位数字 / 1~2 位大写字母
+_CIRCLED_BASE = ord("①") - 1
+_AXIS_NUM_RE = re.compile(r"^\d{1,2}$")
+_AXIS_ALPHA_RE = re.compile(r"^[A-Z]{1,2}$")
+_AXIS_LABEL_SEARCH_X_PT = 18.0   # 轴号距轴线的横向容差
+_AXIS_LABEL_SEARCH_END_PT = 34.0  # 轴号距轴线端点的容差
+# 工程标高：±0.000 / -9.300 / 23.700（三位小数），合理范围 [-30, 300] 米
+_ELEVATION_RE = re.compile(r"(±|[+-])?(\d{1,3}\.\d{3})")
+_ELEVATION_RANGE = (-30.0, 300.0)
+
+
+def _normalize_axis_label(text: str) -> str | None:
+    """轴号归一化：③→'3'；'12'→'12'；'B'→'B'；其他→None。"""
+    text = (text or "").strip().strip("()（）")
+    if len(text) == 1 and "①" <= text <= "⑳":
+        return str(ord(text) - _CIRCLED_BASE)
+    if _AXIS_NUM_RE.match(text):
+        return str(int(text))
+    if _AXIS_ALPHA_RE.match(text):
+        return text
+    return None
+
+
+def _axis_label_sort_key(label: str) -> tuple[int, int]:
+    """轴号排序键：数字轴按数值，字母轴按字母序（'AA' 排在 'Z' 后）。"""
+    if label.isdigit():
+        return (0, int(label))
+    return (1, (len(label) - 1) * 26 * 26 + sum(ord(c) - ord("A") for c in label))
+
+
+def extract_elevations(all_text: str) -> list[float]:
+    """提取工程标高文本（±0.000/-9.300/23.700），去重升序。"""
+    values: set[float] = set()
+    for sign, number in _ELEVATION_RE.findall(all_text):
+        value = float(number)
+        if sign == "-":
+            value = -value
+        if _ELEVATION_RANGE[0] <= value <= _ELEVATION_RANGE[1]:
+            values.add(round(value, 3))
+    return sorted(values)
+
 
 def recognize(geom: DrawingGeometry, discipline: str, drawing_id: str) -> FloorElements:
     """识别构件；任何异常返回空 FloorElements（scale=缺省）。
@@ -63,12 +104,16 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str) -> Floor
     polys = geom.polys[:MAX_PRIMITIVES]
 
     all_text = "；".join(t[2] for t in geom.texts)
-    axis_x, axis_y, axis_lines = _detect_axes(lines, geom.page_w, geom.page_h)
+    axis_x, axis_y, axis_lines = _detect_axes(
+        lines, geom.page_w, geom.page_h, geom.texts
+    )
     scale = _detect_scale(all_text, geom.page_w, axis_x, axis_y)
     origin = _origin_pt(axis_x, axis_y, geom.page_h)
 
     ctx = _Ctx(geom.page_h, scale, origin, drawing_id)
-    result = FloorElements(scale=scale, axes=_axes_dict(axis_x, axis_y, ctx, truncated))
+    result = FloorElements(
+        scale=scale, axes=_axes_dict(axis_x, axis_y, ctx, truncated, all_text)
+    )
 
     if discipline == "mep":
         result.pipes = _find_pipes(lines, axis_lines, all_text, ctx)
@@ -124,50 +169,100 @@ def _detect_scale(
     return _DEFAULT_SCALE
 
 
-def _median_spacing(positions: list[float]) -> float | None:
+def _median_spacing(axes: list[tuple[str, float]]) -> float | None:
+    positions = [pos for _label, pos in axes]
     if len(positions) < 2:
         return None
     gaps = sorted(b - a for a, b in zip(positions, positions[1:]))
     return gaps[len(gaps) // 2] if gaps else None
 
 
+def _find_axis_label(
+    texts: list, *, along: str, pos: float, end_a: float, end_b: float,
+) -> str:
+    """轴线端部附近的轴号标注（along='x' 时轴为竖线，pos 为 x 坐标）。"""
+    for tx, ty, content in texts:
+        label = _normalize_axis_label(content)
+        if label is None:
+            continue
+        near_pos = abs((tx if along == "x" else ty) - pos) <= _AXIS_LABEL_SEARCH_X_PT
+        cursor = ty if along == "x" else tx
+        near_end = (
+            abs(cursor - end_a) <= _AXIS_LABEL_SEARCH_END_PT
+            or abs(cursor - end_b) <= _AXIS_LABEL_SEARCH_END_PT
+        )
+        if near_pos and near_end:
+            return label
+    return ""
+
+
 def _detect_axes(
-    lines: list, page_w: float, page_h: float,
-) -> tuple[list[float], list[float], set[int]]:
-    """长直线 → 轴网位置；返回 (x 轴位置, y 轴位置, 轴线索引集合)。"""
-    axis_x: list[float] = []
-    axis_y: list[float] = []
+    lines: list, page_w: float, page_h: float, texts: list,
+) -> tuple[list[tuple[str, float]], list[tuple[str, float]], set[int]]:
+    """长直线 → 轴网（带轴号标注）；返回 (x 轴, y 轴, 轴线索引集合)。
+
+    轴元素为 ``(label, pos_pt)``，label 由端部圈号/数字/字母标注识别，无标注为 ""。
+    """
+    axis_x: list[tuple[str, float]] = []
+    axis_y: list[tuple[str, float]] = []
     axis_idx: set[int] = set()
     for i, (x0, y0, x1, y1) in enumerate(lines):
         if abs(x0 - x1) <= _LINE_STRAIGHT_TOL_PT and abs(y1 - y0) >= _AXIS_MIN_RATIO * page_h:
-            axis_x.append((x0 + x1) / 2)
+            pos = (x0 + x1) / 2
+            label = _find_axis_label(texts, along="x", pos=pos, end_a=min(y0, y1), end_b=max(y0, y1))
+            axis_x.append((label, pos))
             axis_idx.add(i)
         elif abs(y0 - y1) <= _LINE_STRAIGHT_TOL_PT and abs(x1 - x0) >= _AXIS_MIN_RATIO * page_w:
-            axis_y.append((y0 + y1) / 2)
+            pos = (y0 + y1) / 2
+            label = _find_axis_label(texts, along="y", pos=pos, end_a=min(x0, x1), end_b=max(x0, x1))
+            axis_y.append((label, pos))
             axis_idx.add(i)
-    return _dedupe(sorted(axis_x)), _dedupe(sorted(axis_y)), axis_idx
+    return _dedupe(axis_x), _dedupe(axis_y), axis_idx
 
 
-def _dedupe(positions: list[float], tol: float = 2.0) -> list[float]:
-    merged: list[float] = []
-    for pos in positions:
-        if not merged or pos - merged[-1] > tol:
-            merged.append(pos)
+def _dedupe(axes: list[tuple[str, float]], tol: float = 2.0) -> list[tuple[str, float]]:
+    merged: list[tuple[str, float]] = []
+    for label, pos in sorted(axes, key=lambda a: a[1]):
+        if merged and pos - merged[-1][1] <= tol:
+            # 同一条轴：保留已有标注
+            if label and not merged[-1][0]:
+                merged[-1] = (label, merged[-1][1])
+            continue
+        merged.append((label, pos))
     return merged
 
 
-def _origin_pt(axis_x: list[float], axis_y: list[float], page_h: float) -> tuple[float, float]:
-    ox = min(axis_x) if axis_x else 0.0
-    # y 轴位置是页面坐标，翻转后取最小
-    flipped = sorted(page_h - y for y in axis_y)
-    oy = flipped[0] if flipped else 0.0
+def _min_labeled_pos(axes: list[tuple[str, float]]) -> float:
+    """源坐标基准：有轴号 → 轴号最小者的位置；无轴号 → 位置最小者。"""
+    if not axes:
+        return 0.0
+    labeled = [(label, pos) for label, pos in axes if label]
+    if labeled:
+        return min(labeled, key=lambda a: _axis_label_sort_key(a[0]))[1]
+    return min(pos for _label, pos in axes)
+
+
+def _origin_pt(
+    axis_x: list[tuple[str, float]], axis_y: list[tuple[str, float]], page_h: float,
+) -> tuple[float, float]:
+    """统一源坐标点：最小轴号 X 轴 × 最小轴号 Y 轴 交点（无轴号回退最小位置）。"""
+    ox = _min_labeled_pos(axis_x)
+    flipped_y = [(label, page_h - pos) for label, pos in axis_y]
+    oy = _min_labeled_pos(flipped_y)
     return ox, oy
 
 
-def _axes_dict(axis_x: list[float], axis_y: list[float], ctx: _Ctx, truncated: bool) -> dict:
+def _axes_dict(
+    axis_x: list[tuple[str, float]], axis_y: list[tuple[str, float]],
+    ctx: _Ctx, truncated: bool, all_text: str,
+) -> dict:
     axes = {
-        "x": [["", ctx.to_m(pos, ctx.page_h)[0]] for pos in axis_x],
-        "y": [["", ctx.to_m(0, pos)[1]] for pos in axis_y],
+        "x": [[label, ctx.to_m(pos, ctx.page_h)[0]] for label, pos in axis_x],
+        "y": sorted(
+            ([label, ctx.to_m(0, pos)[1]] for label, pos in axis_y),
+            key=lambda a: a[1],
+        ),
+        "elevations": extract_elevations(all_text),
     }
     if truncated:
         axes["truncated"] = True
@@ -278,8 +373,10 @@ def _find_slabs(polys: list, axis_x: list[float], axis_y: list[float], ctx: _Ctx
     if best is not None and best_area >= _SLAB_MIN_AREA_M2:
         return [{"outline": [ctx.to_m(x, y) for x, y in best], "thickness": 0.12, "src": ctx.src}]
     if len(axis_x) >= 2 and len(axis_y) >= 2:
-        x0, x1 = min(axis_x), max(axis_x)
-        y0, y1 = min(axis_y), max(axis_y)
+        xs = [pos for _label, pos in axis_x]
+        ys = [pos for _label, pos in axis_y]
+        x0, x1 = min(xs), max(xs)
+        y0, y1 = min(ys), max(ys)
         outline = [ctx.to_m(x0, y0), ctx.to_m(x1, y0), ctx.to_m(x1, y1), ctx.to_m(x0, y1)]
         return [{"outline": outline, "thickness": 0.12, "src": ctx.src}]
     return []

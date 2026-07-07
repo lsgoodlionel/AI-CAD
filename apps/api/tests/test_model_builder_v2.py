@@ -50,7 +50,7 @@ def _fake_elements() -> dict:
 
 
 async def _fake_build_floor_elements(executor, floor_drawings, file_getter):
-    return _fake_elements(), 0
+    return _fake_elements(), 0, {"elevations": [0.0, 4.5], "registered": 0}
 
 
 @pytest.mark.asyncio
@@ -177,3 +177,54 @@ def test_reconstruction_mode_mixed():
         {"elements": {k: [] for k in ELEMENT_KINDS}},
     ]
     assert model_elements.reconstruction_mode(floors) == "mixed"
+
+
+# ── V3：跨图轴号配准 + 真实标高 ──────────────────────────────────
+
+@pytest.mark.unit
+def test_register_offset_by_shared_axis_labels():
+    """两图共有轴号 → 位置差中位数作为平移量"""
+    ref = {"x": [["1", 0.0], ["2", 8.4], ["3", 16.8]], "y": [["A", 0.0], ["B", 4.2]]}
+    cur = {"x": [["2", 0.0], ["3", 8.4]], "y": [["B", 0.0]]}
+    dx, dy = model_elements.register_offset(ref, cur)
+    assert dx == pytest.approx(8.4)
+    assert dy == pytest.approx(4.2)
+
+
+@pytest.mark.unit
+def test_register_offset_without_shared_labels_is_zero():
+    ref = {"x": [["1", 0.0]], "y": []}
+    cur = {"x": [["9", 0.0]], "y": []}
+    assert model_elements.register_offset(ref, cur) == (0.0, 0.0)
+
+
+@pytest.mark.unit
+def test_shift_elements_moves_all_coordinates():
+    elements = {
+        "columns": [{"outline": [[0, 0], [1, 0]], "src": "d"}],
+        "pipes": [{"path": [[2, 2], [5, 2]], "dia": 0.1, "system": "电气", "src": "d"}],
+        "walls": [], "beams": [], "slabs": [], "equipment": [],
+    }
+    shifted = model_elements._shift_elements(elements, 8.4, -4.2)
+    assert shifted["columns"][0]["outline"][0] == [8.4, -4.2]
+    assert shifted["pipes"][0]["path"][1] == [13.4, -2.2]
+
+
+@pytest.mark.unit
+def test_apply_real_elevations_greedy_monotonic():
+    from services.model_builder import _apply_real_elevations
+
+    floors = [
+        {"key": "B2", "order": -2, "_elevation_candidates": [-9.3, 0.0]},
+        {"key": "B1", "order": -1, "_elevation_candidates": [-9.3, -4.5, 0.0]},
+        {"key": "F1", "order": 1, "_elevation_candidates": [0.0, 23.7]},
+        {"key": "F2", "order": 2, "_elevation_candidates": []},
+        {"key": "UNZONED", "order": 0, "_elevation_candidates": [0.0]},
+    ]
+    _apply_real_elevations(floors)
+    by_key = {f["key"]: f["elevation_m"] for f in floors}
+    assert by_key["B2"] == pytest.approx(-9.3)
+    assert by_key["B1"] == pytest.approx(-4.5)
+    assert by_key["F1"] == pytest.approx(0.0)
+    assert by_key["F2"] is None
+    assert by_key["UNZONED"] is None
