@@ -53,6 +53,13 @@ def test_dwg_conversion_failure_degrades_with_warning(monkeypatch):
         raise RuntimeError("converter crashed")
 
     monkeypatch.setattr(dwg_support, "_convert_with_oda", _boom)
+    # 固定 dwg2dxf 存在且同样失败（消除 CI/本机 dwg2dxf 安装差异）
+    monkeypatch.setattr(dwg_support.shutil, "which", lambda _n: "/usr/local/bin/dwg2dxf")
+
+    def _boom2(_exe: str, _data: bytes) -> bytes:
+        raise RuntimeError("dwg2dxf crashed")
+
+    monkeypatch.setattr(dwg_support, "_convert_with_dwg2dxf", _boom2)
     data, ext, warning = ensure_dxf(DWG_BYTES, "dwg")
     assert data == DWG_BYTES
     assert ext == "dwg"
