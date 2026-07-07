@@ -26,6 +26,7 @@ from typing import Any
 
 from core.ai_review.dwg_support import ensure_dxf
 from core.storage import get_file_bytes, upload_file
+from services import model_elements
 from services.floor_parser import floor_of_drawing, parse_floor
 
 logger = logging.getLogger(__name__)
@@ -447,11 +448,47 @@ async def _fetch_inputs(db, project_id: str) -> tuple[dict, list[dict], dict, di
     return dict(project), drawings, issues_by_drawing, cross
 
 
+async def _attach_floor_elements(
+    floors: list[dict], drawings: list[dict], floor_of: dict[str, str]
+) -> int:
+    """为每楼层识别构件（V2）：floor 增 elements/element_stats；返回 YOLO 设备数。"""
+    drawings_by_floor: dict[str, list[dict]] = {}
+    for drawing in drawings:
+        key = floor_of.get(str(drawing["id"]), "UNZONED")
+        drawings_by_floor.setdefault(key, []).append(drawing)
+
+    yolo_total = 0
+    for floor in floors:
+        floor_drawings = drawings_by_floor.get(floor["key"], [])
+        try:
+            elements, yolo_count = await model_elements.build_floor_elements(
+                _executor, floor_drawings, get_file_bytes
+            )
+        except Exception as exc:  # noqa: BLE001 — 构件层失败回退贴图
+            logger.warning("[ModelBuilder] 楼层构件识别失败 %s: %s", floor["key"], exc)
+            elements, yolo_count = {k: [] for k in model_elements.EMPTY_ELEMENTS}, 0
+        floor["elements"] = elements
+        floor["element_stats"] = model_elements.element_stats(elements)
+        yolo_total += yolo_count
+    return yolo_total
+
+
+def _marker_building_keys(markers: list[dict], drawings: list[dict]) -> None:
+    """markers 补 building_key（按所属图纸的单体）。"""
+    building_by_drawing = {
+        str(d["id"]): model_elements.building_of(d)[0] for d in drawings
+    }
+    for marker in markers:
+        drawing_id = str((marker.get("ref") or {}).get("drawing_id") or "")
+        marker["building_key"] = building_by_drawing.get(drawing_id, "main")
+
+
 async def build_scene(db, project_id: str) -> tuple[dict, dict]:
-    """构建 scene（蓝图第 4 节契约）与 assets 索引，返回 (scene, assets)。"""
+    """构建 scene（V1 契约全保留 + schema_version=2 构件层），返回 (scene, assets)。"""
     project, drawings, issues_by_drawing, cross = await _fetch_inputs(db, project_id)
     assets, ifc_models, ifc_skipped = await _build_assets(project_id, drawings)
     floors, floor_of = _build_floors(drawings, issues_by_drawing, assets)
+    yolo_total = await _attach_floor_elements(floors, drawings, floor_of)
 
     ids_by_no: dict[str, list[str]] = {}
     floor_by_no: dict[str, str] = {}
@@ -460,13 +497,29 @@ async def build_scene(db, project_id: str) -> tuple[dict, dict]:
         ids_by_no.setdefault(no, []).append(str(drawing["id"]))
         floor_by_no.setdefault(no, floor_of[str(drawing["id"])])
 
+    markers = _build_markers(issues_by_drawing, floor_of)
+    _marker_building_keys(markers, drawings)
+
+    stats = _build_stats(drawings, issues_by_drawing, floors, ifc_skipped)
+    stats["elements_total"] = model_elements.totals(floors)
+    stats["reconstruction"] = model_elements.reconstruction_mode(floors)
+    stats["buildings"] = 0  # 占位，下方 buildings 组装后回填
+    if yolo_total:
+        stats["yolo_equipment"] = yolo_total
+
+    project_name = project.get("name") or ""
+    buildings = model_elements.group_buildings(floors, drawings, project_name)
+    stats["buildings"] = len(buildings)
+
     scene = {
-        "project": {"id": str(project["id"]), "name": project.get("name") or ""},
+        "schema_version": 2,
+        "project": {"id": str(project["id"]), "name": project_name},
+        "buildings": buildings,
         "floors": floors,
-        "markers": _build_markers(issues_by_drawing, floor_of),
+        "markers": markers,
         "cross_links": _build_cross_links(cross, ids_by_no, floor_by_no),
         "ifc_models": ifc_models,
-        "stats": _build_stats(drawings, issues_by_drawing, floors, ifc_skipped),
+        "stats": stats,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     return scene, assets

@@ -9,6 +9,7 @@ import * as THREE from 'three'
 import type {
   ModelScene,
   SceneDrawing,
+  SceneFloorV2,
   SceneMarker,
 } from '@/services/projectModel'
 
@@ -31,6 +32,9 @@ export const SEVERITY_COLORS: Record<string, string> = {
   minor: '#faad14',
   info: '#8c8c8c',
 }
+
+// eslint-disable-next-line import/no-cycle -- elementsBuilder 仅引用本文件常量
+import { buildFloorElementMeshes } from './elementsBuilder'
 
 const FLOOR_COLOR = '#5b8ff9'
 const PANEL_PLACEHOLDER_COLOR = '#1677ff'
@@ -60,6 +64,8 @@ export interface BuiltSceneGraph {
   floorMeshes: THREE.Mesh[]
   drawingMeshes: THREE.Mesh[]
   markerMeshes: THREE.Mesh[]
+  /** V2 构件网格（userData.kind === 'element'） */
+  elementMeshes: THREE.Mesh[]
   /** 楼层 key → 板片中心 Y 坐标 */
   floorYByKey: Map<string, number>
   /** 场景整体高度（相机初始化用） */
@@ -151,7 +157,9 @@ export function buildSceneGraph(scene: ModelScene): BuiltSceneGraph {
   const floorMeshes: THREE.Mesh[] = []
   const drawingMeshes: THREE.Mesh[] = []
   const markerMeshes: THREE.Mesh[] = []
+  const elementMeshes: THREE.Mesh[] = []
   const floorYByKey = new Map<string, number>()
+  const renderElements = scene.schema_version === 2
 
   const sorted = [...scene.floors].sort((a, b) => a.order - b.order)
   sorted.forEach((floor, level) => {
@@ -167,6 +175,16 @@ export function buildSceneGraph(scene: ModelScene): BuiltSceneGraph {
       drawingMeshes.push(panel)
       root.add(panel)
     })
+
+    // ── V2 构件层（有构件的楼层叠加渲染；构建失败/超预算自动回退贴图）──
+    const elements = (floor as SceneFloorV2).elements
+    if (renderElements && elements) {
+      const meshes = buildFloorElementMeshes(elements, y, floor.key, 'main')
+      if (meshes) {
+        elementMeshes.push(...meshes)
+        meshes.forEach((mesh) => root.add(mesh))
+      }
+    }
   })
 
   scene.markers.forEach((marker) => {
@@ -182,6 +200,7 @@ export function buildSceneGraph(scene: ModelScene): BuiltSceneGraph {
     floorMeshes,
     drawingMeshes,
     markerMeshes,
+    elementMeshes,
     floorYByKey,
     totalHeight: Math.max(sorted.length - 1, 0) * FLOOR_HEIGHT,
   }

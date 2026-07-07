@@ -1,0 +1,288 @@
+"""scene V2 构件层组装（Phase 7 蓝图第 4 节）：单体分组 + 构件识别接线 + YOLO 设备补充。
+
+- core.model3d 延迟 import：ImportError → 楼层回退贴图（调用方据空 elements 判断）；
+- 每楼层每类构件按「最适图纸」选择并限量识别，单图异常跳过；
+- YOLO 检测框（归一化）按楼层包络映射为米坐标设备块。
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import re
+from typing import Any, Callable
+
+logger = logging.getLogger(__name__)
+
+# 每楼层每类参与识别的图纸上限（控制构建时长）
+_MAX_STRUCTURE_PLANS = 2
+_MAX_BEAM_PLANS = 2
+_MAX_MEP_PLANS = 3
+_RECOGNIZE_TIMEOUT_SEC = 20
+
+_STRUCTURE_TITLE_RE = re.compile(r"墙柱|结构平面|模板")
+_BEAM_TITLE_RE = re.compile(r"梁")
+
+# 单体识别：图名/标题正则 → building key
+_BUILDING_PATTERNS: tuple[tuple[re.Pattern, str], ...] = (
+    (re.compile(r"南区"), "south"),
+    (re.compile(r"北区"), "north"),
+    (re.compile(r"东区"), "east"),
+    (re.compile(r"西区"), "west"),
+)
+_BUILDING_UNIT_RE = re.compile(r"([A-Z]\d?)栋|(\d+)#楼")
+
+EMPTY_ELEMENTS: dict[str, list] = {
+    "columns": [], "walls": [], "beams": [], "slabs": [], "pipes": [], "equipment": [],
+}
+
+# YOLO 设备缺省楼层包络（米，无识别构件可参照时）
+_DEFAULT_FLOOR_EXTENT = (60.0, 40.0)
+_YOLO_MIN_CONFIDENCE = 0.4
+
+
+def building_of(drawing: dict) -> tuple[str, str]:
+    """图名/标题 → (building_key, label)；未命中 → ('main', '')。"""
+    text = f"{drawing.get('title') or ''} {drawing.get('drawing_no') or ''}"
+    for pattern, key in _BUILDING_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            return key, match.group(0)
+    unit = _BUILDING_UNIT_RE.search(text)
+    if unit:
+        label = unit.group(0)
+        key = "building_" + (unit.group(1) or unit.group(2) or "x")
+        return key, label
+    return "main", ""
+
+
+def pick_element_drawings(floor_drawings: list[dict]) -> dict[str, list[dict]]:
+    """楼层图纸 → 各构件类的「最适图纸」清单（蓝图 4 节规则）。"""
+    structure: list[dict] = []
+    beams: list[dict] = []
+    mep: list[dict] = []
+    for drawing in floor_drawings:
+        title = str(drawing.get("title") or "")
+        discipline = str(drawing.get("discipline") or "")
+        if discipline == "mep":
+            mep.append(drawing)
+        elif _BEAM_TITLE_RE.search(title):
+            beams.append(drawing)
+        elif _STRUCTURE_TITLE_RE.search(title) or discipline == "structure":
+            structure.append(drawing)
+    return {
+        "structure": structure[:_MAX_STRUCTURE_PLANS],
+        "beam": beams[:_MAX_BEAM_PLANS],
+        "mep": mep[:_MAX_MEP_PLANS],
+    }
+
+
+def _recognize_sync(data: bytes, ext: str, discipline: str, drawing_id: str) -> dict | None:
+    """线程池内执行：几何提取 + 构件识别 → elements dict；失败返回 None。"""
+    from core.model3d import extract_dxf_geometry, extract_pdf_geometry, recognize
+
+    if ext == "pdf":
+        geom = extract_pdf_geometry(data)
+    elif ext in ("dxf", "dwg"):
+        geom = extract_dxf_geometry(data)
+    else:
+        return None
+    if geom.primitive_count() == 0:
+        return None
+    return recognize(geom, discipline, drawing_id).as_dict()
+
+
+async def _recognize_one(
+    loop: asyncio.AbstractEventLoop, executor, drawing: dict,
+    discipline: str, file_getter: Callable[[str], bytes],
+) -> dict | None:
+    """单图识别（下载 + 提取 + 识别，20s 超时；任何失败返回 None）。"""
+    file_key = drawing.get("file_key") or ""
+    ext = file_key.rsplit(".", 1)[-1].lower() if "." in file_key else ""
+    if not file_key or ext not in ("pdf", "dxf", "dwg"):
+        return None
+    try:
+        data = await loop.run_in_executor(executor, file_getter, file_key)
+        return await asyncio.wait_for(
+            loop.run_in_executor(
+                executor, _recognize_sync, data, ext, discipline, str(drawing["id"])
+            ),
+            timeout=_RECOGNIZE_TIMEOUT_SEC,
+        )
+    except Exception as exc:  # noqa: BLE001 — 单图识别失败跳过
+        logger.warning("[ModelElements] 构件识别跳过 %s: %s", drawing.get("id"), exc)
+        return None
+
+
+def _merge_elements(target: dict[str, list], parts: dict | None, kinds: tuple[str, ...]) -> None:
+    if not parts:
+        return
+    for kind in kinds:
+        target[kind].extend(parts.get(kind) or [])
+
+
+async def build_floor_elements(
+    executor, floor_drawings: list[dict], file_getter: Callable[[str], bytes],
+) -> tuple[dict[str, list], int]:
+    """构建单楼层 elements（六类构件合并 + YOLO 设备补充）。
+
+    返回 (elements, yolo_count)；core.model3d 缺失时返回 (全空, 0)。
+    """
+    empty = {key: [] for key in EMPTY_ELEMENTS}
+    try:
+        import core.model3d  # noqa: F401 — 探测模块可用性
+    except ImportError:
+        return empty, 0
+
+    loop = asyncio.get_event_loop()
+    picked = pick_element_drawings(floor_drawings)
+    elements: dict[str, list] = empty
+    for drawing in picked["structure"]:
+        result = await _recognize_one(loop, executor, drawing, "structure", file_getter)
+        _merge_elements(elements, result, ("columns", "walls", "slabs"))
+    for drawing in picked["beam"]:
+        result = await _recognize_one(loop, executor, drawing, "structure", file_getter)
+        _merge_elements(elements, result, ("beams",))
+    for drawing in picked["mep"]:
+        result = await _recognize_one(loop, executor, drawing, "mep", file_getter)
+        _merge_elements(elements, result, ("pipes", "equipment"))
+
+    yolo_count = await _yolo_supplement(loop, executor, picked["mep"], elements, file_getter)
+    return elements, yolo_count
+
+
+async def _yolo_supplement(
+    loop, executor, mep_drawings: list[dict],
+    elements: dict[str, list], file_getter: Callable[[str], bytes],
+) -> int:
+    """对该层首张机电图跑 YOLO 图元检测，检出设备并入 elements。"""
+    if not mep_drawings:
+        return 0
+    drawing = mep_drawings[0]
+    file_key = drawing.get("file_key") or ""
+    ext = file_key.rsplit(".", 1)[-1].lower() if "." in file_key else ""
+    if not file_key or ext not in ("pdf", "png", "jpg", "jpeg", "tif", "tiff"):
+        return 0
+    try:
+        data = await loop.run_in_executor(executor, file_getter, file_key)
+        detected = await loop.run_in_executor(
+            executor, yolo_equipment, data, ext, elements, str(drawing["id"])
+        )
+    except Exception as exc:  # noqa: BLE001 — YOLO 失败不影响构件层
+        logger.debug("[ModelElements] YOLO 补充跳过: %s", exc)
+        return 0
+    elements["equipment"].extend(detected)
+    return len(detected)
+
+
+# ── YOLO 设备补充 ────────────────────────────────────────────
+
+def _floor_extent(elements: dict[str, list]) -> tuple[float, float]:
+    """楼层包络（米）：由板/柱坐标推算，无参照用缺省。"""
+    xs: list[float] = []
+    ys: list[float] = []
+    for slab in elements.get("slabs") or []:
+        for x, y in slab.get("outline") or []:
+            xs.append(x); ys.append(y)
+    for column in elements.get("columns") or []:
+        for x, y in column.get("outline") or []:
+            xs.append(x); ys.append(y)
+    if xs and ys and max(xs) > min(xs) and max(ys) > min(ys):
+        return max(xs) - min(xs), max(ys) - min(ys)
+    return _DEFAULT_FLOOR_EXTENT
+
+
+def yolo_equipment(
+    file_bytes: bytes, file_ext: str, elements: dict[str, list], drawing_id: str,
+) -> list[dict]:
+    """YOLO 检测框 → 设备块（label='YOLO:<cls>'）；ultralytics/权重缺失静默返回空。"""
+    try:
+        from core.ai_review.yolo_detector import detect_drawing_elements
+
+        detections, _issues = detect_drawing_elements(file_bytes, file_ext)
+    except Exception as exc:  # noqa: BLE001 — YOLO 为可插拔增强位
+        logger.debug("[ModelElements] YOLO 跳过: %s", exc)
+        return []
+
+    width_m, height_m = _floor_extent(elements)
+    equipment: list[dict] = []
+    for det in detections:
+        if det.confidence < _YOLO_MIN_CONFIDENCE:
+            continue
+        x1, y1, x2, y2 = det.box
+        cx, cy = (x1 + x2) / 2 * width_m, (y1 + y2) / 2 * height_m
+        half = 0.5
+        equipment.append({
+            "outline": [
+                [round(cx - half, 3), round(cy - half, 3)],
+                [round(cx + half, 3), round(cy - half, 3)],
+                [round(cx + half, 3), round(cy + half, 3)],
+                [round(cx - half, 3), round(cy + half, 3)],
+            ],
+            "height": 1.5,
+            "label": f"YOLO:{det.label}",
+            "src": drawing_id,
+        })
+    return equipment
+
+
+def element_stats(elements: dict[str, list]) -> dict[str, int]:
+    return {key: len(elements.get(key) or []) for key in EMPTY_ELEMENTS}
+
+
+def reconstruction_mode(floors: list[dict]) -> str:
+    """stats.reconstruction：elements | texture | mixed。"""
+    with_elements = sum(
+        1 for floor in floors
+        if any((floor.get("elements") or {}).get(k) for k in EMPTY_ELEMENTS)
+    )
+    if with_elements == 0:
+        return "texture"
+    if with_elements == len(floors):
+        return "elements"
+    return "mixed"
+
+
+def totals(floors: list[dict]) -> dict[str, int]:
+    """全场景构件总量汇总。"""
+    result: dict[str, int] = {key: 0 for key in EMPTY_ELEMENTS}
+    for floor in floors:
+        for key, count in (floor.get("element_stats") or {}).items():
+            if key in result:
+                result[key] += int(count)
+    return result
+
+
+def group_buildings(
+    floors: list[dict], drawings: list[dict], project_name: str,
+) -> list[dict]:
+    """按单体分组楼层（同楼层图纸可能分属多单体 → 楼层按单体拆分）。
+
+    输入 floors 为拍平楼层（V1 结构 + elements）；输出蓝图 buildings 数组。
+    """
+    building_of_drawing = {
+        str(d["id"]): building_of(d) for d in drawings
+    }
+    buildings: dict[str, dict] = {}
+    for floor in floors:
+        groups: dict[str, list[dict]] = {}
+        for entry in floor.get("drawings") or []:
+            key, _label = building_of_drawing.get(entry["drawing_id"], ("main", ""))
+            groups.setdefault(key, []).append(entry)
+        for key, entries in groups.items():
+            label = next(
+                (lb for k, lb in building_of_drawing.values() if k == key and lb), ""
+            )
+            building = buildings.setdefault(
+                key,
+                {"key": key, "label": label or (project_name if key == "main" else key),
+                 "origin": [0, 0], "floors": []},
+            )
+            building["floors"].append({
+                **{k: floor[k] for k in ("key", "label", "elevation", "order")},
+                "drawings": entries,
+                "elements": floor.get("elements") or {k: [] for k in EMPTY_ELEMENTS},
+                "element_stats": floor.get("element_stats") or element_stats({}),
+            })
+    for building in buildings.values():
+        building["floors"].sort(key=lambda f: f["order"])
+    return sorted(buildings.values(), key=lambda b: b["key"])

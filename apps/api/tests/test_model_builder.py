@@ -15,12 +15,30 @@ DRAWING_2 = "77777777-7777-7777-7777-777777777772"
 ISSUE_1 = "88888888-8888-8888-8888-888888888881"
 ISSUE_2 = "88888888-8888-8888-8888-888888888882"
 
-SCENE_KEYS = {"project", "floors", "markers", "cross_links", "ifc_models", "stats", "generated_at"}
+# V1 keys + Phase 7 新增（schema_version/buildings，见 test_model_builder_v2.py）
+SCENE_KEYS = {
+    "project", "floors", "markers", "cross_links", "ifc_models", "stats",
+    "generated_at", "schema_version", "buildings",
+}
 DRAWING_ENTRY_KEYS = {
     "drawing_id", "drawing_no", "title", "discipline", "status",
     "current_stage", "image_key", "issue_count", "critical_count",
 }
-MARKER_KEYS = {"id", "type", "severity", "floor_key", "x", "y", "title", "discipline_code", "ref"}
+MARKER_KEYS = {
+    "id", "type", "severity", "floor_key", "x", "y", "title",
+    "discipline_code", "ref", "building_key",
+}
+
+
+@pytest.fixture(autouse=True)
+def _skip_element_recognition(monkeypatch):
+    """本文件专注 V1 契约：跳过 V2 构件识别（V2 路径见 test_model_builder_v2.py）。"""
+    import services.model_elements as model_elements
+
+    async def _empty(executor, floor_drawings, file_getter):
+        return {k: [] for k in model_elements.EMPTY_ELEMENTS}, 0
+
+    monkeypatch.setattr(model_elements, "build_floor_elements", _empty)
 
 
 def _drawing(did: str, no: str, title: str, file_key: str = "projects/p/d.pdf") -> dict:

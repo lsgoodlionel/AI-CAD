@@ -30,6 +30,89 @@ export interface SceneFloor {
   drawings: SceneDrawing[]
 }
 
+// ── V2 构件级类型（对齐 docs/MODEL_PRECISION_BLUEPRINT.md 第 4 节，key 一字不差）──
+
+/** 平面点 [x, y]（米，轴网原点坐标系） */
+export type ElementPoint = number[]
+
+/** 柱：真实轮廓挤出 */
+export interface ElementColumn {
+  outline: ElementPoint[]
+  src: string
+}
+
+/** 墙：中线 path + 墙厚 */
+export interface ElementWall {
+  path: ElementPoint[]
+  width: number
+  src: string
+}
+
+/** 梁：轴线 path + 截面 宽×高 */
+export interface ElementBeam {
+  path: ElementPoint[]
+  width: number
+  depth: number
+  src: string
+}
+
+/** 板：外轮廓 + 板厚 */
+export interface ElementSlab {
+  outline: ElementPoint[]
+  thickness: number
+  src: string
+}
+
+/** 管线：折线 path + 管径 + 专业系统 */
+export interface ElementPipe {
+  path: ElementPoint[]
+  dia: number
+  system: string
+  src: string
+}
+
+/** 设备：闭合块轮廓 + 高度 + 标注文本 */
+export interface ElementEquipment {
+  outline: ElementPoint[]
+  height: number
+  label: string
+  src: string
+}
+
+/** 楼层构件集合（schema_version=2） */
+export interface SceneFloorElements {
+  columns: ElementColumn[]
+  walls: ElementWall[]
+  beams: ElementBeam[]
+  slabs: ElementSlab[]
+  pipes: ElementPipe[]
+  equipment: ElementEquipment[]
+}
+
+/** 楼层构件计数 */
+export interface SceneElementStats {
+  columns: number
+  walls: number
+  beams: number
+  slabs: number
+  pipes: number
+  equipment: number
+}
+
+/** V2 楼层：V1 字段全保留，追加 elements / element_stats */
+export interface SceneFloorV2 extends SceneFloor {
+  elements?: SceneFloorElements
+  element_stats?: SceneElementStats
+}
+
+/** 单体（南区/北区/main…）；origin 后端恒 [0,0]，布局由前端计算 */
+export interface SceneBuilding {
+  key: string
+  label: string
+  origin: number[]
+  floors: SceneFloorV2[]
+}
+
 export type SceneMarkerType = 'issue' | 'cross'
 
 export type SceneMarkerSeverity = 'critical' | 'major' | 'minor' | 'info'
@@ -50,6 +133,8 @@ export interface SceneMarker {
   title: string
   discipline_code: string
   ref: SceneMarkerRef
+  /** V2：所属单体 key */
+  building_key?: string
 }
 
 export interface CrossLink {
@@ -71,10 +156,18 @@ export interface SceneStats {
   by_discipline: Record<string, number>
   floors: number
   ifc_skipped?: boolean
+  // ── V2（schema_version=2）──
+  elements_total?: Record<string, number>
+  reconstruction?: 'elements' | 'texture' | 'mixed'
+  buildings?: number
+  yolo_equipment?: number
 }
 
 export interface ModelScene {
+  /** 缺省=V1 楼层贴图模型；2=构件级重建（buildings/elements 可用） */
+  schema_version?: number
   project: SceneProject
+  buildings?: SceneBuilding[]
   floors: SceneFloor[]
   markers: SceneMarker[]
   cross_links: CrossLink[]

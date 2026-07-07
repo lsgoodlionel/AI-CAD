@@ -24,9 +24,12 @@ import type {
   FloorUserData,
   MarkerUserData,
 } from './sceneBuilder'
+import type { ElementUserData } from './elementsBuilder'
 
 const CLICK_MOVE_TOLERANCE_PX = 6
 const BACKGROUND_COLOR = '#f0f2f5'
+
+export type RenderMode = 'elements' | 'texture' | 'mixed'
 
 export interface ModelViewerProps {
   scene: ModelScene
@@ -36,9 +39,15 @@ export interface ModelViewerProps {
   /** 标记类型开关（issue/cross）；不传视为全部显示 */
   markerTypeFilter?: string[]
   isolatedFloorKey?: string | null
+  /** V2 渲染模式（schema_version=2 生效）：构件 / 贴图 / 混合，缺省混合 */
+  renderMode?: RenderMode
+  /** V2 构件图层：['columns','walls','beams','slabs','pipes:给排水',...,'equipment']；不传全显 */
+  elementFilter?: string[]
   resolveAssetUrl: (key: string) => Promise<string>
   onSelectDrawing: (drawing: SceneDrawing) => void
   onSelectMarker: (marker: SceneMarker) => void
+  /** V2 构件点击回调（合批网格返回类别级元数据，设备含 label） */
+  onSelectElement?: (element: ElementUserData) => void
 }
 
 export default function ModelViewer({
@@ -48,9 +57,12 @@ export default function ModelViewer({
   severityFilter,
   markerTypeFilter,
   isolatedFloorKey,
+  renderMode = 'mixed',
+  elementFilter,
   resolveAssetUrl,
   onSelectDrawing,
   onSelectMarker,
+  onSelectElement,
 }: ModelViewerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
@@ -67,14 +79,22 @@ export default function ModelViewer({
   // 回调与过滤器存入 ref，避免 pointer 事件重复绑定
   const onSelectDrawingRef = useRef(onSelectDrawing)
   const onSelectMarkerRef = useRef(onSelectMarker)
+  const onSelectElementRef = useRef(onSelectElement)
   const resolveAssetUrlRef = useRef(resolveAssetUrl)
   onSelectDrawingRef.current = onSelectDrawing
   onSelectMarkerRef.current = onSelectMarker
+  onSelectElementRef.current = onSelectElement
   resolveAssetUrlRef.current = resolveAssetUrl
 
-  // ── 可见性（filters / 楼层隔离，仅切换 visible 与透明度）──
-  const filtersRef = useRef({ disciplineFilter, severityFilter, markerTypeFilter, isolatedFloorKey })
-  filtersRef.current = { disciplineFilter, severityFilter, markerTypeFilter, isolatedFloorKey }
+  // ── 可见性（filters / 楼层隔离 / 渲染模式，仅切换 visible 与透明度）──
+  const filtersRef = useRef({
+    disciplineFilter, severityFilter, markerTypeFilter, isolatedFloorKey,
+    renderMode, elementFilter,
+  })
+  filtersRef.current = {
+    disciplineFilter, severityFilter, markerTypeFilter, isolatedFloorKey,
+    renderMode, elementFilter,
+  }
 
   const applyVisibility = () => {
     const graph = graphRef.current
@@ -87,10 +107,25 @@ export default function ModelViewer({
       const material = mesh.material as THREE.MeshLambertMaterial
       material.opacity = iso && data.floorKey !== iso ? FLOOR_FADED_OPACITY : FLOOR_OPACITY
     })
+    // 有构件的楼层集合：构件模式下这些层隐藏贴图面板（无构件层保留贴图回退）
+    const elementFloorKeys = new Set(
+      graph.elementMeshes.map((mesh) => (mesh.userData as ElementUserData).floorKey),
+    )
     graph.drawingMeshes.forEach((mesh) => {
       const data = mesh.userData as DrawingUserData
       const inFloor = !iso || data.floorKey === iso
-      mesh.visible = inFloor && filters.disciplineFilter.includes(data.drawing.discipline)
+      const modeOk =
+        filters.renderMode !== 'elements' || !elementFloorKeys.has(data.floorKey)
+      mesh.visible =
+        inFloor && modeOk && filters.disciplineFilter.includes(data.drawing.discipline)
+    })
+    graph.elementMeshes.forEach((mesh) => {
+      const data = mesh.userData as ElementUserData
+      const inFloor = !iso || data.floorKey === iso
+      const modeOk = filters.renderMode !== 'texture'
+      const filterOk =
+        !filters.elementFilter || filters.elementFilter.includes(data.elementType)
+      mesh.visible = inFloor && modeOk && filterOk
     })
     graph.markerMeshes.forEach((mesh) => {
       const data = mesh.userData as MarkerUserData
@@ -199,16 +234,20 @@ export default function ModelViewer({
       pointerNdc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
       pointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
       raycaster.setFromCamera(pointerNdc, camera)
-      const candidates = [...graph.markerMeshes, ...graph.drawingMeshes].filter(
-        (mesh) => mesh.visible,
-      )
+      const candidates = [
+        ...graph.markerMeshes,
+        ...graph.drawingMeshes,
+        ...graph.elementMeshes,
+      ].filter((mesh) => mesh.visible)
       const hit = raycaster.intersectObjects(candidates, false)[0]
       if (!hit) return
-      const data = hit.object.userData as DrawingUserData | MarkerUserData
+      const data = hit.object.userData as DrawingUserData | MarkerUserData | ElementUserData
       if (data.kind === 'drawing') {
         onSelectDrawingRef.current(data.drawing)
-      } else {
+      } else if (data.kind === 'marker') {
         onSelectMarkerRef.current(data.marker)
+      } else if (onSelectElementRef.current) {
+        onSelectElementRef.current(data)
       }
     }
     renderer.domElement.addEventListener('pointerdown', handlePointerDown)
@@ -299,7 +338,7 @@ export default function ModelViewer({
   useEffect(() => {
     applyVisibility()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [disciplineFilter, severityFilter, markerTypeFilter, isolatedFloorKey])
+  }, [disciplineFilter, severityFilter, markerTypeFilter, isolatedFloorKey, renderMode, elementFilter])
 
   // ── 焦点图纸变化 ───────────────────────────────────────────
   useEffect(() => {

@@ -20,9 +20,11 @@ import {
   Empty,
   List,
   Row,
+  Segmented,
   Space,
   Spin,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from 'antd'
@@ -40,9 +42,12 @@ import type {
   ProjectModelResponse,
   ProjectModelStatus,
   SceneDrawing,
+  SceneFloorV2,
   SceneMarker,
 } from '@/services/projectModel'
 import ModelViewer from './ModelViewer'
+import type { RenderMode } from './ModelViewer'
+import type { ElementUserData } from './elementsBuilder'
 
 const { Text, Title } = Typography
 
@@ -84,6 +89,38 @@ const MODEL_STATUS_META: Record<
 type Selection =
   | { type: 'drawing'; drawing: SceneDrawing }
   | { type: 'marker'; marker: SceneMarker }
+  | { type: 'element'; element: ElementUserData }
+
+const ELEMENT_TYPE_LABEL: Record<string, string> = {
+  columns: '柱',
+  walls: '墙',
+  beams: '梁',
+  slabs: '板',
+  equipment: '设备',
+}
+
+const RECONSTRUCTION_LABEL: Record<string, string> = {
+  elements: '构件级重建',
+  texture: '贴图级',
+  mixed: '混合级',
+}
+
+/** 构件图层选项：固定四类 + 场景中实际出现的管线 system + 设备 */
+function elementFilterOptions(scene: ModelScene): { label: string; value: string }[] {
+  const systems = new Set<string>()
+  for (const floor of scene.floors as SceneFloorV2[]) {
+    for (const pipe of floor.elements?.pipes ?? []) systems.add(pipe.system)
+  }
+  return [
+    ...['columns', 'walls', 'beams', 'slabs'].map((kind) => ({
+      label: ELEMENT_TYPE_LABEL[kind], value: kind,
+    })),
+    ...Array.from(systems).map((system) => ({
+      label: `管线·${system}`, value: `pipes:${system}`,
+    })),
+    { label: ELEMENT_TYPE_LABEL.equipment, value: 'equipment' },
+  ]
+}
 
 interface RequestLikeError {
   response?: { status?: number }
@@ -165,8 +202,29 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
   const [markerTypeFilter, setMarkerTypeFilter] = useState<string[]>(ALL_MARKER_TYPES)
   const [isolatedFloorKey, setIsolatedFloorKey] = useState<string | null>(null)
   const [selection, setSelection] = useState<Selection | null>(null)
+  // ── V2 构件级视图状态 ──
+  const [renderMode, setRenderMode] = useState<RenderMode>('mixed')
+  const [elementFilter, setElementFilter] = useState<string[] | undefined>(undefined)
+  const [selectedBuildingKey, setSelectedBuildingKey] = useState<string | null>(null)
 
   const scene: ModelScene | null = model?.scene ?? null
+  const isV2 = scene?.schema_version === 2
+  const buildings = scene?.buildings ?? []
+
+  // 选中单体 → 派生只含该单体楼层/标记的 scene（切换单体重建场景）
+  const viewScene: ModelScene | null = useMemo(() => {
+    if (!scene) return null
+    if (!isV2 || !selectedBuildingKey) return scene
+    const building = buildings.find((b) => b.key === selectedBuildingKey)
+    if (!building) return scene
+    return {
+      ...scene,
+      floors: building.floors,
+      markers: scene.markers.filter(
+        (marker) => (marker.building_key ?? 'main') === selectedBuildingKey,
+      ),
+    }
+  }, [scene, isV2, selectedBuildingKey, buildings])
 
   const fetchModel = useCallback(async () => {
     try {
@@ -251,8 +309,8 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
   }, [selection, allDrawings])
 
   const sortedFloors = useMemo(
-    () => (scene ? [...scene.floors].sort((a, b) => b.order - a.order) : []),
-    [scene],
+    () => (viewScene ? [...viewScene.floors].sort((a, b) => b.order - a.order) : []),
+    [viewScene],
   )
 
   // ── 未构建空态 ─────────────────────────────────────────────
@@ -303,6 +361,34 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
               <Text>图纸 {scene.stats.total_drawings} 张</Text>
               <Text>问题 {scene.stats.total_issues} 个</Text>
               <Text>楼层 {scene.stats.floors} 层</Text>
+              {isV2 && scene.stats.reconstruction ? (
+                <Tooltip title="构件级重建：由矢量图纸提取真实几何生成；扫描图纸楼层自动回退贴图">
+                  <Tag color={scene.stats.reconstruction === 'texture' ? 'default' : 'geekblue'}>
+                    {RECONSTRUCTION_LABEL[scene.stats.reconstruction]}
+                  </Tag>
+                </Tooltip>
+              ) : null}
+              {isV2 && scene.stats.elements_total ? (
+                <Text type="secondary">
+                  构件{' '}
+                  {Object.entries(scene.stats.elements_total)
+                    .filter(([, count]) => count > 0)
+                    .map(([kind, count]) => `${ELEMENT_TYPE_LABEL[kind] ?? '管线'}${count}`)
+                    .join(' / ') || '—'}
+                </Text>
+              ) : null}
+              {isV2 ? (
+                <Segmented
+                  size="small"
+                  value={renderMode}
+                  onChange={(value) => setRenderMode(value as RenderMode)}
+                  options={[
+                    { label: '构件', value: 'elements' },
+                    { label: '贴图', value: 'texture' },
+                    { label: '混合', value: 'mixed' },
+                  ]}
+                />
+              ) : null}
               {Object.entries(scene.stats.by_severity).map(([severity, count]) => {
                 const meta = SEVERITY_META[severity]
                 return meta ? (
@@ -335,8 +421,37 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
 
       {scene ? (
         <Row gutter={12}>
-          {/* ── 左侧：楼层树 + 过滤器 ── */}
+          {/* ── 左侧：单体 + 楼层树 + 过滤器 ── */}
           <Col flex="260px">
+            {isV2 && buildings.length > 1 ? (
+              <Card size="small" title="单体（点击聚焦，再点回总体）" style={{ marginBottom: 12 }}>
+                <List
+                  size="small"
+                  dataSource={buildings}
+                  renderItem={(building) => {
+                    const isActive = selectedBuildingKey === building.key
+                    return (
+                      <List.Item
+                        onClick={() => {
+                          setSelectedBuildingKey(isActive ? null : building.key)
+                          setIsolatedFloorKey(null)
+                        }}
+                        style={{
+                          cursor: 'pointer', paddingLeft: 8, paddingRight: 8,
+                          background: isActive ? '#e6f4ff' : undefined, borderRadius: 6,
+                        }}
+                      >
+                        <Space>
+                          <Text strong={isActive}>{building.label || building.key}</Text>
+                          <Text type="secondary">{building.floors.length} 层</Text>
+                        </Space>
+                      </List.Item>
+                    )
+                  }}
+                />
+              </Card>
+            ) : null}
+
             <Card size="small" title="楼层（点击隔离，再点取消）" style={{ marginBottom: 12 }}>
               <List
                 size="small"
@@ -390,7 +505,7 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
               />
             </Card>
 
-            <Card size="small" title="标记类型">
+            <Card size="small" title="标记类型" style={{ marginBottom: 12 }}>
               <Checkbox.Group
                 style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
                 value={markerTypeFilter}
@@ -401,6 +516,17 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
                 }))}
               />
             </Card>
+
+            {isV2 && viewScene ? (
+              <Card size="small" title="构件图层">
+                <Checkbox.Group
+                  style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
+                  value={elementFilter ?? elementFilterOptions(viewScene).map((o) => o.value)}
+                  onChange={(values) => setElementFilter(values as string[])}
+                  options={elementFilterOptions(viewScene)}
+                />
+              </Card>
+            ) : null}
           </Col>
 
           {/* ── 中央：3D 查看器 ── */}
@@ -408,15 +534,18 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
             <Card size="small" styles={{ body: { padding: 0 } }}>
               <div style={{ height: 'calc(100vh - 300px)', minHeight: 480 }}>
                 <ModelViewer
-                  scene={scene}
+                  scene={viewScene ?? scene}
                   focusDrawingId={focusDrawingId}
                   disciplineFilter={disciplineFilter}
                   severityFilter={severityFilter}
                   markerTypeFilter={markerTypeFilter}
                   isolatedFloorKey={isolatedFloorKey}
+                  renderMode={renderMode}
+                  elementFilter={elementFilter}
                   resolveAssetUrl={resolveAssetUrl}
                   onSelectDrawing={(drawing) => setSelection({ type: 'drawing', drawing })}
                   onSelectMarker={(marker) => setSelection({ type: 'marker', marker })}
+                  onSelectElement={(element) => setSelection({ type: 'element', element })}
                 />
               </div>
             </Card>
@@ -431,7 +560,13 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
         open={selection !== null}
         onClose={() => setSelection(null)}
         width={380}
-        title={selection?.type === 'drawing' ? '图纸信息' : '问题标记'}
+        title={
+          selection?.type === 'drawing'
+            ? '图纸信息'
+            : selection?.type === 'element'
+              ? '构件信息'
+              : '问题标记'
+        }
       >
         {selection?.type === 'drawing' ? (
           <>
@@ -494,6 +629,42 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
                 onClick={() => history.push(`/drawings/${selection.marker.ref.drawing_id}`)}
               >
                 查看图纸
+              </Button>
+            ) : null}
+          </>
+        ) : null}
+        {selection?.type === 'element' ? (
+          <>
+            <Descriptions column={1} size="small" bordered>
+              <Descriptions.Item label="构件类型">
+                {selection.element.elementType.startsWith('pipes:')
+                  ? `管线·${selection.element.elementType.slice(6)}`
+                  : ELEMENT_TYPE_LABEL[selection.element.elementType] ?? selection.element.elementType}
+              </Descriptions.Item>
+              <Descriptions.Item label="所在楼层">{selection.element.floorKey}</Descriptions.Item>
+              <Descriptions.Item label="数量">
+                {selection.element.count}
+                {selection.element.count > 1 ? '（同类合批渲染）' : ''}
+              </Descriptions.Item>
+              {selection.element.label ? (
+                <Descriptions.Item label="标注">{selection.element.label}</Descriptions.Item>
+              ) : null}
+            </Descriptions>
+            <Alert
+              style={{ marginTop: 12 }}
+              type="info"
+              showIcon
+              message="构件级重建（矢量图纸提取）"
+              description="几何由结构/机电平面图矢量线条确定性识别生成，构件可追溯来源图纸。"
+            />
+            {selection.element.src ? (
+              <Button
+                type="primary"
+                block
+                style={{ marginTop: 16 }}
+                onClick={() => history.push(`/drawings/${selection.element.src}`)}
+              >
+                查看来源图纸
               </Button>
             ) : null}
           </>
