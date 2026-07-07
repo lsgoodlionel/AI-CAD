@@ -167,3 +167,36 @@ async def test_import_zip_rejects_invalid_archive(client, fake_db):
     )
     assert resp.status_code == 400
     assert "INVALID_ZIP_FILE" in str(resp.json())
+
+
+# ── ZIP 中文文件名编码修复（cp437 乱码还原）─────────────────────
+
+@pytest.mark.unit
+def test_fix_zip_filename_restores_utf8_from_cp437():
+    """未设 UTF-8 标志位的中文条目：cp437 乱码还原为原始 UTF-8 名称"""
+    from routers.drawings import _fix_zip_filename
+
+    original = "给排水-竣工图-P-60-02-屋面雨水图.pdf"
+    info = zipfile.ZipInfo(original)
+    # 模拟老工具打包：字节按 cp437 解读、UTF-8 标志位未设
+    info.filename = original.encode("utf-8").decode("cp437")
+    info.flag_bits = 0
+    assert _fix_zip_filename(info) == original
+
+
+@pytest.mark.unit
+def test_fix_zip_filename_keeps_utf8_flagged_entries():
+    from routers.drawings import _fix_zip_filename, _ZIP_UTF8_FLAG
+
+    info = zipfile.ZipInfo("结构图.pdf")
+    info.flag_bits = _ZIP_UTF8_FLAG
+    assert _fix_zip_filename(info) == "结构图.pdf"
+
+
+@pytest.mark.unit
+def test_fix_zip_filename_ascii_passthrough():
+    from routers.drawings import _fix_zip_filename
+
+    info = zipfile.ZipInfo("S-0-11-103C.pdf")
+    info.flag_bits = 0
+    assert _fix_zip_filename(info) == "S-0-11-103C.pdf"

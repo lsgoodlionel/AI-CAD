@@ -277,9 +277,33 @@ def _is_zip_slip(entry_name: str) -> bool:
     return normalized.startswith("/") or ".." in normalized.split("/")
 
 
-def _zip_entry_skip_reason(info: zipfile.ZipInfo) -> str | None:
+# ZIP 通用标志位第 11 位：文件名为 UTF-8 编码
+_ZIP_UTF8_FLAG = 0x800
+
+
+def _fix_zip_filename(info: zipfile.ZipInfo) -> str:
+    """修复 zip 中文文件名乱码。
+
+    Python zipfile 对未设 UTF-8 标志位的条目按 cp437 解码；国内工具打包的
+    UTF-8/GBK 文件名会变成乱码。此处还原原始字节后按 utf-8 → gbk 依次尝试。
+    """
+    if info.flag_bits & _ZIP_UTF8_FLAG:
+        return info.filename
+    try:
+        raw = info.filename.encode("cp437")
+    except UnicodeEncodeError:
+        return info.filename
+    for encoding in ("utf-8", "gbk"):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return info.filename
+
+
+def _zip_entry_skip_reason(info: zipfile.ZipInfo, filename: str) -> str | None:
     """返回跳过原因（directory/hidden/extension）；None 表示应处理该条目"""
-    parts = info.filename.replace("\\", "/").split("/")
+    parts = filename.replace("\\", "/").split("/")
     basename = parts[-1]
     if info.is_dir() or not basename:
         return "directory"
@@ -300,15 +324,16 @@ async def _import_zip_entries(
     failed: list[dict] = []
     skipped: list[str] = []
     for info in archive.infolist():
-        reason = _zip_entry_skip_reason(info)
+        filename = _fix_zip_filename(info)
+        reason = _zip_entry_skip_reason(info, filename)
         if reason == "directory":
             continue
         if reason:
-            skipped.append(info.filename)
+            skipped.append(filename)
             continue
-        basename = info.filename.replace("\\", "/").split("/")[-1]
+        basename = filename.replace("\\", "/").split("/")[-1]
         if info.file_size > MAX_FILE_SIZE:
-            failed.append({"filename": info.filename, "error": "FILE_TOO_LARGE"})
+            failed.append({"filename": filename, "error": "FILE_TOO_LARGE"})
             continue
         try:
             meta = _resolve_file_meta(basename, {})
@@ -321,13 +346,13 @@ async def _import_zip_entries(
             created.append({
                 "drawing_id": record["drawing_id"],
                 "drawing_no": meta["drawing_no"],
-                "filename": info.filename,
+                "filename": filename,
             })
         except HTTPException as exc:
-            failed.append({"filename": info.filename, "error": str(exc.detail)})
+            failed.append({"filename": filename, "error": str(exc.detail)})
         except Exception as exc:  # noqa: BLE001 — 单条目失败不阻断其余条目
-            logger.error("[ImportZip] 条目 %s 导入失败: %s", info.filename, exc)
-            failed.append({"filename": info.filename, "error": f"UPLOAD_FAILED: {exc}"})
+            logger.error("[ImportZip] 条目 %s 导入失败: %s", filename, exc)
+            failed.append({"filename": filename, "error": f"UPLOAD_FAILED: {exc}"})
     return created, failed, skipped
 
 
