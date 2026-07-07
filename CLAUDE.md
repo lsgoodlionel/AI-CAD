@@ -47,6 +47,7 @@
 | Phase 5：批量上传/ZIP 整套导入 + 文件名解析 + DWG→DXF（ODA）| ✅ | `routers/drawings.py`（/batch、/import-zip）、`services/drawing_filename_parser.py`、`core/ai_review/dwg_support.py` |
 | Phase 5：套图审图（单张/多张/整套）+ 跨图分析 | ✅ | `routers/review_batches.py`、`tasks/batch_review.py`、`core/ai_review/cross_drawing.py`、`migrations/012`；前端 `pages/drawings/ReviewBatch/` |
 | Phase 6：工程 3D 模型基座（楼层堆叠+图纸贴图+IFC glTF+成果标记）| ✅ | `services/{floor_parser,model_builder}.py`、`tasks/model_build.py`、`routers/project_models.py`、`migrations/013`；前端 `pages/model/ProjectModel/`（three.js）+ 四处平台入口 |
+| Phase 7：3D 模型 V2 构件级重建（总体/单体/柱墙梁板/机电管线设备）+ YOLOv8 | ✅ | `core/model3d/`（几何提取+确定性构件识别）、`services/model_elements.py`（scene v2 单体分组+YOLO 接线）；前端 `elementsBuilder.ts`（构件挤出渲染三模式）；ultralytics 入镜像 |
 
 ---
 
