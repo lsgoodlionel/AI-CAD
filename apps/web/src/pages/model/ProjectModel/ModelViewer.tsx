@@ -25,6 +25,7 @@ import type {
   MarkerUserData,
 } from './sceneBuilder'
 import type { ElementUserData } from './elementsBuilder'
+import type { ModelLodMode } from './types'
 
 const CLICK_MOVE_TOLERANCE_PX = 6
 const BACKGROUND_COLOR = '#f0f2f5'
@@ -48,6 +49,10 @@ export interface ModelViewerProps {
   onSelectMarker: (marker: SceneMarker) => void
   /** V2 构件点击回调（合批网格返回类别级元数据，设备含 label） */
   onSelectElement?: (element: ElementUserData) => void
+  lodMode?: ModelLodMode
+  lodLabel?: string
+  buildingLabel?: string
+  pendingAnnotationCount?: number
 }
 
 export default function ModelViewer({
@@ -63,6 +68,10 @@ export default function ModelViewer({
   onSelectDrawing,
   onSelectMarker,
   onSelectElement,
+  lodMode = 'review_skeleton',
+  lodLabel = '审图骨架',
+  buildingLabel,
+  pendingAnnotationCount,
 }: ModelViewerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
@@ -351,5 +360,60 @@ export default function ModelViewer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusDrawingId])
 
-  return <div ref={containerRef} style={{ width: '100%', height: '100%', minHeight: 420 }} />
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 420 }}>
+      <div ref={containerRef} style={{ width: '100%', height: '100%', minHeight: 420 }} />
+      <div
+        style={{
+          position: 'absolute',
+          top: 12,
+          left: 12,
+          display: 'flex',
+          gap: 8,
+          flexWrap: 'wrap',
+          pointerEvents: 'none',
+        }}
+      >
+        <div
+          style={{
+            padding: '6px 10px',
+            borderRadius: 6,
+            background: 'rgba(255,255,255,0.9)',
+            border: '1px solid rgba(5, 5, 5, 0.08)',
+            fontSize: 12,
+            color: '#595959',
+          }}
+        >
+          LOD: {lodLabel}
+          {lodMode === 'realistic_proxy' ? '（近似）' : ''}
+        </div>
+        <div
+          style={{
+            padding: '6px 10px',
+            borderRadius: 6,
+            background: 'rgba(255,255,255,0.9)',
+            border: '1px solid rgba(5, 5, 5, 0.08)',
+            fontSize: 12,
+            color: '#595959',
+          }}
+        >
+          单体: {buildingLabel ?? '总体'}
+        </div>
+        {typeof pendingAnnotationCount === 'number' ? (
+          <div
+            style={{
+              padding: '6px 10px',
+              borderRadius: 6,
+              background: 'rgba(255,255,255,0.9)',
+              border: '1px solid rgba(5, 5, 5, 0.08)',
+              fontSize: 12,
+              color: '#595959',
+            }}
+          >
+            待人工识别: {pendingAnnotationCount}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
 }

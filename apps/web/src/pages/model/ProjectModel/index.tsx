@@ -1,12 +1,12 @@
 /**
  * 工程模型页（路由 /model 与 /model/:projectId）
  * - 无 projectId：项目选择卡片列表
- * - 有 projectId：顶部状态条 + 左侧楼层树/过滤器 + 中央 ModelViewer + 右侧详情 Drawer
+ * - 有 projectId：顶部状态条 + 左侧楼层树/过滤器 + 中央 ModelViewer + 右侧质量/标注工作台
  * - status=building 或触发重建后每 5s 轮询直到 ready/failed
  * - 404 MODEL_NOT_BUILT：空态引导「立即生成模型」
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { history, useParams, useSearchParams } from '@umijs/max'
+import { history, request, useParams, useSearchParams } from '@umijs/max'
 import {
   Alert,
   Badge,
@@ -30,8 +30,6 @@ import {
   message,
 } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
-// 项目列表数据源：项目独立接口已存在（services/projects.ts，套图审查页同款），
-// 故不再用 listDrawings 聚合 project_id/project_name。
 import { listProjects } from '@/services/projects'
 import {
   getModelAssetUrl,
@@ -46,9 +44,20 @@ import type {
   SceneFloorV2,
   SceneMarker,
 } from '@/services/projectModel'
+import DrawingAnnotationQueue from './DrawingAnnotationQueue'
+import ModelQualityPanel from './ModelQualityPanel'
 import ModelViewer from './ModelViewer'
 import type { RenderMode } from './ModelViewer'
 import type { ElementUserData } from './elementsBuilder'
+import { buildStoryOptions, normalizeModelInsights } from './modelData'
+import type {
+  AnnotationQueueItem,
+  AnnotationSaveDraft,
+  BuildingUnitOption,
+  LodModeOption,
+  ModelLodMode,
+  ModelQualitySummary,
+} from './types'
 
 const { Text, Title } = Typography
 
@@ -87,6 +96,14 @@ const MODEL_STATUS_META: Record<
   failed: { badge: 'error', text: '构建失败' },
 }
 
+const EMPTY_QUALITY: ModelQualitySummary = {
+  unassignedStoryCount: 0,
+  floorConflictCount: 0,
+  floorConflicts: [],
+  lowConfidenceUnits: [],
+  pendingManualCount: 0,
+}
+
 type Selection =
   | { type: 'drawing'; drawing: SceneDrawing }
   | { type: 'marker'; marker: SceneMarker }
@@ -106,7 +123,6 @@ const RECONSTRUCTION_LABEL: Record<string, string> = {
   mixed: '混合级',
 }
 
-/** 构件图层选项：固定四类 + 场景中实际出现的管线 system + 设备 */
 function elementFilterOptions(scene: ModelScene): { label: string; value: string }[] {
   const systems = new Set<string>()
   for (const floor of scene.floors as SceneFloorV2[]) {
@@ -132,7 +148,75 @@ function isNotBuiltError(error: unknown): boolean {
   return (error as RequestLikeError)?.response?.status === 404
 }
 
-// ── 项目选择列表（无 projectId 时）────────────────────────────
+function normalizeManualKey(input: string): string {
+  const value = input
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return value || `manual-${Date.now()}`
+}
+
+function mergeManualBuildingUnit(
+  current: BuildingUnitOption[],
+  draft: AnnotationSaveDraft,
+): BuildingUnitOption[] {
+  if (!draft.buildingUnitName.trim()) return current
+  const existing = current.find((unit) => unit.label === draft.buildingUnitName.trim())
+  if (existing) return current
+  return [
+    ...current,
+    {
+      key: draft.buildingUnitKey ?? normalizeManualKey(draft.buildingUnitName),
+      label: draft.buildingUnitName.trim(),
+      source: 'manual',
+      hasGeometry: false,
+    },
+  ].sort((a, b) => a.label.localeCompare(b.label, 'zh-CN'))
+}
+
+async function saveModelAnnotation(
+  projectId: string,
+  item: AnnotationQueueItem,
+  draft: AnnotationSaveDraft,
+) {
+  const payload = {
+    drawing_id: item.drawingId,
+    building_unit_key: draft.buildingUnitKey,
+    building_unit_name: draft.buildingUnitName.trim(),
+    story_key: draft.storyKey,
+    story_name: draft.storyName.trim(),
+    drawing_type: draft.drawingType.trim(),
+  }
+  const endpoints = [
+    `/api/v1/projects/${projectId}/model/annotations`,
+    `/api/v1/projects/${projectId}/model/annotation-queue`,
+  ]
+
+  for (let index = 0; index < endpoints.length; index += 1) {
+    try {
+      await request(endpoints[index], {
+        method: 'POST',
+        data: payload,
+        skipErrorHandler: true,
+      })
+      return
+    } catch (error) {
+      const status = (error as RequestLikeError)?.response?.status
+      if (status === 404 && index < endpoints.length - 1) continue
+      throw error
+    }
+  }
+}
+
+function activeLodMode(
+  lodModes: LodModeOption[],
+  lodMode: ModelLodMode,
+): LodModeOption {
+  return lodModes.find((item) => item.key === lodMode)
+    ?? lodModes.find((item) => item.enabled)
+    ?? lodModes[0]
+}
 
 interface ProjectOption {
   id: string
@@ -186,8 +270,6 @@ function ProjectPicker() {
   )
 }
 
-// ── 模型查看主页面（有 projectId 时）──────────────────────────
-
 interface ModelWorkspaceProps {
   projectId: string
   focusDrawingId?: string
@@ -198,35 +280,82 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
   const [isNotBuilt, setIsNotBuilt] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isRebuilding, setIsRebuilding] = useState(false)
-
   const [disciplineFilter, setDisciplineFilter] = useState<string[]>([])
   const [severityFilter, setSeverityFilter] = useState<string[]>(ALL_SEVERITIES)
   const [markerTypeFilter, setMarkerTypeFilter] = useState<string[]>(ALL_MARKER_TYPES)
   const [isolatedFloorKey, setIsolatedFloorKey] = useState<string | null>(null)
   const [selection, setSelection] = useState<Selection | null>(null)
-  // ── V2 构件级视图状态 ──
   const [renderMode, setRenderMode] = useState<RenderMode>('mixed')
   const [elementFilter, setElementFilter] = useState<string[] | undefined>(undefined)
   const [selectedBuildingKey, setSelectedBuildingKey] = useState<string | null>(null)
+  const [buildingUnits, setBuildingUnits] = useState<BuildingUnitOption[]>([])
+  const [annotationQueue, setAnnotationQueue] = useState<AnnotationQueueItem[]>([])
+  const [lodMode, setLodMode] = useState<ModelLodMode>('review_skeleton')
 
   const scene: ModelScene | null = model?.scene ?? null
   const isV2 = scene?.schema_version === 2
-  const buildings = scene?.buildings ?? []
+  const insights = useMemo(() => (model ? normalizeModelInsights(model) : null), [model])
+  const lodModes = insights?.lodModes ?? [
+    { key: 'review_skeleton', label: '审图骨架', enabled: true },
+    { key: 'architectural_massing', label: '建筑体量', enabled: true },
+    { key: 'realistic_proxy', label: '实景近似', enabled: false, reason: '需要 LOD300 数据' },
+  ]
+  const currentLod = activeLodMode(lodModes, lodMode)
 
-  // 选中单体 → 派生只含该单体楼层/标记的 scene（切换单体重建场景）
+  useEffect(() => {
+    if (!insights) {
+      setBuildingUnits([])
+      setAnnotationQueue([])
+      return
+    }
+    setBuildingUnits(insights.buildingUnits)
+    setAnnotationQueue(insights.annotationQueue)
+  }, [insights])
+
+  useEffect(() => {
+    if (!lodModes.some((item) => item.key === lodMode && item.enabled)) {
+      const next = lodModes.find((item) => item.enabled)
+      if (next) setLodMode(next.key)
+    }
+  }, [lodMode, lodModes])
+
+  const availableDisciplines = useMemo(() => {
+    if (!scene) return []
+    const set = new Set<string>()
+    scene.floors.forEach((floor) =>
+      floor.drawings.forEach((drawing) => set.add(drawing.discipline)),
+    )
+    return Array.from(set)
+  }, [scene])
+
+  useEffect(() => {
+    setDisciplineFilter(availableDisciplines)
+  }, [availableDisciplines])
+
+  const selectedBuilding = buildingUnits.find((unit) => unit.key === selectedBuildingKey) ?? null
   const viewScene: ModelScene | null = useMemo(() => {
-    if (!scene) return null
-    if (!isV2 || !selectedBuildingKey) return scene
-    const building = buildings.find((b) => b.key === selectedBuildingKey)
+    if (!scene || !selectedBuildingKey) return scene
+    const building = scene.buildings?.find((item) => item.key === selectedBuildingKey)
     if (!building) return scene
     return {
       ...scene,
       floors: building.floors,
-      markers: scene.markers.filter(
-        (marker) => (marker.building_key ?? 'main') === selectedBuildingKey,
-      ),
+      markers: scene.markers.filter((marker) => marker.building_key === selectedBuildingKey),
     }
-  }, [scene, isV2, selectedBuildingKey, buildings])
+  }, [scene, selectedBuildingKey])
+
+  const storyOptionsByBuilding = useMemo(
+    () => buildStoryOptions(scene, buildingUnits),
+    [scene, buildingUnits],
+  )
+
+  const quality = useMemo<ModelQualitySummary>(() => {
+    if (!insights) return EMPTY_QUALITY
+    return {
+      ...insights.quality,
+      pendingManualCount: annotationQueue.length,
+    }
+  }, [insights, annotationQueue.length])
 
   const fetchModel = useCallback(async () => {
     try {
@@ -254,27 +383,11 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
     fetchModel()
   }, [fetchModel])
 
-  // building 状态每 5s 轮询直到 ready / failed（deps 用整个 model：
-  // 每次拉取都是新对象，保证链式重排定时器，进度持续刷新）
   useEffect(() => {
     if (model?.status !== 'building') return undefined
     const timer = setTimeout(fetchModel, POLL_INTERVAL_MS)
     return () => clearTimeout(timer)
   }, [model, fetchModel])
-
-  // 场景变化时初始化专业过滤器为全选
-  const availableDisciplines = useMemo(() => {
-    if (!scene) return []
-    const set = new Set<string>()
-    scene.floors.forEach((floor) =>
-      floor.drawings.forEach((drawing) => set.add(drawing.discipline)),
-    )
-    return Array.from(set)
-  }, [scene])
-
-  useEffect(() => {
-    setDisciplineFilter(availableDisciplines)
-  }, [availableDisciplines])
 
   const handleRebuild = async () => {
     setIsRebuilding(true)
@@ -284,7 +397,6 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
       setIsNotBuilt(false)
       await fetchModel()
     } catch {
-      // 全局 errorHandler 已提示，这里仅兜底
       message.error('触发重建失败')
     } finally {
       setIsRebuilding(false)
@@ -306,9 +418,7 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
 
   const markerDrawing = useMemo(() => {
     if (selection?.type !== 'marker') return null
-    return (
-      allDrawings.find((d) => d.drawing_id === selection.marker.ref.drawing_id) ?? null
-    )
+    return allDrawings.find((d) => d.drawing_id === selection.marker.ref.drawing_id) ?? null
   }, [selection, allDrawings])
 
   const sortedFloors = useMemo(
@@ -316,7 +426,16 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
     [viewScene],
   )
 
-  // ── 未构建空态 ─────────────────────────────────────────────
+  const handleSaveAnnotation = useCallback(async (
+    item: AnnotationQueueItem,
+    draft: AnnotationSaveDraft,
+  ) => {
+    await saveModelAnnotation(projectId, item, draft)
+    setAnnotationQueue((current) => current.filter((queueItem) => queueItem.id !== item.id))
+    setBuildingUnits((current) => mergeManualBuildingUnit(current, draft))
+    message.success('人工识别结果已保存')
+  }, [projectId])
+
   if (isNotBuilt) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 100 }}>
@@ -341,7 +460,6 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
 
   return (
     <div style={{ padding: 12 }}>
-      {/* ── 顶部状态条 ── */}
       <Card size="small" style={{ marginBottom: 12 }}>
         <Space size="middle" wrap>
           <Badge status={statusMeta.badge} text={statusMeta.text} />
@@ -364,8 +482,11 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
               <Text>图纸 {scene.stats.total_drawings} 张</Text>
               <Text>问题 {scene.stats.total_issues} 个</Text>
               <Text>楼层 {scene.stats.floors} 层</Text>
-              {isV2 && scene.stats.reconstruction ? (
-                <Tooltip title="构件级重建：由矢量图纸提取真实几何生成；扫描图纸楼层自动回退贴图">
+              {quality.pendingManualCount > 0 ? (
+                <Tag color="gold">待人工识别 {quality.pendingManualCount}</Tag>
+              ) : null}
+              {scene.stats.reconstruction ? (
+                <Tooltip title="构件级重建、贴图级与混合模式保持可用；LOD 入口单独控制审图骨架/建筑体量/实景近似。">
                   <Tag color={scene.stats.reconstruction === 'texture' ? 'default' : 'geekblue'}>
                     {RECONSTRUCTION_LABEL[scene.stats.reconstruction]}
                   </Tag>
@@ -380,18 +501,6 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
                     .join(' / ') || '—'}
                 </Text>
               ) : null}
-              {isV2 ? (
-                <Segmented
-                  size="small"
-                  value={renderMode}
-                  onChange={(value) => setRenderMode(value as RenderMode)}
-                  options={[
-                    { label: '构件', value: 'elements' },
-                    { label: '贴图', value: 'texture' },
-                    { label: '混合', value: 'mixed' },
-                  ]}
-                />
-              ) : null}
               {Object.entries(scene.stats.by_severity).map(([severity, count]) => {
                 const meta = SEVERITY_META[severity]
                 return meta ? (
@@ -403,6 +512,41 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
             </>
           ) : null}
         </Space>
+
+        <Space size={8} wrap style={{ marginTop: 12 }}>
+          {lodModes.map((item) => {
+            const button = (
+              <Button
+                key={item.key}
+                type={lodMode === item.key ? 'primary' : 'default'}
+                disabled={!item.enabled}
+                onClick={() => setLodMode(item.key)}
+              >
+                {item.label}
+              </Button>
+            )
+            return item.enabled
+              ? button
+              : (
+                <Tooltip key={item.key} title={item.reason ?? '当前数据暂不支持'}>
+                  <span>{button}</span>
+                </Tooltip>
+              )
+          })}
+          {isV2 ? (
+            <Segmented
+              size="small"
+              value={renderMode}
+              onChange={(value) => setRenderMode(value as RenderMode)}
+              options={[
+                { label: '构件', value: 'elements' },
+                { label: '贴图', value: 'texture' },
+                { label: '混合', value: 'mixed' },
+              ]}
+            />
+          ) : null}
+        </Space>
+
         {model.status === 'building' ? (
           <Alert
             style={{ marginTop: 8 }}
@@ -437,14 +581,13 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
       </Card>
 
       {scene ? (
-        <Row gutter={12}>
-          {/* ── 左侧：单体 + 楼层树 + 过滤器 ── */}
-          <Col flex="260px">
-            {isV2 && buildings.length > 1 ? (
-              <Card size="small" title="单体（点击聚焦，再点回总体）" style={{ marginBottom: 12 }}>
+        <Row gutter={12} wrap>
+          <Col flex="280px">
+            {buildingUnits.length > 0 ? (
+              <Card size="small" title="单体" style={{ marginBottom: 12 }}>
                 <List
                   size="small"
-                  dataSource={buildings}
+                  dataSource={buildingUnits}
                   renderItem={(building) => {
                     const isActive = selectedBuildingKey === building.key
                     return (
@@ -454,13 +597,17 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
                           setIsolatedFloorKey(null)
                         }}
                         style={{
-                          cursor: 'pointer', paddingLeft: 8, paddingRight: 8,
-                          background: isActive ? '#e6f4ff' : undefined, borderRadius: 6,
+                          cursor: 'pointer',
+                          paddingLeft: 8,
+                          paddingRight: 8,
+                          background: isActive ? '#e6f4ff' : undefined,
+                          borderRadius: 6,
                         }}
                       >
-                        <Space>
-                          <Text strong={isActive}>{building.label || building.key}</Text>
-                          <Text type="secondary">{building.floors.length} 层</Text>
+                        <Space wrap>
+                          <Text strong={isActive}>{building.label}</Text>
+                          <Tag>{building.source === 'manual' ? '人工' : '识别'}</Tag>
+                          {!building.hasGeometry ? <Tag color="default">无几何</Tag> : null}
                         </Space>
                       </List.Item>
                     )
@@ -477,9 +624,7 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
                   const isActive = isolatedFloorKey === floor.key
                   return (
                     <List.Item
-                      onClick={() =>
-                        setIsolatedFloorKey(isActive ? null : floor.key)
-                      }
+                      onClick={() => setIsolatedFloorKey(isActive ? null : floor.key)}
                       style={{
                         cursor: 'pointer',
                         paddingLeft: 8,
@@ -546,10 +691,9 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
             ) : null}
           </Col>
 
-          {/* ── 中央：3D 查看器 ── */}
           <Col flex="auto">
             <Card size="small" styles={{ body: { padding: 0 } }}>
-              <div style={{ height: 'calc(100vh - 300px)', minHeight: 480 }}>
+              <div style={{ height: 'calc(100vh - 260px)', minHeight: 520 }}>
                 <ModelViewer
                   scene={viewScene ?? scene}
                   focusDrawingId={focusDrawingId}
@@ -563,8 +707,39 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
                   onSelectDrawing={(drawing) => setSelection({ type: 'drawing', drawing })}
                   onSelectMarker={(marker) => setSelection({ type: 'marker', marker })}
                   onSelectElement={(element) => setSelection({ type: 'element', element })}
+                  lodMode={lodMode}
+                  lodLabel={currentLod.label}
+                  buildingLabel={selectedBuilding?.label}
+                  pendingAnnotationCount={quality.pendingManualCount}
                 />
               </div>
+            </Card>
+            {!selectedBuilding?.hasGeometry && selectedBuilding ? (
+              <Alert
+                style={{ marginTop: 12 }}
+                type="info"
+                showIcon
+                message={`${selectedBuilding.label} 暂无可展示几何`}
+                description="当前保留数据驱动的单体入口，待后端产出该单体楼层/体量后可直接在此页查看。"
+              />
+            ) : null}
+          </Col>
+
+          <Col flex="360px">
+            <Card size="small" title="模型质量" style={{ marginBottom: 12 }}>
+              <ModelQualityPanel quality={quality} buildingUnits={buildingUnits} />
+            </Card>
+            <Card
+              size="small"
+              title="待人工识别"
+              extra={quality.pendingManualCount > 0 ? <Tag color="gold">{quality.pendingManualCount}</Tag> : null}
+            >
+              <DrawingAnnotationQueue
+                items={annotationQueue}
+                buildingUnits={buildingUnits}
+                storyOptionsByBuilding={storyOptionsByBuilding}
+                onSave={handleSaveAnnotation}
+              />
             </Card>
           </Col>
         </Row>
@@ -572,7 +747,6 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
         <Empty description="模型场景为空，请尝试重建" />
       )}
 
-      {/* ── 右侧：详情 Drawer ── */}
       <Drawer
         open={selection !== null}
         onClose={() => setSelection(null)}
@@ -650,6 +824,7 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
             ) : null}
           </>
         ) : null}
+
         {selection?.type === 'element' ? (
           <>
             <Descriptions column={1} size="small" bordered>
@@ -690,8 +865,6 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
     </div>
   )
 }
-
-// ── 路由入口 ─────────────────────────────────────────────────
 
 export default function ProjectModelPage() {
   const params = useParams<{ projectId?: string }>()
