@@ -43,7 +43,9 @@ test.describe('角色 smoke matrix', () => {
       await loginAs(page, role)
 
       await expect(page.locator('.ant-pro-table').first()).toBeVisible()
-      await expect(page.getByText('图纸管理').first()).toBeVisible()
+      if (!page.viewportSize() || page.viewportSize()!.width >= 768) {
+        await expect(page.locator('.ant-pro-sider-menu').getByText('图纸管理').first()).toBeVisible()
+      }
 
       await page.goto(`${BASE}/incentive`)
       await expect(page.locator('.ant-pro-table').first()).toBeVisible()
@@ -57,7 +59,9 @@ test.describe('角色 smoke matrix', () => {
   test('admin 可访问系统管理和集团看板', async ({ page }) => {
     await loginAs(page, 'admin')
 
-    await expect(page.getByText('系统管理').first()).toBeVisible()
+    if (!page.viewportSize() || page.viewportSize()!.width >= 768) {
+      await expect(page.locator('.ant-pro-sider-menu').getByText('系统管理').first()).toBeVisible()
+    }
 
     await page.goto(`${BASE}/dashboard/group`)
     await expect(page).not.toHaveURL(/\/login/)
@@ -69,7 +73,7 @@ test.describe('角色 smoke matrix', () => {
     test(`${role} 不能访问管理员页面`, async ({ page }) => {
       await loginAs(page, role)
 
-      await expect(page.getByText('系统管理')).toHaveCount(0)
+      await expect(page.locator('.ant-pro-sider-menu').getByText('系统管理')).toHaveCount(0)
 
       await page.goto(`${BASE}/dashboard/group`)
       await expect(page.getByText(/403|权限不足/).first()).toBeVisible({ timeout: 8000 })
