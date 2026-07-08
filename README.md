@@ -53,11 +53,11 @@
 
 | 项目 | 结果 |
 |------|------|
-| Docker 服务 | `cad_web` / `cad_api` / `cad_celery_worker` / `cad_celery_beat` / `cad_postgres` / `cad_redis` / `cad_minio` / `cad_chroma` 均运行正常 |
+| Docker 服务 | 使用 `docker compose -p cad -f docker-compose.yml -f docker-compose.alt-ports.yml --profile app up -d --build` 重建；`cad_web` / `cad_api` / `cad_celery_worker` / `cad_celery_beat` / `cad_postgres` / `cad_redis` / `cad_minio` / `cad_chroma` 均运行正常 |
 | 镜像一致性 | `cad_api`、`cad_celery_worker`、`cad_celery_beat` 均使用当前 `cad-api:local` 镜像 |
 | 前端构建 | `npm run build` 通过 |
-| 后端测试 | `396 passed`，总覆盖率 `80.56%`，达到 `cov-fail-under=80` |
-| E2E 测试 | `79 passed, 1 skipped`；唯一 skip 为移动端默认折叠菜单下的桌面侧边栏文字检查 |
+| 后端测试 | `409 passed`，总覆盖率 `80.90%`，达到 `cov-fail-under=80` |
+| 模型页 E2E | `E2E_BASE_URL=http://127.0.0.1:3002 npx playwright test tests/e2e/model.spec.ts --project=chromium` 通过，覆盖模型质量、动态单体、待人工识别队列和保存标注 |
 | 健康检查 | `http://127.0.0.1:8002/health` 返回 `{"status":"ok"}` |
 | 登录验证 | `admin / admin123` 登录接口验证通过 |
 

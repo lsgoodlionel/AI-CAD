@@ -286,30 +286,33 @@ test.describe('工程模型页 - LOD 与人工识别', () => {
     await expect(page.getByText('未分层 3')).toBeVisible()
     await expect(page.getByText('楼层冲突 1')).toBeVisible()
     await expect(page.getByText('低置信度单体 2')).toBeVisible()
-    await expect(page.getByText('待人工识别 2')).toBeVisible()
+    await expect(page.getByText('待人工识别 2').first()).toBeVisible()
 
-    await expect(page.getByText('A塔')).toBeVisible()
-    await expect(page.getByText('西裙房')).toBeVisible()
-    await expect(page.getByText('手工北翼')).toBeVisible()
+    await expect(page.getByText('A塔', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('西裙房', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('手工北翼', { exact: true }).first()).toBeVisible()
 
     await expect(page.getByRole('button', { name: '审图骨架' })).toBeVisible()
     await expect(page.getByRole('button', { name: '建筑体量' })).toBeVisible()
     await expect(page.getByRole('button', { name: '实景近似' })).toBeDisabled()
-    await expect(page.getByRole('button', { name: '构件' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '贴图' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '混合' })).toBeVisible()
+    await expect(page.getByText('构件', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('贴图', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('混合', { exact: true }).first()).toBeVisible()
 
     await expect(page.getByText('机房夹层平面图')).toBeVisible()
     await expect(page.getByText('M-201')).toBeVisible()
     await expect(page.getByText('OCR: 北翼夹层')).toBeVisible()
 
-    await page.getByLabel('单体').nth(1).fill('北翼扩展段')
-    await page.getByLabel('楼层').nth(1).fill('夹层')
-    await page.getByLabel('图纸类型').nth(1).fill('机电平面')
-    await page.getByRole('button', { name: '保存标注' }).nth(1).click()
+    const targetQueueItem = page.locator('.ant-list-item').filter({ hasText: '机房夹层平面图' })
+    await targetQueueItem.scrollIntoViewIfNeeded()
+    const fields = targetQueueItem.getByRole('combobox')
+    await fields.nth(0).fill('北翼扩展段')
+    await fields.nth(1).fill('夹层')
+    await fields.nth(2).fill('机电平面')
+    await targetQueueItem.getByRole('button', { name: '保存标注' }).click()
 
     await expect(page.getByText('机房夹层平面图')).toHaveCount(0)
-    await expect(page.getByText('待人工识别 1')).toBeVisible()
+    await expect(page.getByText('待人工识别 1').first()).toBeVisible()
 
     expect(api.getSavedBody()).toMatchObject({
       drawing_id: 'drawing-2',
