@@ -35,6 +35,10 @@ _executor = ThreadPoolExecutor(max_workers=2)
 
 RENDER_DPI = 110
 MAX_TEXTURE_PX = 1600
+# 全量套图保护：超大矢量 PDF 渲染可卡死线程（无法强杀），从源头限制
+MAX_RENDER_FILE_MB = 25          # 超此大小跳过贴图（保留线框面板）
+RENDER_TIMEOUT_SEC = 90          # 单张渲染超时（超时线程自然结束，主流程继续）
+MAX_TEXTURES_PER_PROJECT = 400   # 全项目贴图渲染上限（其余线框，控构建时长与前端负载）
 DXF_FIG_SIZE = (16, 12)     # 英寸
 DXF_FIG_DPI = 100
 MARKER_TITLE_MAX = 80
@@ -146,6 +150,8 @@ def _render_and_upload_sync(
 ) -> dict:
     """下载 → 渲染 → 上传 MinIO，返回 asset 描述；失败由上层降级。"""
     data = get_file_bytes(file_key)
+    if len(data) > MAX_RENDER_FILE_MB * 1024 * 1024:
+        raise RuntimeError(f"RENDER_SKIPPED_TOO_LARGE:{len(data) >> 20}MB")
     ext = file_ext
     if ext == "dwg":
         data, ext, warning = ensure_dxf(data, ext)
@@ -227,11 +233,14 @@ async def _build_one_asset(
             logger.warning("[ModelBuilder] IFC 转换失败 %s: %s", drawing_id, exc)
             return _empty_asset("ifc"), None, False
     try:
-        asset = await loop.run_in_executor(
-            _executor, _render_and_upload_sync, project_id, drawing_id, file_key, ext
+        asset = await asyncio.wait_for(
+            loop.run_in_executor(
+                _executor, _render_and_upload_sync, project_id, drawing_id, file_key, ext
+            ),
+            timeout=RENDER_TIMEOUT_SEC,
         )
         return asset, None, False
-    except Exception as exc:  # noqa: BLE001 — 单图失败必须降级
+    except Exception as exc:  # noqa: BLE001 — 单图失败/超时必须降级
         logger.warning("[ModelBuilder] 贴图渲染失败 %s: %s", drawing_id, exc)
         return _empty_asset(ext or "none"), None, False
 
@@ -268,12 +277,19 @@ async def _build_assets(
     ifc_models: list[dict] = []
     ifc_skipped = False
     total = len(drawings)
+    rendered = 0
     for index, drawing in enumerate(drawings):
         await _notify(progress_cb, _progress_payload(
             "render", "读取图纸内容并渲染贴图",
             str(drawing.get("drawing_no") or ""), index, total,
         ))
+        if rendered >= MAX_TEXTURES_PER_PROJECT:
+            # 超过全项目贴图上限：其余图纸线框占位（保构建时长与前端负载）
+            assets[str(drawing["id"])] = _empty_asset("capped")
+            continue
         asset, gltf_key, skipped = await _build_one_asset(loop, project_id, drawing)
+        if asset.get("image_key"):
+            rendered += 1
         assets[str(drawing["id"])] = asset
         if gltf_key:
             ifc_models.append({"drawing_id": str(drawing["id"]), "gltf_key": gltf_key})
@@ -307,16 +323,30 @@ def _drawing_entry(drawing: dict, issues: list[dict], asset: dict) -> dict:
     }
 
 
+def _trusted_floor_keys(drawings: list[dict]) -> set[str]:
+    """可信楼层集：由图名/图号直接解析出的楼层（约束 issue levels 弱信号）。"""
+    trusted: set[str] = set()
+    for drawing in drawings:
+        for text in (drawing.get("title"), drawing.get("drawing_no")):
+            parsed = parse_floor(str(text or ""))
+            if parsed is not None:
+                trusted.add(parsed[0])
+    return trusted
+
+
 def _build_floors(
     drawings: list[dict], issues_by_drawing: dict[str, list[dict]], assets: dict
 ) -> tuple[list[dict], dict[str, str]]:
     """楼层堆叠：按 order 排序的 floors 列表 + drawing_id → floor_key 映射。"""
     floors: dict[str, dict] = {}
     floor_of: dict[str, str] = {}
+    trusted = _trusted_floor_keys(drawings)
     for drawing in drawings:
         drawing_id = str(drawing["id"])
         issues = issues_by_drawing.get(drawing_id, [])
-        key, label, order = floor_of_drawing(drawing, _issue_levels(issues))
+        key, label, order = floor_of_drawing(
+            drawing, _issue_levels(issues), trusted_keys=trusted
+        )
         floor = floors.setdefault(
             key,
             {"key": key, "label": label, "elevation": order, "order": order, "drawings": []},
@@ -521,7 +551,13 @@ def _apply_real_elevations(floors: list[dict]) -> None:
     )
     previous: float | None = None
     for floor in ordered:
-        candidates = sorted(floor.pop("_elevation_candidates", []) or [])
+        raw = floor.pop("_elevation_candidates", []) or []
+        # 符号约束：地下层候选 ≤0.5（含 ±0.000 顶板），地上层候选 ≥-0.5
+        order = int(floor.get("order", 0))
+        candidates = sorted(
+            v for v in raw
+            if (v <= 0.5 if order < 0 else v >= -0.5)
+        )
         chosen: float | None = None
         if candidates:
             if previous is None:

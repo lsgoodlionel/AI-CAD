@@ -228,3 +228,18 @@ def test_apply_real_elevations_greedy_monotonic():
     assert by_key["F1"] == pytest.approx(0.0)
     assert by_key["F2"] is None
     assert by_key["UNZONED"] is None
+
+
+@pytest.mark.unit
+def test_apply_real_elevations_sign_constraint():
+    """地下层只取 ≤0.5 候选、地上层只取 ≥-0.5 候选（防 ±0.000 抢占错层）"""
+    from services.model_builder import _apply_real_elevations
+
+    floors = [
+        {"key": "B2", "order": -2, "_elevation_candidates": [0.0, 9.3]},   # 无负值候选
+        {"key": "F1", "order": 1, "_elevation_candidates": [-9.3, 0.0]},   # 负值应被滤掉
+    ]
+    _apply_real_elevations(floors)
+    by_key = {f["key"]: f["elevation_m"] for f in floors}
+    assert by_key["B2"] == pytest.approx(0.0)   # 地下层允许 ±0.000（顶板）
+    assert by_key["F1"] is None or by_key["F1"] >= -0.5

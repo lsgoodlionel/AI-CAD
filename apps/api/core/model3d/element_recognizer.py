@@ -118,6 +118,7 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str) -> Floor
     if discipline == "mep":
         result.pipes = _find_pipes(lines, axis_lines, all_text, ctx)
         result.equipment = _find_equipment(rects, polys, geom.texts, ctx)
+        _clip_to_axes(result)
         return result
 
     result.columns = _find_columns(rects, polys, ctx)
@@ -133,6 +134,7 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str) -> Floor
     else:
         result.walls = pairs[:_CAPS["walls"]]
     result.slabs = _find_slabs(polys, axis_x, axis_y, ctx)
+    _clip_to_axes(result)
     return result
 
 
@@ -380,6 +382,31 @@ def _find_slabs(polys: list, axis_x: list[float], axis_y: list[float], ctx: _Ctx
         outline = [ctx.to_m(x0, y0), ctx.to_m(x1, y0), ctx.to_m(x1, y1), ctx.to_m(x0, y1)]
         return [{"outline": outline, "thickness": 0.12, "src": ctx.src}]
     return []
+
+
+# 轴网范围外允许的构件溢出边距（米）——超出视为图框/图例等离群图形
+_AXIS_CLIP_PAD_M = 15.0
+
+
+def _clip_to_axes(result: FloorElements) -> None:
+    """构件裁剪到轴网包络 + 边距内（防图框/图例/说明块被当构件拉大建筑包络）。"""
+    xs = [pos for _label, pos in result.axes.get("x", [])]
+    ys = [pos for _label, pos in result.axes.get("y", [])]
+    if len(xs) < 2 or len(ys) < 2:
+        return
+    x_lo, x_hi = min(xs) - _AXIS_CLIP_PAD_M, max(xs) + _AXIS_CLIP_PAD_M
+    y_lo, y_hi = min(ys) - _AXIS_CLIP_PAD_M, max(ys) + _AXIS_CLIP_PAD_M
+
+    def _inside(item: dict) -> bool:
+        points = item.get("outline") or item.get("path") or []
+        if not points:
+            return True
+        cx = sum(p[0] for p in points) / len(points)
+        cy = sum(p[1] for p in points) / len(points)
+        return x_lo <= cx <= x_hi and y_lo <= cy <= y_hi
+
+    for kind in ("columns", "walls", "beams", "pipes", "equipment"):
+        setattr(result, kind, [i for i in getattr(result, kind) if _inside(i)])
 
 
 def _pipe_system(all_text: str) -> str:

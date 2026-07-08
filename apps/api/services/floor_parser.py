@@ -107,8 +107,16 @@ def parse_floor(text: str) -> tuple[str, str, int] | None:
     return _match_above_ground(text)
 
 
-def floor_of_drawing(drawing: dict, issue_levels: list[str]) -> tuple[str, str, int]:
-    """优先图纸 title/drawing_no，再取该图 issues 的 location levels 众数；都无 → ('UNZONED','未分层',0)。"""
+def floor_of_drawing(
+    drawing: dict, issue_levels: list[str],
+    trusted_keys: set[str] | None = None,
+) -> tuple[str, str, int]:
+    """优先图纸 title/drawing_no，再取该图 issues 的 location levels 众数。
+
+    ``trusted_keys``：可信楼层集（通常由项目内 title 直接解析出的楼层构成）。
+    issue levels 是图内 OCR/正则抓取的弱信号（实测会抓出 B9/61F 等伪楼层），
+    提供可信集时仅采纳集合内楼层，否则归 UNZONED。title 解析不受约束。
+    """
     for text in (drawing.get("title"), drawing.get("drawing_no")):
         parsed = parse_floor(str(text or ""))
         if parsed is not None:
@@ -117,6 +125,7 @@ def floor_of_drawing(drawing: dict, issue_levels: list[str]) -> tuple[str, str, 
     parsed_levels = [
         floor for floor in (parse_floor(str(level or "")) for level in issue_levels)
         if floor is not None
+        and (trusted_keys is None or floor[0] in trusted_keys)
     ]
     if parsed_levels:
         return Counter(parsed_levels).most_common(1)[0][0]

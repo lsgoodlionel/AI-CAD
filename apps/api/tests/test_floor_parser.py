@@ -103,3 +103,33 @@ def test_reasonable_floors_still_parse():
     assert parse_floor("B2 平面")[0] == "B2"
     assert parse_floor("地下二层")[0] == "B2"
     assert parse_floor("15层平面图")[0] == "F15"
+
+
+# ── 可信楼层集约束（全量实测：issue levels 文本 B9/61F 产生伪楼层）──
+
+@pytest.mark.unit
+def test_issue_levels_floor_rejected_when_not_trusted():
+    """issue levels 推出的楼层不在可信集（title 解析出的楼层）→ 归 UNZONED"""
+    from services.floor_parser import floor_of_drawing
+
+    drawing = {"title": "栈桥区域立柱详图", "drawing_no": "WH-61"}
+    result = floor_of_drawing(drawing, ["B9"], trusted_keys={"B2", "B1", "F1"})
+    assert result[0] == "UNZONED"
+
+
+@pytest.mark.unit
+def test_issue_levels_floor_kept_when_trusted():
+    from services.floor_parser import floor_of_drawing
+
+    drawing = {"title": "栈桥区域立柱详图", "drawing_no": "WH-61"}
+    result = floor_of_drawing(drawing, ["B2"], trusted_keys={"B2", "B1"})
+    assert result[0] == "B2"
+
+
+@pytest.mark.unit
+def test_title_floor_not_affected_by_trusted_keys():
+    """title 直接解析的楼层不受可信集约束（title 本身就是可信来源）"""
+    from services.floor_parser import floor_of_drawing
+
+    drawing = {"title": "地下二层结构平面图", "drawing_no": "S-1"}
+    assert floor_of_drawing(drawing, [], trusted_keys={"F1"})[0] == "B2"
