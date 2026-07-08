@@ -1,7 +1,58 @@
 """scene V2 组装测试（schema_version=2：单体分组 + 构件层 + 回退）"""
 import json
+import sys
+import types
+from unittest.mock import AsyncMock
 
 import pytest
+
+if "pydantic_settings" not in sys.modules:
+    module = types.ModuleType("pydantic_settings")
+
+    class _BaseSettings:
+        def __init__(self, **kwargs):
+            for key, value in self.__class__.__dict__.items():
+                if key.startswith("_") or callable(value):
+                    continue
+                setattr(self, key, value)
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
+    module.BaseSettings = _BaseSettings
+    sys.modules["pydantic_settings"] = module
+
+if "minio" not in sys.modules:
+    minio_module = types.ModuleType("minio")
+
+    class _Minio:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    minio_module.Minio = _Minio
+    sys.modules["minio"] = minio_module
+
+if "minio.error" not in sys.modules:
+    error_module = types.ModuleType("minio.error")
+
+    class S3Error(Exception):
+        pass
+
+    error_module.S3Error = S3Error
+    sys.modules["minio.error"] = error_module
+
+if "core.ai_review" not in sys.modules:
+    package = types.ModuleType("core.ai_review")
+    package.__path__ = []
+    sys.modules["core.ai_review"] = package
+
+if "core.ai_review.dwg_support" not in sys.modules:
+    dwg_support = types.ModuleType("core.ai_review.dwg_support")
+
+    def ensure_dxf(data: bytes, file_ext: str):
+        return data, file_ext, None
+
+    dwg_support.ensure_dxf = ensure_dxf
+    sys.modules["core.ai_review.dwg_support"] = dwg_support
 
 import services.model_builder as model_builder
 import services.model_elements as model_elements
@@ -14,6 +65,16 @@ D_MAIN = "77777777-7777-7777-7777-777777777773"
 
 V1_KEYS = {"project", "floors", "markers", "cross_links", "ifc_models", "stats", "generated_at"}
 ELEMENT_KINDS = {"columns", "walls", "beams", "slabs", "pipes", "equipment"}
+
+
+@pytest.fixture
+def fake_db():
+    class _FakeDB:
+        def __init__(self):
+            self.fetch_one = AsyncMock(return_value=None)
+            self.fetch_all = AsyncMock(return_value=[])
+
+    return _FakeDB()
 
 
 def _drawing(did: str, no: str, title: str) -> dict:
@@ -122,7 +183,7 @@ async def test_scene_v2_falls_back_to_texture_on_element_failure(fake_db, monkey
 @pytest.mark.unit
 def test_building_of_patterns():
     assert model_elements.building_of({"title": "南区（大、中歌剧厅）梁图"})[0] == "south"
-    assert model_elements.building_of({"title": "B2栋结构图"})[0] == "building_B2"
+    assert model_elements.building_of({"title": "B2栋结构图"})[0] == "building_b2"
     assert model_elements.building_of({"title": "3#楼平面"})[0] == "building_3"
     assert model_elements.building_of({"title": "通用说明"})[0] == "main"
 

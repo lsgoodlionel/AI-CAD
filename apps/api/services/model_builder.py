@@ -26,8 +26,8 @@ from typing import Any
 
 from core.ai_review.dwg_support import ensure_dxf
 from core.storage import get_file_bytes, upload_file
-from services import model_elements
-from services.floor_parser import floor_of_drawing, parse_floor
+from services import model_annotations, model_elements, model_story
+from services.floor_parser import parse_floor
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +88,15 @@ def _safe_json(value: Any, default: Any) -> Any:
     if not isinstance(value, type(default)):
         return default
     return value
+
+
+async def _load_annotation_overrides(db, project_id: str) -> dict[str, dict[str, Any]]:
+    """最小可测试 hook：默认尝试读取人工标注，失败时回退为空。"""
+    try:
+        return await model_annotations.load_annotation_overrides(db, project_id)
+    except Exception as exc:  # noqa: BLE001 - 标注表未部署时不阻断模型构建
+        logger.info("[ModelBuilder] 标注覆盖读取失败，回退自动识别: %s", exc)
+        return {}
 
 
 # ── 贴图渲染（线程池内同步执行）───────────────────────────────
@@ -308,9 +317,15 @@ def _issue_levels(issues: list[dict]) -> list[str]:
     return levels
 
 
-def _drawing_entry(drawing: dict, issues: list[dict], asset: dict) -> dict:
+def _drawing_entry(
+    drawing: dict,
+    issues: list[dict],
+    asset: dict,
+    assignment: dict[str, Any] | None = None,
+) -> dict:
     """楼层内单张图纸条目（蓝图第 4 节 floors[].drawings[] 契约）。"""
-    return {
+    assignment = assignment or {}
+    entry = {
         "drawing_id": str(drawing["id"]),
         "drawing_no": drawing.get("drawing_no") or "",
         "title": drawing.get("title") or "",
@@ -321,6 +336,20 @@ def _drawing_entry(drawing: dict, issues: list[dict], asset: dict) -> dict:
         "issue_count": len(issues),
         "critical_count": sum(1 for i in issues if i.get("severity") == "critical"),
     }
+    if assignment:
+        entry.update(
+            {
+                "building_unit_key": assignment.get("building_unit_key") or "main",
+                "building_unit_display_name": assignment.get("building_unit_display_name") or "主体",
+                "story_key": assignment.get("story_key") or "UNZONED",
+                "story_display_name": assignment.get("story_display_name") or "未分层",
+                "assignment_source": assignment.get("assignment_source") or "detected",
+                "assignment_confidence": assignment.get("story_confidence")
+                or assignment.get("building_unit_confidence")
+                or 0.0,
+            }
+        )
+    return entry
 
 
 def _trusted_floor_keys(drawings: list[dict]) -> set[str]:
@@ -335,27 +364,49 @@ def _trusted_floor_keys(drawings: list[dict]) -> set[str]:
 
 
 def _build_floors(
-    drawings: list[dict], issues_by_drawing: dict[str, list[dict]], assets: dict
+    drawings: list[dict],
+    issues_by_drawing: dict[str, list[dict]],
+    assets: dict,
+    normalization: model_story.StoryNormalizationResult,
 ) -> tuple[list[dict], dict[str, str]]:
-    """楼层堆叠：按 order 排序的 floors 列表 + drawing_id → floor_key 映射。"""
+    """楼层堆叠：使用 normalized story assignment 组装 floors。"""
     floors: dict[str, dict] = {}
     floor_of: dict[str, str] = {}
-    trusted = _trusted_floor_keys(drawings)
     for drawing in drawings:
         drawing_id = str(drawing["id"])
         issues = issues_by_drawing.get(drawing_id, [])
-        key, label, order = floor_of_drawing(
-            drawing, _issue_levels(issues), trusted_keys=trusted
-        )
+        assignment = normalization.drawing_assignments.get(drawing_id) or {}
+        key = str(assignment.get("story_key") or "UNZONED")
+        label = str(assignment.get("story_display_name") or "未分层")
+        order = int(assignment.get("story_order") or 0)
         floor = floors.setdefault(
             key,
-            {"key": key, "label": label, "elevation": order, "order": order, "drawings": []},
+            {
+                "key": key,
+                "label": label,
+                "elevation": order,
+                "order": order,
+                "elevation_m": assignment.get("normalized_elevation_m"),
+                "drawings": [],
+                "building_units": set(),
+            },
         )
+        if floor.get("elevation_m") is None and assignment.get("normalized_elevation_m") is not None:
+            floor["elevation_m"] = assignment["normalized_elevation_m"]
+        floor["building_units"].add(assignment.get("building_unit_key") or "main")
         floor["drawings"].append(
-            _drawing_entry(drawing, issues, assets.get(drawing_id, _empty_asset("none")))
+            _drawing_entry(
+                drawing,
+                issues,
+                assets.get(drawing_id, _empty_asset("none")),
+                assignment,
+            )
         )
         floor_of[drawing_id] = key
-    return sorted(floors.values(), key=lambda f: f["order"]), floor_of
+    ordered = sorted(floors.values(), key=lambda f: f["order"])
+    for floor in ordered:
+        floor["building_units"] = sorted(floor["building_units"])
+    return ordered, floor_of
 
 
 def _stable_point(basis: str) -> tuple[float, float]:
@@ -488,6 +539,58 @@ def _build_stats(
     return stats
 
 
+def _serialize_story_level(level: model_story.StoryLevel) -> dict[str, Any]:
+    return {
+        "building_unit_key": level.building_unit_key,
+        "display_building_name": level.display_building_name,
+        "story_key": level.story_key,
+        "display_name": level.display_name,
+        "story_order": level.story_order,
+        "elevation_m": level.elevation_m,
+        "height_m": level.height_m,
+        "source": level.source,
+        "confidence": level.confidence,
+    }
+
+
+def _serialize_quality_issue(issue: model_story.ModelQualityIssue) -> dict[str, Any]:
+    return {
+        "issue_type": issue.issue_type,
+        "severity": issue.severity,
+        "message": issue.message,
+        "drawing_id": issue.drawing_id,
+        "building_unit_key": issue.building_unit_key,
+        "story_key": issue.story_key,
+        "payload": issue.payload,
+    }
+
+
+def _quality_payload(normalization: model_story.StoryNormalizationResult) -> dict[str, Any]:
+    story_conflicts = [
+        _serialize_quality_issue(issue)
+        for issue in normalization.issues
+        if issue.issue_type == "story_spacing_too_small"
+    ]
+    low_confidence_units = [
+        unit for unit in normalization.building_units
+        if float(unit.get("confidence") or 0) < 0.6
+    ]
+    return {
+        "building_units": normalization.building_units,
+        "story_tables": {
+            key: [_serialize_story_level(level) for level in levels]
+            for key, levels in normalization.stories_by_building.items()
+        },
+        "unclassified_drawings": normalization.unclassified_drawings,
+        "unassigned_story_count": len(normalization.unclassified_drawings),
+        "pending_manual_count": len(normalization.unclassified_drawings),
+        "story_conflict_count": len(story_conflicts),
+        "story_conflicts": story_conflicts,
+        "low_confidence_building_units": low_confidence_units,
+        "issues": [_serialize_quality_issue(issue) for issue in normalization.issues],
+    }
+
+
 async def _fetch_inputs(db, project_id: str) -> tuple[dict, list[dict], dict, dict]:
     """聚合查询：项目 + 图纸 + 每图最新报告问题 + 最近一次跨图发现。"""
     project = await db.fetch_one(_PROJECT_SQL, {"project_id": project_id})
@@ -551,6 +654,10 @@ def _apply_real_elevations(floors: list[dict]) -> None:
     )
     previous: float | None = None
     for floor in ordered:
+        if floor.get("elevation_m") is not None:
+            previous = float(floor["elevation_m"])
+            floor.pop("_elevation_candidates", None)
+            continue
         raw = floor.pop("_elevation_candidates", []) or []
         # 符号约束：地下层候选 ≤0.5（含 ±0.000 顶板），地上层候选 ≥-0.5
         order = int(floor.get("order", 0))
@@ -572,10 +679,16 @@ def _apply_real_elevations(floors: list[dict]) -> None:
         floor.setdefault("elevation_m", None)
 
 
-def _marker_building_keys(markers: list[dict], drawings: list[dict]) -> None:
+def _marker_building_keys(
+    markers: list[dict],
+    drawings: list[dict],
+    assignments: dict[str, dict[str, Any]] | None = None,
+) -> None:
     """markers 补 building_key（按所属图纸的单体）。"""
+    assignments = assignments or {}
     building_by_drawing = {
-        str(d["id"]): model_elements.building_of(d)[0] for d in drawings
+        str(d["id"]): model_elements.building_of(d, assignments.get(str(d["id"])))[0]
+        for d in drawings
     }
     for marker in markers:
         drawing_id = str((marker.get("ref") or {}).get("drawing_id") or "")
@@ -590,8 +703,10 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     """
     await _notify(progress_cb, _progress_payload("fetch", "读取项目图纸与审图数据", "", 0, 1))
     project, drawings, issues_by_drawing, cross = await _fetch_inputs(db, project_id)
+    annotation_overrides = await _load_annotation_overrides(db, project_id)
+    normalization = model_story.normalize_story_table(drawings, annotation_overrides)
     assets, ifc_models, ifc_skipped = await _build_assets(project_id, drawings, progress_cb)
-    floors, floor_of = _build_floors(drawings, issues_by_drawing, assets)
+    floors, floor_of = _build_floors(drawings, issues_by_drawing, assets, normalization)
     yolo_total = await _attach_floor_elements(floors, drawings, floor_of, progress_cb)
     await _notify(progress_cb, _progress_payload("assemble", "组装场景与统计", "", 0, 1))
 
@@ -603,17 +718,25 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
         floor_by_no.setdefault(no, floor_of[str(drawing["id"])])
 
     markers = _build_markers(issues_by_drawing, floor_of)
-    _marker_building_keys(markers, drawings)
+    _marker_building_keys(markers, drawings, normalization.drawing_assignments)
 
     stats = _build_stats(drawings, issues_by_drawing, floors, ifc_skipped)
     stats["elements_total"] = model_elements.totals(floors)
     stats["reconstruction"] = model_elements.reconstruction_mode(floors)
     stats["buildings"] = 0  # 占位，下方 buildings 组装后回填
+    stats["unclassified_drawings"] = len(normalization.unclassified_drawings)
+    stats["quality_issues"] = len(normalization.issues)
     if yolo_total:
         stats["yolo_equipment"] = yolo_total
 
     project_name = project.get("name") or ""
-    buildings = model_elements.group_buildings(floors, drawings, project_name)
+    buildings = model_elements.group_buildings(
+        floors,
+        drawings,
+        project_name,
+        normalized_assignments=normalization.drawing_assignments,
+        building_units=normalization.building_units,
+    )
     stats["buildings"] = len(buildings)
 
     scene = {
@@ -621,10 +744,23 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
         "project": {"id": str(project["id"]), "name": project_name},
         "buildings": buildings,
         "floors": floors,
+        "quality": _quality_payload(normalization),
+        "annotation_queue": normalization.unclassified_drawings,
+        "building_units": {
+            "detected": normalization.building_units,
+            "manual": [
+                unit for unit in normalization.building_units
+                if unit.get("source") == "manual"
+            ],
+        },
         "markers": markers,
         "cross_links": _build_cross_links(cross, ids_by_no, floor_by_no),
         "ifc_models": ifc_models,
         "stats": stats,
+        "lod": {
+            "default_mode": stats["reconstruction"],
+            "supported_modes": ["texture", "elements", "mixed"],
+        },
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     return scene, assets

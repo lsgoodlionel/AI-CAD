@@ -14,11 +14,19 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from core.storage import presigned_get_url
 from dependencies import get_db, get_current_user
 from services.audit import write_audit
+from services import model_annotations, model_story
 from tasks.model_build import build_project_model
 
 router = APIRouter(prefix="/projects", tags=["project-models"])
 
 ASSET_URL_EXPIRES_SECONDS = 300
+
+_ANNOTATION_DRAWINGS_SQL = """
+SELECT id, drawing_no, title, discipline, status, current_stage, file_key
+FROM drawings
+WHERE project_id=$1
+ORDER BY drawing_no, created_at
+"""
 
 
 def _parse_jsonb(value: Any, default: Any) -> Any:
@@ -31,6 +39,69 @@ def _parse_jsonb(value: Any, default: Any) -> Any:
         except (json.JSONDecodeError, ValueError):
             return default
     return value
+
+
+def _model_quality_from_scene(scene: dict | None) -> dict:
+    if not isinstance(scene, dict):
+        return {}
+    quality = scene.get("quality")
+    return quality if isinstance(quality, dict) else {}
+
+
+def _model_annotation_queue_from_scene(scene: dict | None) -> list:
+    if not isinstance(scene, dict):
+        return []
+    queue = scene.get("annotation_queue")
+    if isinstance(queue, list):
+        return queue
+    quality = _model_quality_from_scene(scene)
+    queue = quality.get("unclassified_drawings")
+    return queue if isinstance(queue, list) else []
+
+
+def _model_building_units_from_scene(scene: dict | None) -> dict:
+    if not isinstance(scene, dict):
+        return {"detected": [], "manual": []}
+    units = scene.get("building_units")
+    if isinstance(units, dict):
+        return {
+            "detected": units.get("detected") if isinstance(units.get("detected"), list) else [],
+            "manual": units.get("manual") if isinstance(units.get("manual"), list) else [],
+        }
+    quality = _model_quality_from_scene(scene)
+    detected = quality.get("building_units")
+    return {"detected": detected if isinstance(detected, list) else [], "manual": []}
+
+
+async def _build_annotation_context(db, project_id: str) -> dict:
+    drawings = [
+        dict(row) for row in await db.fetch_all(_ANNOTATION_DRAWINGS_SQL, project_id)
+    ]
+    annotations = await model_annotations.load_annotation_overrides(db, project_id)
+    normalization = model_story.normalize_story_table(drawings, annotations)
+    quality = {
+        "building_units": normalization.building_units,
+        "unclassified_drawings": normalization.unclassified_drawings,
+        "unassigned_story_count": len(normalization.unclassified_drawings),
+        "pending_manual_count": len(normalization.unclassified_drawings),
+        "story_conflict_count": sum(
+            1 for issue in normalization.issues
+            if issue.issue_type == "story_spacing_too_small"
+        ),
+        "issues": [issue.__dict__ for issue in normalization.issues],
+    }
+    return {
+        "items": normalization.unclassified_drawings,
+        "annotation_queue": normalization.unclassified_drawings,
+        "building_units": {
+            "detected": normalization.building_units,
+            "manual": [
+                unit for unit in normalization.building_units
+                if unit.get("source") == "manual"
+            ],
+        },
+        "quality": quality,
+    }
 
 
 # ── 重建模型 ──────────────────────────────────────────────────
@@ -90,15 +161,67 @@ async def get_project_model(
     if row is None:
         raise HTTPException(404, "MODEL_NOT_BUILT")
     record = dict(row)
+    scene = _parse_jsonb(record["scene"], None)
     return {
         "status": record["status"],
         "version": record["version"],
         "built_at": record["built_at"],
         "error": record["error"],
-        "scene": _parse_jsonb(record["scene"], None),
+        "scene": scene,
+        "quality": _model_quality_from_scene(scene),
+        "annotation_queue": _model_annotation_queue_from_scene(scene),
+        "building_units": _model_building_units_from_scene(scene),
         # 构建实时进度（migration 014；building 状态时前端展示）
         "progress": _parse_jsonb(record.get("progress"), None),
     }
+
+
+@router.get("/{project_id}/model/annotation-queue")
+async def get_model_annotation_queue(
+    project_id: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    project = await db.fetch_one("SELECT id FROM projects WHERE id=$1", project_id)
+    if project is None:
+        raise HTTPException(404, "PROJECT_NOT_FOUND")
+    return await _build_annotation_context(db, project_id)
+
+
+@router.post("/{project_id}/model/annotations")
+async def save_model_annotation(
+    project_id: str,
+    body: dict[str, Any],
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    project = await db.fetch_one("SELECT id FROM projects WHERE id=$1", project_id)
+    if project is None:
+        raise HTTPException(404, "PROJECT_NOT_FOUND")
+
+    drawing_id = str(body.get("drawing_id") or "").strip()
+    if not drawing_id:
+        raise HTTPException(400, "DRAWING_ID_REQUIRED")
+    drawing = await db.fetch_one(
+        "SELECT id FROM drawings WHERE id=$1 AND project_id=$2",
+        drawing_id,
+        project_id,
+    )
+    if drawing is None:
+        raise HTTPException(404, "DRAWING_NOT_FOUND")
+
+    try:
+        annotation = await model_annotations.save_drawing_annotation(
+            db,
+            project_id=project_id,
+            drawing_id=drawing_id,
+            payload=body,
+            annotated_by=str(current_user["id"]),
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    return {"annotation": annotation}
 
 
 # ── 资产签名 URL ─────────────────────────────────────────────

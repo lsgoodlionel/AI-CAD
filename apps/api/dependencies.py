@@ -24,6 +24,8 @@ class DatabaseAdapter:
             return query, kwargs
         if not args:
             return query, None
+        if len(args) == 1 and isinstance(args[0], dict):
+            return query, args[0]
         values = {f"p{i}": value for i, value in enumerate(args, start=1)}
         normalized = re.sub(r"\$(\d+)", lambda m: f":p{m.group(1)}", query)
         return normalized, values

@@ -11,6 +11,8 @@ import logging
 import re
 from typing import Any, Callable
 
+from services.model_story import detect_building_unit
+
 logger = logging.getLogger(__name__)
 
 # 每楼层每类参与识别的图纸上限（控制构建时长）
@@ -40,8 +42,18 @@ _DEFAULT_FLOOR_EXTENT = (60.0, 40.0)
 _YOLO_MIN_CONFIDENCE = 0.4
 
 
-def building_of(drawing: dict) -> tuple[str, str]:
-    """图名/标题 → (building_key, label)；未命中 → ('main', '')。"""
+def building_of(drawing: dict, normalized_assignment: dict[str, Any] | None = None) -> tuple[str, str]:
+    """图纸 → (building_key, label)；优先 normalized assignment，回退动态识别。"""
+    normalized_assignment = normalized_assignment or {}
+    unit_key = str(normalized_assignment.get("building_unit_key") or "").strip()
+    display_name = str(normalized_assignment.get("building_unit_display_name") or "").strip()
+    if unit_key:
+        return unit_key, display_name
+
+    detected = detect_building_unit(drawing)
+    if detected.unit_key != "main":
+        return detected.unit_key, detected.display_name
+
     text = f"{drawing.get('title') or ''} {drawing.get('drawing_no') or ''}"
     for pattern, key in _BUILDING_PATTERNS:
         match = pattern.search(text)
@@ -52,7 +64,7 @@ def building_of(drawing: dict) -> tuple[str, str]:
         label = unit.group(0)
         key = "building_" + (unit.group(1) or unit.group(2) or "x")
         return key, label
-    return "main", ""
+    return "main", detected.display_name
 
 
 def pick_element_drawings(floor_drawings: list[dict]) -> dict[str, list[dict]]:
@@ -341,15 +353,24 @@ def _split_elements_by_srcs(elements: dict, src_ids: set[str]) -> dict[str, list
 
 
 def group_buildings(
-    floors: list[dict], drawings: list[dict], project_name: str,
+    floors: list[dict],
+    drawings: list[dict],
+    project_name: str,
+    normalized_assignments: dict[str, dict[str, Any]] | None = None,
+    building_units: list[dict[str, Any]] | None = None,
 ) -> list[dict]:
     """按单体分组楼层（同楼层图纸可能分属多单体 → 楼层按单体拆分）。
 
     输入 floors 为拍平楼层（V1 结构 + elements）；输出蓝图 buildings 数组。
     楼层构件按 src 来源图纸切分到所属单体（不重复归组）。
     """
+    normalized_assignments = normalized_assignments or {}
+    building_unit_map = {
+        str(item.get("unit_key")): dict(item) for item in (building_units or []) if item.get("unit_key")
+    }
     building_of_drawing = {
-        str(d["id"]): building_of(d) for d in drawings
+        str(d["id"]): building_of(d, normalized_assignments.get(str(d["id"])))
+        for d in drawings
     }
     buildings: dict[str, dict] = {}
     for floor in floors:
@@ -358,13 +379,18 @@ def group_buildings(
             key, _label = building_of_drawing.get(entry["drawing_id"], ("main", ""))
             groups.setdefault(key, []).append(entry)
         for key, entries in groups.items():
-            label = next(
-                (lb for k, lb in building_of_drawing.values() if k == key and lb), ""
+            label = (
+                str(building_unit_map.get(key, {}).get("display_name") or "")
+                or next((lb for k, lb in building_of_drawing.values() if k == key and lb), "")
             )
             building = buildings.setdefault(
                 key,
-                {"key": key, "label": label or (project_name if key == "main" else key),
-                 "origin": [0, 0], "floors": []},
+                {
+                    "key": key,
+                    "label": label or (project_name if key == "main" else key),
+                    "origin": [0, 0],
+                    "floors": [],
+                },
             )
             src_ids = {str(entry["drawing_id"]) for entry in entries}
             elements = _split_elements_by_srcs(
