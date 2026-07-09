@@ -5,6 +5,7 @@
 供批量上传 / ZIP 整套导入在前端元数据缺失时兜底使用。
 解析不出的字段给安全默认值（discipline=general / version=A / drawing_no=文件名主干）。
 """
+from dataclasses import dataclass
 import re
 
 # 专业前缀映射（按序匹配）：结施/GS→structure 建施/JS→architecture
@@ -37,6 +38,22 @@ DEFAULT_VERSION = "A"
 DEFAULT_DISCIPLINE = "general"
 
 
+@dataclass(frozen=True)
+class ParsedField:
+    value: str
+    confidence: float
+    span: tuple[int, int] | None
+    source: str = "filename"
+
+
+@dataclass(frozen=True)
+class ParsedDrawingMetadata:
+    drawing_no: ParsedField
+    discipline: ParsedField
+    title: ParsedField
+    version: ParsedField
+
+
 def parse_drawing_filename(filename: str) -> dict:
     """解析图纸文件名，返回 {drawing_no, discipline, title, version}。
 
@@ -46,16 +63,46 @@ def parse_drawing_filename(filename: str) -> dict:
     3. 版本：`[Vv]?([A-Z])(?:版|$)`（含 _A/_B 结尾后缀）；无匹配→'A'
     4. title = 去除图号/版本标记后的剩余主干
     """
+    evidence = parse_drawing_filename_evidence(filename)
+    return {
+        "drawing_no": evidence.drawing_no.value,
+        "discipline": evidence.discipline.value,
+        "title": evidence.title.value,
+        "version": evidence.version.value,
+    }
+
+
+def parse_drawing_filename_evidence(filename: str) -> ParsedDrawingMetadata:
     stem = _extract_stem(filename)
     no_match = _MULTI_SEGMENT_NO_RE.search(stem) or _DRAWING_NO_RE.search(stem)
     drawing_no = no_match.group(0) if no_match else stem
-    version, version_span = _detect_version(stem, drawing_no)
-    return {
-        "drawing_no": drawing_no,
-        "discipline": _detect_discipline(stem),
-        "title": _build_title(stem, no_match.span() if no_match else None, version_span),
-        "version": version,
-    }
+    drawing_no_span = no_match.span() if no_match else None
+    version, version_span = _detect_version(stem, drawing_no, drawing_no_span)
+    discipline, discipline_confidence = _detect_discipline(stem)
+    title = _build_title(stem, drawing_no_span, version_span)
+    title_confidence = 0.8 if title and title != stem else 0.4 if title else 0.2
+    return ParsedDrawingMetadata(
+        drawing_no=ParsedField(
+            value=drawing_no,
+            confidence=0.95 if no_match else 0.45,
+            span=drawing_no_span,
+        ),
+        discipline=ParsedField(
+            value=discipline,
+            confidence=discipline_confidence,
+            span=None,
+        ),
+        title=ParsedField(
+            value=title,
+            confidence=title_confidence,
+            span=None,
+        ),
+        version=ParsedField(
+            value=version,
+            confidence=0.9 if version_span else 0.3,
+            span=version_span,
+        ),
+    )
 
 
 def _extract_stem(filename: str) -> str:
@@ -65,23 +112,30 @@ def _extract_stem(filename: str) -> str:
     return stem.strip()
 
 
-def _detect_discipline(stem: str) -> str:
+def _detect_discipline(stem: str) -> tuple[str, float]:
     """先按前缀缩写匹配，再按专业全称关键词包含匹配（机电类优先）"""
     upper = stem.upper()
     for prefixes, discipline in _DISCIPLINE_PREFIXES:
         if any(upper.startswith(prefix) for prefix in prefixes):
-            return discipline
+            return discipline, 0.9
     for keywords, discipline in _DISCIPLINE_KEYWORDS:
         if any(keyword in stem for keyword in keywords):
-            return discipline
-    return DEFAULT_DISCIPLINE
+            return discipline, 0.75
+    return DEFAULT_DISCIPLINE, 0.4
 
 
-def _detect_version(stem: str, drawing_no: str) -> tuple[str, tuple[int, int] | None]:
+def _detect_version(
+    stem: str,
+    drawing_no: str,
+    drawing_no_span: tuple[int, int] | None,
+) -> tuple[str, tuple[int, int] | None]:
     """提取版次：图号尾字母（103C→C）优先，其次 _A/B版 等显式标记；无→A"""
     trailing = _TRAILING_REV_RE.search(drawing_no)
     if trailing:
-        return trailing.group(1), None
+        if drawing_no_span is None:
+            return trailing.group(1), None
+        start, _ = drawing_no_span
+        return trailing.group(1), (start + trailing.start(1), start + trailing.end(1))
     match = _VERSION_RE.search(stem)
     if not match:
         return DEFAULT_VERSION, None

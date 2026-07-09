@@ -1,7 +1,10 @@
 """文件名解析器测试（蓝图 4.2：专业前缀 / 图号 / 版本 / 兜底各分支）"""
 import pytest
 
-from services.drawing_filename_parser import parse_drawing_filename
+from services.drawing_filename_parser import (
+    parse_drawing_filename,
+    parse_drawing_filename_evidence,
+)
 
 
 # ── 规则 1：专业前缀 ─────────────────────────────────────────────
@@ -102,6 +105,36 @@ def test_empty_filename_returns_safe_defaults():
 def test_result_contains_exactly_contract_keys():
     result = parse_drawing_filename("结施-01.pdf")
     assert set(result) == {"drawing_no", "discipline", "title", "version"}
+
+
+@pytest.mark.unit
+def test_parse_drawing_filename_evidence_returns_structured_fields():
+    result = parse_drawing_filename_evidence("结施-01_一层梁配筋图_B.dxf")
+
+    assert result.drawing_no.value == "结施-01"
+    assert result.drawing_no.confidence == pytest.approx(0.95)
+    assert result.drawing_no.span == (0, 5)
+    assert result.discipline.value == "structure"
+    assert result.discipline.confidence == pytest.approx(0.9)
+    assert result.discipline.source == "filename"
+    assert result.title.value == "一层梁配筋图"
+    assert result.title.confidence == pytest.approx(0.8)
+    assert result.version.value == "B"
+    assert result.version.confidence == pytest.approx(0.9)
+
+
+@pytest.mark.unit
+def test_parse_drawing_filename_evidence_retains_fallback_defaults():
+    result = parse_drawing_filename_evidence("项目总说明.pdf")
+
+    assert result.drawing_no.value == "项目总说明"
+    assert result.drawing_no.span is None
+    assert result.discipline.value == "general"
+    assert result.discipline.confidence == pytest.approx(0.4)
+    assert result.title.value == "项目总说明"
+    assert result.title.confidence == pytest.approx(0.4)
+    assert result.version.value == "A"
+    assert result.version.confidence == pytest.approx(0.3)
 
 
 # ── 真实工程样本（上海大歌剧院竣工图命名规范）────────────────────
