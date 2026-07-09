@@ -302,7 +302,7 @@ EXPLICIT_BUILDING_RE = re.compile(
 )
 SUB_ZONE_RE = re.compile(r"(?<!\d)([A-Za-z]\d?|D\d+)\s*区")
 FUNCTIONAL_SPACE_RE = re.compile(
-    r"(?:大歌剧厅|中歌剧厅|小歌剧厅|观众厅|舞台|台塔|台仓|机房|厂房)"
+    r"([\u4e00-\u9fffA-Za-z0-9]{1,16}(?:厅|室|房|车间|舞台|机房|厂房|库房))"
 )
 CONSTRUCTION_CONTEXT_RE = re.compile(
     r"(?:围护|基坑|施工|工区|标段|联通道|连通道)"
