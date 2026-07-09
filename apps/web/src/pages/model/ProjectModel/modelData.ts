@@ -305,7 +305,7 @@ function lodModesFromModel(model: ProjectModelResponse): LodModeOption[] {
   const defaults: LodModeOption[] = [
     { key: 'review_skeleton', label: '审图骨架', enabled: true },
     { key: 'architectural_massing', label: '建筑体量', enabled: true },
-    { key: 'realistic_proxy', label: '实景近似', enabled: false, reason: '需要 LOD300 数据' },
+    { key: 'realistic_proxy', label: '实景近似', enabled: true },
   ]
 
   if (!raw) return defaults

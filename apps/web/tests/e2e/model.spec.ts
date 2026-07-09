@@ -79,15 +79,6 @@ async function mockModelPage(page: Page) {
             },
           },
         ],
-        lod_modes: {
-          review_skeleton: { enabled: true, label: '审图骨架' },
-          architectural_massing: { enabled: true, label: '建筑体量' },
-          realistic_proxy: {
-            enabled: false,
-            label: '实景近似',
-            reason: '需要 LOD300 数据',
-          },
-        },
         scene: {
           schema_version: 2,
           project: { id: PROJECT_ID, name: '模型 E2E 项目' },
@@ -294,7 +285,8 @@ test.describe('工程模型页 - LOD 与人工识别', () => {
 
     await expect(page.getByRole('button', { name: '审图骨架' })).toBeVisible()
     await expect(page.getByRole('button', { name: '建筑体量' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '实景近似' })).toBeDisabled()
+    await page.getByRole('button', { name: '实景近似' }).click()
+    await expect(page.getByText('LOD: 实景近似（近似）')).toBeVisible()
     await expect(page.getByText('构件', { exact: true }).first()).toBeVisible()
     await expect(page.getByText('贴图', { exact: true }).first()).toBeVisible()
     await expect(page.getByText('混合', { exact: true }).first()).toBeVisible()
