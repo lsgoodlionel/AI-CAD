@@ -59,7 +59,7 @@ def extract_semantic_candidates(drawing: Mapping[str, Any]) -> list[SemanticCand
         candidates.extend(
             _dedupe_candidates(
                 seen,
-                _extract_directional_groups(source, source_value, construction_context),
+                _extract_directional_sub_zones(source, source_value, construction_context),
             )
         )
         candidates.extend(
@@ -77,7 +77,7 @@ def extract_semantic_candidates(drawing: Mapping[str, Any]) -> list[SemanticCand
         candidates.extend(
             _dedupe_candidates(
                 seen,
-                _extract_infrastructure_segments(source, source_value),
+                _extract_bridge_construction_zones(source, source_value),
             )
         )
 
@@ -139,14 +139,14 @@ def _extract_sub_zones(
         )
 
 
-def _extract_directional_groups(
+def _extract_directional_sub_zones(
     source: str,
     source_value: str,
     construction_context: bool,
 ) -> Iterable[SemanticCandidate]:
     for match in DIRECTIONAL_GROUP_RE.finditer(source_value):
         yield _make_candidate(
-            node_type="directional_group",
+            node_type="sub_zone",
             label=match.group(1),
             confidence=0.58 if construction_context else 0.68,
             source=source,
@@ -190,13 +190,13 @@ def _extract_functional_spaces(source: str, source_value: str) -> Iterable[Seman
             )
 
 
-def _extract_infrastructure_segments(
+def _extract_bridge_construction_zones(
     source: str,
     source_value: str,
 ) -> Iterable[SemanticCandidate]:
     for match in BRIDGE_SEGMENT_RE.finditer(source_value):
         yield _make_candidate(
-            node_type="infrastructure_segment",
+            node_type="construction_zone",
             label=match.group(1),
             confidence=0.86,
             source=source,

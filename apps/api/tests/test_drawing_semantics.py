@@ -61,7 +61,7 @@ def test_directional_groups_are_candidates_not_confirmed_buildings():
     east_zone = next(
         item
         for item in candidates
-        if item.node_type == "directional_group" and item.label == "东区"
+        if item.node_type == "sub_zone" and item.label == "东区"
     )
 
     assert east_zone.confidence < 0.9
@@ -85,10 +85,27 @@ def test_industrial_and_infrastructure_terms_map_to_generic_types():
         for item in garage
     )
     assert any(
-        item.node_type == "infrastructure_segment" and item.label == "1号桥"
+        item.node_type == "construction_zone" and item.label == "1号桥"
         for item in bridge
     )
     assert any(
         item.node_type == "construction_zone" and item.label == "二工区"
         for item in tunnel
     )
+
+
+@pytest.mark.unit
+def test_only_allowed_node_types_are_emitted():
+    candidates = extract_semantic_candidates(
+        {
+            "title": "东区1号桥二工区A座地下车库平面图",
+            "folder_path": "施工图纸",
+        }
+    )
+
+    assert {item.node_type for item in candidates} <= {
+        "building_unit",
+        "sub_zone",
+        "functional_space",
+        "construction_zone",
+    }
