@@ -32,12 +32,16 @@ import {
 import { ReloadOutlined } from '@ant-design/icons'
 import { listProjects } from '@/services/projects'
 import {
+  applyProjectModelSemanticOperation,
   getModelAssetUrl,
   getProjectModel,
+  getProjectModelSemanticGraph,
+  previewProjectModelSemanticImpact,
   rebuildProjectModel,
 } from '@/services/projectModel'
 import type {
   ModelScene,
+  SemanticOperationRequest,
   ProjectModelResponse,
   ProjectModelStatus,
   SceneDrawing,
@@ -47,9 +51,15 @@ import type {
 import DrawingAnnotationQueue from './DrawingAnnotationQueue'
 import ModelQualityPanel from './ModelQualityPanel'
 import ModelViewer from './ModelViewer'
+import SemanticReviewQueue from './SemanticReviewQueue'
+import SemanticTreePanel from './SemanticTreePanel'
 import type { RenderMode } from './ModelViewer'
 import type { ElementUserData } from './elementsBuilder'
-import { buildStoryOptions, normalizeModelInsights } from './modelData'
+import {
+  buildStoryOptions,
+  normalizeModelInsights,
+  resolveScopeLodQuality,
+} from './modelData'
 import type {
   AnnotationQueueItem,
   AnnotationSaveDraft,
@@ -57,6 +67,10 @@ import type {
   LodModeOption,
   ModelLodMode,
   ModelQualitySummary,
+  SemanticOperationDraft,
+  SemanticOperationOutcome,
+  SemanticOperationPreview,
+  SemanticTreeNodeView,
 } from './types'
 
 const { Text, Title } = Typography
@@ -102,6 +116,8 @@ const EMPTY_QUALITY: ModelQualitySummary = {
   floorConflicts: [],
   lowConfidenceUnits: [],
   pendingManualCount: 0,
+  pendingCandidateCount: 0,
+  semanticConflictCount: 0,
 }
 
 type Selection =
@@ -142,10 +158,56 @@ function elementFilterOptions(scene: ModelScene): { label: string; value: string
 
 interface RequestLikeError {
   response?: { status?: number }
+  data?: Record<string, unknown>
+  info?: Record<string, unknown>
 }
 
 function isNotBuiltError(error: unknown): boolean {
   return (error as RequestLikeError)?.response?.status === 404
+}
+
+function readErrorNumber(error: unknown, ...keys: string[]): number | undefined {
+  const data = (error as RequestLikeError)?.data
+  const info = (error as RequestLikeError)?.info
+  const sources = [
+    data,
+    data?.detail as Record<string, unknown> | undefined,
+    (data?.detail as Record<string, unknown> | undefined)?.latest as Record<string, unknown> | undefined,
+    info,
+    info?.detail as Record<string, unknown> | undefined,
+    (info?.detail as Record<string, unknown> | undefined)?.latest as Record<string, unknown> | undefined,
+  ]
+  for (const source of sources) {
+    if (!source) continue
+    for (const key of keys) {
+      const value = source[key]
+      if (typeof value === 'number' && Number.isFinite(value)) return value
+      if (typeof value === 'string' && value.trim()) {
+        const parsed = Number(value)
+        if (Number.isFinite(parsed)) return parsed
+      }
+    }
+  }
+  return undefined
+}
+
+function readErrorString(error: unknown, ...keys: string[]): string | undefined {
+  const data = (error as RequestLikeError)?.data
+  const info = (error as RequestLikeError)?.info
+  const sources = [
+    data,
+    data?.detail as Record<string, unknown> | undefined,
+    info,
+    info?.detail as Record<string, unknown> | undefined,
+  ]
+  for (const source of sources) {
+    if (!source) continue
+    for (const key of keys) {
+      const value = source[key]
+      if (typeof value === 'string' && value.trim()) return value.trim()
+    }
+  }
+  return undefined
 }
 
 function normalizeManualKey(input: string): string {
@@ -206,6 +268,19 @@ async function saveModelAnnotation(
       if (status === 404 && index < endpoints.length - 1) continue
       throw error
     }
+  }
+}
+
+function semanticOperationPayload(
+  draft: SemanticOperationDraft,
+): SemanticOperationRequest {
+  return {
+    operation: draft.operation,
+    node_id: draft.nodeId,
+    version: draft.version,
+    target_node_id: draft.targetNodeId,
+    new_name: draft.newName,
+    split_names: draft.splitNames,
   }
 }
 
@@ -288,6 +363,7 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
   const [renderMode, setRenderMode] = useState<RenderMode>('mixed')
   const [elementFilter, setElementFilter] = useState<string[] | undefined>(undefined)
   const [selectedBuildingKey, setSelectedBuildingKey] = useState<string | null>(null)
+  const [selectedSemanticNode, setSelectedSemanticNode] = useState<SemanticTreeNodeView | null>(null)
   const [buildingUnits, setBuildingUnits] = useState<BuildingUnitOption[]>([])
   const [annotationQueue, setAnnotationQueue] = useState<AnnotationQueueItem[]>([])
   const [lodMode, setLodMode] = useState<ModelLodMode>('review_skeleton')
@@ -301,6 +377,9 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
     { key: 'realistic_proxy', label: '实景近似', enabled: true },
   ]
   const currentLod = activeLodMode(lodModes, lodMode)
+  const semanticTreeGroups = insights?.semanticTreeGroups ?? []
+  const semanticNodeMap = insights?.semanticNodeMap ?? {}
+  const semanticReviewQueue = insights?.semanticReviewQueue ?? []
 
   useEffect(() => {
     if (!insights) {
@@ -318,6 +397,18 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
       if (next) setLodMode(next.key)
     }
   }, [lodMode, lodModes])
+
+  useEffect(() => {
+    if (!selectedSemanticNode) return
+    const nextNode = semanticNodeMap[selectedSemanticNode.id]
+    if (!nextNode) {
+      setSelectedSemanticNode(null)
+      return
+    }
+    if (nextNode !== selectedSemanticNode) {
+      setSelectedSemanticNode(nextNode)
+    }
+  }, [selectedSemanticNode, semanticNodeMap])
 
   const availableDisciplines = useMemo(() => {
     if (!scene) return []
@@ -356,6 +447,17 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
       pendingManualCount: annotationQueue.length,
     }
   }, [insights, annotationQueue.length])
+  const selectedScopeQuality = useMemo(
+    () => (
+      insights
+        ? resolveScopeLodQuality(
+          insights,
+          selectedSemanticNode?.id ?? selectedBuildingKey,
+        )
+        : null
+    ),
+    [insights, selectedBuildingKey, selectedSemanticNode],
+  )
 
   const fetchModel = useCallback(async () => {
     try {
@@ -374,12 +476,22 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
     }
   }, [projectId])
 
+  const refreshSemanticGraph = useCallback(async () => {
+    try {
+      const semanticTree = await getProjectModelSemanticGraph(projectId)
+      setModel((current) => (current ? { ...current, semantic_tree: semanticTree } : current))
+    } catch {
+      await fetchModel()
+    }
+  }, [fetchModel, projectId])
+
   useEffect(() => {
     setIsLoading(true)
     setModel(null)
     setIsNotBuilt(false)
     setSelection(null)
     setIsolatedFloorKey(null)
+    setSelectedSemanticNode(null)
     fetchModel()
   }, [fetchModel])
 
@@ -435,6 +547,56 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
     setBuildingUnits((current) => mergeManualBuildingUnit(current, draft))
     message.success('人工识别结果已保存')
   }, [projectId])
+
+  const handlePreviewSemanticOperation = useCallback(async (
+    draft: SemanticOperationDraft,
+  ): Promise<SemanticOperationPreview> => {
+    return previewProjectModelSemanticImpact(projectId, semanticOperationPayload(draft))
+  }, [projectId])
+
+  const handleSubmitSemanticOperation = useCallback(async (
+    draft: SemanticOperationDraft,
+  ): Promise<SemanticOperationOutcome> => {
+    try {
+      await applyProjectModelSemanticOperation(projectId, semanticOperationPayload(draft))
+      await fetchModel()
+      message.success('语义修正已提交')
+      return { ok: true }
+    } catch (error) {
+      const staleVersion = readErrorNumber(error, 'version', 'expected_version', 'expectedVersion')
+      if ((error as RequestLikeError)?.response?.status === 409 && staleVersion) {
+        message.warning('语义树版本已更新，请刷新后重试')
+        return {
+          ok: false,
+          staleVersion,
+          message: readErrorString(error, 'message') ?? '语义树版本已更新',
+        }
+      }
+      message.error(readErrorString(error, 'message') ?? '语义修正失败')
+      return {
+        ok: false,
+        message: readErrorString(error, 'message') ?? '语义修正失败',
+      }
+    }
+  }, [fetchModel, projectId])
+
+  const handleSelectSemanticNode = useCallback((node: SemanticTreeNodeView | null) => {
+    setSelectedSemanticNode(node)
+    if (!node) return
+    if (node.nodeType === 'building_unit') {
+      setSelectedBuildingKey(node.id)
+      return
+    }
+    let currentParentId = node.parentId
+    while (currentParentId) {
+      const parent = semanticNodeMap[currentParentId]
+      if (parent?.nodeType === 'building_unit') {
+        setSelectedBuildingKey(currentParentId)
+        return
+      }
+      currentParentId = parent?.parentId ?? null
+    }
+  }, [semanticNodeMap])
 
   if (isNotBuilt) {
     return (
@@ -583,6 +745,16 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
       {scene ? (
         <Row gutter={12} wrap>
           <Col flex="280px">
+            {semanticTreeGroups.length > 0 ? (
+              <Card size="small" title="语义树" style={{ marginBottom: 12 }}>
+                <SemanticTreePanel
+                  groups={semanticTreeGroups}
+                  selectedNodeId={selectedSemanticNode?.id}
+                  onSelectNode={handleSelectSemanticNode}
+                />
+              </Card>
+            ) : null}
+
             {buildingUnits.length > 0 ? (
               <Card size="small" title="单体" style={{ marginBottom: 12 }}>
                 <List
@@ -727,7 +899,31 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
 
           <Col flex="360px">
             <Card size="small" title="模型质量" style={{ marginBottom: 12 }}>
-              <ModelQualityPanel quality={quality} buildingUnits={buildingUnits} />
+              <ModelQualityPanel
+                quality={quality}
+                buildingUnits={buildingUnits}
+                selectedScopeQuality={selectedScopeQuality}
+              />
+            </Card>
+            <Card
+              size="small"
+              title="语义审查"
+              style={{ marginBottom: 12 }}
+              extra={quality.pendingCandidateCount > 0 ? <Tag color="gold">{quality.pendingCandidateCount}</Tag> : null}
+            >
+              <SemanticReviewQueue
+                items={semanticReviewQueue}
+                nodeNameById={Object.fromEntries(
+                  Object.values(semanticNodeMap).map((node) => [node.id, node.canonicalName]),
+                )}
+                onSelectNode={(nodeId) => {
+                  const node = semanticNodeMap[nodeId] ?? null
+                  handleSelectSemanticNode(node)
+                }}
+                onPreviewOperation={handlePreviewSemanticOperation}
+                onSubmitOperation={handleSubmitSemanticOperation}
+                onRefreshRequested={refreshSemanticGraph}
+              />
             </Card>
             <Card
               size="small"

@@ -1,11 +1,16 @@
 import { Alert, Divider, Space, Tag, Typography } from 'antd'
-import type { BuildingUnitOption, ModelQualitySummary } from './types'
+import type {
+  BuildingUnitOption,
+  ModelQualitySummary,
+  SemanticScopeLodView,
+} from './types'
 
 const { Text } = Typography
 
 interface ModelQualityPanelProps {
   quality: ModelQualitySummary
   buildingUnits: BuildingUnitOption[]
+  selectedScopeQuality?: SemanticScopeLodView | null
 }
 
 function unitLabel(buildingUnits: BuildingUnitOption[], key?: string) {
@@ -16,6 +21,7 @@ function unitLabel(buildingUnits: BuildingUnitOption[], key?: string) {
 export default function ModelQualityPanel({
   quality,
   buildingUnits,
+  selectedScopeQuality,
 }: ModelQualityPanelProps) {
   return (
     <div>
@@ -23,7 +29,7 @@ export default function ModelQualityPanel({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
             gap: 8,
           }}
         >
@@ -32,6 +38,8 @@ export default function ModelQualityPanel({
             `楼层冲突 ${quality.floorConflictCount}`,
             `低置信度单体 ${quality.lowConfidenceUnits.length}`,
             `待人工识别 ${quality.pendingManualCount}`,
+            `待审语义 ${quality.pendingCandidateCount}`,
+            `语义冲突 ${quality.semanticConflictCount}`,
           ].map((label) => (
             <div
               key={label}
@@ -82,6 +90,67 @@ export default function ModelQualityPanel({
                   </Tag>
                 ))}
               </Space>
+            </Space>
+          </>
+        ) : null}
+
+        {selectedScopeQuality ? (
+          <>
+            <Divider style={{ margin: '4px 0' }} />
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <Text strong>LOD 质量</Text>
+              <Space wrap>
+                <Tag color="geekblue">{selectedScopeQuality.scopeLabel}</Tag>
+                {typeof selectedScopeQuality.level === 'number' ? (
+                  <Tag color="blue">LOD {selectedScopeQuality.level}</Tag>
+                ) : (
+                  <Tag>LOD 未评定</Tag>
+                )}
+              </Space>
+
+              {selectedScopeQuality.passedGates.length > 0 ? (
+                <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                  <Text type="secondary">已通过门槛</Text>
+                  <Space wrap>
+                    {selectedScopeQuality.passedGates.map((gate) => (
+                      <Tag key={gate} color="green">
+                        {gate}
+                      </Tag>
+                    ))}
+                  </Space>
+                </Space>
+              ) : null}
+
+              {selectedScopeQuality.missingEvidence.length > 0 ? (
+                <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                  <Text type="secondary">缺失证据</Text>
+                  <Space wrap>
+                    {selectedScopeQuality.missingEvidence.map((item) => (
+                      <Tag key={item} color="orange">
+                        {item}
+                      </Tag>
+                    ))}
+                  </Space>
+                </Space>
+              ) : null}
+
+              {selectedScopeQuality.degradationReasons.length > 0 ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  message="降级原因"
+                  description={selectedScopeQuality.degradationReasons.join('；')}
+                />
+              ) : null}
+
+              {selectedScopeQuality.fallbackReasons.length > 0 ? (
+                <Alert
+                  type="info"
+                  showIcon
+                  message="回退说明"
+                  description={selectedScopeQuality.fallbackReasons.join('；')}
+                />
+              ) : null}
             </Space>
           </>
         ) : null}

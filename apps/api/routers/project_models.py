@@ -273,8 +273,12 @@ async def get_model_rebuild_impact(
     project_id: str,
     node_id: str | None = Query(None),
     drawing_id: str | None = Query(None),
+    target_node_id: str | None = Query(None),
+    operation_type: str | None = Query(None),
+    expected_version: int | None = Query(None),
     current_user: dict = Depends(get_current_user),
 ):
+    scope = [item for item in (node_id, target_node_id, drawing_id) if item]
     return {
         "project_id": project_id,
         "rebuild_required": True,
@@ -282,6 +286,10 @@ async def get_model_rebuild_impact(
         "affected_drawings": [drawing_id] if drawing_id else [],
         "affected_stories": [],
         "affected_assets": [],
+        "affected_scope": scope,
+        "summary": "语义操作将触发相关模型分支重建" if operation_type else "模型重建影响预估",
+        "rebuild_scope": "branch" if target_node_id else "node",
+        "expected_version": expected_version,
     }
 
 

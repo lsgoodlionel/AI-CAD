@@ -178,6 +178,110 @@ export interface ModelScene {
   generated_at: string
 }
 
+export type SemanticNodeType =
+  | 'building_unit'
+  | 'sub_zone'
+  | 'functional_space'
+  | 'construction_zone'
+
+export type SemanticNodeStatus = 'candidate' | 'confirmed' | 'rejected' | 'merged'
+
+export type SemanticNodeSource = 'automatic' | 'manual' | 'legacy_inference'
+
+export interface SemanticNode {
+  id: string
+  node_type: SemanticNodeType
+  canonical_name: string
+  normalized_key: string
+  parent_id?: string | null
+  status: SemanticNodeStatus
+  confidence: number
+  source: SemanticNodeSource
+  version: number
+}
+
+export interface SemanticTreeResponse {
+  version: number
+  nodes: SemanticNode[]
+  evidence?: unknown[]
+  conflicts?: unknown[]
+  unassigned_drawings?: unknown[]
+}
+
+export interface SemanticEvidence {
+  id: string
+  label: string
+  detail: string
+  score?: number
+  source_drawing_id?: string
+}
+
+export interface SemanticReviewQueueItem {
+  node_id: string
+  title?: string
+  canonical_name?: string
+  node_type: SemanticNodeType
+  status: SemanticNodeStatus
+  current_parent_id?: string | null
+  version: number
+  confidence?: number
+  evidence: SemanticEvidence[]
+  valid_targets?: {
+    merge?: string[]
+    reparent?: string[]
+  }
+}
+
+export type SemanticOperationType =
+  | 'confirm'
+  | 'reject'
+  | 'rename'
+  | 'merge'
+  | 'split'
+  | 'reparent'
+
+export interface SemanticOperationRequest {
+  operation: SemanticOperationType
+  node_id: string
+  version: number
+  target_node_id?: string
+  new_name?: string
+  split_names?: string[]
+}
+
+export interface SemanticOperationResult {
+  ok: boolean
+  semantic_tree_version?: number
+  node?: SemanticNode
+  operation?: unknown
+}
+
+export interface SemanticOperationImpact {
+  affected_scope: string[]
+  summary: string
+  rebuild_scope: 'node' | 'branch' | 'project' | 'unknown'
+  fallback_reason?: string
+  rebuild_required?: boolean
+  affected_nodes?: string[]
+  affected_drawings?: string[]
+  affected_stories?: string[]
+  affected_assets?: string[]
+}
+
+export type LodCapabilityMode =
+  | 'review_skeleton'
+  | 'architectural_massing'
+  | 'realistic_proxy'
+
+export interface LodCapabilitySummary {
+  level: number
+  missing_evidence: string[]
+  passed_gates?: string[]
+  degradation_reasons?: string[]
+  fallback_reasons?: string[]
+  available_modes?: LodCapabilityMode[]
+}
+
 // ── API 响应类型 ─────────────────────────────────────────────
 
 export type ProjectModelStatus = 'building' | 'ready' | 'failed'
@@ -199,6 +303,13 @@ export interface ProjectModelResponse {
   error: string | null
   scene: ModelScene | null
   progress?: ModelBuildProgress | null
+  semantic_tree?: SemanticTreeResponse | null
+  semantic_review_queue?: SemanticReviewQueueItem[] | null
+  lod_capabilities?: Record<string, LodCapabilitySummary> | null
+  quality?: Record<string, unknown> | null
+  building_units?: Record<string, unknown> | null
+  annotation_queue?: unknown[] | null
+  lod_modes?: Record<string, Record<string, unknown>> | null
 }
 
 export interface RebuildProjectModelResult {
@@ -223,6 +334,47 @@ export const getProjectModel = (projectId: string) =>
 export const rebuildProjectModel = (projectId: string) =>
   request<RebuildProjectModelResult>(`${BASE}/${projectId}/model/rebuild`, {
     method: 'POST',
+  })
+
+/** 读取语义树快照；后端未独立提供时页面可回退到主模型响应中的 semantic_tree */
+export const getProjectModelSemanticGraph = (projectId: string) =>
+  request<SemanticTreeResponse>(`${BASE}/${projectId}/model/semantics`, {
+    skipErrorHandler: true,
+  })
+
+const semanticOperationApiPayload = (data: SemanticOperationRequest) => ({
+  operation_type: data.operation,
+  target_ids: [data.node_id],
+  target_node_id: data.target_node_id,
+  canonical_name: data.new_name,
+  split_names: data.split_names,
+  expected_version: data.version,
+})
+
+/** 预估语义操作影响范围，用于提交前展示重建范围 */
+export const previewProjectModelSemanticImpact = (
+  projectId: string,
+  data: SemanticOperationRequest,
+) =>
+  request<SemanticOperationImpact>(`${BASE}/${projectId}/model/rebuild-impact`, {
+    params: {
+      node_id: data.node_id,
+      target_node_id: data.target_node_id,
+      operation_type: data.operation,
+      expected_version: data.version,
+    },
+    skipErrorHandler: true,
+  })
+
+/** 提交语义树修正操作；409 版本冲突由页面层处理 */
+export const applyProjectModelSemanticOperation = (
+  projectId: string,
+  data: SemanticOperationRequest,
+) =>
+  request<SemanticOperationResult>(`${BASE}/${projectId}/model/semantic-operations`, {
+    method: 'POST',
+    data: semanticOperationApiPayload(data),
+    skipErrorHandler: true,
   })
 
 /** 用 MinIO 资产 key 换取 presigned URL（5 分钟有效） */
