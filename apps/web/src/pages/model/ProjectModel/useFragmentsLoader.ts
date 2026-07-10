@@ -27,7 +27,11 @@ let workerBlobUrlPromise: Promise<string> | null = null
 /** 懒加载 `@thatopen/fragments` 命名空间（供 FragmentsModels / RenderedFaces 等复用）。 */
 export function loadFragmentsModule(): Promise<FragmentsModule> {
   if (!fragmentsModulePromise) {
-    fragmentsModulePromise = import('@thatopen/fragments')
+    // 失败时清空缓存，避免被拒的 promise 永久缓存（stale chunk 后无法重试）
+    fragmentsModulePromise = import('@thatopen/fragments').catch((error: unknown) => {
+      fragmentsModulePromise = null
+      throw error
+    })
   }
   return fragmentsModulePromise
 }
@@ -49,7 +53,11 @@ async function resolveWorkerUrl(): Promise<string> {
       const source = await res.text()
       const blob = new Blob([source], { type: 'text/javascript' })
       return URL.createObjectURL(blob)
-    })()
+    })().catch((error: unknown) => {
+      // 失败时清空缓存，允许下次调用重试（避免首次 fetch 失败后永久锁死 IFC 模式）
+      workerBlobUrlPromise = null
+      throw error
+    })
   }
   return workerBlobUrlPromise
 }
@@ -82,7 +90,11 @@ export function useFragmentsLoader(): FragmentsLoaderHandle {
         const instance = new fragmentsModule.FragmentsModels(workerUrl)
         fragmentsRef.current = instance
         return instance
-      })()
+      })().catch((error: unknown) => {
+        // 失败时清空缓存，允许下次 ensure 重试（否则被拒 promise 永久缓存）
+        creatingRef.current = null
+        throw error
+      })
     }
     return creatingRef.current
   }, [])
@@ -111,7 +123,8 @@ export function useFragmentsLoader(): FragmentsLoaderHandle {
       fragmentsRef.current = null
       creatingRef.current = null
       // 异步释放；卸载路径 fire-and-forget（worker + GPU 资源随之回收）
-      if (fragments) void fragments.dispose()
+      // dispose() 可能 reject，需吞掉以免变成 unhandled rejection
+      if (fragments) void fragments.dispose().catch(() => {})
     }
   }, [])
 

@@ -11,6 +11,7 @@ import type {
   SceneDrawing,
   SceneFloorV2,
   SceneMarker,
+  SceneModelIfc,
 } from '@/services/projectModel'
 
 // ── 布局常量 ─────────────────────────────────────────────────
@@ -37,18 +38,8 @@ export const SEVERITY_COLORS: Record<string, string> = {
 //
 // scene.model_ifc 由后端 A-03/A-04 写入（见 docs/MODEL_BASE_BLUEPRINT.md 第 4 节），
 // 但 services/projectModel.ts 的 ModelScene 未声明该字段（该文件由并行 A-08 拥有），
-// 故此处就地窄化读取，旧数据缺省安全返回 null。
-
-/** 程序化 IFC / Fragments 产物元数据（scene.model_ifc JSON 契约）。 */
-export interface SceneModelIfc {
-  ifc_key: string
-  /** Fragments（.frag）产物 key；转换失败/未产出为 null，前端回退挤出/贴图。 */
-  frag_key: string | null
-  build_mode: 'ifc' | 'elements' | 'texture'
-  /** 楼层标高是否估算（Phase A 恒 true）。 */
-  is_estimated: boolean
-  generated_at?: string
-}
+// 故此处就地窄化读取，旧数据缺省安全返回 null。SceneModelIfc 类型统一由
+// services/projectModel.ts 提供（唯一来源）。
 
 /** 顶层渲染模式：ifc(Fragments) 优先，回退现有 elements(挤出)/texture(贴图)/mixed。 */
 export type ModelViewMode = 'ifc' | 'elements' | 'texture' | 'mixed'

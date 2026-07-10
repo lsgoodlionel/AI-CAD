@@ -380,6 +380,8 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
   const [selection, setSelection] = useState<Selection | null>(null)
   const [viewMode, setViewMode] = useState<ModelViewMode>('mixed')
   const fragmentsSceneRef = useRef<FragmentsSceneHandle>(null)
+  /** 拾取请求令牌：连点/清除时旧的 resolvePickedItem 迟到不覆盖新状态。 */
+  const pickRequestRef = useRef(0)
   const [fragmentItem, setFragmentItem] = useState<PickedFragmentItem | null>(null)
   const [fragmentItemLoading, setFragmentItemLoading] = useState(false)
   const fragmentsCameraPose = useRef<FragmentsCameraPose | null>(null)
@@ -428,19 +430,31 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
   const handleFragmentPick = useCallback((pick: FragmentPickResult | null) => {
     const sceneHandle = fragmentsSceneRef.current
     if (!sceneHandle) return
+    pickRequestRef.current += 1
+    const requestToken = pickRequestRef.current
     if (!pick) {
-      void sceneHandle.clearHighlight()
+      void sceneHandle.clearHighlight().catch(() => {})
       setFragmentItem(null)
+      setFragmentItemLoading(false)
       return
     }
-    void sceneHandle.highlight([pick.localId])
+    void sceneHandle.highlight([pick.localId]).catch(() => {})
     const model = sceneHandle.getModel()
     if (!model) return
     setFragmentItemLoading(true)
     resolvePickedItem(model, pick.localId)
-      .then((resolved) => setFragmentItem(resolved))
-      .catch(() => setFragmentItem(null))
-      .finally(() => setFragmentItemLoading(false))
+      .then((resolved) => {
+        if (pickRequestRef.current !== requestToken) return
+        setFragmentItem(resolved)
+      })
+      .catch(() => {
+        if (pickRequestRef.current !== requestToken) return
+        setFragmentItem(null)
+      })
+      .finally(() => {
+        if (pickRequestRef.current !== requestToken) return
+        setFragmentItemLoading(false)
+      })
   }, [])
 
   // 离开 IFC 模式清空选中构件，避免残留
@@ -947,6 +961,7 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
                       onItemSelected={handleFragmentPick}
                       cameraPoseRef={fragmentsCameraPose}
                       statusLabel={`单体: ${selectedBuilding?.label ?? '总体'}`}
+                      markerScene={viewScene ?? undefined}
                     />
                     {fragmentItem || fragmentItemLoading ? (
                       <div
@@ -963,8 +978,9 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
                           item={fragmentItem}
                           loading={fragmentItemLoading}
                           onClear={() => {
+                            pickRequestRef.current += 1
                             setFragmentItem(null)
-                            void fragmentsSceneRef.current?.clearHighlight()
+                            void fragmentsSceneRef.current?.clearHighlight().catch(() => {})
                           }}
                           onLocateInTree={handleLocateFragmentInTree}
                         />

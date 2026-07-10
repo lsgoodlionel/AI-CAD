@@ -127,8 +127,12 @@ def _polygon_profile(model: Any, points: list[tuple[float, float]]) -> Any | Non
 
 
 def _oriented_box_profile(model: Any, path: list[tuple[float, float]], width: float) -> tuple[Any, float] | None:
-    """沿 path 首末点方向的定向矩形截面（墙/梁）；返回 (profile, 长度)。"""
-    if len(path) < 2:
+    """沿 path 首末点方向的定向矩形截面（墙/梁）；返回 (profile, 长度)。
+
+    ``width`` 必须由调用方解析为唯一有效值（>0），本函数不再做任何钳制，
+    以保证几何截面宽度与量集（Qto Width/NetVolume）严格一致。
+    """
+    if len(path) < 2 or width <= 0:
         return None
     (x0, y0), (x1, y1) = path[0], path[-1]
     dx, dy = x1 - x0, y1 - y0
@@ -138,7 +142,7 @@ def _oriented_box_profile(model: Any, path: list[tuple[float, float]], width: fl
     mid = model.createIfcCartesianPoint(((x0 + x1) / 2.0, (y0 + y1) / 2.0))
     ref_dir = model.createIfcDirection((dx / length, dy / length))
     position = model.createIfcAxis2Placement2D(mid, ref_dir)
-    profile = model.createIfcRectangleProfileDef("AREA", None, position, length, max(width, _DEFAULT_WALL_WIDTH_M))
+    profile = model.createIfcRectangleProfileDef("AREA", None, position, length, float(width))
     return profile, length
 
 
@@ -160,6 +164,8 @@ def _pipe_solid(model: Any, path: list[tuple[float, float]], dia: float, z_base:
         return None
     axis = model.createIfcDirection((dx / length, dy / length, 0.0))
     position = model.createIfcAxis2Placement3D(_point3(model, x0, y0, z_base), axis, None)
+    if dia < _MIN_PIPE_DIA_M:
+        logger.warning("管线直径 %.4fm 小于下限 %.4fm，钳制为下限", dia, _MIN_PIPE_DIA_M)
     profile = model.createIfcCircleProfileDef("AREA", None, None, max(dia, _MIN_PIPE_DIA_M) / 2.0)
     return model.createIfcExtrudedAreaSolid(profile, position, model.createIfcDirection(_Z_UP), length)
 
@@ -354,7 +360,11 @@ def _build_storey(
     for kind in _ELEMENT_KINDS:
         adder = _ADDERS[kind]
         for spec in elements[kind]:
-            product = adder(ctx, spec)
+            try:
+                product = adder(ctx, spec)
+            except Exception as exc:  # noqa: BLE001 — 单构件几何异常跳过，不拖垮整体建模
+                logger.warning("跳过异常 %s 构件（%s）：%s", kind, exc, spec)
+                continue
             if product is None:
                 logger.warning("跳过非法 %s 构件：%s", kind, spec)
                 continue

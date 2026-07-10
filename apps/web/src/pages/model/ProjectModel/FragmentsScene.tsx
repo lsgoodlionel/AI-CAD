@@ -26,13 +26,23 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { Alert, Spin } from 'antd'
 import type { FragmentsModel, FragmentsModels } from '@thatopen/fragments'
+import type { ModelScene } from '@/services/projectModel'
 import { loadFragmentsModule, useFragmentsLoader } from './useFragmentsLoader'
+import { alignMarkersToFragments, buildFloorPlacements } from './fragmentsMarkers'
+import { SEVERITY_COLORS, disposeObjectTree } from './sceneBuilder'
+import type { MarkerUserData } from './sceneBuilder'
 
 const BACKGROUND_COLOR = '#f0f2f5'
 const CLICK_MOVE_TOLERANCE_PX = 6
 const HIGHLIGHT_COLOR = '#13c2c2'
 /** 相机远裁剪面：真实米坐标下建筑包络可达数百米。 */
 const CAMERA_FAR = 5000
+/** devicePixelRatio 封顶，避免高 DPR 设备渲染成本失控。 */
+const MAX_PIXEL_RATIO = 2
+/** 标记球半径下限（米），防止极小 footprint 下不可见。 */
+const MIN_MARKER_RADIUS = 0.05
+/** 标记球半径 = max(footprint) / 该系数（与贴图模式 realScale 取值一致）。 */
+const MARKER_RADIUS_DIVISOR = 90
 
 /** 拾取结果（A-08 据此读取 IFC 属性 / 定位成果标记）。 */
 export interface FragmentPickResult {
@@ -73,6 +83,11 @@ export interface FragmentsSceneProps {
   cameraPoseRef?: MutableRefObject<FragmentsCameraPose | null>
   /** 左上角状态徽标文本（与 ModelViewer 风格一致）。 */
   statusLabel?: string
+  /**
+   * 成果标记叠加数据（当前单体范围的 floors + markers）；缺省不渲染标记。
+   * Phase A 仅楼层级对齐：按楼层标高 + 模型 footprint 落位，构件级锚定见 Phase B。
+   */
+  markerScene?: Pick<ModelScene, 'floors' | 'markers'>
 }
 
 interface WorldRefs {
@@ -114,7 +129,15 @@ function frameBox(world: WorldRefs, box: THREE.Box3): void {
 
 const FragmentsScene = forwardRef<FragmentsSceneHandle, FragmentsSceneProps>(
   function FragmentsScene(
-    { fragKey, resolveAssetUrl, onModelLoaded, onItemSelected, cameraPoseRef, statusLabel },
+    {
+      fragKey,
+      resolveAssetUrl,
+      onModelLoaded,
+      onItemSelected,
+      cameraPoseRef,
+      statusLabel,
+      markerScene,
+    },
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement | null>(null)
@@ -124,6 +147,8 @@ const FragmentsScene = forwardRef<FragmentsSceneHandle, FragmentsSceneProps>(
     const rafRef = useRef<number>(0)
     /** 加载代际：异步返回时若代际已变则丢弃（防贴到已释放世界）。 */
     const loadGenerationRef = useRef(0)
+    /** 拾取代际：快速连点时旧 raycast 后 resolve 也不覆盖新选中。 */
+    const pickGenerationRef = useRef(0)
     const pointerDownRef = useRef<{ x: number; y: number } | null>(null)
 
     const loader = useFragmentsLoader()
@@ -183,7 +208,7 @@ const FragmentsScene = forwardRef<FragmentsSceneHandle, FragmentsSceneProps>(
       if (!container) return undefined
 
       const renderer = new THREE.WebGLRenderer({ antialias: true })
-      renderer.setPixelRatio(window.devicePixelRatio)
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO))
       renderer.setSize(container.clientWidth, container.clientHeight)
       container.appendChild(renderer.domElement)
 
@@ -237,7 +262,7 @@ const FragmentsScene = forwardRef<FragmentsSceneHandle, FragmentsSceneProps>(
         camera.updateProjectionMatrix()
         renderer.setSize(width, height)
       }
-      window.addEventListener('resize', handleResize)
+      window.addEventListener('resize', handleResize, { passive: true })
 
       // 点击拾取（区分拖拽）：pointerdown 记录，pointerup 位移小于阈值才拾取
       const handlePointerDown = (event: PointerEvent) => {
@@ -256,9 +281,13 @@ const FragmentsScene = forwardRef<FragmentsSceneHandle, FragmentsSceneProps>(
         const rect = renderer.domElement.getBoundingClientRect()
         mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
         mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+        pickGenerationRef.current += 1
+        const pickGeneration = pickGenerationRef.current
         void model
           .raycast({ camera, mouse, dom: renderer.domElement })
           .then((hit) => {
+            // 旧代际的迟到 raycast 不覆盖更新的选中
+            if (pickGenerationRef.current !== pickGeneration) return
             if (!hit) {
               callback(null)
               return
@@ -274,8 +303,8 @@ const FragmentsScene = forwardRef<FragmentsSceneHandle, FragmentsSceneProps>(
             // 拾取失败不影响渲染
           })
       }
-      renderer.domElement.addEventListener('pointerdown', handlePointerDown)
-      renderer.domElement.addEventListener('pointerup', handlePointerUp)
+      renderer.domElement.addEventListener('pointerdown', handlePointerDown, { passive: true })
+      renderer.domElement.addEventListener('pointerup', handlePointerUp, { passive: true })
 
       return () => {
         cancelAnimationFrame(rafRef.current)
@@ -366,6 +395,57 @@ const FragmentsScene = forwardRef<FragmentsSceneHandle, FragmentsSceneProps>(
       // resolveAssetUrl 走 ref；loader 稳定；cameraPoseRef 稳定（父层 ref）
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fragKey])
+
+    // ── 成果标记叠加（A-08，楼层级对齐）──────────────────────────
+    // 模型就绪后按其 world footprint + 楼层标高把 markers 落位为标记球。
+    // 依赖 status（ready 时 modelRef/box 已就绪）与 markerScene（单体切换重建）。
+    useEffect(() => {
+      const world = worldRef.current
+      const model = modelRef.current
+      if (!world || !model || status !== 'ready') return undefined
+      const markers = markerScene?.markers
+      const floors = markerScene?.floors
+      if (!markers?.length || !floors?.length) return undefined
+
+      // 用模型 world 包围盒推导平面跨度与中心（楼层级近似锚定）
+      const size = new THREE.Vector3()
+      const center = new THREE.Vector3()
+      model.box.getSize(size)
+      model.box.getCenter(center)
+      const planWidth = Math.max(size.x, 1)
+      const planDepth = Math.max(size.z, 1)
+
+      const placements = buildFloorPlacements(
+        { floors },
+        { planWidth, planDepth, center: [center.x, center.z] },
+      )
+      const { aligned } = alignMarkersToFragments(markers, placements)
+      if (aligned.length === 0) return undefined
+
+      const radius = Math.max(
+        Math.max(planWidth, planDepth) / MARKER_RADIUS_DIVISOR,
+        MIN_MARKER_RADIUS,
+      )
+      const group = new THREE.Group()
+      group.name = 'fragments-markers'
+      for (const item of aligned) {
+        const geometry = new THREE.SphereGeometry(radius, 16, 12)
+        const material = new THREE.MeshLambertMaterial({
+          color: SEVERITY_COLORS[item.marker.severity] ?? SEVERITY_COLORS.info,
+        })
+        const sphere = new THREE.Mesh(geometry, material)
+        sphere.position.set(item.position.x, item.position.y, item.position.z)
+        const userData: MarkerUserData = { kind: 'marker', marker: item.marker }
+        sphere.userData = userData
+        group.add(sphere)
+      }
+      world.scene.add(group)
+
+      return () => {
+        world.scene.remove(group)
+        disposeObjectTree(group)
+      }
+    }, [markerScene, status])
 
     return (
       <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 420 }}>

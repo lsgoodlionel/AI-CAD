@@ -387,21 +387,21 @@ export const getModelAssetUrl = (projectId: string, key: string) =>
 // 对齐 docs/PHASE_A_TASKS.md A-05：scene.model_ifc = {ifc_key, frag_key, build_mode, is_estimated, generated_at}
 // 以及 A-08：Fragments 构件拾取返回的选中 item 形状。
 
-/** scene 重建模式：贴图 / 挤出构件 / 程序化 IFC */
-export type ModelBuildMode = 'texture' | 'elements' | 'ifc'
-
 /**
- * 程序化 IFC / Fragments 产物元信息（scene.model_ifc）。
+ * 程序化 IFC / Fragments 产物元信息（scene.model_ifc JSON 契约，唯一来源）。
  * 后端 A-03/A-04 写入；前端 A-06 依据 frag_key 拉取 .frag，缺省时回退挤出/贴图。
+ * 字段按后端真实契约：model_ifc 存在时各字段都有值，故为 required
+ * （frag_key 转换失败/未产出时为 null；generated_at 旧数据可能缺省）。
  */
 export interface SceneModelIfc {
   /** MinIO key：projects/{id}/model_ifc/{building_key}.ifc（合规 IFC4） */
-  ifc_key?: string
-  /** MinIO key：That Open Fragments 二进制（.frag），缺省=无 Fragments 产物 */
-  frag_key?: string
-  build_mode?: ModelBuildMode
+  ifc_key: string
+  /** MinIO key：That Open Fragments 二进制（.frag）；转换失败/未产出为 null */
+  frag_key: string | null
+  /** scene 重建模式：程序化 IFC / 挤出构件 / 贴图 */
+  build_mode: 'ifc' | 'elements' | 'texture'
   /** 楼层标高等是否为估算（Phase A 恒可能为 true，Phase B 恢复真实标高） */
-  is_estimated?: boolean
+  is_estimated: boolean
   generated_at?: string
 }
 

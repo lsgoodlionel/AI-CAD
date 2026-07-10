@@ -114,12 +114,11 @@ def _building_input(
     )
     stories: list[IfcStoryInput] = []
     prev_elev: float | None = None
-    prev_height = DEFAULT_STORY_HEIGHT_M
     for floor in floors:
         story, mark = _story_input(floor, prev_elev)
         stories.append(story)
         provenance[(story.display_name, round(story.elevation_m, 3))] = mark
-        prev_elev, prev_height = story.elevation_m, story.height_m
+        prev_elev = story.elevation_m
     return IfcBuildingInput(
         unit_key=str(building.get("key") or "main"),
         display_name=str(building.get("label") or building.get("key") or "主体"),

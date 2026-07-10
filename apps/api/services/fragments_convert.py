@@ -5,8 +5,9 @@
 转为 Fragments 二进制，供前端 Fragments 加载器高性能渲染。
 
 边界（A-04）：
-- 只提供「独立转换 + 上传」两组函数，**不接线进 tasks/model_build.py**
-  （那依赖并行的 A-03）。
+- 提供「独立转换 + 上传」两组函数。已由 ``services/model_ifc_integration.py``
+  （经 ``model_builder.build_scene``）接线进模型构建链路：程序化 IFC 生成后
+  调用 ``convert_and_upload_ifc_bytes`` 产出 Fragments。
 - 转换失败一律抛 ``FragmentsConversionError``，由上层决定降级（回退
   glTF / 挤出 / 贴图），本模块绝不静默吞错。
 """
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -32,6 +34,11 @@ _CONVERT_SCRIPT = _CONVERT_DIR / "ifc_to_fragments.mjs"
 _CONVERT_TIMEOUT_SEC = 300
 
 FRAG_CONTENT_TYPE = "application/octet-stream"
+
+# building_key 直接进 MinIO object key，须限制在安全字符集，防未来调用方
+# 传入用户/OCR 文本（路径穿越、非法对象名）。
+_BUILDING_KEY_MAX_LEN = 64
+_BUILDING_KEY_ILLEGAL = re.compile(r"[^A-Za-z0-9_-]+")
 
 
 class FragmentsConversionError(RuntimeError):
@@ -137,9 +144,20 @@ def convert_ifc_bytes_to_fragments(ifc_bytes: bytes) -> bytes:
         return frag_path.read_bytes()
 
 
+def _slugify_building_key(building_key: str) -> str:
+    """把 building_key 规整为 MinIO key 安全字符集（``[A-Za-z0-9_-]``，限长）。
+
+    非法字符替换为 ``-``，去除首尾 ``-`` 并截断；全部非法时回退 ``building``，
+    确保对象名始终合法且不含路径穿越。
+    """
+    slug = _BUILDING_KEY_ILLEGAL.sub("-", str(building_key or "")).strip("-")
+    slug = slug[:_BUILDING_KEY_MAX_LEN].strip("-")
+    return slug or "building"
+
+
 def fragments_object_key(project_id: int | str, building_key: str) -> str:
-    """产物 MinIO key：``projects/{id}/model_ifc/{building_key}.frag``。"""
-    return f"projects/{project_id}/model_ifc/{building_key}.frag"
+    """产物 MinIO key：``projects/{id}/model_ifc/{building_key}.frag``（key 已 slug 化）。"""
+    return f"projects/{project_id}/model_ifc/{_slugify_building_key(building_key)}.frag"
 
 
 def upload_fragments(frag_bytes: bytes, project_id: int | str, building_key: str) -> str:
