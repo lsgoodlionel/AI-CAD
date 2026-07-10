@@ -5,6 +5,7 @@ OpenAI / DeepSeek / Qwen / 月之暗面 / 零一万物 / Mistral 等
 import time
 import openai
 from .base import LLMProvider, LLMResponse, ModelParams
+from . import vision
 
 
 class OpenAICompatProvider(LLMProvider):
@@ -12,6 +13,9 @@ class OpenAICompatProvider(LLMProvider):
         self.client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
 
     async def complete(self, messages: list[dict], params: ModelParams) -> LLMResponse:
+        # 仅当含图像块时才走多模态转换，text-only 保持零差异
+        if vision.messages_have_images(messages):
+            messages = vision.to_openai_messages(messages)
         start = time.monotonic()
         kwargs: dict = {
             "model": params.model_id,

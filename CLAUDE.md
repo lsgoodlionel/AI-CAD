@@ -247,13 +247,14 @@ CAD/
     → 异步记录调用日志（engine/model/tokens/延迟/费用/成功率）
 ```
 
-**13 个预定义引擎名称**:
+**14 个预定义引擎名称**:
 - `regulation_classifier` / `regulation_extractor`（规范 NLP 提取）
 - `kg_compliance_reasoning` / `kg_suggestion_generator` / `kg_diff_analyzer`（KG 引擎）
 - `rag_qa` / `rag_rewriter`（RAG 引擎）
 - `rebar_annotation_parser` / `cost_explanation_writer` / `optimization_hint_writer`（经济测算）
 - `report_summary_writer`（报告生成）
 - `drawing_visual_analyzer`（视觉引擎）
+- `drawing_semantic_vlm`（VLM 语义引擎，Phase A：读图名/标题栏/判专业/跨图提示，本地 Ollama / 云端 DashScope 热切换，种子见 `migrations/018_vlm_engine_seed.sql`）
 - `incentive_description_writer`（激励描述）
 
 ### 4. 规范知识库（三途径输入）
