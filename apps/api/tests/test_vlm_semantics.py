@@ -323,3 +323,135 @@ async def test_collect_scene_vlm_disabled_returns_empty(monkeypatch):
 async def test_collect_scene_vlm_no_drawings_returns_empty(monkeypatch):
     _enable(monkeypatch)
     assert await collect_scene_vlm(None, []) == {}
+
+
+# ── A-17 补齐：collect_scene_vlm 开启态主循环（注入 router）────────
+
+async def test_collect_scene_vlm_enabled_collects_results(monkeypatch):
+    # Arrange：开启 + 注入 fake router + mock MinIO 取字节 + mock 切图
+    _enable(monkeypatch)
+    _patch_preprocess(monkeypatch)
+    monkeypatch.setattr("core.storage.get_file_bytes", lambda key: b"raw-bytes")
+    router = _FakeRouter(content=_SAMPLE_JSON)
+    drawings = [
+        {"id": "d1", "file_key": "projects/p/jg.pdf", "title": "结构平面图"},
+        {"id": "d2", "file_key": ""},          # 无 file_key → 跳过（366-367）
+        {"file_key": "projects/p/x.pdf"},        # 无 id → 跳过
+    ]
+
+    # Act
+    results = await collect_scene_vlm(None, drawings, router=router)
+
+    # Assert：仅 d1 被收录
+    assert set(results) == {"d1"}
+    assert results["d1"].discipline.value == "structure"
+
+
+async def test_collect_scene_vlm_single_drawing_error_skipped(monkeypatch):
+    # 单图取字节抛错 → 跳过该图，不影响整体（373-375）
+    _enable(monkeypatch)
+
+    def _boom(key):
+        raise RuntimeError("MinIO 500")
+
+    monkeypatch.setattr("core.storage.get_file_bytes", _boom)
+    router = _FakeRouter(content=_SAMPLE_JSON)
+    drawings = [{"id": "d1", "file_key": "projects/p/a.pdf"}]
+
+    results = await collect_scene_vlm(None, drawings, router=router)
+
+    assert results == {}
+
+
+async def test_collect_scene_vlm_empty_result_not_collected(monkeypatch):
+    # VLM 返回空语义 → is_empty → 不收录（376 分支）
+    _enable(monkeypatch)
+    _patch_preprocess(monkeypatch)
+    monkeypatch.setattr("core.storage.get_file_bytes", lambda key: b"raw")
+    router = _FakeRouter(content="完全不是 JSON")  # 解析空 → 空结果
+    drawings = [{"id": "d1", "file_key": "projects/p/a.pdf"}]
+
+    results = await collect_scene_vlm(None, drawings, router=router)
+
+    assert results == {}
+
+
+async def test_collect_scene_vlm_builds_router_when_not_injected(monkeypatch):
+    # 未注入 router → 自建；若自建失败降级返回 {}
+    _enable(monkeypatch)
+    monkeypatch.setattr(vlm_semantics, "_build_router", lambda db: None)
+
+    results = await collect_scene_vlm(object(), [{"id": "d1", "file_key": "a.pdf"}])
+
+    assert results == {}
+
+
+# ── A-17 补齐：_build_router 成功 / 失败降级 ──────────────────────
+
+def test_build_router_success():
+    router = vlm_semantics._build_router(SimpleNamespace())
+    assert router is not None
+
+
+def test_build_router_degrades_on_failure(monkeypatch):
+    def _boom(**kwargs):
+        raise RuntimeError("no redis")
+
+    monkeypatch.setattr("core.llm.router.ModelRouter", _boom)
+    assert vlm_semantics._build_router(SimpleNamespace()) is None
+
+
+# ── A-17 补齐：纯函数边界 ─────────────────────────────────────────
+
+def test_ext_of_variants():
+    assert vlm_semantics._ext_of("projects/p/a.PDF") == "pdf"
+    assert vlm_semantics._ext_of("noext") == ""
+    assert vlm_semantics._ext_of("a.b.dxf") == "dxf"
+
+
+def test_parse_vlm_json_invalid_braces_returns_empty():
+    # 有大括号但内部非法 JSON → json.loads 抛错 → {}（249-250）
+    assert _parse_vlm_json("{不是合法 json}") == {}
+    assert _parse_vlm_json("{'single': 'quotes'}") == {}
+
+
+def test_value_of_rejects_empty_or_nonstring():
+    # value 为空串 / 非字符串 → None（278）
+    r1 = vlm_semantics._result_from_parsed("d1", {"title": {"value": ""}}, source="vlm")
+    assert r1.title is None
+    r2 = vlm_semantics._result_from_parsed("d1", {"title": {"value": 123}}, source="vlm")
+    assert r2.title is None
+
+
+def test_apply_vlm_discipline_ignores_drawing_without_result():
+    # 图纸不在 VLM 映射中（result None）→ 原样返回（429）
+    drawings = [{"id": "d1", "discipline": ""}, {"id": "d2", "discipline": ""}]
+    vlm = {"d2": DrawingSemanticResult(drawing_id="d2", discipline=VlmValue("mep", 0.9))}
+
+    out = apply_vlm_discipline(drawings, vlm)
+
+    assert "discipline_source" not in out[0]  # d1 未被触碰
+    assert out[1]["discipline"] == "mep"
+
+
+def test_apply_vlm_discipline_no_hint_when_discipline_matches():
+    # 确定性专业与 VLM 归一化后一致 → 无冲突标注（443）
+    drawings = [{"id": "d1", "discipline": "结构"}]  # 归一化 → structure
+    vlm = {"d1": DrawingSemanticResult(
+        drawing_id="d1", discipline=VlmValue("structure", 0.9))}
+
+    out = apply_vlm_discipline(drawings, vlm)
+
+    assert out[0]["discipline"] == "结构"          # 确定性专业保留
+    assert "vlm_discipline_hint" not in out[0]      # 一致 → 无候选标注
+
+
+def test_cross_link_candidates_skips_empty_hint_value():
+    # 空 value 的跨图提示被跳过（524）
+    vlm = {"d1": DrawingSemanticResult(
+        drawing_id="d1", cross_hints=(VlmValue("", 0.5), VlmValue("有效提示", 0.7)))}
+
+    links = vlm_cross_link_candidates(vlm, {}, {})
+
+    assert len(links) == 1
+    assert links[0]["label"] == "有效提示"

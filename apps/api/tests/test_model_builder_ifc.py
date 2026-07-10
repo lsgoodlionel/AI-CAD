@@ -89,6 +89,18 @@ def test_fragments_failure_keeps_ifc(monkeypatch):
     assert result["build_mode"] == "ifc"
 
 
+def test_convert_fragments_quiet_returns_key_on_success(monkeypatch):
+    """Fragments 转换成功：_convert_fragments_quiet 透传 frag_key（success 分支）。"""
+    import services.fragments_convert as fragments_convert
+
+    monkeypatch.setattr(
+        fragments_convert, "convert_and_upload_ifc_bytes",
+        lambda ifc_bytes, project_id, kind: ("projects/9/model_ifc/project.frag", 123),
+    )
+    frag_key = model_ifc_integration._convert_fragments_quiet(b"IFC", "9")
+    assert frag_key == "projects/9/model_ifc/project.frag"
+
+
 def test_ifc_build_failure_degrades(monkeypatch):
     """IFC 建模本身抛错：整体降级返回 None，绝不中断 build_scene。"""
     import services.ifc_mapping as ifc_mapping
