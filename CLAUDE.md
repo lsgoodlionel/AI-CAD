@@ -1,6 +1,6 @@
 # CAD — 图纸深化全过程管理平台
 
-> 最后更新：2026-07-06 | 实现进度：Phase 0~4B 全部完成；会审审查 V4（方法论）已并入 AI 审图；Phase 5 批量读图与整套审图完成；Phase 6 工程 3D 模型基座完成（模型成为全平台成果展示主通道之一）
+> 最后更新：2026-07-10 | 实现进度：Phase 0~4B 全部完成；会审审查 V4（方法论）已并入 AI 审图；Phase 5 批量读图与整套审图完成；Phase 6 工程 3D 模型基座完成（模型成为全平台成果展示主通道之一）；超级工程建模 Phase A（AI 读图→IFC/Fragments）已合并 main；**超级工程建模 Phase B（算量级：跨视图 z 恢复 + 构件拓扑 + IFC-QTO 算量 + 创效打通）完成（B-01~B-24）**
 
 ## 项目概述
 
@@ -48,6 +48,14 @@
 | Phase 5：套图审图（单张/多张/整套）+ 跨图分析 | ✅ | `routers/review_batches.py`、`tasks/batch_review.py`、`core/ai_review/cross_drawing.py`、`migrations/012`；前端 `pages/drawings/ReviewBatch/` |
 | Phase 6：工程 3D 模型基座（楼层堆叠+图纸贴图+IFC glTF+成果标记）| ✅ | `services/{floor_parser,model_builder}.py`、`tasks/model_build.py`、`routers/project_models.py`、`migrations/013`；前端 `pages/model/ProjectModel/`（three.js）+ 四处平台入口 |
 | Phase 7：3D 模型 V2 构件级重建（总体/单体/柱墙梁板/机电管线设备）+ YOLOv8 | ✅ | `core/model3d/`（几何提取+确定性构件识别）、`services/model_elements.py`（scene v2 单体分组+YOLO 接线）；前端 `elementsBuilder.ts`（构件挤出渲染三模式）；ultralytics 入镜像 |
+| Phase B 工作块一：图种判别（平面/剖面/立面/详图）| ✅ | `services/drawing_view_classifier.py`、`drawing_filename_parser.py`（view_type 关键词）|
+| Phase B 工作块二：跨视图 z 恢复 MVP（剖面标高→真实层高，点亮 `cross_view_match` gate）| ✅ | `core/model3d/section_level_extractor.py`、`services/model_z_levels.py`、`section_z_recovery.py`、`model_story.py`（z_overrides）、`migrations/019` |
+| Phase B 工作块三：立面洞口 + 构件截面表（替换硬编码梁高/板厚/管径）| ✅ | `core/model3d/elevation_opening_extractor.py`、`services/model_component_sections.py`、`migrations/020` |
+| Phase B 工作块四：全三视图配准（轴网锚点+z 装配+置信降级框架）| ✅ | `core/model3d/{grid_anchor_extractor,provenance}.py`、`services/cross_view_registration.py`、`core/ai_review/cross_view_z.py` |
+| Phase B 工作块五：构件拓扑规则（门窗-墙/梁-柱/板-梁，确定性纯几何）| ✅ | `core/model3d/topology_rules.py`、`services/model_topology.py`、`migrations/021` |
+| Phase B 工作块六：IFC-QTO 算量（混凝土净体积/模板/钢筋 + 汇总 API）| ✅ | `services/{model_qto,model_qto_summary}.py`、`migrations/022`、`GET /projects/{id}/model/quantities` |
+| Phase B 工作块七：QTO → 创效激励打通（草稿入三审硬约束）| ✅ | `routers/project_models.py`（`POST /model/quantities/to-proposal`）|
+| Phase B 工作块八：测试与里程碑 E2E Demo（合成整套图，验收总标准 1–5）| ✅ | `tests/e2e/test_phase_b_demo.py`、`tests/test_phase_b_edge_cases.py`、`docs/PHASE_B_DEMO.md` |
 
 ---
 

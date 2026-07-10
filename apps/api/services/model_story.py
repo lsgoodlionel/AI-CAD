@@ -61,6 +61,12 @@ class StoryLevel:
     source: str
     confidence: float
     display_building_name: str
+    # B-04 层高 provenance（与 source/confidence 的「楼层识别」语义分离）：
+    # height_source ∈ section|elevation|default；default 时 height_estimated=True + note。
+    height_source: str = "default"
+    height_confidence: float = 0.55
+    height_estimated: bool = True
+    height_note: str = ""
 
 
 @dataclass(frozen=True)
@@ -145,6 +151,34 @@ def _story_elevation(annotation: dict[str, Any], drawing: dict[str, Any]) -> flo
         if match is not None:
             return float(match.group(1))
     return None
+
+
+def _default_story_height(story_order: int) -> float:
+    return DEFAULT_BASEMENT_HEIGHT_M if story_order < 0 else DEFAULT_STORY_HEIGHT_M
+
+
+def _resolve_story_height(
+    story_order: int,
+    override: dict[str, Any] | None,
+) -> tuple[float, str, float, bool, str]:
+    """层高解析优先级链：section/elevation 实测 > default 兜底。
+
+    返回 (height_m, height_source, height_confidence, height_estimated, height_note)。
+    有实测覆盖 → 非估算、note 空；无 → 默认层高 + 显式 estimated + 低置信 + note。
+    """
+    if override is not None:
+        measured = round(float(override.get("height_m") or 0.0), 3)
+        if measured > 0:
+            return (
+                measured,
+                str(override.get("source") or "section"),
+                round(float(override.get("confidence") or 0.0), 4),
+                False,
+                "",
+            )
+    height = _default_story_height(story_order)
+    note = f"默认层高 {height}m 估算（缺剖面标高证据）"
+    return height, "default", 0.55, True, note
 
 
 def _default_story_elevation(story_order: int, highest_story_order: int) -> float:
@@ -278,7 +312,14 @@ def _serialize_candidate_sources(value: Any) -> list[dict[str, Any]]:
 def normalize_story_table(
     drawings: list[dict[str, Any]],
     annotations: dict[str, dict[str, Any]] | None = None,
+    z_overrides: dict[tuple[str, str], dict[str, Any]] | None = None,
 ) -> StoryNormalizationResult:
+    """归一化楼层表。
+
+    ``z_overrides``：可选跨视图 z 恢复覆盖，键 (building_unit_key, story_key)，
+    值含 height_m / elevation_bottom_m / source / confidence。存在时用实测层高与标高，
+    否则维持默认——保持向后兼容（不传时行为不变）。
+    """
     annotations = annotations or {}
     grouped: dict[str, dict[str, dict[str, Any]]] = {}
     assignments: dict[str, dict[str, Any]] = {}
@@ -384,26 +425,36 @@ def normalize_story_table(
         previous: float | None = None
         levels: list[StoryLevel] = []
         for entry in ordered:
-            explicit = sorted(set(round(value, 3) for value in entry["elevations"]))
-            chosen = explicit[0] if explicit else _default_story_elevation(entry["story_order"], highest_order)
-            if previous is not None and chosen - previous < MIN_STORY_SPACING_M:
-                detected_spacing = round(chosen - previous, 3)
-                issues.append(
-                    ModelQualityIssue(
-                        issue_type="story_spacing_too_small",
-                        severity="warning",
-                        message="相邻楼层标高过近，已按默认层高校正",
-                        building_unit_key=unit_key,
-                        story_key=entry["story_key"],
-                        payload={
-                            "detected_spacing_m": detected_spacing,
-                            "min_spacing_m": MIN_STORY_SPACING_M,
-                            "previous_elevation_m": previous,
-                            "detected_elevation_m": chosen,
-                        },
+            story_order = int(entry["story_order"])
+            override = z_overrides.get((unit_key, entry["story_key"])) if z_overrides else None
+            height_m, h_source, h_conf, h_estimated, h_note = _resolve_story_height(
+                story_order, override
+            )
+            override_elev = override.get("elevation_bottom_m") if override else None
+            if override_elev is not None:
+                # 实测标高：直接采用，不走「过近默认校正」（校正仅对估算标高兜底）
+                chosen = round(float(override_elev), 3)
+            else:
+                explicit = sorted(set(round(value, 3) for value in entry["elevations"]))
+                chosen = explicit[0] if explicit else _default_story_elevation(story_order, highest_order)
+                if previous is not None and chosen - previous < MIN_STORY_SPACING_M:
+                    detected_spacing = round(chosen - previous, 3)
+                    issues.append(
+                        ModelQualityIssue(
+                            issue_type="story_spacing_too_small",
+                            severity="warning",
+                            message="相邻楼层标高过近，已按默认层高校正",
+                            building_unit_key=unit_key,
+                            story_key=entry["story_key"],
+                            payload={
+                                "detected_spacing_m": detected_spacing,
+                                "min_spacing_m": MIN_STORY_SPACING_M,
+                                "previous_elevation_m": previous,
+                                "detected_elevation_m": chosen,
+                            },
+                        )
                     )
-                )
-                chosen = round(previous + DEFAULT_STORY_HEIGHT_M, 3)
+                    chosen = round(previous + DEFAULT_STORY_HEIGHT_M, 3)
             normalized_elevations[(unit_key, entry["story_key"])] = chosen
             previous = chosen
             levels.append(
@@ -411,12 +462,16 @@ def normalize_story_table(
                     building_unit_key=unit_key,
                     story_key=entry["story_key"],
                     display_name=entry["display_name"],
-                    story_order=int(entry["story_order"]),
+                    story_order=story_order,
                     elevation_m=chosen,
-                    height_m=DEFAULT_BASEMENT_HEIGHT_M if int(entry["story_order"]) < 0 else DEFAULT_STORY_HEIGHT_M,
+                    height_m=height_m,
                     source=entry["source"],
                     confidence=round(float(entry["confidence"]), 4),
                     display_building_name=entry["building_display_name"],
+                    height_source=h_source,
+                    height_confidence=h_conf,
+                    height_estimated=h_estimated,
+                    height_note=h_note,
                 )
             )
         stories_by_building[unit_key] = levels

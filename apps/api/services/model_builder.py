@@ -29,19 +29,24 @@ from core.config import settings
 from core.storage import get_file_bytes, upload_file
 from services import (
     model_annotations,
+    model_component_sections,
     model_elements,
     model_ifc_integration,
     model_semantics,
     model_story,
+    model_topology,
+    section_z_recovery,
     vlm_semantics,
 )
 from services.drawing_semantics import extract_semantic_candidates
+from services.drawing_view_classifier import classify_view_type
 from services.floor_parser import parse_floor
 from services.model_lod import ModelScopeEvidence, aggregate_lod_modes, evaluate_lod_capability
 
 logger = logging.getLogger(__name__)
 
 _executor = ThreadPoolExecutor(max_workers=2)
+_SECTION_TIMEOUT_SEC = 20  # 单张剖面标高抽取超时（与构件识别同量级）
 
 RENDER_DPI = 110
 MAX_TEXTURE_PX = 1600
@@ -561,6 +566,10 @@ def _serialize_story_level(level: model_story.StoryLevel) -> dict[str, Any]:
         "height_m": level.height_m,
         "source": level.source,
         "confidence": level.confidence,
+        "height_source": level.height_source,
+        "height_confidence": level.height_confidence,
+        "height_estimated": level.height_estimated,
+        "height_note": level.height_note,
     }
 
 
@@ -735,19 +744,120 @@ def _marker_building_keys(
         marker["building_key"] = building_by_drawing.get(drawing_id, "main")
 
 
+def _section_levels_sync(data: bytes, ext: str):
+    """同步：字节 → 几何 → 剖面标高序列（任何失败返回 None，绝不抛）。"""
+    try:
+        from core.model3d import geometry_extractor
+        from core.model3d.section_level_extractor import extract_section_levels
+
+        geom = (
+            geometry_extractor.extract_pdf_geometry(data)
+            if ext == "pdf"
+            else geometry_extractor.extract_dxf_geometry(data)
+        )
+        return extract_section_levels(geom)
+    except Exception as exc:  # noqa: BLE001 — 剖面识别失败跳过
+        logger.warning("[ModelBuilder] 剖面标高抽取跳过: %s", exc)
+        return None
+
+
+async def _recover_section_z(
+    drawings: list[dict],
+    normalization: model_story.StoryNormalizationResult,
+) -> section_z_recovery.SectionZRecovery:
+    """识别剖面图 → 抽标高 → 对齐平面楼层序（B-05）。无剖面时 no-op。"""
+    section_drawings = [
+        drawing for drawing in drawings
+        if classify_view_type(drawing).view_type == "section"
+    ]
+    if not section_drawings:
+        return section_z_recovery.SectionZRecovery()
+
+    loop = asyncio.get_event_loop()
+    levels_by_drawing: dict[str, Any] = {}
+    for drawing in section_drawings:
+        file_key = drawing.get("file_key") or ""
+        ext = file_key.rsplit(".", 1)[-1].lower() if "." in file_key else ""
+        if not file_key or ext not in ("pdf", "dxf", "dwg"):
+            continue
+        try:
+            data = await loop.run_in_executor(_executor, get_file_bytes, file_key)
+            levels = await asyncio.wait_for(
+                loop.run_in_executor(_executor, _section_levels_sync, data, ext),
+                timeout=_SECTION_TIMEOUT_SEC,
+            )
+        except Exception as exc:  # noqa: BLE001 — 单图失败不阻断整链
+            logger.warning("[ModelBuilder] 剖面 z 恢复跳过 %s: %s", drawing.get("id"), exc)
+            continue
+        if levels is not None and getattr(levels, "marks", ()):
+            levels_by_drawing[str(drawing["id"])] = levels
+
+    return section_z_recovery.recover_section_z(drawings, levels_by_drawing, normalization)
+
+
+def _section_texts_sync(data: bytes, ext: str) -> list[str]:
+    """同步：字节 → 几何 → 文本内容列表（供截面标注解析）。失败返回 []。"""
+    try:
+        from core.model3d import geometry_extractor
+
+        geom = (
+            geometry_extractor.extract_pdf_geometry(data)
+            if ext == "pdf"
+            else geometry_extractor.extract_dxf_geometry(data)
+        )
+        return [t[2] for t in geom.texts if len(t) >= 3 and isinstance(t[2], str)]
+    except Exception as exc:  # noqa: BLE001 — 截面文本抽取失败跳过
+        logger.warning("[ModelBuilder] 截面文本抽取跳过: %s", exc)
+        return []
+
+
+async def _recover_component_sections(drawings: list[dict]) -> dict:
+    """从剖面/详图标注构建构件截面表（B-07）。无剖面/详图时回落全默认。"""
+    targets = [
+        drawing for drawing in drawings
+        if classify_view_type(drawing).view_type in ("section", "detail")
+    ]
+    texts: list[str] = []
+    loop = asyncio.get_event_loop()
+    for drawing in targets:
+        # 图纸自带文本字段（标题/OCR）先入料，零额外 IO
+        for field_key in ("title", "ocr_text", "drawing_no"):
+            value = drawing.get(field_key)
+            if isinstance(value, str) and value:
+                texts.append(value)
+        file_key = drawing.get("file_key") or ""
+        ext = file_key.rsplit(".", 1)[-1].lower() if "." in file_key else ""
+        if not file_key or ext not in ("pdf", "dxf", "dwg"):
+            continue
+        try:
+            data = await loop.run_in_executor(_executor, get_file_bytes, file_key)
+            geom_texts = await asyncio.wait_for(
+                loop.run_in_executor(_executor, _section_texts_sync, data, ext),
+                timeout=_SECTION_TIMEOUT_SEC,
+            )
+        except Exception as exc:  # noqa: BLE001 — 单图失败不阻断整链
+            logger.warning("[ModelBuilder] 截面表跳过 %s: %s", drawing.get("id"), exc)
+            continue
+        texts.extend(geom_texts)
+    return model_component_sections.build_component_sections(texts)
+
+
 def _build_model_scopes(
     buildings: list[dict],
     floors: list[dict],
     ifc_models: list[dict],
+    matched_units: set[str] | None = None,
 ) -> list[ModelScopeEvidence]:
+    matched_units = matched_units or set()
     if not buildings:
-        return [_scope_evidence_for("scene", "总体", floors, ifc_models)]
+        return [_scope_evidence_for("scene", "总体", floors, ifc_models, matched_units)]
     return [
         _scope_evidence_for(
             str(building.get("key") or "scene"),
             str(building.get("label") or building.get("key") or "总体"),
             building.get("floors") or floors,
             ifc_models,
+            matched_units,
         )
         for building in buildings
     ]
@@ -758,6 +868,7 @@ def _scope_evidence_for(
     scope_label: str,
     floors: list[dict],
     ifc_models: list[dict],
+    matched_units: set[str] | None = None,
 ) -> ModelScopeEvidence:
     relevant_floors = [floor for floor in floors if floor.get("key") != "UNZONED"] or list(floors)
     drawings = [drawing for floor in relevant_floors for drawing in floor.get("drawings") or []]
@@ -767,6 +878,9 @@ def _scope_evidence_for(
         if str(model.get("drawing_id") or "") in drawing_ids
     ]
     explicit_evidence = _collect_scope_lod_evidence(relevant_floors, drawings, ifc_scope_models)
+    cross_view = explicit_evidence["cross_view_match"] or _scope_cross_view_matched(
+        relevant_floors, matched_units or set()
+    )
 
     return ModelScopeEvidence(
         scope_key=scope_key,
@@ -777,10 +891,22 @@ def _scope_evidence_for(
         has_coordinates=bool(drawings),
         has_registered_grid=explicit_evidence["registered_grid"],
         has_dimensions=explicit_evidence["dimensions"],
-        has_cross_view_match=explicit_evidence["cross_view_match"],
+        has_cross_view_match=cross_view,
         has_stable_component_boundaries=explicit_evidence["stable_component_boundaries"],
         geometry_consistent=explicit_evidence["geometry_consistent"],
     )
+
+
+def _scope_cross_view_matched(floors: list[dict], matched_units: set[str]) -> bool:
+    """本 scope 是否达成跨视图对齐：其楼层所属单体命中剖面 z 恢复的匹配单体。"""
+    if not matched_units:
+        return False
+    scope_units = {
+        unit for floor in floors for unit in (floor.get("building_units") or [])
+    }
+    if not scope_units:
+        return True  # 无单体细分（单体项目）→ 有匹配即算命中
+    return bool(scope_units & matched_units)
 
 
 def _collect_scope_lod_evidence(
@@ -814,7 +940,29 @@ def _collect_scope_lod_evidence(
         evidence["dimensions"] = True
         evidence["stable_component_boundaries"] = True
         evidence["geometry_consistent"] = True
+
+    # B-15：构件拓扑闭合驱动几何一致性证据（与既有来源 OR，无拓扑时无副作用）。
+    topology_evidence = _topology_lod_evidence(floors)
+    evidence["stable_component_boundaries"] = (
+        evidence["stable_component_boundaries"] or topology_evidence["stable_component_boundaries"]
+    )
+    evidence["geometry_consistent"] = (
+        evidence["geometry_consistent"] or topology_evidence["geometry_consistent"]
+    )
     return evidence
+
+
+def _topology_lod_evidence(floors: list[dict]) -> dict[str, bool]:
+    """跨楼层汇构件 → 拓扑图 → LOD 证据（梁柱/板梁闭合）。"""
+    walls, columns, beams, slabs = [], [], [], []
+    for floor in floors:
+        elements = floor.get("elements") or {}
+        walls.extend(elements.get("walls") or [])
+        columns.extend(elements.get("columns") or [])
+        beams.extend(elements.get("beams") or [])
+        slabs.extend(elements.get("slabs") or [])
+    graph = model_topology.build_topology_graph(walls, columns, beams, slabs, [])
+    return graph.lod_evidence()
 
 
 def _strip_private_lod_fields(floors: list[dict], buildings: list[dict]) -> None:
@@ -844,12 +992,21 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     drawings = vlm_semantics.apply_vlm_discipline(drawings, vlm_by_drawing)
     annotation_overrides = await _load_annotation_overrides(db, project_id)
     normalization = model_story.normalize_story_table(drawings, annotation_overrides)
+    # B-05：跨视图 z 恢复（仅剖面标高）——有剖面则以实测层高重归一化并点亮 gate；无剖面 no-op。
+    section_z = await _recover_section_z(drawings, normalization)
+    if section_z.z_overrides:
+        normalization = model_story.normalize_story_table(
+            drawings, annotation_overrides, z_overrides=section_z.z_overrides
+        )
     semantic_payload = vlm_semantics.merge_vlm_into_semantic_payload(
         _semantic_scene_payload(drawings), vlm_by_drawing
     )
     assets, ifc_models, ifc_skipped = await _build_assets(project_id, drawings, progress_cb)
     floors, floor_of = _build_floors(drawings, issues_by_drawing, assets, normalization)
     yolo_total = await _attach_floor_elements(floors, drawings, floor_of, progress_cb)
+    # B-07：剖面/详图截面回填构件（实测覆盖硬编码默认；无标注时全默认→无副作用）。
+    component_sections = await _recover_component_sections(drawings)
+    model_component_sections.apply_component_sections(floors, component_sections)
     await _notify(progress_cb, _progress_payload("assemble", "组装场景与统计", "", 0, 1))
 
     ids_by_no: dict[str, list[str]] = {}
@@ -885,7 +1042,7 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
         building_units=normalization.building_units,
     )
     stats["buildings"] = len(buildings)
-    model_scopes = _build_model_scopes(buildings, floors, ifc_models)
+    model_scopes = _build_model_scopes(buildings, floors, ifc_models, section_z.matched_units)
     lod_capabilities = {
         scope.scope_key: evaluate_lod_capability(scope).as_dict()
         for scope in model_scopes

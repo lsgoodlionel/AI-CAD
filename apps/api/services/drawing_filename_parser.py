@@ -37,6 +37,32 @@ _SEPARATORS = " -_"
 DEFAULT_VERSION = "A"
 DEFAULT_DISCIPLINE = "general"
 
+# ── 图种关键词（B-01 图种判别供料）────────────────────────────
+# view_type ∈ {plan, section, elevation, detail}；unknown 由判别器在无证据时给出。
+VIEW_TYPE_PLAN = "plan"
+VIEW_TYPE_SECTION = "section"
+VIEW_TYPE_ELEVATION = "elevation"
+VIEW_TYPE_DETAIL = "detail"
+VIEW_TYPE_UNKNOWN = "unknown"
+
+# 关键词词表（中文用词不统一，集中维护便于扩充）：
+# 剖面：含「剖」即命中（剖面/剖视/剖切/X-X剖），召回优先，漏判代价最高。
+_VIEW_SECTION_RE = re.compile(r"剖|section", re.I)
+# 立面：立面（含正/背/侧/东南西北立面）/ elevation。
+_VIEW_ELEVATION_RE = re.compile(r"立面|elevation", re.I)
+# 平面：平面 / plan / 楼层 / N层（一二三..或数字）/ 顶板。
+_VIEW_PLAN_RE = re.compile(r"平面|plan|楼层|[一二三四五六七八九十百\d]+\s*层|顶板", re.I)
+# 详图：兜底类，详图/大样/节点/做法/detail。
+_VIEW_DETAIL_RE = re.compile(r"详图|大样|节点|做法|detail", re.I)
+
+# 优先级：剖面 > 立面 > 平面 > 详图（详图为兜底，先满足剖/立面高召回）。
+_VIEW_TYPE_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
+    (_VIEW_SECTION_RE, VIEW_TYPE_SECTION),
+    (_VIEW_ELEVATION_RE, VIEW_TYPE_ELEVATION),
+    (_VIEW_PLAN_RE, VIEW_TYPE_PLAN),
+    (_VIEW_DETAIL_RE, VIEW_TYPE_DETAIL),
+)
+
 
 @dataclass(frozen=True)
 class ParsedField:
@@ -52,6 +78,31 @@ class ParsedDrawingMetadata:
     discipline: ParsedField
     title: ParsedField
     version: ParsedField
+
+
+@dataclass(frozen=True)
+class ViewTypeKeywordHit:
+    """图种关键词命中结果（B-01 供料层）。"""
+    view_type: str
+    keyword: str
+    span: tuple[int, int]
+
+
+def match_view_type_keyword(text: str | None) -> ViewTypeKeywordHit | None:
+    """按优先级（剖面>立面>平面>详图）匹配图种关键词。
+
+    命中返回首个匹配（含匹配子串与位置），全不命中返回 None。
+    仅做关键词判别，不含几何/VLM 佐证——由 drawing_view_classifier 编排。
+    """
+    if not text:
+        return None
+    for pattern, view_type in _VIEW_TYPE_RULES:
+        match = pattern.search(text)
+        if match:
+            return ViewTypeKeywordHit(
+                view_type=view_type, keyword=match.group(0), span=match.span()
+            )
+    return None
 
 
 def parse_drawing_filename(filename: str) -> dict:

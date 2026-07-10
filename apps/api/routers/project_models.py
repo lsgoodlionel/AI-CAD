@@ -10,11 +10,13 @@ import json
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel
 
 from core.storage import presigned_get_url
 from dependencies import get_db, get_current_user
 from services.audit import write_audit
-from services import model_annotations, model_semantics, model_story
+from services import model_annotations, model_qto_summary, model_semantics, model_story
+from services.model_qto import compute_rebar_quantities
 from services.model_semantics import SemanticHierarchyError, SemanticVersionConflict
 from tasks.model_build import build_project_model
 
@@ -175,6 +177,95 @@ async def get_project_model(
         # 构建实时进度（migration 014；building 状态时前端展示）
         "progress": _parse_jsonb(record.get("progress"), None),
     }
+
+
+@router.get("/{project_id}/model/quantities")
+async def get_model_quantities(
+    project_id: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """QTO 工程量汇总（B-19）：混凝土/模板/钢筋，分楼层/分单体下钻，统一信封。"""
+    row = await db.fetch_one(
+        "SELECT scene FROM project_models WHERE project_id=$1", project_id
+    )
+    if row is None:
+        raise HTTPException(404, "MODEL_NOT_BUILT")
+    scene = _parse_jsonb(dict(row)["scene"], None)
+    data = (
+        model_qto_summary.build_scene_quantities(scene)
+        if scene
+        else {"project": model_qto_summary.summarize([]), "by_floor": [], "by_building": []}
+    )
+    return {"success": True, "data": data, "error": None, "meta": {"scope": "scene"}}
+
+
+class QtoToProposalBody(BaseModel):
+    rebar_inputs: list[dict] = []
+    rebar_params: dict | None = None
+    extra_saving_yuan: float = 0.0     # 混凝土/模板量差价值（调用方另算，可选叠加）
+    title: str | None = None
+
+
+def _qto_proposal_description(qto: dict, rebar: dict, raw_saving: float) -> str:
+    concrete = qto["project"]["concrete"]
+    summary = rebar.get("summary") or {}
+    return (
+        f"由 QTO 算量自动生成创效草稿。混凝土净体积 {concrete['net_m3']} m³"
+        f"（毛 {concrete['gross_m3']} m³）；钢筋优化节约 {summary.get('saving_kg', 0)} kg / "
+        f"{summary.get('saving_yuan', 0)} 元。预估净节约（待经济师测算复核）约 {raw_saving} 元。"
+    )
+
+
+@router.post("/{project_id}/model/quantities/to-proposal", status_code=201)
+async def qto_to_proposal(
+    project_id: str,
+    body: QtoToProposalBody,
+    request: Request,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """QTO 差值 → 创效提案草稿（B-20）。仅造 draft，下游 calculate/签字硬约束不被绕过。"""
+    row = await db.fetch_one(
+        "SELECT scene FROM project_models WHERE project_id=$1", project_id
+    )
+    if row is None:
+        raise HTTPException(404, "MODEL_NOT_BUILT")
+    scene = _parse_jsonb(dict(row)["scene"], None)
+    if not scene:
+        raise HTTPException(409, "MODEL_SCENE_EMPTY")
+
+    rebar = compute_rebar_quantities(body.rebar_inputs, body.rebar_params)
+    rebar_saving = (
+        0.0 if rebar["rebar_missing"]
+        else float((rebar.get("summary") or {}).get("saving_yuan") or 0.0)
+    )
+    raw_saving = round(rebar_saving + max(body.extra_saving_yuan, 0.0), 2)
+    if raw_saving <= 0:
+        raise HTTPException(400, "NO_POSITIVE_SAVING")
+
+    qto = model_qto_summary.build_scene_quantities(
+        scene, rebar_inputs=body.rebar_inputs, rebar_params=body.rebar_params
+    )
+    inserted = await db.fetch_one(
+        """
+        INSERT INTO incentive_proposals
+            (project_id, drawing_id, proposer_id, proposal_type,
+             title, description, raw_saving_est)
+        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id
+        """,
+        project_id, None, current_user["id"], "B",
+        body.title or "QTO算量创效草稿", _qto_proposal_description(qto, rebar, raw_saving),
+        raw_saving,
+    )
+    proposal_id = str(inserted["id"])
+    await write_audit(
+        db, user_id=current_user["id"], action="qto_to_proposal",
+        resource="proposal", resource_id=proposal_id,
+        new_state={"raw_saving_est": raw_saving, "project_id": project_id},
+        ip_address=request.client.host if request.client else None,
+    )
+    return {"proposal_id": proposal_id, "status": "draft", "raw_saving_est": raw_saving}
 
 
 @router.get("/{project_id}/model/annotation-queue")
