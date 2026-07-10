@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     model_router_cache_ttl_sec: int = 30
     # 企业微信通知（可选）
     wechat_webhook_url: str = ""
+    # Phase A 灰度特性开关（默认关闭，保证增量上线可逐字节回退到现网行为）
+    model_ifc_enabled: bool = False          # 程序化 IFC 建模（FloorElements → 合规 IFC）
+    web_fragments_enabled: bool = False      # 前端 That Open Fragments 加载
+    vlm_semantic_enabled: bool = False       # VLM 语义读表/判专业微服务
 
     class Config:
         env_file = ".env"
