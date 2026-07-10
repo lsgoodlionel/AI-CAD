@@ -1,4 +1,25 @@
-from services.model_lod import build_initial_lod_volumes
+from services.model_lod import (
+    ModelScopeEvidence,
+    aggregate_lod_modes,
+    build_initial_lod_volumes,
+    evaluate_lod_capability,
+)
+
+
+def _complete_scope_evidence() -> ModelScopeEvidence:
+    return ModelScopeEvidence(
+        scope_key="unit-a",
+        scope_label="Unit A",
+        has_plan_boundary=True,
+        has_story_order=True,
+        has_scale=True,
+        has_coordinates=True,
+        has_registered_grid=True,
+        has_dimensions=True,
+        has_cross_view_match=True,
+        has_stable_component_boundaries=True,
+        geometry_consistent=True,
+    )
 
 
 def test_build_initial_lod_volumes_uses_dynamic_building_units_and_source_bounds():
@@ -83,3 +104,72 @@ def test_build_initial_lod_volumes_falls_back_for_missing_geometry_with_low_conf
     assert beta["height_m"] == 4.5
     assert beta["confidence"] < alpha["confidence"]
     assert any("default story height" in note for note in beta["notes"])
+
+
+def test_pdf_scope_gets_lod200_and_reports_missing_lod300_evidence():
+    capability = evaluate_lod_capability(
+        ModelScopeEvidence(
+            scope_key="pdf-floor-stack",
+            has_plan_boundary=True,
+            has_story_order=True,
+            has_scale=True,
+        )
+    )
+
+    assert capability.level == 200
+    assert capability.enabled_modes["realistic_proxy"] is True
+    assert set(capability.missing_evidence) >= {
+        "registered_grid",
+        "dimensions",
+        "cross_view_match",
+        "stable_component_boundaries",
+        "geometry_consistent",
+    }
+
+
+def test_lod300_requires_all_geometric_gates():
+    capability = evaluate_lod_capability(_complete_scope_evidence())
+
+    assert capability.level == 300
+    assert capability.missing_evidence == []
+    assert capability.enabled_modes["realistic_proxy"] is True
+
+
+def test_reference_images_do_not_satisfy_any_geometric_gate():
+    capability = evaluate_lod_capability(
+        ModelScopeEvidence(
+            scope_key="reference-renderings",
+            reference_images=(
+                {
+                    "path": "/tmp/reference.jpg",
+                    "usage": "visual_calibration_only",
+                },
+            ),
+        )
+    )
+
+    assert capability.level == 100
+    assert capability.enabled_modes["realistic_proxy"] is False
+    assert capability.passed_gates == []
+    assert "plan_boundary" in capability.missing_evidence
+    assert capability.provenance["reference_images"]["count"] == 1
+
+
+def test_lod_modes_keep_realistic_proxy_approximate_until_all_scopes_lod300():
+    modes = aggregate_lod_modes(
+        {
+            "unit-a": evaluate_lod_capability(_complete_scope_evidence()),
+            "unit-b": evaluate_lod_capability(
+                ModelScopeEvidence(
+                    scope_key="unit-b",
+                    has_plan_boundary=True,
+                    has_story_order=True,
+                    has_coordinates=True,
+                )
+            ),
+        }
+    )
+
+    assert modes["realistic_proxy"]["enabled"] is True
+    assert modes["realistic_proxy"]["label"] == "实景近似（近似）"
+    assert "LOD300" in modes["realistic_proxy"]["reason"]

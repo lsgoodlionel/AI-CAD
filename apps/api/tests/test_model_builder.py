@@ -114,7 +114,7 @@ ISSUE_2 = "88888888-8888-8888-8888-888888888882"
 # V1 keys + Phase 7 新增（schema_version/buildings，见 test_model_builder_v2.py）
 SCENE_KEYS = {
     "project", "floors", "markers", "cross_links", "ifc_models", "stats",
-    "generated_at", "schema_version", "buildings",
+    "generated_at", "schema_version", "buildings", "lod_capabilities", "lod_modes",
 }
 DRAWING_ENTRY_KEYS = {
     "drawing_id", "drawing_no", "title", "discipline", "status",
@@ -225,6 +225,110 @@ async def test_build_scene_contract_fields(fake_db, monkeypatch):
     assert scene["stats"]["floors"] == 2
     assert "ifc_skipped" not in scene["stats"]
     assert assets[DRAWING_1]["parser"] == "pdf"
+    assert scene["lod_capabilities"]["main"]["level"] == 200
+    assert scene["lod_modes"]["realistic_proxy"]["enabled"] is True
+    assert scene["lod_modes"]["realistic_proxy"]["label"] == "实景近似（近似）"
+
+
+@pytest.mark.asyncio
+async def test_build_scene_lod300_requires_explicit_scope_evidence(fake_db, monkeypatch):
+    monkeypatch.setattr(model_builder, "_render_and_upload_sync", _fake_render)
+    drawings = [
+        {
+            **_drawing(DRAWING_1, "JG-B1-01", "地下一层结构平面图"),
+            "lod_evidence": {
+                "scale": True,
+                "registered_grid": True,
+                "dimensions": True,
+                "cross_view_match": True,
+            },
+        }
+    ]
+
+    async def _elements_with_lod_evidence(executor, floor_drawings, file_getter):
+        return (
+            {
+                "columns": [
+                    {
+                        "outline": [[0, 0], [1, 0], [1, 1], [0, 1]],
+                        "src": DRAWING_1,
+                        "lod_evidence": {
+                            "stable_component_boundaries": True,
+                            "geometry_consistent": True,
+                        },
+                    }
+                ],
+                "walls": [],
+                "beams": [],
+                "slabs": [],
+                "pipes": [],
+                "equipment": [],
+            },
+            0,
+            {},
+        )
+
+    monkeypatch.setattr(model_builder.model_elements, "build_floor_elements", _elements_with_lod_evidence)
+    _arrange(fake_db, drawings, [])
+
+    scene, _ = await build_scene(fake_db, PROJECT_ID)
+
+    assert scene["lod_capabilities"]["main"]["level"] == 300
+    assert scene["lod_capabilities"]["main"]["missing_evidence"] == []
+    assert scene["lod_modes"]["realistic_proxy"] == {
+        "enabled": True,
+        "label": "实景近似",
+        "reason": None,
+    }
+    assert "_lod_evidence" not in scene["floors"][0]
+    assert "_lod_evidence" not in scene["floors"][0]["drawings"][0]
+
+
+@pytest.mark.asyncio
+async def test_build_scene_does_not_infer_lod300_from_geometry_or_elevation(fake_db, monkeypatch):
+    monkeypatch.setattr(model_builder, "_render_and_upload_sync", _fake_render)
+
+    async def _elements_without_lod_evidence(executor, floor_drawings, file_getter):
+        return (
+            {
+                "columns": [
+                    {
+                        "outline": [[0, 0], [1, 0], [1, 1], [0, 1]],
+                        "src": DRAWING_1,
+                    }
+                ],
+                "walls": [],
+                "beams": [],
+                "slabs": [],
+                "pipes": [],
+                "equipment": [],
+            },
+            0,
+            {"elevations": [0.0, 4.5], "registered": 2},
+        )
+
+    monkeypatch.setattr(model_builder.model_elements, "build_floor_elements", _elements_without_lod_evidence)
+    _arrange(
+        fake_db,
+        [
+            _drawing(DRAWING_1, "JG-B2-01", "地下二层结构平面图"),
+            _drawing(DRAWING_2, "JG-3F-01", "三层结构平面图"),
+        ],
+        [],
+    )
+
+    scene, _ = await build_scene(fake_db, PROJECT_ID)
+    capability = scene["lod_capabilities"]["main"]
+
+    assert capability["level"] == 200
+    assert set(capability["missing_evidence"]) >= {
+        "scale",
+        "registered_grid",
+        "dimensions",
+        "cross_view_match",
+        "stable_component_boundaries",
+        "geometry_consistent",
+    }
 
 
 # ── 渲染失败降级 ──────────────────────────────────────────────

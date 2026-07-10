@@ -28,6 +28,7 @@ from core.ai_review.dwg_support import ensure_dxf
 from core.storage import get_file_bytes, upload_file
 from services import model_annotations, model_elements, model_story
 from services.floor_parser import parse_floor
+from services.model_lod import ModelScopeEvidence, aggregate_lod_modes, evaluate_lod_capability
 
 logger = logging.getLogger(__name__)
 
@@ -335,6 +336,7 @@ def _drawing_entry(
         "image_key": asset.get("image_key", ""),
         "issue_count": len(issues),
         "critical_count": sum(1 for i in issues if i.get("severity") == "critical"),
+        "_lod_evidence": dict(drawing.get("lod_evidence") or {}),
     }
     if assignment:
         entry.update(
@@ -638,6 +640,12 @@ async def _attach_floor_elements(
         floor["elements"] = elements
         floor["element_stats"] = model_elements.element_stats(elements)
         floor["_elevation_candidates"] = meta.get("elevations") or []
+        floor["_lod_registered_drawings"] = int(meta.get("registered") or 0)
+        floor["_lod_evidence"] = (
+            dict(meta["lod_evidence"])
+            if isinstance(meta.get("lod_evidence"), dict)
+            else {}
+        )
         yolo_total += yolo_count
     _apply_real_elevations(floors)
     return yolo_total
@@ -695,6 +703,102 @@ def _marker_building_keys(
         marker["building_key"] = building_by_drawing.get(drawing_id, "main")
 
 
+def _build_model_scopes(
+    buildings: list[dict],
+    floors: list[dict],
+    ifc_models: list[dict],
+) -> list[ModelScopeEvidence]:
+    if not buildings:
+        return [_scope_evidence_for("scene", "总体", floors, ifc_models)]
+    return [
+        _scope_evidence_for(
+            str(building.get("key") or "scene"),
+            str(building.get("label") or building.get("key") or "总体"),
+            building.get("floors") or floors,
+            ifc_models,
+        )
+        for building in buildings
+    ]
+
+
+def _scope_evidence_for(
+    scope_key: str,
+    scope_label: str,
+    floors: list[dict],
+    ifc_models: list[dict],
+) -> ModelScopeEvidence:
+    relevant_floors = [floor for floor in floors if floor.get("key") != "UNZONED"] or list(floors)
+    drawings = [drawing for floor in relevant_floors for drawing in floor.get("drawings") or []]
+    drawing_ids = {str(drawing.get("drawing_id") or "") for drawing in drawings}
+    ifc_scope_models = [
+        model for model in ifc_models
+        if str(model.get("drawing_id") or "") in drawing_ids
+    ]
+    explicit_evidence = _collect_scope_lod_evidence(relevant_floors, drawings, ifc_scope_models)
+
+    return ModelScopeEvidence(
+        scope_key=scope_key,
+        scope_label=scope_label,
+        has_plan_boundary=bool(drawings),
+        has_story_order=all(floor.get("order") is not None for floor in relevant_floors),
+        has_scale=explicit_evidence["scale"],
+        has_coordinates=bool(drawings),
+        has_registered_grid=explicit_evidence["registered_grid"],
+        has_dimensions=explicit_evidence["dimensions"],
+        has_cross_view_match=explicit_evidence["cross_view_match"],
+        has_stable_component_boundaries=explicit_evidence["stable_component_boundaries"],
+        geometry_consistent=explicit_evidence["geometry_consistent"],
+    )
+
+
+def _collect_scope_lod_evidence(
+    floors: list[dict],
+    drawings: list[dict],
+    ifc_models: list[dict],
+) -> dict[str, bool]:
+    evidence = {
+        "scale": False,
+        "registered_grid": False,
+        "dimensions": False,
+        "cross_view_match": False,
+        "stable_component_boundaries": False,
+        "geometry_consistent": False,
+    }
+    for item in [*floors, *drawings]:
+        raw = item.get("_lod_evidence") or {}
+        if isinstance(raw, dict):
+            for key in evidence:
+                evidence[key] = evidence[key] or bool(raw.get(key))
+
+    for floor in floors:
+        for items in (floor.get("elements") or {}).values():
+            for element in items or []:
+                raw = element.get("lod_evidence") if isinstance(element, dict) else None
+                if isinstance(raw, dict):
+                    for key in evidence:
+                        evidence[key] = evidence[key] or bool(raw.get(key))
+
+    if ifc_models:
+        evidence["dimensions"] = True
+        evidence["stable_component_boundaries"] = True
+        evidence["geometry_consistent"] = True
+    return evidence
+
+
+def _strip_private_lod_fields(floors: list[dict], buildings: list[dict]) -> None:
+    for floor in floors:
+        floor.pop("_lod_registered_drawings", None)
+        floor.pop("_lod_evidence", None)
+        for drawing in floor.get("drawings") or []:
+            drawing.pop("_lod_evidence", None)
+    for building in buildings:
+        for floor in building.get("floors") or []:
+            floor.pop("_lod_registered_drawings", None)
+            floor.pop("_lod_evidence", None)
+            for drawing in floor.get("drawings") or []:
+                drawing.pop("_lod_evidence", None)
+
+
 async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict]:
     """构建 scene（V1 契约全保留 + schema_version=2 构件层），返回 (scene, assets)。
 
@@ -738,6 +842,12 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
         building_units=normalization.building_units,
     )
     stats["buildings"] = len(buildings)
+    model_scopes = _build_model_scopes(buildings, floors, ifc_models)
+    lod_capabilities = {
+        scope.scope_key: evaluate_lod_capability(scope).as_dict()
+        for scope in model_scopes
+    }
+    _strip_private_lod_fields(floors, buildings)
 
     scene = {
         "schema_version": 2,
@@ -756,6 +866,8 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
         "markers": markers,
         "cross_links": _build_cross_links(cross, ids_by_no, floor_by_no),
         "ifc_models": ifc_models,
+        "lod_capabilities": lod_capabilities,
+        "lod_modes": aggregate_lod_modes(lod_capabilities),
         "stats": stats,
         "lod": {
             "default_mode": stats["reconstruction"],
