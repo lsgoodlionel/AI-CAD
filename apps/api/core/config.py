@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        # 允许 model_* 字段名（pydantic v2 默认保护 model_ 命名空间）
+        protected_namespaces = ()
 
 
 settings = Settings()

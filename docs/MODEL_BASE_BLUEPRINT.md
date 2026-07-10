@@ -50,6 +50,11 @@ CREATE TABLE IF NOT EXISTS project_models (
 );
 ```
 
+增量迁移：`014` 加 `progress JSONB`（构建实时进度）；`017`（A-05）加 `build_mode VARCHAR(16)`
+——`scene.model_ifc.build_mode` 的可查询汇总冗余（`ifc|elements|texture`；旧行 NULL），
+带部分索引 `idx_project_models_build_mode`（仅索引非 NULL 行），用于按渲染模式筛选项目模型。
+IFC/Fragments 其余元数据不加列，走 `scene.model_ifc` JSON 契约（见第 4 节）。
+
 ## 4. scene JSON 契约（前后端核心契约，中文 key 与审图输出保持同风格的地方用中文，结构 key 用英文）
 
 ```json
@@ -75,11 +80,32 @@ CREATE TABLE IF NOT EXISTS project_models (
     {"kind": "接口缺图|问题聚类|版本冲突|重复图号", "label": "", "floor_keys": [], "drawing_ids": []}
   ],
   "ifc_models": [{"drawing_id": "", "gltf_key": ""}],
+  "model_ifc": {                                          // Phase A（A-03/A-04 写入），旧数据可缺省
+    "ifc_key": "projects/../model_ifc/xx.ifc",            // MinIO 中程序化 IFC 的 key
+    "frag_key": "projects/../model_ifc/xx.frag",          // Fragments 产物 key；转换失败为 null
+    "build_mode": "ifc",                                  // ifc | elements | texture
+    "is_estimated": true,                                 // 楼层标高是否估算（Phase A 恒 true）
+    "generated_at": "ISO8601"
+  },
   "stats": {"total_drawings": 0, "total_issues": 0,
             "by_severity": {}, "by_discipline": {}, "floors": 0},
   "generated_at": "ISO8601"
 }
 ```
+
+**`scene.model_ifc` 字段契约（A-05，migration 017）**：程序化 IFC / Fragments 建模的产物元数据统一以
+JSON 挂在 `scene.model_ifc`，避免为每个新字段加列（优先 JSON、减少 DDL）。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `ifc_key` | str | MinIO 中程序化 IFC 的 key |
+| `frag_key` | str \| null | Fragments（`.frag`）产物 key；转换失败/未产出为 `null`，前端回退 glTF/挤出 |
+| `build_mode` | `"ifc"` \| `"elements"` \| `"texture"` | 当前渲染模式，`ifc` 优先，无 `frag_key` 回退 |
+| `is_estimated` | bool | 楼层标高是否为估算；Phase A 恒 `true`，Phase B 跨图 Z 恢复后转 `false` |
+| `generated_at` | str | ISO8601 生成时间 |
+
+兼容性：旧模型 scene 无 `model_ifc` 键时读取端按缺省处理（等价 `texture` 模式、无 IFC 产物），不报错。
+`build_mode` 另物化为 `project_models.build_mode` 汇总列（见第 3 节）以支撑按模式筛选查询，权威值仍以本 JSON 为准。
 
 坐标规则：无真实空间坐标 → 稳定伪随机布点：`hash(axes文本 or issue_id) → (x,y)∈[0.1,0.9]²`，
 同轴线问题共享坐标簇（axes 文本相同 → 同点位偏移 0.02 步进），保证重建后位置稳定。
@@ -119,8 +145,10 @@ def floor_of_drawing(drawing: dict, issue_levels: list[str]) -> tuple[str, str, 
   DWG 复用 Phase 5 `dwg_support.ensure_dxf`；任何渲染失败 → image_key=""（前端线框占位），绝不抛异常中断整体。
 - IFC：`ifcopenshell` + `ifcopenshell.geom`（settings USE_WORLD_COORDS）导出 glb；
   import 失败/未安装 → 跳过并在 scene.stats 记 `ifc_skipped:true`。
+- IFC/Fragments（A-03/A-04）：程序化 IFC 与 `.frag` 产物元数据写入 `scene.model_ifc`（第 4 节契约）；
+  落库时同步刷新汇总列 `project_models.build_mode`（= `scene.model_ifc.build_mode`），无 IFC 产物时留空/沿用 texture。
 - `tasks/model_build.py`：Celery `build_project_model(project_id)`（bind、max_retries=2）：
-  status building → 成功 ready（version+1、scene/assets/built_at 更新）/ 失败 failed（error 截断 500）。
+  status building → 成功 ready（version+1、scene/assets/built_at 更新，同步写 build_mode）/ 失败 failed（error 截断 500）。
 
 ## 8. 前端（模块 E 查看器 + 模块 F 平台关联）
 

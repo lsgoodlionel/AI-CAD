@@ -72,6 +72,7 @@ async def _do_build(project_id: str) -> dict:
             UPDATE project_models
             SET status='ready', version=version+1,
                 scene=CAST(:scene AS jsonb), assets=CAST(:assets AS jsonb),
+                build_mode=:build_mode,
                 error=NULL, built_at=now(), updated_at=now()
             WHERE project_id=:project_id
             RETURNING version
@@ -80,6 +81,7 @@ async def _do_build(project_id: str) -> dict:
                 "project_id": project_id,
                 "scene": json.dumps(scene, ensure_ascii=False, default=str),
                 "assets": json.dumps(assets, ensure_ascii=False, default=str),
+                "build_mode": (scene.get("model_ifc") or {}).get("build_mode"),
             },
         )
         version = row["version"] if row is not None else None
