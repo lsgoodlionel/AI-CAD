@@ -9,7 +9,13 @@ import logging
 import re
 
 from .geometry_extractor import MAX_PRIMITIVES
+from .layer_conventions import classify_by_layer, classify_system
 from .types import DrawingGeometry, FloorElements
+
+
+def _at(values: list, index: int) -> str:
+    """安全读取索引对齐的图层/块并行列表（越界或缺失返回空串），保证无图层时零副作用。"""
+    return values[index] if index < len(values) else ""
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +108,11 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str) -> Floor
     lines = geom.lines[:MAX_PRIMITIVES]
     rects = geom.rects[:MAX_PRIMITIVES]
     polys = geom.polys[:MAX_PRIMITIVES]
+    line_layers = geom.line_layers[:MAX_PRIMITIVES]
+    rect_layers = geom.rect_layers[:MAX_PRIMITIVES]
+    rect_blocks = geom.rect_blocks[:MAX_PRIMITIVES]
+    poly_layers = geom.poly_layers[:MAX_PRIMITIVES]
+    poly_blocks = geom.poly_blocks[:MAX_PRIMITIVES]
 
     all_text = "；".join(t[2] for t in geom.texts)
     axis_x, axis_y, axis_lines = _detect_axes(
@@ -116,12 +127,16 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str) -> Floor
     )
 
     if discipline == "mep":
-        result.pipes = _find_pipes(lines, axis_lines, all_text, ctx)
-        result.equipment = _find_equipment(rects, polys, geom.texts, ctx)
+        result.pipes = _find_pipes(lines, line_layers, axis_lines, all_text, ctx)
+        result.equipment = _find_equipment(
+            rects, rect_layers, rect_blocks, polys, poly_layers, poly_blocks, geom.texts, ctx
+        )
         _clip_to_axes(result)
         return result
 
-    result.columns = _find_columns(rects, polys, ctx)
+    result.columns = _find_columns(
+        rects, rect_layers, rect_blocks, polys, poly_layers, poly_blocks, ctx
+    )
     pairs_are_beams = _is_beam_drawing(all_text)
     pairs = _find_parallel_pairs(
         lines, axis_lines, _BEAM_GAP if pairs_are_beams else _WALL_GAP, ctx
@@ -271,18 +286,24 @@ def _axes_dict(
     return axes
 
 
-def _find_columns(rects: list, polys: list, ctx: _Ctx) -> list[dict]:
+def _find_columns(
+    rects: list, rect_layers: list, rect_blocks: list,
+    polys: list, poly_layers: list, poly_blocks: list, ctx: _Ctx,
+) -> list[dict]:
     columns: list[dict] = []
-    for x, y, w, h, filled in rects:
-        if not filled:
+    for i, (x, y, w, h, filled) in enumerate(rects):
+        is_column_layer = classify_by_layer(_at(rect_layers, i), _at(rect_blocks, i)) == "column"
+        # 图层/块名明确为柱时，即使未填充也识别（修复「柱必须 filled 才识别」漏检）
+        if not filled and not is_column_layer:
             continue
-        if _is_column_size(ctx.len_m(w), ctx.len_m(h)):
+        if is_column_layer or _is_column_size(ctx.len_m(w), ctx.len_m(h)):
             columns.append(_rect_element(x, y, w, h, ctx))
         if len(columns) >= _CAPS["columns"]:
             return columns
-    for poly in polys:
+    for i, poly in enumerate(polys):
         x, y, w, h = _poly_bbox(poly)
-        if _is_column_size(ctx.len_m(w), ctx.len_m(h)):
+        is_column_layer = classify_by_layer(_at(poly_layers, i), _at(poly_blocks, i)) == "column"
+        if is_column_layer or _is_column_size(ctx.len_m(w), ctx.len_m(h)):
             columns.append({"outline": [ctx.to_m(px, py) for px, py in poly[:8]], "src": ctx.src})
         if len(columns) >= _CAPS["columns"]:
             break
@@ -416,14 +437,18 @@ def _pipe_system(all_text: str) -> str:
     return "其他"
 
 
-def _find_pipes(lines: list, axis_idx: set[int], all_text: str, ctx: _Ctx) -> list[dict]:
-    system = _pipe_system(all_text)
+def _find_pipes(
+    lines: list, line_layers: list, axis_idx: set[int], all_text: str, ctx: _Ctx
+) -> list[dict]:
+    default_system = _pipe_system(all_text)
     pipes: list[dict] = []
     for i, (x0, y0, x1, y1) in enumerate(lines):
         if i in axis_idx:
             continue
         length_m = ctx.len_m(((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5)
         if length_m >= _PIPE_MIN_LEN_M:
+            # 图层可判定系统时优先（消防/给排水/电气/暖通），否则回退全图关键词
+            system = classify_system(_at(line_layers, i)) or default_system
             pipes.append({
                 "path": [ctx.to_m(x0, y0), ctx.to_m(x1, y1)],
                 "dia": 0.1, "system": system, "src": ctx.src,
@@ -433,19 +458,25 @@ def _find_pipes(lines: list, axis_idx: set[int], all_text: str, ctx: _Ctx) -> li
     return pipes
 
 
-def _find_equipment(rects: list, polys: list, texts: list, ctx: _Ctx) -> list[dict]:
+def _find_equipment(
+    rects: list, rect_layers: list, rect_blocks: list,
+    polys: list, poly_layers: list, poly_blocks: list, texts: list, ctx: _Ctx,
+) -> list[dict]:
     equipment: list[dict] = []
-    for x, y, w, h, _filled in rects:
-        if not _is_equipment_size(ctx.len_m(w), ctx.len_m(h)):
+    for i, (x, y, w, h, _filled) in enumerate(rects):
+        is_equip_layer = classify_by_layer(_at(rect_layers, i), _at(rect_blocks, i)) == "equipment"
+        # 图层/块名明确为设备时，放宽尺寸阈值（具名设备块常不规则）
+        if not is_equip_layer and not _is_equipment_size(ctx.len_m(w), ctx.len_m(h)):
             continue
         label = _text_inside(texts, x, y, w, h)
         element = _rect_element(x, y, w, h, ctx)
         equipment.append({"outline": element["outline"], "height": 1.5, "label": label, "src": ctx.src})
         if len(equipment) >= _CAPS["equipment"]:
             return equipment
-    for poly in polys:
+    for i, poly in enumerate(polys):
         x, y, w, h = _poly_bbox(poly)
-        if not _is_equipment_size(ctx.len_m(w), ctx.len_m(h)):
+        is_equip_layer = classify_by_layer(_at(poly_layers, i), _at(poly_blocks, i)) == "equipment"
+        if not is_equip_layer and not _is_equipment_size(ctx.len_m(w), ctx.len_m(h)):
             continue
         label = _text_inside(texts, x, y, w, h)
         equipment.append({

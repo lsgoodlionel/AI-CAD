@@ -1,0 +1,108 @@
+# 图层约定配置 —— 中国施工图「图层名 / 块名 → 构件类型」映射
+#
+# 用途：为构件识别（core/model3d/element_recognizer.py，A-16）提供强先验。
+#       CAD 图层命名往往直接编码了构件语义，比纯几何启发式更可靠。
+#
+# 参考来源：
+#   - AIA CAD Layer Guidelines（S-/A-/M-/P-/E- 专业前缀 + 四段命名）
+#   - ISO 13567 图层组织标准
+#   - 国标《房屋建筑制图统一标准》GB/T 50001 及各设计院常见中文图层约定
+#
+# 匹配语义（由加载器 layer_conventions.py 实现，优先级从高到低）：
+#   1. aliases   —— 精确别名（整串相等，大小写不敏感）
+#   2. prefixes  —— 前缀匹配（图层名以此开头）
+#   3. substrings—— 子串匹配（图层名 / 块名包含此片段）
+#   4. patterns  —— 正则匹配（Python re，大小写不敏感）
+#
+# 可扩展性：用户可直接向任一列表追加别名 / 前缀 / 子串 / 正则，无需改代码。
+# 原则：只覆盖常见约定，不臆造过细的行业内部私有命名。
+
+version: "1.0"
+description: "中国施工图图层/块命名 → 构件类型映射（column/wall/beam/slab/pipe/equipment/door/window/axis）"
+
+# ── 构件类型映射 ─────────────────────────────────────────────
+# kind 取值须与 element_recognizer 的构件体系一致。
+conventions:
+  # 结构柱：S-COLU（AIA）/ KZ 框架柱 / GZ 构造柱 / 中文「柱」
+  - kind: column
+    aliases: ["S-COLU", "S-COLS", "STRU-COLU", "结构柱", "框架柱", "KZ", "GZ", "COLUMN"]
+    prefixes: ["S-COLU", "S-COL", "A-COLS", "结-柱", "结构-柱"]
+    substrings: ["柱"]
+    patterns: ['^(?:S|STR)[-_]?COL']
+
+  # 结构梁：S-BEAM / KL 框架梁 / LL 连梁 / 中文「梁」
+  - kind: beam
+    aliases: ["S-BEAM", "STRU-BEAM", "结构梁", "框架梁", "KL", "LL", "BEAM"]
+    prefixes: ["S-BEAM", "S-BEA", "结-梁", "结构-梁"]
+    substrings: ["梁"]
+    patterns: ['^(?:S|STR)[-_]?BEA']
+
+  # 结构板 / 楼板：S-SLAB / 中文「板」「楼板」
+  - kind: slab
+    aliases: ["S-SLAB", "STRU-SLAB", "结构板", "楼板", "现浇板", "SLAB", "FLOOR-SLAB"]
+    prefixes: ["S-SLAB", "S-SLB", "S-FLOR", "结-板", "结构-板"]
+    substrings: ["楼板", "现浇板", "板"]
+    patterns: ['^(?:S|STR)[-_]?SL']
+
+  # 墙：S-WALL 剪力墙 / A-WALL 建筑墙 / 中文「墙」「剪力墙」「砌体」
+  - kind: wall
+    aliases: ["S-WALL", "A-WALL", "剪力墙", "建筑墙", "砌体墙", "填充墙", "WALL", "Q"]
+    prefixes: ["S-WALL", "A-WALL", "S-WAL", "A-WAL", "建-墙", "结-墙", "墙-"]
+    substrings: ["剪力墙", "砌体", "填充墙", "墙"]
+    patterns: ['^[AS][-_]?WAL']
+
+  # 门（洞口）：门 / DOOR / M- 门编号 / A-DOOR
+  #   注：门窗多为「块（block）」命名，加载器优先用块名匹配。
+  - kind: door
+    aliases: ["A-DOOR", "门", "DOOR", "M"]
+    prefixes: ["A-DOOR", "A-DOR", "门-", "M-", "MEN-", "DOOR-"]
+    substrings: ["门"]
+    patterns: ['^M\d', 'DOOR']
+
+  # 窗（洞口）：窗 / WINDOW / C- 窗编号 / A-GLAZ
+  - kind: window
+    aliases: ["A-GLAZ", "A-WIND", "窗", "WINDOW", "C"]
+    prefixes: ["A-GLAZ", "A-WIND", "窗-", "C-", "CHUANG-", "WIN-", "WINDOW-"]
+    substrings: ["窗"]
+    patterns: ['^C\d', 'WIND']
+
+  # 机电管线：暖通风管 / 给排水管 / 中文「管」；system 另由 systems 段判定
+  - kind: pipe
+    aliases: ["M-DUCT", "P-PIPE", "H-PIPE", "风管", "水管", "管线", "PIPE", "DUCT"]
+    prefixes: ["M-DUCT", "P-PIPE", "P-DOMW", "P-SANR", "M-HVAC", "暖-", "水-", "风-"]
+    substrings: ["风管", "水管", "管道", "管线", "管"]
+    patterns: ['^[MPH][-_]?(?:PIPE|DUCT|HVAC)']
+
+  # 机电设备：设备 / EQPM / 电箱 / 桥架末端设备等
+  - kind: equipment
+    aliases: ["M-EQPM", "E-EQPM", "P-EQPM", "设备", "机电设备", "EQUIPMENT", "EQPM"]
+    prefixes: ["M-EQPM", "E-EQPM", "P-EQPM", "E-POWR", "E-LITE", "设备-", "电-"]
+    substrings: ["设备", "配电箱", "桥架", "水泵", "风机", "空调机"]
+    patterns: ['[-_]EQPM', '^E[-_]?(?:POWR|LITE)']
+
+  # 轴网 / 轴线：AXIS / GRID / DOTE(AIA 定位) / 中文「轴线」「轴网」「定位」
+  - kind: axis
+    aliases: ["S-GRID", "A-GRID", "AXIS", "GRID", "DOTE", "轴线", "轴网", "定位轴线"]
+    prefixes: ["S-GRID", "A-GRID", "M-GRID", "轴-", "轴线-", "AXIS-", "GRID-"]
+    substrings: ["轴线", "轴网", "定位轴"]
+    patterns: ['[-_]?(?:GRID|AXIS)$', '^DOTE']
+
+# ── 机电系统判定（仅对 pipe / equipment 有意义）─────────────────
+# 返回的 system 与 element_recognizer._SYSTEM_KEYWORDS 命名保持一致：
+#   消防 / 给排水 / 电气 / 暖通
+systems:
+  - system: 消防
+    substrings: ["消防", "喷淋", "消火栓", "FIRE", "SPKL"]
+    prefixes: ["F-", "FP-", "FIRE-"]
+
+  - system: 给排水
+    substrings: ["给排水", "给水", "排水", "雨水", "污水", "废水", "中水", "DOMW", "SANR", "STRM"]
+    prefixes: ["P-", "PD-", "给-", "排-", "水-"]
+
+  - system: 电气
+    substrings: ["电气", "桥架", "配电", "照明", "动力", "强电", "弱电", "POWR", "LITE"]
+    prefixes: ["E-", "EL-", "电-"]
+
+  - system: 暖通
+    substrings: ["暖通", "风管", "空调", "通风", "采暖", "HVAC", "DUCT"]
+    prefixes: ["M-", "H-", "暖-", "通-", "风-"]
