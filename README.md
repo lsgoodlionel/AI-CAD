@@ -4,9 +4,22 @@
 
 ---
 
-## 当前版本：v0.6.0-dev（feat/batch-review-and-model-base）
+## 当前版本：v0.6.1-dev（feat/batch-review-and-model-base）
 
-当前最新开发线为 `feat/batch-review-and-model-base`。截至 2026-07-08，本轮继续推进**批量读图 / 整套审图（Phase 5）**、**工程 3D 模型基座（Phase 6）** 和 **3D 模型高精度重建（Phase 7）**，并针对上海大歌剧院真实图纸补齐动态单体识别、楼层归一化、人工标注队列和 LOD 体量升级路径。
+当前最新开发线为 `feat/batch-review-and-model-base`。截至 2026-07-10，本轮继续推进**批量读图 / 整套审图（Phase 5）**、**工程 3D 模型基座（Phase 6）** 和 **3D 模型高精度重建（Phase 7）**，并把上海大歌剧院图纸验证中暴露的“固定三单体假设”升级为通用语义图谱、可审查候选、人工校正和 LOD 证据门控。
+
+### v0.6.1-dev 更新摘要（2026-07-10）
+
+| 类别 | 更新内容 |
+|------|----------|
+| 通用图纸语义识别 | 新增 `drawing_semantics`，按项目无关规则抽取 `building_unit`、`sub_zone`、`functional_space`、`construction_zone` 四类候选；A/B/C/D1/D2 区、剧厅、施工区、连通道等只作为证据候选，不再硬编码为固定单体 |
+| 语义图谱数据结构 | 新增 migration `016_model_semantic_graph.sql`，包含 `model_semantic_nodes`、`model_semantic_evidence`、`model_semantic_assignments`、`model_semantic_operations`；历史 `model_building_units` 仅迁移为 `legacy_inference` 候选，不自动确认为真实单体 |
+| 语义校正 API | 新增 `GET /projects/{project_id}/model/semantics`、`POST /projects/{project_id}/model/semantic-operations`、`GET /projects/{project_id}/model/rebuild-impact`，支持版本冲突 `409 SEMANTIC_VERSION_CONFLICT` 和层级错误 `422 INVALID_SEMANTIC_HIERARCHY` |
+| 模型 scene V3 兼容字段 | `build_scene` 保留 V2 `buildings/floors/markers/stats`，新增 `semantic_tree`、`unassigned_drawings`、`semantic_version`，前端可展示和修正候选语义，不破坏旧模型读取 |
+| LOD 证据门控 | 新增 `ModelScopeEvidence` / `LodCapability`；LOD200 作为 PDF 基线，LOD300 必须满足比例、轴网配准、尺寸、跨视图匹配、稳定构件边界、几何一致性等显式证据；效果图只作为视觉校准，不满足几何门槛 |
+| 前端语义校正工作流 | 工程模型页新增语义树、候选审查队列、证据弹窗、确认/调整父级等操作；接口已对齐后端 `semantic-operations` 和 `rebuild-impact` |
+| Docker 验证 | 本地 Docker `api/web` 已按最新代码重建，应用 migration 016；`http://127.0.0.1:8002/health` 返回 `{"status":"ok"}`，模型页 Playwright E2E 通过 |
+| 测试验证 | 后端语义/模型相关聚合回归 `102 passed`；前端 `npm run build` 通过；`E2E_BASE_URL=http://127.0.0.1:3002 npx playwright test tests/e2e/model.spec.ts --project=chromium` 通过 |
 
 ### v0.6.0-dev 更新摘要
 
@@ -49,15 +62,15 @@
 | 前端 E2E | 调整角色 smoke matrix 和图纸详情断言，兼容桌面/移动端差异；覆盖 chromium/firefox/webkit/mobile-chrome |
 | 后端测试 | 新增批量审图、跨图纸、文件名解析、楼层解析、模型构建、项目模型路由、DWG 支持等测试 |
 
-### 当前本地 Docker 验证结果（2026-07-08）
+### 当前本地 Docker 验证结果（2026-07-10）
 
 | 项目 | 结果 |
 |------|------|
-| Docker 服务 | 使用 `docker compose -p cad -f docker-compose.yml -f docker-compose.alt-ports.yml --profile app up -d --build` 重建；`cad_web` / `cad_api` / `cad_celery_worker` / `cad_celery_beat` / `cad_postgres` / `cad_redis` / `cad_minio` / `cad_chroma` 均运行正常 |
-| 镜像一致性 | `cad_api`、`cad_celery_worker`、`cad_celery_beat` 均使用当前 `cad-api:local` 镜像 |
+| Docker 服务 | 使用 `docker compose -p cad -f infra/docker-compose.yml -f infra/docker-compose.alt-ports.yml --profile app up -d --build api web` 重建；`cad_web` / `cad_api` / `cad_postgres` / `cad_redis` / `cad_minio` / `cad_chroma` 运行正常 |
+| 数据迁移 | 已在本地 Docker PostgreSQL 执行 `apps/api/migrations/016_model_semantic_graph.sql` |
 | 前端构建 | `npm run build` 通过 |
-| 后端测试 | `409 passed`，总覆盖率 `80.90%`，达到 `cov-fail-under=80` |
-| 模型页 E2E | `E2E_BASE_URL=http://127.0.0.1:3002 npx playwright test tests/e2e/model.spec.ts --project=chromium` 通过，覆盖模型质量、动态单体、待人工识别队列和保存标注 |
+| 后端测试 | `102 passed`（语义图谱、语义 API、文件名解析、模型构建、LOD gate 相关聚合回归）；完整覆盖率套件仍沿用 v0.6.0-dev 的 80% 策略 |
+| 模型页 E2E | `E2E_SKIP_SEED=1 E2E_BASE_URL=http://127.0.0.1:3002 npx playwright test tests/e2e/model.spec.ts --project=chromium` 通过，覆盖语义树、候选审查、LOD 质量、证据弹窗和语义操作 |
 | 健康检查 | `http://127.0.0.1:8002/health` 返回 `{"status":"ok"}` |
 | 登录验证 | `admin / admin123` 登录接口验证通过 |
 

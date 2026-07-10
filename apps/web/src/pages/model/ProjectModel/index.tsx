@@ -157,7 +157,7 @@ function elementFilterOptions(scene: ModelScene): { label: string; value: string
 }
 
 interface RequestLikeError {
-  response?: { status?: number }
+  response?: { status?: number, data?: Record<string, unknown> }
   data?: Record<string, unknown>
   info?: Record<string, unknown>
 }
@@ -169,6 +169,7 @@ function isNotBuiltError(error: unknown): boolean {
 function readErrorNumber(error: unknown, ...keys: string[]): number | undefined {
   const data = (error as RequestLikeError)?.data
   const info = (error as RequestLikeError)?.info
+  const responseData = (error as RequestLikeError)?.response?.data
   const sources = [
     data,
     data?.detail as Record<string, unknown> | undefined,
@@ -176,6 +177,9 @@ function readErrorNumber(error: unknown, ...keys: string[]): number | undefined 
     info,
     info?.detail as Record<string, unknown> | undefined,
     (info?.detail as Record<string, unknown> | undefined)?.latest as Record<string, unknown> | undefined,
+    responseData,
+    responseData?.detail as Record<string, unknown> | undefined,
+    (responseData?.detail as Record<string, unknown> | undefined)?.latest as Record<string, unknown> | undefined,
   ]
   for (const source of sources) {
     if (!source) continue
@@ -194,11 +198,14 @@ function readErrorNumber(error: unknown, ...keys: string[]): number | undefined 
 function readErrorString(error: unknown, ...keys: string[]): string | undefined {
   const data = (error as RequestLikeError)?.data
   const info = (error as RequestLikeError)?.info
+  const responseData = (error as RequestLikeError)?.response?.data
   const sources = [
     data,
     data?.detail as Record<string, unknown> | undefined,
     info,
     info?.detail as Record<string, unknown> | undefined,
+    responseData,
+    responseData?.detail as Record<string, unknown> | undefined,
   ]
   for (const source of sources) {
     if (!source) continue

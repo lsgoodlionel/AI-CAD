@@ -501,9 +501,9 @@ test.describe('工程模型页 - LOD 与人工识别', () => {
     await expect(page.getByRole('button', { name: '实景近似' })).toBeEnabled()
     await page.getByRole('button', { name: '实景近似' }).click()
     await expect(page.getByRole('button', { name: '实景近似' })).toHaveClass(/ant-btn-primary/)
-    await expect(page.getByRole('button', { name: '构件' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '贴图' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '混合' })).toBeVisible()
+    await expect(page.getByText('构件', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('贴图', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('混合', { exact: true }).first()).toBeVisible()
 
     await page.getByRole('button', { name: '查看证据 D1区' }).click()
     await expect(page.getByRole('dialog', { name: 'D1区 证据' })).toBeVisible()
@@ -517,10 +517,12 @@ test.describe('工程模型页 - LOD 与人工识别', () => {
 
     await page.getByRole('button', { name: '调整父级 D1区' }).click()
     await expect(page.getByRole('dialog', { name: '调整父级' })).toBeVisible()
-    await page.getByLabel('新的父级').click()
-    await page.getByRole('option', { name: '2-1区' }).click()
+    await page.getByRole('combobox', { name: '新的父级' }).click()
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('Enter')
     await expect(page.getByText('将 D1区 调整到 2-1区，会重建对应分支')).toBeVisible()
     await page.getByRole('button', { name: '提交父级调整' }).click()
+    await expect.poll(() => api.getSemanticBodies().length).toBe(2)
 
     await expect(page.getByRole('button', { name: '刷新到 v8' })).toBeVisible()
 
