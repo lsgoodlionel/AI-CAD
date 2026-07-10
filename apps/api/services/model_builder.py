@@ -26,7 +26,8 @@ from typing import Any
 
 from core.ai_review.dwg_support import ensure_dxf
 from core.storage import get_file_bytes, upload_file
-from services import model_annotations, model_elements, model_story
+from services import model_annotations, model_elements, model_semantics, model_story
+from services.drawing_semantics import extract_semantic_candidates
 from services.floor_parser import parse_floor
 from services.model_lod import ModelScopeEvidence, aggregate_lod_modes, evaluate_lod_capability
 
@@ -593,6 +594,29 @@ def _quality_payload(normalization: model_story.StoryNormalizationResult) -> dic
     }
 
 
+def _semantic_scene_payload(drawings: list[dict]) -> dict[str, Any]:
+    candidates = []
+    unassigned: list[dict[str, Any]] = []
+    for drawing in drawings:
+        drawing_candidates = extract_semantic_candidates(drawing)
+        if not drawing_candidates:
+            unassigned.append(
+                {
+                    "drawing_id": str(drawing.get("id") or ""),
+                    "drawing_no": str(drawing.get("drawing_no") or ""),
+                    "title": str(drawing.get("title") or ""),
+                    "reason": "semantic_unassigned",
+                }
+            )
+        candidates.extend(drawing_candidates)
+    graph = model_semantics.resolve_candidates(candidates)
+    return {
+        "semantic_tree": graph.as_dict(),
+        "unassigned_drawings": unassigned,
+        "semantic_version": graph.version,
+    }
+
+
 async def _fetch_inputs(db, project_id: str) -> tuple[dict, list[dict], dict, dict]:
     """聚合查询：项目 + 图纸 + 每图最新报告问题 + 最近一次跨图发现。"""
     project = await db.fetch_one(_PROJECT_SQL, {"project_id": project_id})
@@ -809,6 +833,7 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     project, drawings, issues_by_drawing, cross = await _fetch_inputs(db, project_id)
     annotation_overrides = await _load_annotation_overrides(db, project_id)
     normalization = model_story.normalize_story_table(drawings, annotation_overrides)
+    semantic_payload = _semantic_scene_payload(drawings)
     assets, ifc_models, ifc_skipped = await _build_assets(project_id, drawings, progress_cb)
     floors, floor_of = _build_floors(drawings, issues_by_drawing, assets, normalization)
     yolo_total = await _attach_floor_elements(floors, drawings, floor_of, progress_cb)
@@ -854,6 +879,9 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
         "project": {"id": str(project["id"]), "name": project_name},
         "buildings": buildings,
         "floors": floors,
+        "semantic_tree": semantic_payload["semantic_tree"],
+        "unassigned_drawings": semantic_payload["unassigned_drawings"],
+        "semantic_version": semantic_payload["semantic_version"],
         "quality": _quality_payload(normalization),
         "annotation_queue": normalization.unclassified_drawings,
         "building_units": {

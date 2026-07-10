@@ -115,6 +115,7 @@ ISSUE_2 = "88888888-8888-8888-8888-888888888882"
 SCENE_KEYS = {
     "project", "floors", "markers", "cross_links", "ifc_models", "stats",
     "generated_at", "schema_version", "buildings", "lod_capabilities", "lod_modes",
+    "semantic_tree", "unassigned_drawings", "semantic_version",
 }
 DRAWING_ENTRY_KEYS = {
     "drawing_id", "drawing_no", "title", "discipline", "status",
@@ -228,6 +229,25 @@ async def test_build_scene_contract_fields(fake_db, monkeypatch):
     assert scene["lod_capabilities"]["main"]["level"] == 200
     assert scene["lod_modes"]["realistic_proxy"]["enabled"] is True
     assert scene["lod_modes"]["realistic_proxy"]["label"] == "实景近似（近似）"
+    assert set(scene["semantic_tree"]) >= {
+        "nodes",
+        "evidence",
+        "conflicts",
+        "unassigned_drawings",
+        "version",
+    }
+    assert scene["semantic_version"] == scene["semantic_tree"]["version"]
+
+
+@pytest.mark.asyncio
+async def test_build_scene_semantic_tree_keeps_unmatched_drawings_unassigned(fake_db, monkeypatch):
+    monkeypatch.setattr(model_builder, "_render_and_upload_sync", _fake_render)
+    _arrange(fake_db, [_drawing(DRAWING_1, "M-001", "总说明")], [])
+
+    scene, _ = await build_scene(fake_db, PROJECT_ID)
+
+    assert scene["semantic_tree"]["nodes"] == []
+    assert scene["unassigned_drawings"][0]["drawing_id"] == DRAWING_1
 
 
 @pytest.mark.asyncio
