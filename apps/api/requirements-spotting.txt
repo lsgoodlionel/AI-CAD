@@ -1,0 +1,31 @@
+# ---------------------------------------------------------------------------
+# CADTransformer 符号 spotting 推理依赖（C-08）—— 独立 extra，按需安装
+#
+# ⚠️ 绝不并入主 requirements.txt：
+#   CADTransformer 依赖较老（特定 torch/dgl/PyG 组合），并入主依赖会拖累整个
+#   API 服务的依赖解析（环境地狱）。API 主服务不装本文件即可运行——缺失时
+#   CADTransformerBackend.is_available() 返回 False，优雅降级到 mock。
+#
+# 仅在具备 GPU 与官方权重的推理环境安装：
+#   cd apps/api && source .venv/bin/activate
+#   pip install -r requirements-spotting.txt
+#
+# 许可：CADTransformer(MIT) / torch(BSD-3) / dgl(Apache-2.0) / torch-geometric(MIT)
+#      —— 均可商用（见 docs/PHASE_C_LICENSE_AUDIT.md §3.1、附录依赖表）。
+# ---------------------------------------------------------------------------
+
+# 深度学习底座（CADTransformer 基线；版本按上游 VITA-Group/CADTransformer 锁定）
+torch==1.12.1
+torchvision==0.13.1
+
+# 图神经网络算子（CADTransformer 图卷积；须匹配上方 torch 版本）
+dgl==0.9.1
+
+# PyG 图算子（部分模块依赖；须匹配上方 torch 版本）
+torch-geometric==2.1.0
+
+# 说明：
+# - CUDA 轮子按目标机 CUDA 版本从对应 index-url 安装，例如：
+#     pip install torch==1.12.1+cu113 --extra-index-url https://download.pytorch.org/whl/cu113
+#     pip install dgl==0.9.1 -f https://data.dgl.ai/wheels/cu113/repo.html
+# - 上游模型定义随其仓库以 vendored/子模块方式引入（保留 MIT LICENSE + NOTICE）。
