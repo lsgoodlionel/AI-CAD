@@ -1,0 +1,21 @@
+# 根构建上下文忽略规则（二次保险）。
+# 注：产品镜像上下文为 apps/（cad-api）与 apps/web（cad-web），research/ 本就
+# 在其上下文之外，天然隔离；此处显式排除，防止任何从根目录构建的场景泄漏。
+
+# ── Phase C 隔离区（C-11）—— SymPoint 非商用件绝不进任何镜像 ──
+# 详见 docs/PHASE_C_LICENSE_AUDIT.md §4。
+research/
+
+# ── 常规忽略 ──────────────────────────────────────────────
+.git
+**/__pycache__
+**/*.pyc
+**/node_modules
+**/.venv
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/htmlcov
+**/.coverage
+.env
+.env.*

@@ -63,3 +63,21 @@ infra/minio-data/
 # ── Test artifacts ────────────────────────────────────────
 playwright-report/
 test-results/
+
+# ── Phase C 隔离区（C-11）──────────────────────────────────
+# SymPoint 系为非商用/未声明许可（⛔），仅允许存在于此隔离区做内部
+# 精度天花板对标，绝不进产品代码/镜像。详见 docs/PHASE_C_LICENSE_AUDIT.md §4。
+# 隔离区代码、权重、其专属依赖清单一律不入 git（大权重走本地/私有存储）。
+research/sympoint-eval/
+
+# ── Phase C 自建数据集大文件（C-05/C-07）──────────────────
+# 图纸/派生/标注二进制/权重走 MinIO/DVC，绝不进 git；仅保留清单指针
+# （manifest.jsonl）、切分快照（splits/*.json）、DATASHEET/README、.gitkeep。
+apps/api/data/model3d/dataset/**/*.dwg
+apps/api/data/model3d/dataset/**/*.dxf
+apps/api/data/model3d/dataset/**/*.pdf
+apps/api/data/model3d/dataset/**/*.svg
+apps/api/data/model3d/dataset/**/*.npz
+apps/api/data/model3d/dataset/**/*.png
+apps/api/data/model3d/dataset/**/*.jpg
+apps/api/data/model3d/dataset/**/*.jpeg
