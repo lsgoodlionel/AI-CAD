@@ -14,7 +14,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from core.storage import presigned_get_url
 from dependencies import get_db, get_current_user
 from services.audit import write_audit
-from services import model_annotations, model_story
+from services import model_annotations, model_semantics, model_story
+from services.model_semantics import SemanticHierarchyError, SemanticVersionConflict
 from tasks.model_build import build_project_model
 
 router = APIRouter(prefix="/projects", tags=["project-models"])
@@ -222,6 +223,66 @@ async def save_model_annotation(
         raise HTTPException(400, str(exc)) from exc
 
     return {"annotation": annotation}
+
+
+# ── 语义图谱与人工操作 ─────────────────────────────────────────
+
+@router.get("/{project_id}/model/semantics")
+async def get_model_semantics(
+    project_id: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    drawings = [
+        dict(row) for row in await db.fetch_all(_ANNOTATION_DRAWINGS_SQL, project_id)
+    ]
+    graph = await model_semantics.build_semantic_graph(db, project_id, drawings)
+    return graph.as_dict()
+
+
+@router.post("/{project_id}/model/semantic-operations")
+async def apply_model_semantic_operation(
+    project_id: str,
+    body: dict[str, Any],
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    expected_version = body.get("expected_version")
+    try:
+        return await model_semantics.apply_semantic_operation(
+            db,
+            project_id=project_id,
+            actor_id=str(current_user["id"]),
+            operation=body,
+            expected_version=int(expected_version) if expected_version is not None else None,
+        )
+    except SemanticVersionConflict as exc:
+        raise HTTPException(
+            409,
+            {"code": "SEMANTIC_VERSION_CONFLICT", "latest": exc.latest},
+        ) from exc
+    except SemanticHierarchyError as exc:
+        raise HTTPException(
+            422,
+            {"code": "INVALID_SEMANTIC_HIERARCHY", "message": str(exc)},
+        ) from exc
+
+
+@router.get("/{project_id}/model/rebuild-impact")
+async def get_model_rebuild_impact(
+    project_id: str,
+    node_id: str | None = Query(None),
+    drawing_id: str | None = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+    return {
+        "project_id": project_id,
+        "rebuild_required": True,
+        "affected_nodes": [node_id] if node_id else [],
+        "affected_drawings": [drawing_id] if drawing_id else [],
+        "affected_stories": [],
+        "affected_assets": [],
+    }
 
 
 # ── 资产签名 URL ─────────────────────────────────────────────

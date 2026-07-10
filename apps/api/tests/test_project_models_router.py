@@ -4,6 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from services.model_semantics import SemanticGraph, SemanticHierarchyError, SemanticVersionConflict
+
 PROJECT_ID = "22222222-2222-2222-2222-222222222222"
 OTHER_PROJECT_ID = "33333333-3333-3333-3333-333333333333"
 
@@ -144,6 +146,90 @@ async def test_save_model_annotation_calls_service(client, fake_db):
     assert resp.status_code == 200
     assert resp.json()["annotation"]["building_unit_key"] == "custom-unit"
     save.assert_awaited_once()
+
+
+# ── 语义图谱与人工操作 ─────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_get_semantics_returns_tree_evidence_conflicts_and_unassigned(client, fake_db):
+    fake_db.fetch_all.return_value = []
+    graph = SemanticGraph(
+        nodes=[],
+        evidence=[],
+        conflicts=[{"normalized_key": "a", "reason": "type_conflict"}],
+        unassigned_drawings=[{"drawing_id": "d1", "reason": "semantic_unassigned"}],
+        version=4,
+    )
+
+    with patch(
+        "routers.project_models.model_semantics.build_semantic_graph",
+        AsyncMock(return_value=graph),
+    ) as build_graph:
+        resp = await client.get(f"/api/v1/projects/{PROJECT_ID}/model/semantics")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert set(data) >= {"nodes", "evidence", "conflicts", "unassigned_drawings", "version"}
+    assert data["version"] == 4
+    assert data["unassigned_drawings"][0]["drawing_id"] == "d1"
+    build_graph.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_semantic_operation_returns_409_for_stale_version(client):
+    conflict = SemanticVersionConflict({"id": "node-1", "version": 3})
+
+    with patch(
+        "routers.project_models.model_semantics.apply_semantic_operation",
+        AsyncMock(side_effect=conflict),
+    ):
+        resp = await client.post(
+            f"/api/v1/projects/{PROJECT_ID}/model/semantic-operations",
+            json={
+                "operation_type": "rename",
+                "target_ids": ["node-1"],
+                "canonical_name": "新名称",
+                "expected_version": 1,
+            },
+        )
+
+    assert resp.status_code == 409
+    assert resp.json()["detail"]["code"] == "SEMANTIC_VERSION_CONFLICT"
+    assert resp.json()["detail"]["latest"]["version"] == 3
+
+
+@pytest.mark.asyncio
+async def test_semantic_operation_returns_422_for_invalid_hierarchy(client):
+    with patch(
+        "routers.project_models.model_semantics.apply_semantic_operation",
+        AsyncMock(side_effect=SemanticHierarchyError("cycle rejected")),
+    ):
+        resp = await client.post(
+            f"/api/v1/projects/{PROJECT_ID}/model/semantic-operations",
+            json={
+                "operation_type": "reparent",
+                "target_ids": ["child"],
+                "parent_id": "child",
+                "expected_version": 1,
+            },
+        )
+
+    assert resp.status_code == 422
+    assert resp.json()["detail"]["code"] == "INVALID_SEMANTIC_HIERARCHY"
+
+
+@pytest.mark.asyncio
+async def test_rebuild_impact_returns_affected_scope(client):
+    resp = await client.get(
+        f"/api/v1/projects/{PROJECT_ID}/model/rebuild-impact",
+        params={"node_id": "node-1", "drawing_id": "drawing-1"},
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["rebuild_required"] is True
+    assert data["affected_nodes"] == ["node-1"]
+    assert data["affected_drawings"] == ["drawing-1"]
 
 
 # ── 资产签名 URL ─────────────────────────────────────────────
