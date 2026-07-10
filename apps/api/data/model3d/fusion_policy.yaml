@@ -1,0 +1,54 @@
+# 融合仲裁策略配置 —— 学习模型 × 确定性规则（C-13，Phase C 方法论核心）
+#
+# 灵魂：学习模型「补规则的模糊边界，不替代规则」。
+#   - 规则命中（高确定性）优先；
+#   - 规则未覆盖/低置信区域用模型候选补召回；
+#   - 冲突时按「置信度 + 规则优先级」仲裁；
+#   - 规则强命中（高置信）不被模型翻案（确定性优先，不可破坏）。
+#
+# 加载语义（由 fusion_engine.load_fusion_policy 实现，风格仿 layer_conventions.py）：
+#   - pyyaml 缺失 / 文件缺失 / 解析失败 → 全量降级为内置 DEFAULT_POLICY，绝不抛异常。
+#   - 单条无效项（类型不符 / 越界）跳过，不影响其余；缺项回退默认值。
+#
+# 类别锚定既有 9 类 taxonomy（与 layer_conventions / spotting.types 一致）：
+#   column / beam / slab / wall / door / window / pipe / equipment / axis
+
+version: "1.0"
+description: "规则×学习模型融合仲裁策略（IoU 配对 + 强规则保护 + 置信仲裁 + 补召回门槛）"
+
+# ── 空间配对 ─────────────────────────────────────────────
+# bbox IoU ≥ 此阈值判定「规则候选与模型候选落在同一处」，进入仲裁；
+# 否则模型候选视作独立区域，走补召回逻辑。
+iou_threshold: 0.30
+
+# ── 规则强命中保护（确定性优先原则的硬边界）───────────────
+# 规则候选置信 ≥ 此值 → 强命中，冲突时绝不被模型覆盖。
+rule_strong_confidence: 0.85
+
+# ── 模型补召回门槛 ───────────────────────────────────────
+# 落在无规则候选区域的模型候选，置信 ≥ 此值才纳入（低置信噪声不补）。
+model_min_confidence: 0.45
+
+# ── 一致增强 ─────────────────────────────────────────────
+# 规则与模型同处且同类 → 共识，融合置信 = max(两者) + 此增量（封顶 1.0）。
+agreement_boost: 0.10
+
+# ── 弱规则冲突仲裁 ───────────────────────────────────────
+# 弱规则冲突时，规则一侧按「规则优先级」抬高门槛：
+#   rule_score = rule.confidence + priority_gain * (rule_priority[cat] / max_priority)
+# 模型需同时满足 model.confidence ≥ model_min_confidence 且 > rule_score 方能翻案。
+priority_gain: 0.20
+default_priority: 5
+
+# ── 各类别规则优先级（越高越难被模型翻案）─────────────────
+# 结构承重构件确定性最强、优先级最高；机电/门窗语义较柔，优先级次之。
+rule_priority:
+  column: 10
+  beam: 9
+  slab: 8
+  wall: 8
+  door: 6
+  window: 6
+  pipe: 5
+  equipment: 5
+  axis: 4

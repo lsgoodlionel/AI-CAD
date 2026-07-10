@@ -1,11 +1,16 @@
 """
 数据看板 API
 
-GET /dashboard/group          集团级看板（仅 group_admin）
-GET /dashboard/project/{id}   项目级看板（所有已登录用户）
+GET /dashboard/group                  集团级看板（仅 group_admin）
+GET /dashboard/project/{id}           项目级看板（所有已登录用户）
+GET /dashboard/model-review-metrics   Phase C 返工点埋点与审校收敛度量（所有已登录用户）
 """
-from datetime import datetime, timezone
+from __future__ import annotations
+
+from datetime import date, datetime, timezone
 import inspect
+from typing import Any, Callable, Mapping, Sequence
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from dependencies import get_db, get_current_user, require_admin
@@ -223,4 +228,130 @@ async def _get_project_dashboard(project_id: str, db, current_user: dict):
         "kpi_red_flag": kpi_red,
         "recent_activity": [dict(r) for r in recent],
         "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# ── C-17 返工点埋点与审校收敛度量 ────────────────────────────────
+#
+# 度量口径（一次定义，避免古德哈特反噬）：
+#   数据源：model_review_actions（C-15/C-16 写入的人审动作埋点，本端只读聚合）。
+#   rework（返工点）  = reclass（改类）+ reject（否定）+ addbox（补框）
+#                     —— 机器初模「错了 / 漏了」需人工返工的动作；
+#   confirm（确认）   = 机器初模「对了」，人审一次通过；
+#   edit（编辑）      = 轻微微调，不计入 rework，也不计入 confirm（中性）。
+#   reworkRate       = rework 动作数 / 该维度动作总数。
+#   收敛趋势         = 按天分桶的 reworkRate 序列，随数据/模型迭代应单调下降，
+#                     用于佐证「AI 出初模→人工审改」效率提升落在 25–30% 现实区间。
+_REWORK_ACTIONS = frozenset({"reclass", "reject", "addbox"})
+_UNLABELED = "未标注"
+
+
+@router.get("/model-review-metrics")
+async def model_review_metrics(
+    project_id: str | None = None,
+    discipline: str | None = None,
+    db=Depends(get_db),
+    _: dict = Depends(get_current_user),
+):
+    """返工收敛度量：按专业/按类别返工率 + 收敛趋势（统一信封）。"""
+    try:
+        rows = await _fetch_review_action_rows(db, project_id, discipline)
+        data = _compute_review_metrics(rows)
+    except Exception as exc:  # noqa: BLE001 — 边界兜底，避免看板整体 500
+        return {"success": False, "data": None, "error": str(exc), "meta": {}}
+    return {
+        "success": True,
+        "data": data,
+        "error": None,
+        "meta": {
+            "total": len(rows),
+            "project_id": project_id,
+            "discipline": discipline,
+            "rework_actions": sorted(_REWORK_ACTIONS),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        },
+    }
+
+
+async def _fetch_review_action_rows(
+    db, project_id: str | None, discipline: str | None
+) -> list[Mapping[str, Any]]:
+    """参数化读取人审动作埋点（可选按项目/专业过滤，防注入）。"""
+    conditions: list[str] = []
+    params: list[Any] = []
+    if project_id:
+        params.append(project_id)
+        conditions.append(f"project_id = ${len(params)}")
+    if discipline:
+        params.append(discipline)
+        conditions.append(f"discipline = ${len(params)}")
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    sql = (
+        "SELECT action_type, discipline, old_category, new_category, created_at "
+        f"FROM model_review_actions {where} ORDER BY created_at"
+    )
+    rows = await db.fetch_all(sql, *params)
+    return [dict(r) for r in (rows or [])]
+
+
+def _rate(numerator: int, denominator: int) -> float:
+    """安全比率，分母为 0 返回 0（空数据不报错）。"""
+    return round(numerator / denominator, 4) if denominator else 0.0
+
+
+def _category_of(row: Mapping[str, Any]) -> str | None:
+    """归因类别：优先机器初模类别（old_category），补框取 new_category。"""
+    return row.get("old_category") or row.get("new_category")
+
+
+def _period_of(row: Mapping[str, Any]) -> str:
+    """时间分桶键：按天（YYYY-MM-DD），兼容 datetime / date / 字符串。"""
+    value = row.get("created_at")
+    if isinstance(value, (datetime, date)):
+        return value.date().isoformat() if isinstance(value, datetime) else value.isoformat()
+    return str(value)[:10] if value else "未知"
+
+
+def _group_rework(
+    rows: Sequence[Mapping[str, Any]], key_fn: Callable[[Mapping[str, Any]], str | None]
+) -> dict[str, dict[str, Any]]:
+    """按 key_fn 分组统计返工率（total / rework / reworkRate）。"""
+    buckets: dict[str, dict[str, int]] = {}
+    for row in rows:
+        key = key_fn(row) or _UNLABELED
+        bucket = buckets.setdefault(key, {"total": 0, "rework": 0})
+        bucket["total"] += 1
+        if row.get("action_type") in _REWORK_ACTIONS:
+            bucket["rework"] += 1
+    return {
+        key: {"total": b["total"], "rework": b["rework"], "reworkRate": _rate(b["rework"], b["total"])}
+        for key, b in buckets.items()
+    }
+
+
+def _compute_trend(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """按天的返工率收敛序列（升序），用于展示随迭代下降趋势。"""
+    grouped = _group_rework(rows, _period_of)
+    return [
+        {"period": period, "reworkRate": stat["reworkRate"], "count": stat["total"]}
+        for period, stat in sorted(grouped.items())
+    ]
+
+
+def _compute_review_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """纯聚合：确认率/改类率/否定率/补框率 + 按专业/类别返工率 + 收敛趋势。"""
+    total = len(rows)
+    counts = {"confirm": 0, "reject": 0, "reclass": 0, "addbox": 0, "edit": 0}
+    for row in rows:
+        action = row.get("action_type")
+        if action in counts:
+            counts[action] += 1
+    return {
+        "confirmRate": _rate(counts["confirm"], total),
+        "reclassRate": _rate(counts["reclass"], total),
+        "rejectRate": _rate(counts["reject"], total),
+        "addboxRate": _rate(counts["addbox"], total),
+        "byDiscipline": _group_rework(rows, lambda r: r.get("discipline")),
+        "byCategory": _group_rework(rows, _category_of),
+        "trend": _compute_trend(rows),
     }

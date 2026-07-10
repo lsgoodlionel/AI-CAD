@@ -1,6 +1,6 @@
 # CAD — 图纸深化全过程管理平台
 
-> 最后更新：2026-07-10 | 实现进度：Phase 0~4B 全部完成；会审审查 V4（方法论）已并入 AI 审图；Phase 5 批量读图与整套审图完成；Phase 6 工程 3D 模型基座完成（模型成为全平台成果展示主通道之一）；超级工程建模 Phase A（AI 读图→IFC/Fragments）已合并 main；**超级工程建模 Phase B（算量级：跨视图 z 恢复 + 构件拓扑 + IFC-QTO 算量 + 创效打通）完成（B-01~B-24）**
+> 最后更新：2026-07-10 | 实现进度：Phase 0~4B 全部完成；会审审查 V4（方法论）已并入 AI 审图；Phase 5 批量读图与整套审图完成；Phase 6 工程 3D 模型基座完成（模型成为全平台成果展示主通道之一）；超级工程建模 Phase A（AI 读图→IFC/Fragments）已合并 main；超级工程建模 Phase B（算量级：跨视图 z 恢复 + 构件拓扑 + IFC-QTO 算量 + 创效打通）完成（B-01~B-24）；**Phase C（BIM 级）离线可交付部分全部完成：泳道 A 合规门禁（C-01 许可审计 + 人工审核双通道门禁 + C-11 隔离）、泳道 B 数据关键路径（C-02~C-07）、泳道 C 模型（契约基座 + C-08/C-10/C-12/C-13）、泳道 D 审校（C-15/C-16/C-17）、C-14 评测基座、C-18 验收 Demo，累计 227 测试全绿、双门禁 PASS；里程碑 M2（审校收敛返工点）达成，M1（符号识别超纯规则）基座就绪、终评数字待 C-09 真实微调（卡 GPU/脱敏数据/权重）**
 
 ## 项目概述
 
@@ -56,6 +56,26 @@
 | Phase B 工作块六：IFC-QTO 算量（混凝土净体积/模板/钢筋 + 汇总 API）| ✅ | `services/{model_qto,model_qto_summary}.py`、`migrations/022`、`GET /projects/{id}/model/quantities` |
 | Phase B 工作块七：QTO → 创效激励打通（草稿入三审硬约束）| ✅ | `routers/project_models.py`（`POST /model/quantities/to-proposal`）|
 | Phase B 工作块八：测试与里程碑 E2E Demo（合成整套图，验收总标准 1–5）| ✅ | `tests/e2e/test_phase_b_demo.py`、`tests/test_phase_b_edge_cases.py`、`docs/PHASE_B_DEMO.md` |
+| Phase C 泳道 A｜合规（C-01）：开源件许可证审计（CADTransformer MIT/VecFormer Apache 放行；SymPoint ⛔ 隔离）+ CI 阻断型 license 门禁 | ✅ | `docs/PHASE_C_LICENSE_AUDIT.md`、`.github/workflows/ci.yml`（`license-compliance`）、`.gitignore`/`.dockerignore`（`research/sympoint-eval/` 隔离） |
+| Phase C 泳道 A｜人工审核门禁（C-01 签字栏升级）：密码 + 电子签章（预留）双通道 OR 语义，CI 随模型代码自我武装阻断 | ✅ | `services/phase_c_signoff.py`、`scripts/model3d/phase_c_signoff.py`、`data/model3d/phase_c_signoff.json`、`tests/test_phase_c_signoff.py` |
+| Phase C 泳道 B｜数据（C-02）：DXF/DWG/PDF → 统一 SVG + 图元 JSON 预处理器（复用 geometry_extractor/dwg_support，图层/块弱标签透传，优雅降级）| ✅ | `core/model3d/preprocess/{__init__,schema,primitive_json,dxf_to_svg}.py`、`scripts/model3d/preprocess_drawing.py`、`tests/test_preprocess.py`、`docs/PHASE_C_PREPROCESS_SCHEMA.md` |
+| Phase C 泳道 B｜数据（C-03）：块 INSERT 递归展开（嵌套/缩放旋转/MINSERT 阵列）+ 每图元保留块名·图层弱标签（修 C-02 线段丢块名缺口）+ 坐标等比归一化到 [0,1] | ✅ | `core/model3d/preprocess/{block_expander,normalize}.py`、`tests/test_block_expander.py`、`tests/test_normalize.py` |
+| Phase C 泳道 B｜数据（C-04，关键路径）：图层/块属性 → 弱标签自动标注引擎（复用 layer_conventions 基础分类器 + 补充映射表，9 类/4 系统硬约束，弱标注质量报告）| ✅ | `core/model3d/dataset/auto_label.py`、`data/model3d/layer_class_map.yaml`、`tests/test_auto_label.py` |
+| Phase C 泳道 B｜数据（C-05）：中文专业域数据集冷启动规范（symbol taxonomy 精化 9 类 + 采集/脱敏规范 + 分专业目标样本量 + FloorPlanCAD 交叉参照）| ✅ | `docs/PHASE_C_DATASET_SPEC.md`、`data/model3d/dataset/{README.md,.gitkeep}` |
+| Phase C 泳道 B｜数据（C-06）：人工精标注规范 + 质检（双人交叉+仲裁，IoU/Kappa≥0.8 硬门槛，复用 DrawingAnnotationQueue 工具，金标签回流数据飞轮）| ✅ | `docs/PHASE_C_ANNOTATION_GUIDE.md`、`docs/PHASE_C_ANNOTATION_QC_TEMPLATE.md` |
+| Phase C 泳道 B｜数据（C-07）：数据集版本/切分（**按项目切分防泄漏** + 固定种子可复现 + test 集冻结 + 数据卡）| ✅ | `scripts/model3d/dataset_split.py`、`data/model3d/dataset/DATASHEET.md`、`tests/test_dataset_split.py` |
+| Phase C 泳道 C｜模型契约基座：符号候选契约 + 后端 Protocol + 离线 mock（复用 auto_label 让无 GPU 链路端到端可跑）| ✅ | `core/model3d/spotting/{__init__,types,mock_backend}.py` |
+| Phase C 泳道 C｜模型（C-08）：CADTransformer(MIT) 推理封装 PoC（adapter 纯函数可测 + torch/dgl 懒加载 + 无权重/GPU 优雅降级 + 依赖锁定/Dockerfile 片段）| ✅ | `core/model3d/spotting/cadtransformer/*`、`requirements-spotting.txt`、`tests/test_cadtransformer_backend.py` |
+| Phase C 泳道 C｜模型（C-12）：符号 spotting 推理微服务（接 ModelRouter 引擎治理/日志，后端有序回退 mock，离线可测）| ✅ | `core/model3d/spotting/service.py`、`routers/model_spotting.py`、`migrations/023_symbol_spotting.sql`、`tests/test_model_spotting.py` |
+| Phase C 泳道 C｜模型（C-13）：学习模型×确定性规则融合引擎（规则强命中不被覆盖 + 模型补召回 + 冲突仲裁，输出带 source+confidence）| ✅ | `core/model3d/fusion/*`、`data/model3d/fusion_policy.yaml`、`tests/test_fusion_engine.py` |
+| Phase C 泳道 C｜模型（C-10 旁路）：VecFormer(Apache2.0) 权重释放跟踪 + 迁移预研 + 占位 stub（同实现 SpottingBackend）| ✅ | `docs/PHASE_C_VECFORMER_WATCH.md`、`core/model3d/spotting/vecformer/__init__.py` |
+| Phase C 泳道 C｜C-09 微调 / C-11 SymPoint 天花板评测 | ⏳ 顺延 | 卡 GPU/自建数据/隔离环境（C-11 在 gitignore 的 `research/sympoint-eval/` 跑）；C-09 待 C-08+GPU+C-07 数据 |
+| Phase C 泳道 D｜审校契约基座：人审动作埋点表 + 符号标注表 + 前端共享类型/端点 | ✅ | `migrations/024_review_actions.sql`、`apps/web/src/services/modelReview.ts` |
+| Phase C 泳道 D｜前端审校（C-16）：DrawingAnnotationQueue 深化（符号级候选框+置信度着色+确认/否定/改类/补框，标注+埋点双写，COCO 导出喂 C-09）| ✅ | `pages/model/ProjectModel/DrawingAnnotationQueue.tsx`、`routers/model_annotations.py`、`scripts/model3d/export_annotations.py`、`tests/test_model_annotations_router.py` |
+| Phase C 泳道 D｜前端审校（C-15）：SemanticReviewQueue 深化（拓扑闭合/命名/规范人审，低置信+规则-模型冲突优先排队，写埋点+audit_logs）| ✅ | `pages/model/ProjectModel/SemanticReviewQueue.tsx`、`routers/model_review.py`、`tests/test_model_review.py` |
+| Phase C 泳道 D｜前端审校（C-17）：返工点埋点度量看板（确认/改类/否定/补框率 by 专业 by 类别 + 收敛趋势，rework=reclass+reject+addbox，25–30% 效率口径）| ✅ | `routers/dashboard.py`（扩展 model-review-metrics）、`pages/model/ProjectModel/ModelQualityPanel.tsx`、`tests/test_model_review_metrics.py` |
+| Phase C 汇聚（C-14）：统一评测基座（纯规则 vs 学习模型 vs 融合，PQ/精度/召回/F1/分专业分类别/混淆矩阵，度量口径锁定，一键复现）| ✅ | `core/model3d/eval/{metrics,harness,report}.py`、`scripts/model3d/eval_harness.py`、`tests/test_eval_harness.py`、`docs/PHASE_C_EVAL_REPORT.md`（model 端待 C-09 真实权重复评出 M1 结论）|
+| Phase C 收口（C-18）：里程碑 Demo + 验收报告（逐条勾对 6 项验收总标准，M2 达成/M1 基座就绪终评待 C-09，能力边界如实）| ✅ | `docs/PHASE_C_ACCEPTANCE.md`、`tests/e2e/test_phase_c_demo.py`（离线端到端断言标准 1/3/4/5/6 + 标准 2 基座就绪）|
 
 ---
 

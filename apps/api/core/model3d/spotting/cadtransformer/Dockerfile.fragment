@@ -1,0 +1,45 @@
+# ===========================================================================
+# CADTransformer GPU 推理镜像片段（C-08）
+#
+# ⚠️ 这是**片段**，不是完整镜像，也**绝不修改主 Dockerfile**。
+#    CADTransformer 依赖较老（torch 1.12 / dgl 0.9），并入主镜像会拖累整个
+#    API 服务；故 GPU 推理单独构建为一个 sidecar/批处理镜像，主服务缺它照常运行
+#    （CADTransformerBackend.is_available() → False，降级到 mock）。
+#
+# 用法：作为独立推理镜像的构建基线（在 CI/CD 或运维手册中单独引用），
+#       与官方权重（MinIO / 卷挂载）解耦，权重不进镜像层。
+# 许可：CADTransformer(MIT)，保留上游 LICENSE 与 NOTICE。
+# ===========================================================================
+
+# CUDA 11.3 runtime（匹配 torch 1.12.1+cu113 / dgl 0.9.1 cu113 轮子）
+FROM nvidia/cuda:11.3.1-cudnn8-runtime-ubuntu20.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3.10 python3-pip git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# --- 锁定版本的推理依赖（对应 requirements-spotting.txt）---------------------
+RUN pip3 install --upgrade pip \
+    && pip3 install torch==1.12.1+cu113 torchvision==0.13.1+cu113 \
+        --extra-index-url https://download.pytorch.org/whl/cu113 \
+    && pip3 install dgl==0.9.1 -f https://data.dgl.ai/wheels/cu113/repo.html \
+    && pip3 install torch-geometric==2.1.0
+
+# --- 应用代码（预处理 + spotting 封装）--------------------------------------
+COPY apps/api/core/model3d /app/core/model3d
+COPY apps/api/requirements-spotting.txt /app/requirements-spotting.txt
+
+# 权重通过卷挂载 / 环境变量注入，不进镜像层：
+#   -e CADTRANSFORMER_WEIGHTS=/models/cadtransformer/floorplancad.pth
+#   -e CADTRANSFORMER_DEVICE=cuda:0
+#   -v /host/models:/models:ro
+ENV CADTRANSFORMER_DEVICE=cuda:0
+
+# 就绪自检（依赖 + 权重齐全应打印 True）
+# CMD ["python3", "-c", "from core.model3d.spotting.cadtransformer import CADTransformerBackend; print(CADTransformerBackend().is_available())"]

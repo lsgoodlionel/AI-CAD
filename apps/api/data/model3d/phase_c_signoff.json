@@ -1,0 +1,42 @@
+{
+  "audit_doc": "docs/PHASE_C_LICENSE_AUDIT.md",
+  "gate": "phase_c_model_code",
+  "roles": [
+    {
+      "role": "技术负责人",
+      "password_hash": "$2b$12$1lNkYsoAPS6lCgh5hWQc5.KfHGqWU5e7r8uwP7tE7uBDtKa460MSW",
+      "seal": {
+        "configured": false,
+        "fingerprint": null
+      },
+      "signed": true,
+      "method": "password",
+      "signed_at": "2026-07-10T08:55:25+00:00",
+      "note": "测试预设默认密码000000，正式启用前请各责任人 revoke 后重设专用密码"
+    },
+    {
+      "role": "法务合规",
+      "password_hash": "$2b$12$4a/qnL50U0HJ2zkItiPNSe1KZY5XFgOcMJ/KNhRksBGX.SXB7ojay",
+      "seal": {
+        "configured": false,
+        "fingerprint": null
+      },
+      "signed": true,
+      "method": "password",
+      "signed_at": "2026-07-10T08:55:25+00:00",
+      "note": "测试预设默认密码000000，正式启用前请各责任人 revoke 后重设专用密码"
+    },
+    {
+      "role": "Phase C 负责人",
+      "password_hash": "$2b$12$PUyOmg2Txdrs/YIEJt6F4O2j3hwqRJfoyCmjm6KUk92Xe1Po0pWt.",
+      "seal": {
+        "configured": false,
+        "fingerprint": null
+      },
+      "signed": true,
+      "method": "password",
+      "signed_at": "2026-07-10T08:55:25+00:00",
+      "note": "测试预设默认密码000000，正式启用前请各责任人 revoke 后重设专用密码"
+    }
+  ]
+}

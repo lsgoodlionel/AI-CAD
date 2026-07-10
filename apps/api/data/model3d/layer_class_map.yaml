@@ -1,0 +1,150 @@
+# 补充图层/块 → 类别映射（C-04 自动标注引擎）
+#
+# 用途：在**不改代码**的前提下，为不同设计院 / 专业域补充中国施工图的图层名·块名·
+#       正则映射，扩大弱标注引擎（core/model3d/dataset/auto_label.py）的召回。
+#
+# 关系：本表是基础分类器 core/model3d/layer_conventions.py 的**补充层**。
+#       auto_label 先用基础分类器（classify_by_layer / classify_system）作主判据，
+#       未命中时才回退本表（label_source = "layer_class_map"，置信度 ≈ 0.6）。
+#
+# 强制约束（对齐 Phase C 共享 taxonomy，勿自造顶层类别）：
+#   - conventions.kind ∈ {column, beam, slab, wall, door, window, pipe, equipment, axis}
+#   - systems.system   ∈ {消防, 给排水, 电气, 暖通}
+#   非法 kind / system 的条目会被加载器静默跳过（不抛异常）。
+#
+# 匹配语义（与 layer_conventions.yaml 一致，优先级由高到低）：
+#   1. aliases    精确别名（整串相等，大小写不敏感，中文原样）
+#   2. prefixes   前缀匹配（图层名 / 块名以此开头）
+#   3. substrings 子串匹配（图层名 / 块名包含此片段）
+#   4. patterns   正则匹配（Python re，大小写不敏感）
+#
+# 维护原则：只覆盖真实存在的院/专业约定，宁缺毋滥；无效正则单条跳过不影响其余。
+
+version: "1.0"
+description: "结构/机电/装修主要图层约定补充映射（补充 layer_conventions.yaml，勿新增顶层类别）"
+
+# ── 构件类别补充映射 ──────────────────────────────────────────
+conventions:
+  # 结构柱：部分院用 GKZ/框支柱、暗柱 AZ、边缘构件 YBZ/GBZ
+  - kind: column
+    aliases: ["GKZ", "AZ", "YBZ", "GBZ", "框支柱", "暗柱", "端柱", "芯柱"]
+    prefixes: ["STR-COLU", "STRUCT-COL", "PKPM-COL", "砼-柱", "混凝土-柱"]
+    substrings: ["柱帽", "柱墩"]
+    patterns: ['(?:^|[-_])(?:GKZ|AZ|YBZ|GBZ|KZ|GZ)(?:$|[-_\d])']
+
+  # 结构梁：次梁 L、连梁 LL、悬挑梁 XL、基础梁 JCL/JL、圈梁 QL、过梁 GL
+  - kind: beam
+    aliases: ["XL", "JCL", "JL", "QL", "GL", "WKL", "次梁", "连梁", "悬挑梁",
+              "基础梁", "圈梁", "过梁", "屋面框架梁"]
+    prefixes: ["STR-BEAM", "STRUCT-BEA", "砼-梁", "混凝土-梁"]
+    substrings: ["梁配筋", "梁平法"]
+    patterns: ['(?:^|[-_])(?:KL|LL|XL|WKL|JCL|JL|QL|GL)(?:$|[-_\d])']
+
+  # 结构板：屋面板 WB、悬挑板 XB、楼梯板 TB、筏板 FB、底板 DB
+  - kind: slab
+    aliases: ["WB", "XB", "TB", "FB", "DB", "LB", "屋面板", "悬挑板", "筏板",
+              "底板", "顶板", "叠合板", "压型钢板"]
+    prefixes: ["STR-SLAB", "STRUCT-SL", "砼-板", "混凝土-板", "板-"]
+    substrings: ["板配筋", "板平法", "楼板厚"]
+    patterns: ['(?:^|[-_])(?:LB|WB|XB|TB|FB|DB)(?:$|[-_\d])']
+
+  # 墙：建筑隔墙 A-PART、幕墙 A-GLAZ-WALL、栏板墙、女儿墙、地下室外墙 DWQ
+  - kind: wall
+    aliases: ["DWQ", "NEQ", "隔墙", "幕墙", "女儿墙", "栏板墙", "挡土墙",
+              "人防墙", "外墙", "内墙", "承重墙"]
+    prefixes: ["A-PART", "A-WALL-", "ARCH-WAL", "STRUCT-WAL", "建筑-墙",
+               "混凝土-墙", "砼-墙"]
+    substrings: ["外墙", "内墙", "隔墙", "幕墙"]
+    patterns: ['(?:^|[-_])(?:DWQ|JLQ|Q)(?:$|[-_\d])']
+
+  # 门：防火门 FM、人防门 RFM、卷帘门 JLM、子母门、木门 M
+  - kind: door
+    aliases: ["FM", "RFM", "JLM", "防火门", "人防门", "卷帘门", "子母门",
+              "木门", "钢门", "旋转门", "平开门", "推拉门"]
+    prefixes: ["A-DOOR-", "ARCH-DOR", "门窗-门", "户门-", "FM-", "FHM-"]
+    substrings: ["防火门", "卷帘门", "洞口-门"]
+    patterns: ['(?:^|[-_])(?:FM|RFM|JLM|FHM|LM|TLM)(?:$|[-_\d])']
+
+  # 窗：防火窗 FC、飘窗 PC、百叶窗 BYC、高窗 GC、塑钢窗 C
+  - kind: window
+    aliases: ["FC", "PC", "BYC", "GC", "TC", "防火窗", "飘窗", "百叶窗",
+              "高窗", "塑钢窗", "铝合金窗", "落地窗", "转角窗"]
+    prefixes: ["A-WIND-", "ARCH-WIN", "门窗-窗", "FC-", "PC-"]
+    substrings: ["防火窗", "飘窗", "百叶", "洞口-窗"]
+    patterns: ['(?:^|[-_])(?:FC|PC|BYC|GC|TC|LC)(?:$|[-_\d])']
+
+  # 机电管线：喷淋管 SP、桥架 CT、母线、雨水管 Y、污水管 W、冷媒管
+  - kind: pipe
+    aliases: ["SP-PIPE", "CT-BUS", "喷淋管", "母线", "雨水管", "污水管",
+              "冷媒管", "冷凝水管", "消火栓管", "喷淋支管", "热水管"]
+    prefixes: ["W-PIPE", "P-STRM", "P-WASV", "M-PIPE", "H-DUCT", "喷淋-",
+               "桥架-", "母线-", "风管-", "水管-"]
+    substrings: ["喷淋", "桥架", "母线槽", "立管", "支管", "干管", "冷媒", "冷凝水"]
+    patterns: ['(?:^|[-_])(?:SP|CT|MX)(?:$|[-_\d])', '[-_](?:PIPE|DUCT|TUBE)(?:$|[-_])']
+
+  # 机电设备：水泵、风机、配电柜、消火栓箱、灯具、插座、传感器
+  - kind: equipment
+    aliases: ["水泵", "风机", "配电柜", "配电箱", "消火栓箱", "灯具", "插座",
+              "开关", "传感器", "喷头", "烟感", "温感", "摄像头", "空调机组",
+              "新风机组", "冷水机组", "水箱", "集水坑"]
+    prefixes: ["M-EQPM-", "E-DEVC", "E-LITE-", "E-COMM", "P-FIXT", "设备-",
+               "末端-", "灯具-", "插座-"]
+    substrings: ["水泵", "风机", "喷头", "灯具", "插座", "烟感", "温感",
+                 "配电", "机组", "水箱", "阀门", "仪表"]
+    patterns: ['[-_]EQPM(?:$|[-_])', '(?:^|[-_])(?:FHSX|WB|SB)(?:$|[-_\d])']
+
+  # 轴网：定位轴、辅助轴、圆弧轴、附加轴
+  - kind: axis
+    aliases: ["定位轴", "辅助轴", "附加轴", "圆弧轴线", "轴号", "轴标"]
+    prefixes: ["E-GRID", "P-GRID", "STR-GRID", "ARCH-GRID", "定位-", "轴号-"]
+    substrings: ["定位轴", "辅助轴", "附加轴", "轴圈", "轴号"]
+    patterns: ['[-_](?:GRID|AXIS|GRIDLINE)(?:$|[-_])']
+
+  # ── 装修专业域（Interior/Finish）——统一归入既有 9 类，不新增顶层类别 ──
+  # 装修隔墙/背景墙 → wall
+  - kind: wall
+    aliases: ["I-WALL", "背景墙", "造型墙", "软包墙", "石材墙面", "装饰墙"]
+    prefixes: ["I-WALL", "F-WALL", "装-墙", "精装-墙", "室内-墙"]
+    substrings: ["背景墙", "造型墙", "墙面", "护墙板"]
+
+  # 吊顶/天花 → slab（顶面构件归板）
+  - kind: slab
+    aliases: ["天花", "吊顶", "顶棚", "造型顶", "跌级吊顶", "石膏板吊顶"]
+    prefixes: ["I-CLNG", "F-CEIL", "装-顶", "精装-顶", "天花-", "吊顶-"]
+    substrings: ["天花", "吊顶", "顶棚", "顶面"]
+    patterns: ['[-_](?:CLNG|CEIL)(?:$|[-_])']
+
+  # 地面铺装 → slab
+  - kind: slab
+    aliases: ["地面铺装", "地坪", "拼花地面", "石材地面", "地砖"]
+    prefixes: ["I-FLOR", "F-FLOR", "装-地", "精装-地", "地面-"]
+    substrings: ["地面铺装", "地坪", "拼花", "地砖"]
+
+  # 装修门（成品门/移门）→ door
+  - kind: door
+    aliases: ["成品门", "移门", "隐形门", "谷仓门", "装饰门"]
+    prefixes: ["I-DOOR", "F-DOOR", "装-门", "精装-门"]
+    substrings: ["成品门", "移门", "隐形门"]
+
+# ── 机电系统补充判定（仅对 pipe / equipment 有意义）──────────────
+# system 必须 ∈ {消防, 给排水, 电气, 暖通}，非法值跳过。
+systems:
+  - system: 消防
+    substrings: ["喷淋", "消火栓", "气体灭火", "防排烟", "报警阀", "水炮",
+                 "SPKL", "FIRE", "FHS"]
+    prefixes: ["FS-", "FA-", "XF-", "消-", "喷-"]
+
+  - system: 给排水
+    substrings: ["给水", "排水", "雨水", "污水", "废水", "中水", "热水",
+                 "冷凝水", "虹吸", "DOMW", "SANR", "STRM", "WASV"]
+    prefixes: ["W-", "PW-", "PD-", "给-", "排-", "水-"]
+
+  - system: 电气
+    substrings: ["强电", "弱电", "照明", "动力", "桥架", "母线", "配电",
+                 "综合布线", "安防", "消防电", "POWR", "LITE", "COMM"]
+    prefixes: ["EL-", "EP-", "EC-", "强电-", "弱电-", "电-"]
+
+  - system: 暖通
+    substrings: ["空调", "通风", "采暖", "新风", "冷媒", "地暖", "风盘",
+                 "多联机", "冷冻水", "冷却水", "HVAC", "VRV", "AHU"]
+    prefixes: ["HV-", "AC-", "VT-", "暖-", "通-", "空调-"]
