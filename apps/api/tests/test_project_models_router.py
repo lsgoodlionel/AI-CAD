@@ -271,3 +271,100 @@ async def test_asset_url_rejects_non_model_asset_prefix(client):
 
     assert resp.status_code == 403
     assert resp.json()["detail"] == "ASSET_FORBIDDEN"
+
+
+# ── QTO 工程量汇总（B-19）────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_get_model_quantities_returns_envelope_with_drilldown(client, fake_db):
+    scene = {
+        "floors": [{
+            "key": "F1", "label": "1层", "building_units": ["main"],
+            "elements": {
+                "beams": [{"path": [[0, 0], [6, 0]], "width": 0.3, "depth": 0.6}],
+                "slabs": [{"outline": [[0, 0], [6, 0], [6, 6], [0, 6]], "thickness": 0.12}],
+                "columns": [], "walls": [],
+            },
+        }],
+        "quality": {"story_tables": {"main": [{"story_key": "F1", "height_m": 3.0}]}},
+    }
+    fake_db.fetch_one.return_value = {"scene": json.dumps(scene, ensure_ascii=False)}
+
+    resp = await client.get(f"/api/v1/projects/{PROJECT_ID}/model/quantities")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+    assert body["error"] is None
+    assert body["meta"]["scope"] == "scene"
+    assert body["data"]["project"]["concrete"]["net_m3"] > 0
+    assert body["data"]["by_floor"][0]["floor_key"] == "F1"
+    assert body["data"]["project"]["rebar"]["missing"] is True
+
+
+@pytest.mark.asyncio
+async def test_get_model_quantities_404_when_not_built(client, fake_db):
+    fake_db.fetch_one.return_value = None
+    resp = await client.get(f"/api/v1/projects/{PROJECT_ID}/model/quantities")
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "MODEL_NOT_BUILT"
+
+
+# ── B-20 QTO → 创效提案草稿 ──────────────────────────────────
+
+def _qto_scene():
+    return {
+        "floors": [{
+            "key": "F1", "label": "1层", "building_units": ["main"],
+            "elements": {
+                "beams": [{"path": [[0, 0], [6, 0]], "width": 0.3, "depth": 0.6}],
+                "slabs": [], "columns": [], "walls": [],
+            },
+        }],
+        "quality": {"story_tables": {"main": [{"story_key": "F1", "height_m": 3.0}]}},
+    }
+
+
+@pytest.mark.asyncio
+async def test_qto_to_proposal_creates_draft_with_positive_saving(client, fake_db):
+    fake_db.fetch_one.side_effect = [
+        {"scene": json.dumps(_qto_scene(), ensure_ascii=False)},   # 载入 scene
+        {"id": "44444444-4444-4444-4444-444444444444"},            # INSERT RETURNING id
+    ]
+    rebar_inputs = [{"diameter": 20, "steel_grade": "HRB400", "required_length": 6000, "count": 40}]
+
+    with patch("routers.project_models.write_audit", AsyncMock()) as audit:
+        resp = await client.post(
+            f"/api/v1/projects/{PROJECT_ID}/model/quantities/to-proposal",
+            json={"rebar_inputs": rebar_inputs},
+        )
+
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["status"] == "draft"                # 只造草稿，入正常流程
+    assert body["raw_saving_est"] > 0
+    audit.assert_awaited_once()
+    assert audit.await_args.kwargs["action"] == "qto_to_proposal"
+
+
+@pytest.mark.asyncio
+async def test_qto_to_proposal_rejects_when_no_saving(client, fake_db):
+    fake_db.fetch_one.return_value = {"scene": json.dumps(_qto_scene(), ensure_ascii=False)}
+    with patch("routers.project_models.write_audit", AsyncMock()):
+        resp = await client.post(
+            f"/api/v1/projects/{PROJECT_ID}/model/quantities/to-proposal",
+            json={"rebar_inputs": []},   # 无配筋 → 无优化节约
+        )
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "NO_POSITIVE_SAVING"
+
+
+@pytest.mark.asyncio
+async def test_qto_to_proposal_404_when_not_built(client, fake_db):
+    fake_db.fetch_one.return_value = None
+    resp = await client.post(
+        f"/api/v1/projects/{PROJECT_ID}/model/quantities/to-proposal",
+        json={"rebar_inputs": []},
+    )
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "MODEL_NOT_BUILT"
