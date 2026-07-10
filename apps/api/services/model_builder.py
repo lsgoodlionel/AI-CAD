@@ -25,8 +25,16 @@ from datetime import datetime, timezone
 from typing import Any
 
 from core.ai_review.dwg_support import ensure_dxf
+from core.config import settings
 from core.storage import get_file_bytes, upload_file
-from services import model_annotations, model_elements, model_semantics, model_story
+from services import (
+    model_annotations,
+    model_elements,
+    model_ifc_integration,
+    model_semantics,
+    model_story,
+    vlm_semantics,
+)
 from services.drawing_semantics import extract_semantic_candidates
 from services.floor_parser import parse_floor
 from services.model_lod import ModelScopeEvidence, aggregate_lod_modes, evaluate_lod_capability
@@ -831,9 +839,14 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     """
     await _notify(progress_cb, _progress_payload("fetch", "读取项目图纸与审图数据", "", 0, 1))
     project, drawings, issues_by_drawing, cross = await _fetch_inputs(db, project_id)
+    # A-13：VLM 语义融合（灰度 vlm_semantic_enabled；关闭时下列三步均为恒等无副作用）。
+    vlm_by_drawing = await vlm_semantics.collect_scene_vlm(db, drawings)
+    drawings = vlm_semantics.apply_vlm_discipline(drawings, vlm_by_drawing)
     annotation_overrides = await _load_annotation_overrides(db, project_id)
     normalization = model_story.normalize_story_table(drawings, annotation_overrides)
-    semantic_payload = _semantic_scene_payload(drawings)
+    semantic_payload = vlm_semantics.merge_vlm_into_semantic_payload(
+        _semantic_scene_payload(drawings), vlm_by_drawing
+    )
     assets, ifc_models, ifc_skipped = await _build_assets(project_id, drawings, progress_cb)
     floors, floor_of = _build_floors(drawings, issues_by_drawing, assets, normalization)
     yolo_total = await _attach_floor_elements(floors, drawings, floor_of, progress_cb)
@@ -848,6 +861,11 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
 
     markers = _build_markers(issues_by_drawing, floor_of)
     _marker_building_keys(markers, drawings, normalization.drawing_assignments)
+
+    cross_links = _build_cross_links(cross, ids_by_no, floor_by_no)
+    cross_links.extend(
+        vlm_semantics.vlm_cross_link_candidates(vlm_by_drawing, ids_by_no, floor_by_no)
+    )
 
     stats = _build_stats(drawings, issues_by_drawing, floors, ifc_skipped)
     stats["elements_total"] = model_elements.totals(floors)
@@ -892,7 +910,7 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
             ],
         },
         "markers": markers,
-        "cross_links": _build_cross_links(cross, ids_by_no, floor_by_no),
+        "cross_links": cross_links,
         "ifc_models": ifc_models,
         "lod_capabilities": lod_capabilities,
         "lod_modes": aggregate_lod_modes(lod_capabilities),
@@ -903,4 +921,12 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
         },
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
+
+    model_ifc = await model_ifc_integration.maybe_build_programmatic_ifc(
+        project_id, project_name, buildings, floors, stats["reconstruction"]
+    )
+    if model_ifc:
+        scene["model_ifc"] = model_ifc
+        scene["lod"]["supported_modes"] = ["ifc", "texture", "elements", "mixed"]
+
     return scene, assets

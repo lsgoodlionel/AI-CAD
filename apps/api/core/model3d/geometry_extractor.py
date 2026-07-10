@@ -16,6 +16,31 @@ logger = logging.getLogger(__name__)
 MAX_PRIMITIVES = 20_000
 
 
+# --- 图层/块对齐 append 辅助 ----------------------------------------------
+# 正确性关键：每 append 一个几何原语，就同步 append 一个 layer/block，
+# 保证 DrawingGeometry 的 *_layers/*_blocks 与几何列表严格索引对齐。
+# 所有几何写入必须经这三个函数，禁止直接 geom.lines.append(...)。
+
+def _add_line(geom: DrawingGeometry, x0: float, y0: float, x1: float, y1: float,
+              layer: str = "") -> None:
+    geom.lines.append((x0, y0, x1, y1))
+    geom.line_layers.append(layer)
+
+
+def _add_rect(geom: DrawingGeometry, x: float, y: float, w: float, h: float,
+              filled: bool, layer: str = "", block: str = "") -> None:
+    geom.rects.append((x, y, w, h, filled))
+    geom.rect_layers.append(layer)
+    geom.rect_blocks.append(block)
+
+
+def _add_poly(geom: DrawingGeometry, pts: list[tuple[float, float]],
+              layer: str = "", block: str = "") -> None:
+    geom.polys.append(pts)
+    geom.poly_layers.append(layer)
+    geom.poly_blocks.append(block)
+
+
 def extract_pdf_geometry(data: bytes, page_index: int = 0) -> DrawingGeometry:
     """从矢量 PDF 页提取线段/矩形/多边形/文本。"""
     geom = DrawingGeometry()
@@ -44,29 +69,28 @@ def _collect_pdf_drawings(page, geom: DrawingGeometry) -> None:
             return
         filled = drawing.get("fill") is not None
         path_points: list[tuple[float, float]] = []
+        # PDF 无图层/块概念：并行列表统一填 ""（经 _add_* 保证对齐）
         for item in drawing.get("items", []):
             kind = item[0]
             if kind == "l":
                 p0, p1 = item[1], item[2]
-                geom.lines.append((p0.x, p0.y, p1.x, p1.y))
+                _add_line(geom, p0.x, p0.y, p1.x, p1.y)
                 path_points.extend([(p0.x, p0.y), (p1.x, p1.y)])
             elif kind == "re":
                 rect = item[1]
-                geom.rects.append(
-                    (rect.x0, rect.y0, rect.width, rect.height, filled)
-                )
+                _add_rect(geom, rect.x0, rect.y0, rect.width, rect.height, filled)
             elif kind == "qu":
                 quad = item[1]
                 pts = [(p.x, p.y) for p in (quad.ul, quad.ur, quad.lr, quad.ll)]
-                geom.polys.append(pts)
+                _add_poly(geom, pts)
             elif kind == "c":
                 # 贝塞尔曲线：按端点折线化
                 p0, p3 = item[1], item[4]
-                geom.lines.append((p0.x, p0.y, p3.x, p3.y))
+                _add_line(geom, p0.x, p0.y, p3.x, p3.y)
                 path_points.extend([(p0.x, p0.y), (p3.x, p3.y)])
         # 填充路径且首尾闭合 → 记为多边形（柱等实体填充识别依赖）
         if filled and len(path_points) >= 3:
-            geom.polys.append(path_points)
+            _add_poly(geom, path_points)
 
 
 def _collect_pdf_texts(page, geom: DrawingGeometry) -> None:
@@ -107,37 +131,68 @@ def _collect_dxf_entities(msp, geom: DrawingGeometry) -> None:
     for entity in msp:
         if geom.primitive_count() >= MAX_PRIMITIVES:
             return
-        kind = entity.dxftype()
-        try:
-            if kind == "LINE":
-                s, e = entity.dxf.start, entity.dxf.end
-                geom.lines.append((s.x, s.y, e.x, e.y))
-            elif kind in ("LWPOLYLINE", "POLYLINE"):
-                points = _polyline_points(entity, kind)
-                if len(points) >= 3 and getattr(entity, "closed", False):
-                    geom.polys.append(points)
-                else:
-                    for i in range(len(points) - 1):
-                        geom.lines.append((*points[i], *points[i + 1]))
-            elif kind == "SOLID":
-                pts = [(entity.dxf.vtx0.x, entity.dxf.vtx0.y),
-                       (entity.dxf.vtx1.x, entity.dxf.vtx1.y),
-                       (entity.dxf.vtx2.x, entity.dxf.vtx2.y)]
-                geom.polys.append(pts)
-            elif kind == "HATCH":
-                for path in entity.paths:
-                    vertices = getattr(path, "vertices", None)
-                    if vertices:
-                        geom.polys.append([(v[0], v[1]) for v in vertices])
-            elif kind in ("TEXT", "MTEXT"):
-                insert = entity.dxf.insert
-                content = (
-                    entity.plain_mtext() if kind == "MTEXT" else entity.dxf.text
-                )
-                if content and content.strip():
-                    geom.texts.append((insert.x, insert.y, content.strip()))
-        except Exception:  # noqa: BLE001 — 单实体解析失败跳过
-            continue
+        _process_dxf_entity(entity, geom, block="")
+
+
+def _process_dxf_entity(entity, geom: DrawingGeometry, block: str) -> None:
+    """单实体 → 几何原语（记录 entity.dxf.layer / 所属块名 block）。
+
+    ``block`` 为该实体所属 INSERT 块引用名（顶层实体为 ""）。
+    每个几何写入均经 ``_add_*`` 保证图层/块并行列表严格索引对齐。
+    """
+    kind = entity.dxftype()
+    try:
+        if kind == "INSERT":
+            _expand_insert(entity, geom)
+            return
+        layer = getattr(entity.dxf, "layer", "") or ""
+        if kind == "LINE":
+            s, e = entity.dxf.start, entity.dxf.end
+            _add_line(geom, s.x, s.y, e.x, e.y, layer)
+        elif kind in ("LWPOLYLINE", "POLYLINE"):
+            points = _polyline_points(entity, kind)
+            if len(points) >= 3 and getattr(entity, "closed", False):
+                _add_poly(geom, points, layer, block)
+            else:
+                for i in range(len(points) - 1):
+                    _add_line(geom, *points[i], *points[i + 1], layer)
+        elif kind == "SOLID":
+            pts = [(entity.dxf.vtx0.x, entity.dxf.vtx0.y),
+                   (entity.dxf.vtx1.x, entity.dxf.vtx1.y),
+                   (entity.dxf.vtx2.x, entity.dxf.vtx2.y)]
+            _add_poly(geom, pts, layer, block)
+        elif kind == "HATCH":
+            for path in entity.paths:
+                vertices = getattr(path, "vertices", None)
+                if vertices:
+                    _add_poly(geom, [(v[0], v[1]) for v in vertices], layer, block)
+        elif kind in ("TEXT", "MTEXT"):
+            insert = entity.dxf.insert
+            content = (
+                entity.plain_mtext() if kind == "MTEXT" else entity.dxf.text
+            )
+            if content and content.strip():
+                geom.texts.append((insert.x, insert.y, content.strip()))
+    except Exception:  # noqa: BLE001 — 单实体解析失败跳过
+        return
+
+
+def _expand_insert(entity, geom: DrawingGeometry) -> None:
+    """展开 INSERT 块引用为原语，记录块名到对应 *_blocks 列表。
+
+    用 ezdxf ``virtual_entities()`` 展开块内实体——自动应用 INSERT 的
+    插入点/缩放/旋转变换，得到模型空间真实坐标。``virtual_entities`` 不可用
+    （旧版本 / 特殊实体）时降级跳过，绝不抛异常。尊重 MAX_PRIMITIVES 上限。
+    """
+    block_name = getattr(entity.dxf, "name", "") or ""
+    try:
+        virtuals = entity.virtual_entities()
+    except Exception:  # noqa: BLE001 — virtual_entities 不可用 → 降级跳过
+        return
+    for sub in virtuals:
+        if geom.primitive_count() >= MAX_PRIMITIVES:
+            return
+        _process_dxf_entity(sub, geom, block=block_name)
 
 
 def _polyline_points(entity, kind: str) -> list[tuple[float, float]]:

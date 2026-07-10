@@ -1,0 +1,20 @@
+# 后端(cad-api)镜像构建上下文 = apps/（含 api + sibling model-convert）。
+# 排除与该镜像无关的子目录及生成物，保持上下文精简。
+web/
+ai-review/
+
+# 依赖 / 构建产物（node_modules 在镜像内由 npm ci 重建）
+**/node_modules/
+model-convert/*.frag
+model-convert/*.log
+
+# Python 生成物
+**/__pycache__/
+**/*.pyc
+api/.venv
+api/.pytest_cache
+api/.coverage
+api/htmlcov
+api/celerybeat-schedule
+
+.git

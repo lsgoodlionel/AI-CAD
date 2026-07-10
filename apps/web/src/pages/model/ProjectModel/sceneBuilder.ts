@@ -11,6 +11,7 @@ import type {
   SceneDrawing,
   SceneFloorV2,
   SceneMarker,
+  SceneModelIfc,
 } from '@/services/projectModel'
 
 // ── 布局常量 ─────────────────────────────────────────────────
@@ -31,6 +32,43 @@ export const SEVERITY_COLORS: Record<string, string> = {
   major: '#fa8c16',
   minor: '#faad14',
   info: '#8c8c8c',
+}
+
+// ── 渲染模式分派（A-07）─────────────────────────────────────
+//
+// scene.model_ifc 由后端 A-03/A-04 写入（见 docs/MODEL_BASE_BLUEPRINT.md 第 4 节），
+// 但 services/projectModel.ts 的 ModelScene 未声明该字段（该文件由并行 A-08 拥有），
+// 故此处就地窄化读取，旧数据缺省安全返回 null。SceneModelIfc 类型统一由
+// services/projectModel.ts 提供（唯一来源）。
+
+/** 顶层渲染模式：ifc(Fragments) 优先，回退现有 elements(挤出)/texture(贴图)/mixed。 */
+export type ModelViewMode = 'ifc' | 'elements' | 'texture' | 'mixed'
+
+/** 从 scene 读取 model_ifc（缺省安全返回 null）。 */
+export function readModelIfc(scene: ModelScene): SceneModelIfc | null {
+  const raw = (scene as { model_ifc?: unknown }).model_ifc
+  if (!raw || typeof raw !== 'object') return null
+  const obj = raw as Record<string, unknown>
+  const ifcKey = typeof obj.ifc_key === 'string' ? obj.ifc_key : ''
+  const fragKey =
+    typeof obj.frag_key === 'string' && obj.frag_key.trim() ? obj.frag_key : null
+  const buildMode = obj.build_mode
+  return {
+    ifc_key: ifcKey,
+    frag_key: fragKey,
+    build_mode:
+      buildMode === 'ifc' || buildMode === 'elements' || buildMode === 'texture'
+        ? buildMode
+        : 'texture',
+    is_estimated: obj.is_estimated === true,
+    generated_at: typeof obj.generated_at === 'string' ? obj.generated_at : undefined,
+  }
+}
+
+/** 默认渲染模式：有 frag_key → ifc；否则 V2 → mixed；V1 → texture。 */
+export function pickDefaultViewMode(scene: ModelScene): ModelViewMode {
+  if (readModelIfc(scene)?.frag_key) return 'ifc'
+  return scene.schema_version === 2 ? 'mixed' : 'texture'
 }
 
 // eslint-disable-next-line import/no-cycle -- elementsBuilder 仅引用本文件常量

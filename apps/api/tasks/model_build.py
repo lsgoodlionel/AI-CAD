@@ -23,6 +23,22 @@ logger = logging.getLogger(__name__)
 ERROR_MAX_LEN = 500
 
 
+def _resolve_build_mode(scene: dict) -> str | None:
+    """物化 project_models.build_mode 汇总列（迁移 017）。
+
+    优先取程序化 IFC 的 ``scene.model_ifc.build_mode``（"ifc"）；缺失时回退
+    ``scene.lod.default_mode``（texture/elements/mixed），使该列真实反映渲染模式，
+    而非恒为 ifc/NULL。
+    """
+    model_ifc = scene.get("model_ifc") or {}
+    mode = model_ifc.get("build_mode")
+    if mode:
+        return str(mode)
+    lod = scene.get("lod") or {}
+    default_mode = lod.get("default_mode")
+    return str(default_mode) if default_mode else None
+
+
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=30)
 def build_project_model(self, project_id: str) -> dict:
     """模型基座构建任务入口。"""
@@ -72,6 +88,7 @@ async def _do_build(project_id: str) -> dict:
             UPDATE project_models
             SET status='ready', version=version+1,
                 scene=CAST(:scene AS jsonb), assets=CAST(:assets AS jsonb),
+                build_mode=:build_mode,
                 error=NULL, built_at=now(), updated_at=now()
             WHERE project_id=:project_id
             RETURNING version
@@ -80,6 +97,7 @@ async def _do_build(project_id: str) -> dict:
                 "project_id": project_id,
                 "scene": json.dumps(scene, ensure_ascii=False, default=str),
                 "assets": json.dumps(assets, ensure_ascii=False, default=str),
+                "build_mode": _resolve_build_mode(scene),
             },
         )
         version = row["version"] if row is not None else None

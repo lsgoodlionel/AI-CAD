@@ -42,6 +42,14 @@ export default defineConfig({
 
   // ── 构建 ────────────────────────────────────────────────────
   npmClient: 'npm',
+  // three.js + @thatopen/fragments/web-ifc 使用 BigInt 字面量，
+  // 默认目标 chrome80/es2015 不支持，提升 browserslist + esbuild 压缩器目标到 es2020。
+  targets: {
+    chrome: 87,
+  },
+  jsMinifierOptions: {
+    target: 'es2020',
+  },
   hash: true,
   title: 'CAD 图纸深化管理平台',
 

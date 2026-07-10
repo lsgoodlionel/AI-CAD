@@ -1,6 +1,7 @@
 import time
 import anthropic
 from .base import LLMProvider, LLMResponse, ModelParams
+from . import vision
 
 
 class AnthropicProvider(LLMProvider):
@@ -11,6 +12,9 @@ class AnthropicProvider(LLMProvider):
         self.client = anthropic.AsyncAnthropic(**kwargs)
 
     async def complete(self, messages: list[dict], params: ModelParams) -> LLMResponse:
+        # 仅当含图像块时才走多模态转换，text-only 保持零差异
+        if vision.messages_have_images(messages):
+            messages = vision.to_anthropic_messages(messages)
         start = time.monotonic()
         response = await self.client.messages.create(
             model=params.model_id,

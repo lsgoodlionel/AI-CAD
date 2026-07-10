@@ -1,0 +1,19 @@
+{
+  "name": "@cad/model-convert",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline IFC -> That Open Fragments (.frag) converter (Phase A / A-04)",
+  "license": "UNLICENSED",
+  "bin": {
+    "ifc-to-fragments": "./ifc_to_fragments.mjs"
+  },
+  "scripts": {
+    "convert": "node ifc_to_fragments.mjs"
+  },
+  "dependencies": {
+    "@thatopen/fragments": "3.4.6",
+    "three": "0.185.0",
+    "web-ifc": "0.0.77"
+  }
+}

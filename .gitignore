@@ -31,6 +31,9 @@ apps/web/.umi/
 apps/web/src/.umi/
 apps/web/.umi-production/
 apps/web/.umi-test/
+# That Open runtime assets copied from node_modules by
+# apps/web/scripts/copy-thatopen-assets.mjs (regenerated on predev/prebuild)
+apps/web/public/thatopen/
 
 # ── Secrets & environment ─────────────────────────────────
 .env

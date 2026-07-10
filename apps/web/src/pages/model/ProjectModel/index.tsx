@@ -5,7 +5,7 @@
  * - status=building 或触发重建后每 5s 轮询直到 ready/failed
  * - 404 MODEL_NOT_BUILT：空态引导「立即生成模型」
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { history, request, useParams, useSearchParams } from '@umijs/max'
 import {
   Alert,
@@ -51,10 +51,21 @@ import type {
 import DrawingAnnotationQueue from './DrawingAnnotationQueue'
 import ModelQualityPanel from './ModelQualityPanel'
 import ModelViewer from './ModelViewer'
+import FragmentsScene from './FragmentsScene'
 import SemanticReviewQueue from './SemanticReviewQueue'
 import SemanticTreePanel from './SemanticTreePanel'
 import type { RenderMode } from './ModelViewer'
+import type {
+  FragmentPickResult,
+  FragmentsCameraPose,
+  FragmentsSceneHandle,
+} from './FragmentsScene'
 import type { ElementUserData } from './elementsBuilder'
+import type { ModelViewMode } from './sceneBuilder'
+import FragmentPropertyPanel from './FragmentPropertyPanel'
+import { findSemanticNodeForItem, resolvePickedItem } from './fragmentsPicking'
+import type { PickedFragmentItem } from '@/services/projectModel'
+import { pickDefaultViewMode, readModelIfc } from './sceneBuilder'
 import {
   buildStoryOptions,
   normalizeModelInsights,
@@ -367,7 +378,13 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
   const [markerTypeFilter, setMarkerTypeFilter] = useState<string[]>(ALL_MARKER_TYPES)
   const [isolatedFloorKey, setIsolatedFloorKey] = useState<string | null>(null)
   const [selection, setSelection] = useState<Selection | null>(null)
-  const [renderMode, setRenderMode] = useState<RenderMode>('mixed')
+  const [viewMode, setViewMode] = useState<ModelViewMode>('mixed')
+  const fragmentsSceneRef = useRef<FragmentsSceneHandle>(null)
+  /** 拾取请求令牌：连点/清除时旧的 resolvePickedItem 迟到不覆盖新状态。 */
+  const pickRequestRef = useRef(0)
+  const [fragmentItem, setFragmentItem] = useState<PickedFragmentItem | null>(null)
+  const [fragmentItemLoading, setFragmentItemLoading] = useState(false)
+  const fragmentsCameraPose = useRef<FragmentsCameraPose | null>(null)
   const [elementFilter, setElementFilter] = useState<string[] | undefined>(undefined)
   const [selectedBuildingKey, setSelectedBuildingKey] = useState<string | null>(null)
   const [selectedSemanticNode, setSelectedSemanticNode] = useState<SemanticTreeNodeView | null>(null)
@@ -377,6 +394,8 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
 
   const scene: ModelScene | null = model?.scene ?? null
   const isV2 = scene?.schema_version === 2
+  const modelIfc = useMemo(() => (scene ? readModelIfc(scene) : null), [scene])
+  const fragKey = modelIfc?.frag_key ?? null
   const insights = useMemo(() => (model ? normalizeModelInsights(model) : null), [model])
   const lodModes = insights?.lodModes ?? [
     { key: 'review_skeleton', label: '审图骨架', enabled: true },
@@ -387,6 +406,61 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
   const semanticTreeGroups = insights?.semanticTreeGroups ?? []
   const semanticNodeMap = insights?.semanticNodeMap ?? {}
   const semanticReviewQueue = insights?.semanticReviewQueue ?? []
+
+  // 渲染模式候选：ifc(Fragments) 优先展示，V2 追加构件/贴图/混合
+  const viewModeOptions = useMemo(() => {
+    const options: { label: string; value: ModelViewMode }[] = []
+    if (fragKey) options.push({ label: 'IFC 模型', value: 'ifc' })
+    if (isV2) {
+      options.push({ label: '构件', value: 'elements' })
+      options.push({ label: '贴图', value: 'texture' })
+      options.push({ label: '混合', value: 'mixed' })
+    }
+    return options
+  }, [fragKey, isV2])
+
+  // 模型身份稳定后设一次默认模式（frag_key/schema 不变则不覆盖用户手动选择）
+  useEffect(() => {
+    if (!scene) return
+    setViewMode(pickDefaultViewMode(scene))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene?.project.id, fragKey, scene?.schema_version])
+
+  // A-08 接线：点击构件 → 高亮 + 解析 IFC 属性 → 属性面板
+  const handleFragmentPick = useCallback((pick: FragmentPickResult | null) => {
+    const sceneHandle = fragmentsSceneRef.current
+    if (!sceneHandle) return
+    pickRequestRef.current += 1
+    const requestToken = pickRequestRef.current
+    if (!pick) {
+      void sceneHandle.clearHighlight().catch(() => {})
+      setFragmentItem(null)
+      setFragmentItemLoading(false)
+      return
+    }
+    void sceneHandle.highlight([pick.localId]).catch(() => {})
+    const model = sceneHandle.getModel()
+    if (!model) return
+    setFragmentItemLoading(true)
+    resolvePickedItem(model, pick.localId)
+      .then((resolved) => {
+        if (pickRequestRef.current !== requestToken) return
+        setFragmentItem(resolved)
+      })
+      .catch(() => {
+        if (pickRequestRef.current !== requestToken) return
+        setFragmentItem(null)
+      })
+      .finally(() => {
+        if (pickRequestRef.current !== requestToken) return
+        setFragmentItemLoading(false)
+      })
+  }, [])
+
+  // 离开 IFC 模式清空选中构件，避免残留
+  useEffect(() => {
+    if (viewMode !== 'ifc') setFragmentItem(null)
+  }, [viewMode])
 
   useEffect(() => {
     if (!insights) {
@@ -605,6 +679,15 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
     }
   }, [semanticNodeMap])
 
+  // 属性面板「在语义树中定位」：按构件名匹配语义节点（Phase A 名称级 best-effort）
+  const handleLocateFragmentInTree = useCallback(
+    (item: PickedFragmentItem) => {
+      const node = findSemanticNodeForItem(semanticTreeGroups, item)
+      if (node) handleSelectSemanticNode(node)
+    },
+    [semanticTreeGroups, handleSelectSemanticNode],
+  )
+
   if (isNotBuilt) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 100 }}>
@@ -702,16 +785,12 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
                 </Tooltip>
               )
           })}
-          {isV2 ? (
+          {viewModeOptions.length > 1 ? (
             <Segmented
               size="small"
-              value={renderMode}
-              onChange={(value) => setRenderMode(value as RenderMode)}
-              options={[
-                { label: '构件', value: 'elements' },
-                { label: '贴图', value: 'texture' },
-                { label: '混合', value: 'mixed' },
-              ]}
+              value={viewMode}
+              onChange={(value) => setViewMode(value as ModelViewMode)}
+              options={viewModeOptions}
             />
           ) : null}
         </Space>
@@ -872,25 +951,62 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
 
           <Col flex="auto">
             <Card size="small" styles={{ body: { padding: 0 } }}>
-              <div style={{ height: 'calc(100vh - 260px)', minHeight: 520 }}>
-                <ModelViewer
-                  scene={viewScene ?? scene}
-                  focusDrawingId={focusDrawingId}
-                  disciplineFilter={disciplineFilter}
-                  severityFilter={severityFilter}
-                  markerTypeFilter={markerTypeFilter}
-                  isolatedFloorKey={isolatedFloorKey}
-                  renderMode={renderMode}
-                  elementFilter={elementFilter}
-                  resolveAssetUrl={resolveAssetUrl}
-                  onSelectDrawing={(drawing) => setSelection({ type: 'drawing', drawing })}
-                  onSelectMarker={(marker) => setSelection({ type: 'marker', marker })}
-                  onSelectElement={(element) => setSelection({ type: 'element', element })}
-                  lodMode={lodMode}
-                  lodLabel={currentLod.label}
-                  buildingLabel={selectedBuilding?.label}
-                  pendingAnnotationCount={quality.pendingManualCount}
-                />
+              <div style={{ position: 'relative', height: 'calc(100vh - 260px)', minHeight: 520 }}>
+                {viewMode === 'ifc' && fragKey ? (
+                  <>
+                    <FragmentsScene
+                      ref={fragmentsSceneRef}
+                      fragKey={fragKey}
+                      resolveAssetUrl={resolveAssetUrl}
+                      onItemSelected={handleFragmentPick}
+                      cameraPoseRef={fragmentsCameraPose}
+                      statusLabel={`单体: ${selectedBuilding?.label ?? '总体'}`}
+                      markerScene={viewScene ?? undefined}
+                    />
+                    {fragmentItem || fragmentItemLoading ? (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 12,
+                          right: 12,
+                          width: 300,
+                          maxHeight: 'calc(100% - 24px)',
+                          overflow: 'auto',
+                        }}
+                      >
+                        <FragmentPropertyPanel
+                          item={fragmentItem}
+                          loading={fragmentItemLoading}
+                          onClear={() => {
+                            pickRequestRef.current += 1
+                            setFragmentItem(null)
+                            void fragmentsSceneRef.current?.clearHighlight().catch(() => {})
+                          }}
+                          onLocateInTree={handleLocateFragmentInTree}
+                        />
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <ModelViewer
+                    scene={viewScene ?? scene}
+                    focusDrawingId={focusDrawingId}
+                    disciplineFilter={disciplineFilter}
+                    severityFilter={severityFilter}
+                    markerTypeFilter={markerTypeFilter}
+                    isolatedFloorKey={isolatedFloorKey}
+                    renderMode={viewMode === 'ifc' ? 'mixed' : (viewMode as RenderMode)}
+                    elementFilter={elementFilter}
+                    resolveAssetUrl={resolveAssetUrl}
+                    onSelectDrawing={(drawing) => setSelection({ type: 'drawing', drawing })}
+                    onSelectMarker={(marker) => setSelection({ type: 'marker', marker })}
+                    onSelectElement={(element) => setSelection({ type: 'element', element })}
+                    lodMode={lodMode}
+                    lodLabel={currentLod.label}
+                    buildingLabel={selectedBuilding?.label}
+                    pendingAnnotationCount={quality.pendingManualCount}
+                  />
+                )}
               </div>
             </Card>
             {!selectedBuilding?.hasGeometry && selectedBuilding ? (

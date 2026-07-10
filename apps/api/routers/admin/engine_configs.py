@@ -32,6 +32,8 @@ ENGINE_NAMES = [
     "report_summary_writer",     # 审查摘要（Sonnet）
     # 视觉引擎（支持多模态模型）
     "drawing_visual_analyzer",   # 复杂图纸视觉理解（Sonnet Vision）
+    # VLM 语义引擎（Phase A：读图名/标题栏/判专业/跨图提示，本地/云端热切换）
+    "drawing_semantic_vlm",      # 图纸语义抽取（Qwen-VL，本地 Ollama / 云端 DashScope）
     # 创效激励引擎
     "incentive_description_writer",  # 提案描述生成（Haiku）
 ]

@@ -78,7 +78,9 @@ services:
 
   api:
     build:
-      context: ../apps/api
+      # 上下文为 apps/：镜像需同时打包 api 与 sibling 的 model-convert（IFC→Fragments）
+      context: ../apps
+      dockerfile: api/Dockerfile
     image: cad-api:local
     container_name: cad_api
     profiles: ["app"]

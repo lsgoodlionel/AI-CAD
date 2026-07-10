@@ -25,6 +25,11 @@ celery_app.conf.update(
     enable_utc=True,
     task_track_started=True,
     task_acks_late=True,
+    # 任务硬/软超时：新链路（模型构建、批量审图）含最长 300s 阻塞子进程，
+    # 防止个别任务挂死长期占用 worker。soft 先抛 SoftTimeLimitExceeded 供收尾，
+    # hard 到点强杀。
+    task_time_limit=1800,
+    task_soft_time_limit=1500,
     worker_prefetch_multiplier=1,
     task_default_queue="default",
     task_routes={

@@ -3,26 +3,33 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "copy-thatopen-assets": "node scripts/copy-thatopen-assets.mjs",
+    "predev": "node scripts/copy-thatopen-assets.mjs",
+    "prebuild": "node scripts/copy-thatopen-assets.mjs",
     "dev": "max dev",
     "build": "max build",
     "start": "npm run dev",
-    "lint": "max lint"
+    "lint": "max lint",
+    "test:unit": "vitest run --config src/pages/model/ProjectModel/__tests__/vitest.config.mts"
   },
   "dependencies": {
     "@ant-design/icons": "^5.3.7",
     "@ant-design/pro-components": "^2.7.15",
+    "@thatopen/fragments": "3.4.6",
     "@types/three": "^0.185.0",
     "@umijs/max": "^4.3.12",
     "antd": "^5.19.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "three": "^0.185.1"
+    "three": "^0.185.1",
+    "web-ifc": "^0.0.77"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "vitest": "^2.1.9"
   },
   "overrides": {
     "@babel/runtime": "^7.26.10",
