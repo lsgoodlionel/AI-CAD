@@ -49,8 +49,35 @@ node ifc_to_fragments.mjs /tmp/model_poc.ifc /tmp/model_poc.frag
 > 仅对被修改的 MPL 源文件有回馈义务，不感染调用方。本包仅**运行时依赖**其
 > WASM/JS，未修改其源码，故对本仓库其余代码无许可影响。仍建议登记进法务核验清单。
 
+## 冒烟 fixture
+
+`fixtures/sample_building.ifc` 是一份最小合规 IFC4（单面挤出墙体），供 CI 与
+容器冒烟验证转换链路：
+
+```bash
+node ifc_to_fragments.mjs fixtures/sample_building.ifc /tmp/smoke.frag
+# -> OK /tmp/smoke.frag 1175 bytes
+```
+
+CI `model-convert` job 每次跑 `npm ci` + `node --check` + 上述冒烟；`docker-images`
+job 另在构建好的 `cad-api` 镜像内跑一次同样转换，确保镜像确实带齐 Node 与依赖。
+
+## 容器打包（cad-api 镜像）
+
+本包**随 `cad-api` 镜像一同打包**（Celery worker 与 API 共用该镜像）：
+
+- 构建上下文为 `apps/`（而非 `apps/api`），Dockerfile 把本目录 `COPY` 到
+  `/opt/model-convert` 并在其中 `npm ci --omit=dev`；镜像另装 Node 20。
+- `apps/api/services/fragments_convert.py` 通过 `MODEL_CONVERT_DIR=/opt/model-convert`
+  环境变量（镜像内已 `ENV` 预置）定位本目录与 `node_modules`；本地开发无需设置，
+  回退源码树相对路径。
+
+> 未装 Node / 未打包本目录时，`fragments_convert` 会抛 `FragmentsConversionError`，
+> 上层 `model_builder` 优雅降级为 `frag_key=null`（回退 glTF/挤出/贴图）——这正是
+> 补齐本项 infra 前 Fragments 渲染无法激活的根因。
+
 ## 与后端集成
 
-由 `apps/api/services/fragments_convert.py` 以 `subprocess` 方式调用本脚本。
-本轮（A-04）仅交付独立转换器 + Python 封装，**未接线进 `tasks/model_build.py`**
-（依赖并行的 A-03，留作后续）。
+由 `apps/api/services/fragments_convert.py` 以 `subprocess` 方式调用本脚本，
+已由 `services/model_ifc_integration.py`（经 `model_builder.build_scene`）接线进
+模型构建链路。

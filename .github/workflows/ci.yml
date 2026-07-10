@@ -202,6 +202,37 @@ jobs:
         run: |
           test -d dist && echo "Build output exists" || (echo "Build failed: dist/ not found" && exit 1)
 
+  # ── model-convert：IFC→Fragments 转换器构建 + 冒烟 ──────────────
+  # 此前 CI 完全未覆盖 apps/model-convert，导致镜像未装 Node 的缺口静默存在。
+  model-convert:
+    name: Model-convert — build & smoke
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/model-convert
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/model-convert/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check converter
+        run: node --check ifc_to_fragments.mjs
+
+      # 用真实 @thatopen/fragments + web-ifc 把样例 IFC 转成 .frag，断言非空产物。
+      - name: Smoke — IFC → .frag
+        run: |
+          node ifc_to_fragments.mjs fixtures/sample_building.ifc /tmp/smoke.frag
+          test -s /tmp/smoke.frag && echo "smoke OK: $(wc -c </tmp/smoke.frag) bytes"
+
   # ── Docker：生产镜像构建缓存 + 镜像扫描 ─────────────────────────
   docker-images:
     name: Docker — build cache & scan
@@ -211,8 +242,9 @@ jobs:
       fail-fast: false
       matrix:
         image:
+          # cad-api 上下文为 apps/（需打包 sibling 的 model-convert）
           - name: cad-api
-            context: apps/api
+            context: apps
             dockerfile: apps/api/Dockerfile
           - name: cad-web
             context: apps/web
@@ -234,6 +266,17 @@ jobs:
           tags: ${{ matrix.image.name }}:ci
           cache-from: type=gha,scope=${{ matrix.image.name }}
           cache-to: type=gha,scope=${{ matrix.image.name }},mode=max
+
+      # 容器内冒烟：验证镜像确实装了 Node + model-convert 依赖，且能把
+      # 打包进镜像的样例 IFC 转成非空 .frag（web_fragments_enabled 前置条件）。
+      # 转换器成功打印 "OK ... bytes" 并 exit 0；失败/空产物 exit≠0，阻断该步。
+      - name: Smoke — IFC → .frag inside cad-api image
+        if: matrix.image.name == 'cad-api'
+        run: |
+          docker run --rm --entrypoint node "${{ matrix.image.name }}:ci" \
+            /opt/model-convert/ifc_to_fragments.mjs \
+            /opt/model-convert/fixtures/sample_building.ifc \
+            /tmp/smoke.frag
 
       # Trivy 经官方 APT 源安装：绕开 trivy-action 内置 setup-trivy 必现的二进制
       # 下载失败（见 #4），改用可靠的 deb 渠道，安装失败会有明确报错。

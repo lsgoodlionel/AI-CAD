@@ -76,6 +76,7 @@
 - **工作量**：M（3）。
 - **验收标准**：给定合规 `.ifc`，脚本产出 `.frag` 且能被前端 Fragments 加载器解析显示；转换失败时 `frag_key` 缺省、前端回退 glTF/挤出（有降级测试）；1 万构件样例转换 <30s。
 - **风险**：Node 侧新增运行时（镜像需装 Node）；若不愿引入 Node，退路是「前端直接用 web-ifc 加载 `.ifc`」——但会牺牲 Fragments 的性能优势，需评审取舍（建议保留 A-04）。
+- **基础设施补齐（评审后）**：`cad-api` 镜像（Celery worker 共用）此前基于 `python:3.12-slim`，不含 Node、也未打包 `apps/model-convert`，导致 `fragments_convert` 在所有部署环境恒抛 `FragmentsConversionError`、`frag_key` 恒为 null。已修复：Dockerfile 装 Node 20 + 打包 `model-convert`（构建上下文改为 `apps/`，见 `apps/.dockerignore` 与 `infra/docker-compose.yml`、CI `docker-images` 矩阵）；`fragments_convert` 以 `MODEL_CONVERT_DIR` 定位；CI 新增 `model-convert` job（build/lint/冒烟）+ `docker-images` 内容器级 IFC→.frag 冒烟。此为开启 `web_fragments_enabled` 的前置条件。
 
 #### A-05 · project_models 迁移：IFC/Fragments 字段
 - **描述**：新增迁移 `017`，为 `project_models` 增列或在 `scene` JSON 约定字段（优先 JSON，避免频繁 DDL）：记录 `build_mode`（texture/elements/ifc）、`ifc_key`、`frag_key`、`is_estimated`。若走列式，补索引。

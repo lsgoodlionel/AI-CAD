@@ -25,9 +25,21 @@ from core.storage import upload_file
 
 logger = logging.getLogger(__name__)
 
-# apps/api/services/fragments_convert.py -> 仓库根 -> apps/model-convert
+# 转换器目录定位：
+# - 本地/CI 源码树：apps/api/services/fragments_convert.py -> 仓库根 -> apps/model-convert
+# - 容器内：apps/api 内容被拍平到 /app，源码树相对路径不再成立，故允许
+#   ``MODEL_CONVERT_DIR`` 环境变量覆盖（镜像里指向 /opt/model-convert）。
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_CONVERT_DIR = _REPO_ROOT / "apps" / "model-convert"
+_DEFAULT_CONVERT_DIR = _REPO_ROOT / "apps" / "model-convert"
+
+
+def _resolve_convert_dir() -> Path:
+    """定位转换器目录（``MODEL_CONVERT_DIR`` 覆盖 > 源码树默认路径）。"""
+    env_dir = os.environ.get("MODEL_CONVERT_DIR")
+    return Path(env_dir) if env_dir else _DEFAULT_CONVERT_DIR
+
+
+_CONVERT_DIR = _resolve_convert_dir()
 _CONVERT_SCRIPT = _CONVERT_DIR / "ifc_to_fragments.mjs"
 
 # 单次转换超时（秒）。1 万构件目标 <30s，留足余量并防止子进程挂死。

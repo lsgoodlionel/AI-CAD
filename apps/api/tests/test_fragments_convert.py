@@ -141,6 +141,18 @@ def test_node_binary_env_override(monkeypatch):
     assert fragments_convert._resolve_node_binary() == "/opt/node/bin/node"
 
 
+def test_convert_dir_env_override(monkeypatch):
+    """容器内布局：MODEL_CONVERT_DIR 覆盖转换器目录定位。"""
+    monkeypatch.setenv("MODEL_CONVERT_DIR", "/opt/model-convert")
+    assert fragments_convert._resolve_convert_dir() == Path("/opt/model-convert")
+
+
+def test_convert_dir_defaults_to_source_tree(monkeypatch):
+    """未设 MODEL_CONVERT_DIR 时回退源码树默认路径（本地/CI）。"""
+    monkeypatch.delenv("MODEL_CONVERT_DIR", raising=False)
+    assert fragments_convert._resolve_convert_dir() == fragments_convert._DEFAULT_CONVERT_DIR
+
+
 def test_converter_missing_script_raises(monkeypatch, tmp_path):
     monkeypatch.setattr(fragments_convert, "_CONVERT_SCRIPT", tmp_path / "missing.mjs")
     monkeypatch.setattr(fragments_convert, "_CONVERT_DIR", tmp_path)
