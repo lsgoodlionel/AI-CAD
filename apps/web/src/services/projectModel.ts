@@ -382,3 +382,52 @@ export const getModelAssetUrl = (projectId: string, key: string) =>
   request<ModelAssetUrlResult>(`${BASE}/${projectId}/model/asset-url`, {
     params: { key },
   })
+
+// ── Phase A / WS2：程序化 IFC + Fragments 加载相关类型（仅新增，不改现有）──
+// 对齐 docs/PHASE_A_TASKS.md A-05：scene.model_ifc = {ifc_key, frag_key, build_mode, is_estimated, generated_at}
+// 以及 A-08：Fragments 构件拾取返回的选中 item 形状。
+
+/** scene 重建模式：贴图 / 挤出构件 / 程序化 IFC */
+export type ModelBuildMode = 'texture' | 'elements' | 'ifc'
+
+/**
+ * 程序化 IFC / Fragments 产物元信息（scene.model_ifc）。
+ * 后端 A-03/A-04 写入；前端 A-06 依据 frag_key 拉取 .frag，缺省时回退挤出/贴图。
+ */
+export interface SceneModelIfc {
+  /** MinIO key：projects/{id}/model_ifc/{building_key}.ifc（合规 IFC4） */
+  ifc_key?: string
+  /** MinIO key：That Open Fragments 二进制（.frag），缺省=无 Fragments 产物 */
+  frag_key?: string
+  build_mode?: ModelBuildMode
+  /** 楼层标高等是否为估算（Phase A 恒可能为 true，Phase B 恢复真实标高） */
+  is_estimated?: boolean
+  generated_at?: string
+}
+
+/**
+ * Fragments 单个 Pset：属性名 → 值。
+ * 值可为字符串/数字/布尔（IFC NominalValue），保留 unknown 以便前端安全渲染。
+ */
+export type FragmentPsets = Record<string, Record<string, unknown>>
+
+/**
+ * Fragments 场景拾取到的构件（A-08）。
+ * 由 @thatopen/fragments 模型属性/Pset 归一化而来，供属性面板与语义联动消费。
+ */
+export interface PickedFragmentItem {
+  /** Fragments 模型内局部 id（getItemsData 主键）；无法解析时为 null */
+  localId: number | null
+  /** IFC expressId（部分模型与 localId 等价，保留以便对齐） */
+  expressId?: number | null
+  /** IFC 类型，如 IFCWALL / IFCCOLUMN；未知时为空串 */
+  ifcType: string
+  /** IFC GlobalId（GUID），可缺省 */
+  guid?: string
+  /** 构件名称（IfcRoot.Name） */
+  name?: string
+  /** 所属 Fragments 模型 id（多模型场景区分） */
+  modelId?: string
+  /** 属性集：Pset 名 → {属性名: 值} */
+  psets?: FragmentPsets
+}
