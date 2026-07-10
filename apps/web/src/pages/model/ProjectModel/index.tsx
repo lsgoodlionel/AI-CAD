@@ -1035,6 +1035,7 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
               extra={quality.pendingCandidateCount > 0 ? <Tag color="gold">{quality.pendingCandidateCount}</Tag> : null}
             >
               <SemanticReviewQueue
+                projectId={projectId}
                 items={semanticReviewQueue}
                 nodeNameById={Object.fromEntries(
                   Object.values(semanticNodeMap).map((node) => [node.id, node.canonicalName]),
