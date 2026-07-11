@@ -76,6 +76,7 @@
 | Phase C 泳道 D｜前端审校（C-17）：返工点埋点度量看板（确认/改类/否定/补框率 by 专业 by 类别 + 收敛趋势，rework=reclass+reject+addbox，25–30% 效率口径）| ✅ | `routers/dashboard.py`（扩展 model-review-metrics）、`pages/model/ProjectModel/ModelQualityPanel.tsx`、`tests/test_model_review_metrics.py` |
 | Phase C 汇聚（C-14）：统一评测基座（纯规则 vs 学习模型 vs 融合，PQ/精度/召回/F1/分专业分类别/混淆矩阵，度量口径锁定，一键复现）| ✅ | `core/model3d/eval/{metrics,harness,report}.py`、`scripts/model3d/eval_harness.py`、`tests/test_eval_harness.py`、`docs/PHASE_C_EVAL_REPORT.md`（model 端待 C-09 真实权重复评出 M1 结论）|
 | Phase C 收口（C-18）：里程碑 Demo + 验收报告（逐条勾对 6 项验收总标准，M2 达成/M1 基座就绪终评待 C-09，能力边界如实）| ✅ | `docs/PHASE_C_ACCEPTANCE.md`、`tests/e2e/test_phase_c_demo.py`（离线端到端断言标准 1/3/4/5/6 + 标准 2 基座就绪）|
+| 工程 3D 模型操作手册（用户版 + 管理员版，覆盖界面操作/构建流程/API/能力边界/降级/合规/安全遗留项）**边开发边更新** | ✅ | `docs/MODEL_MANUAL_USER.md`、`docs/MODEL_MANUAL_ADMIN.md`（迭代模型/API/权限/边界时须同步更新对应章节 + 文末版本历史登记）|
 
 ---
 

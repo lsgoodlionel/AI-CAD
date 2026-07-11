@@ -4,39 +4,39 @@
   "roles": [
     {
       "role": "技术负责人",
-      "password_hash": "$2b$12$1lNkYsoAPS6lCgh5hWQc5.KfHGqWU5e7r8uwP7tE7uBDtKa460MSW",
+      "password_hash": null,
       "seal": {
         "configured": false,
         "fingerprint": null
       },
-      "signed": true,
-      "method": "password",
-      "signed_at": "2026-07-10T08:55:25+00:00",
-      "note": "测试预设默认密码000000，正式启用前请各责任人 revoke 后重设专用密码"
+      "signed": false,
+      "method": null,
+      "signed_at": null,
+      "note": "未签核。上线部署前须由本人用 scripts/model3d/phase_c_signoff.py set-password（强密码≥8位，禁纯数字/弱口令）+ sign，或 set-seal + seal-sign 完成签核。"
     },
     {
       "role": "法务合规",
-      "password_hash": "$2b$12$4a/qnL50U0HJ2zkItiPNSe1KZY5XFgOcMJ/KNhRksBGX.SXB7ojay",
+      "password_hash": null,
       "seal": {
         "configured": false,
         "fingerprint": null
       },
-      "signed": true,
-      "method": "password",
-      "signed_at": "2026-07-10T08:55:25+00:00",
-      "note": "测试预设默认密码000000，正式启用前请各责任人 revoke 后重设专用密码"
+      "signed": false,
+      "method": null,
+      "signed_at": null,
+      "note": "未签核。上线部署前须由本人用 scripts/model3d/phase_c_signoff.py set-password（强密码≥8位，禁纯数字/弱口令）+ sign，或 set-seal + seal-sign 完成签核。"
     },
     {
       "role": "Phase C 负责人",
-      "password_hash": "$2b$12$PUyOmg2Txdrs/YIEJt6F4O2j3hwqRJfoyCmjm6KUk92Xe1Po0pWt.",
+      "password_hash": null,
       "seal": {
         "configured": false,
         "fingerprint": null
       },
-      "signed": true,
-      "method": "password",
-      "signed_at": "2026-07-10T08:55:25+00:00",
-      "note": "测试预设默认密码000000，正式启用前请各责任人 revoke 后重设专用密码"
+      "signed": false,
+      "method": null,
+      "signed_at": null,
+      "note": "未签核。上线部署前须由本人用 scripts/model3d/phase_c_signoff.py set-password（强密码≥8位，禁纯数字/弱口令）+ sign，或 set-seal + seal-sign 完成签核。"
     }
   ]
 }
