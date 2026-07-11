@@ -716,6 +716,66 @@ async def _attach_floor_elements(
     return yolo_total
 
 
+# 建筑包络裁剪参数:柱定义可信包络,构件质心超出即视为比例/配准离群
+_ENVELOPE_MIN_COLUMNS = 20        # 柱点少于此值不足以定包络,跳过裁剪
+_ENVELOPE_MARGIN_RATIO = 0.35     # 包络在柱 p2~p98 范围外再放宽的比例
+_ENVELOPE_MARGIN_MIN_M = 30.0     # 放宽下限(米)
+_MAX_ELEMENT_SPAN_M = 300.0       # 单构件自身跨度上限(超出=比例错误的离群构件)
+
+
+def _robust_bounds(values: list[float]) -> tuple[float, float]:
+    """分位数抗离群边界(p2~p98)+ 放宽边距。"""
+    ordered = sorted(values)
+    count = len(ordered)
+    low = ordered[int(count * 0.02)]
+    high = ordered[min(int(count * 0.98), count - 1)]
+    margin = max((high - low) * _ENVELOPE_MARGIN_RATIO, _ENVELOPE_MARGIN_MIN_M)
+    return low - margin, high + margin
+
+
+def _clip_elements_to_envelope(floors: list[dict]) -> None:
+    """裁掉质心落在建筑包络外的离群构件。
+
+    机电图比例检测出错时,管线/设备坐标会冲到数千米(实测 2416m),把模型撑成
+    巨大的扁平 sprawl。以可靠的**柱**坐标(分位数抗离群)建立建筑包络,凡质心
+    远超包络的构件视为比例/配准离群并剔除。柱本身定义包络,全部保留。
+    """
+    col_x: list[float] = []
+    col_y: list[float] = []
+    for floor in floors:
+        for column in (floor.get("elements") or {}).get("columns") or []:
+            for point in column.get("outline") or []:
+                if len(point) >= 2:
+                    col_x.append(float(point[0]))
+                    col_y.append(float(point[1]))
+    if len(col_x) < _ENVELOPE_MIN_COLUMNS:
+        return
+    x0, x1 = _robust_bounds(col_x)
+    y0, y1 = _robust_bounds(col_y)
+
+    for floor in floors:
+        elements = floor.get("elements") or {}
+        for kind, items in list(elements.items()):
+            kept = []
+            for element in items:
+                pts = [
+                    p for key in ("outline", "path")
+                    for p in (element.get(key) or []) if len(p) >= 2
+                ]
+                if not pts:
+                    kept.append(element)
+                    continue
+                xs = [float(p[0]) for p in pts]
+                ys = [float(p[1]) for p in pts]
+                cx = sum(xs) / len(xs)
+                cy = sum(ys) / len(ys)
+                span = max(max(xs) - min(xs), max(ys) - min(ys))
+                if x0 <= cx <= x1 and y0 <= cy <= y1 and span <= _MAX_ELEMENT_SPAN_M:
+                    kept.append(element)
+            elements[kind] = kept
+        floor["element_stats"] = model_elements.element_stats(elements)
+
+
 def _apply_real_elevations(floors: list[dict]) -> None:
     """由图纸标高文本推导楼层真实标高（米）→ floor.elevation_m。
 
@@ -1028,6 +1088,7 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     assets, ifc_models, ifc_skipped = await _build_assets(project_id, drawings, progress_cb)
     floors, floor_of = _build_floors(drawings, issues_by_drawing, assets, normalization)
     yolo_total = await _attach_floor_elements(floors, drawings, floor_of, progress_cb)
+    _clip_elements_to_envelope(floors)  # 裁掉离群构件(机电比例错误致管线冲到数千米)
     # B-07：剖面/详图截面回填构件（实测覆盖硬编码默认；无标注时全默认→无副作用）。
     component_sections = await _recover_component_sections(drawings)
     model_component_sections.apply_component_sections(floors, component_sections)
