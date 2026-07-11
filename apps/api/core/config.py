@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     # MinIO
     minio_endpoint: str = "localhost:9000"
+    # 浏览器可达的 MinIO 端点(用于生成预签名 URL)。内网 endpoint(如 minio:9000)
+    # 浏览器无法解析,须在此配成主机/域名可达地址(如 localhost:9002);留空则回退 minio_endpoint。
+    minio_public_endpoint: str = ""
     minio_access_key: str = "cad_minio"
     minio_secret_key: str = "cad_minio_pass"
     minio_bucket_drawings: str = "drawings"

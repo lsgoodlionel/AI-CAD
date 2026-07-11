@@ -5,6 +5,7 @@ from minio.error import S3Error
 from core.config import settings
 
 _client: Minio | None = None
+_public_client: Minio | None = None
 
 
 def get_minio() -> Minio:
@@ -18,6 +19,29 @@ def get_minio() -> Minio:
         )
         _ensure_buckets(_client)
     return _client
+
+
+def _get_presign_client() -> Minio:
+    """用于生成预签名 URL 的客户端。
+
+    优先用 minio_public_endpoint(浏览器可达),使签名 host 与浏览器访问一致,
+    避免内网 endpoint(minio:9000)导致的 ERR_NAME_NOT_RESOLVED。仅本地签名,
+    不发起网络连接;未配置公网端点时回退内网客户端(行为不变)。
+    """
+    global _public_client
+    if not settings.minio_public_endpoint:
+        return get_minio()
+    if _public_client is None:
+        _public_client = Minio(
+            settings.minio_public_endpoint,
+            access_key=settings.minio_access_key,
+            secret_key=settings.minio_secret_key,
+            secure=settings.minio_use_ssl,
+            # 显式 region:预签名仅本地签名,公网端点在容器内不可达,
+            # 设 region 可避免 minio-py 触发 GetBucketLocation 网络查询。
+            region="us-east-1",
+        )
+    return _public_client
 
 
 def _ensure_buckets(client: Minio) -> None:
@@ -46,10 +70,10 @@ def upload_file(
 
 
 def presigned_get_url(object_key: str, expires_seconds: int = 300, bucket: str | None = None) -> str:
-    """生成签名下载 URL（默认 5 分钟有效）"""
+    """生成签名下载 URL（默认 5 分钟有效）。用浏览器可达端点签名（见 _get_presign_client）。"""
     from datetime import timedelta
     bucket = bucket or settings.minio_bucket_drawings
-    client = get_minio()
+    client = _get_presign_client()
     return client.presigned_get_object(bucket, object_key, expires=timedelta(seconds=expires_seconds))
 
 

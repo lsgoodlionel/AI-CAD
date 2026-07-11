@@ -60,6 +60,9 @@ MARKER_TITLE_MAX = 80
 COORD_MIN, COORD_MAX = 0.1, 0.9
 CLUSTER_STEP = 0.02
 SEVERITY_KEYS = ("critical", "major", "minor", "info")
+# 成果标记按严重度封顶:避免上万条问题全部布点导致视口红点堆叠、可读性差。
+# 各级保留代表性样本(总量 ≤ ~1500),完整问题数仍在 stats.by_severity 与 AI 报告中。
+MAX_MARKERS_PER_SEVERITY = {"critical": 500, "major": 500, "minor": 300, "info": 200}
 CROSS_LINK_KINDS = ("接口缺图", "问题聚类", "版本冲突", "重复图号")
 
 _PROJECT_SQL = "SELECT id, name FROM projects WHERE id=:project_id"
@@ -462,9 +465,12 @@ def _marker_of_issue(
 def _build_markers(
     issues_by_drawing: dict[str, list[dict]], floor_of: dict[str, str]
 ) -> list[dict]:
-    """成果标记层：issues.location_json(levels) → floor_key + 稳定坐标。"""
-    markers: list[dict] = []
-    cluster_counters: dict[tuple[str, str], int] = {}
+    """成果标记层：issues.location_json(levels) → floor_key + 稳定坐标。
+
+    按严重度分组并各自封顶(见 MAX_MARKERS_PER_SEVERITY),避免上万条问题全部
+    布点造成红点堆叠;严重/较大优先,各级保留代表性样本。
+    """
+    by_severity: dict[str, list[tuple[dict, str]]] = {key: [] for key in SEVERITY_KEYS}
     for drawing_id, issues in issues_by_drawing.items():
         fallback_key = floor_of.get(drawing_id, "UNZONED")
         for issue in issues:
@@ -475,6 +481,14 @@ def _build_markers(
                 None,
             )
             floor_key = parsed[0] if parsed else fallback_key
+            severity = str(issue.get("severity") or "info")
+            by_severity.setdefault(severity, []).append((issue, floor_key))
+
+    markers: list[dict] = []
+    cluster_counters: dict[tuple[str, str], int] = {}
+    for severity in SEVERITY_KEYS:
+        cap = MAX_MARKERS_PER_SEVERITY.get(severity, 200)
+        for issue, floor_key in by_severity.get(severity, [])[:cap]:
             markers.append(_marker_of_issue(issue, floor_key, cluster_counters))
     return markers
 
@@ -668,6 +682,16 @@ async def _attach_floor_elements(
             "recognize", "识别楼层构件（柱/墙/梁/板/管线/设备）",
             str(floor.get("label") or floor["key"]), index, len(floors),
         ))
+        if floor["key"] == "UNZONED":
+            # 未分层图纸(多为详图/系统图/说明,非平面图)未定位到楼层,不注入楼层
+            # 构件几何——否则其数千个"构件"会在基座平面堆叠成噪声(挤在一起)。
+            # 这些图在待人工识别队列中,人工归层后重建即可正确落层。
+            floor["elements"] = {k: [] for k in model_elements.EMPTY_ELEMENTS}
+            floor["element_stats"] = model_elements.element_stats(floor["elements"])
+            floor["_elevation_candidates"] = []
+            floor["_lod_registered_drawings"] = 0
+            floor["_lod_evidence"] = {}
+            continue
         floor_drawings = drawings_by_floor.get(floor["key"], [])
         try:
             elements, yolo_count, meta = await model_elements.build_floor_elements(
