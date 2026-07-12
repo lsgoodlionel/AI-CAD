@@ -1,16 +1,25 @@
 # 工程 3D 模型 · 开发交接记录
 
-> 生成日期 2026-07-12 ｜ 分支 `fix/model-3d-quality`(基于 `main`)
-> 目的:在新窗口/新机器继续开发。本文件汇总本轮已完成、未完成、环境坑、以及各待办的诊断与解决方案。
+> 生成日期 2026-07-12（阶段性收尾更新）｜ 分支 `fix/model-3d-quality`(基于 `main`)｜ PR [#11](https://github.com/lsgoodlionel/AI-CAD/pull/11)
+> 目的:在新窗口/新机器继续开发。本文件汇总本阶段已完成、未完成、环境认知、以及各待办的诊断与解决方案。
 
 ---
 
 ## 0. 一分钟接手
 
-- **当前分支** `fix/model-3d-quality`,已提交 6 个 commit(见 §2),**未 push、未开 PR**。
-- **验证项目**:上海大歌剧院 `project_id=9188e163-c684-415e-a4ec-08f208273eff`(2309 张竣工图,模型 v13+)。
-- **本机环境有坑**:Docker Desktop 的 compose 是非常规 v5.x,`docker compose build` 空操作、端口 `!override` 失效。**改后端代码靠 `docker cp` 注入运行容器**,**改前端靠 `npm run build` + `docker cp dist` 进 nginx**。提交的代码是权威源,正常环境 `docker build` 能打包(见 §5 Task 2)。
-- **测试账号**:admin/economist/pm/designer 密码统一 `admin123`。前端 `localhost:3002`,API 经代理容器 `cad_api_proxy` → `localhost:8002`。
+- **当前分支** `fix/model-3d-quality`,**已 push,PR [#11](https://github.com/lsgoodlionel/AI-CAD/pull/11) 开着待评审/合并**。本阶段共 10 个 commit(见 §2)。
+- **验证项目**:上海大歌剧院 `project_id=9188e163-c684-415e-a4ec-08f208273eff`(2309 张竣工图,模型 v15+)。
+- **环境认知已更正**:此前「compose 坏了」是误判——compose v5.x 正常,`docker compose build` 已完整跑通(见 §5 Task 2)。**日常起停/热重载/打包部署统一按 [../infra/DEV.md](../infra/DEV.md)**。改后端优先用 dev override 的 volume 挂载热重载(而非 docker cp);改前端 `npm run build` + `docker cp dist` 进 nginx(或本机 `npm run dev`)。
+- **测试账号**:admin/economist/pm/designer 密码统一 `admin123`。前端 `localhost:3002`,API `localhost:8002`(alt-ports `!override` 直接映,`cad_api_proxy` 代理容器多余可删)。
+
+### 本阶段一句话成果
+上海大歌剧院实测驱动:**建模致命修复**(渲染/幻影层/标高/sprawl/贴图/红点/未分层)+ **模型页 UX** + **楼层标高人工录入通道** + **Web 帮助中心** + **内存优化 1.1GB→115MB** + **图纸全文 OCR 基座** + **compose 认知更正**。所有前端 63 单测、OCR 24 单测全绿,真实 `docker compose build` 已跑通。
+
+### 后续升级路线(优先级)
+1. **OCR 真实推理落地**(高):放开 `requirements` 的 paddle 依赖正式 build → 真实图验准确率 → 逐步 wiring 到 `section_z`/`grid_anchor`/`semantics`(接入缝 `core/model3d/ocr/consume.py` 已就绪)。见 [MODEL_OCR.md](MODEL_OCR.md)。
+2. **PR #11 合并**(高):CI 通过后合入 `main`。
+3. **建模精度继续**(中):地上层高剖面稀少,仍依赖人工录入通道;跨视图 z 恢复(section-z)可接 OCR 标高候选自动打底。
+4. **内存进阶**(低):当前 115MB 已够用;如需更进一步可对 scene JSON 开 gzip、按楼层懒加载。
 
 ---
 
