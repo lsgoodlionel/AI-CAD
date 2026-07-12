@@ -1,0 +1,36 @@
+# 开发热重载 override(测试用):挂载源码 + 自动重载,改代码即生效,无需重建镜像。
+# 正式部署仍用打包镜像(docker-compose.yml,不叠加本文件)。
+#
+# 用法(叠加在基础 + alt-ports 之上):
+#   docker compose -p cad \
+#     -f infra/docker-compose.yml \
+#     -f infra/docker-compose.alt-ports.yml \
+#     -f infra/docker-compose.dev.yml \
+#     --profile app up -d api celery-worker celery-beat
+#
+# 之后改 apps/api/**.py:
+#   - api:uvicorn --reload 自动重载,秒级生效;
+#   - celery-worker/beat:非自动重载,`docker restart cad_celery_worker` 即加载新代码(无需重建镜像)。
+#
+# 前端热重载:本机 node 直接跑(最省事),见 infra/DEV.md:
+#   cd apps/web && npm run dev   # UmiJS dev server(localhost:8000),proxy /api → localhost:8002
+#
+# 注意:本机 Docker Desktop 的 compose 为非常规 v5.x,`docker compose build` 可能空操作、
+# 端口 !override 可能失效。需重建镜像时用直接构建:
+#   docker build -t cad-api:local -f apps/api/Dockerfile apps
+#   docker build -t cad-web:local -f apps/web/Dockerfile apps/web
+
+services:
+  api:
+    volumes:
+      - ../apps/api:/app
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  celery-worker:
+    volumes:
+      - ../apps/api:/app
+    # celery 无热重载;改代码后 `docker restart cad_celery_worker` 加载(挂载已就位,无需重建)
+
+  celery-beat:
+    volumes:
+      - ../apps/api:/app

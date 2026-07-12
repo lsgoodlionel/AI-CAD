@@ -1,0 +1,153 @@
+# 工程 3D 模型 · 开发交接记录
+
+> 生成日期 2026-07-12 ｜ 分支 `fix/model-3d-quality`(基于 `main`)
+> 目的:在新窗口/新机器继续开发。本文件汇总本轮已完成、未完成、环境坑、以及各待办的诊断与解决方案。
+
+---
+
+## 0. 一分钟接手
+
+- **当前分支** `fix/model-3d-quality`,已提交 6 个 commit(见 §2),**未 push、未开 PR**。
+- **验证项目**:上海大歌剧院 `project_id=9188e163-c684-415e-a4ec-08f208273eff`(2309 张竣工图,模型 v13+)。
+- **本机环境有坑**:Docker Desktop 的 compose 是非常规 v5.x,`docker compose build` 空操作、端口 `!override` 失效。**改后端代码靠 `docker cp` 注入运行容器**,**改前端靠 `npm run build` + `docker cp dist` 进 nginx**。提交的代码是权威源,正常环境 `docker build` 能打包(见 §5 Task 2)。
+- **测试账号**:admin/economist/pm/designer 密码统一 `admin123`。前端 `localhost:3002`,API 经代理容器 `cad_api_proxy` → `localhost:8002`。
+
+---
+
+## 1. 本轮已完成(已提交)
+
+### 建模质量修复(评测上海大歌剧院,commit 7be5bbc / 691ac18)
+| 项 | 修复前 | 修复后 |
+|---|---|---|
+| 三维渲染 | 全空白 | 正常显示 13 层堆叠建筑 |
+| 楼层数 | 42(幻影层) | 13(真实) |
+| 标高范围 | -411.6~441m | -16.8~31.5m |
+| 模型尺寸 | 2583×3414m | 397×209m |
+| 贴图加载 | 全挂(ERR_NAME_NOT_RESOLVED) | 0 报错 |
+| 红点标记 | 23417 | 1500(按严重度封顶) |
+| 基座噪声构件 | 2777(未分层) | 0 |
+
+- `model_story.py`:楼层可信范围约束(弱来源不造幻影层)+ 基础/屋面哨兵标高隔离
+- `model_builder.py`:标记按严重度封顶;未分层图不注入楼层构件;**离群构件裁剪(柱分位数包络)消除机电比例错误导致的 sprawl**
+- `element_recognizer.py`:板识别柱包络兜底;`floor_parser.py`:桩基→基础
+- `storage.py`/`config.py`/`docker-compose.yml`:MinIO 公网端点(预签名 URL 浏览器可达)
+- 评测报告:`docs/MODEL_EVAL_SGOH.md`
+
+### 工程模型页 UX(commit ed0d440)
+- 右栏「语义审查/待人工识别/楼层标高校正」→ 可折叠面板 `CollapsiblePanel`(展开收起+限高滚动)
+- 3D 区蓝色边框 + `ModelViewer` 右下角控制按钮(旋转/平移/缩放/复位),鼠标 OrbitControls 保留
+
+### 楼层标高人工录入/校正(commit b737973)
+- migration 025 + `model_story_manual.py` 仓储;`build_scene` 加载人工层高,**按累加层高补全真实底标高**(锚定 ±0.000),使层高真正抬升上层
+- API `GET/POST /projects/{id}/model/story-heights`;前端 `StoryHeightPanel`(自动参考 + 人工录入)
+- 验证:录 2层=6.0m → 3层标高 9.0→10.5m,4层→15.9m ✓
+
+### 更早(commit a188a4b)
+- Phase C 签字门禁:清除弱密码 000000 假签 + 密码强度校验 + CI 告警不阻断
+- 工程 3D 模型操作手册(用户版 + 管理员版):`docs/MODEL_MANUAL_USER.md` / `MODEL_MANUAL_ADMIN.md`
+
+---
+
+## 2. Commit 清单(分支 fix/model-3d-quality)
+
+```
+b737973 feat(model3d): 楼层标高人工录入/校正通道(自动打底→人工校正)
+ed0d440 feat(model3d-ui): 工程模型页 UX 优化(折叠面板 + 3D 视角控制 + 边框)
+691ac18 fix(model3d): 离群构件裁剪消除横向 sprawl(模型 2583m→397m)
+a188a4b chore(phase-c,docs): 清除签字门禁弱密码 + 3D 模型操作手册
+7be5bbc fix(model3d): 修复上海大歌剧院建模致命问题(P0/P1/P2)
+```
+> 另有未提交:`infra/docker-compose.dev.yml`(热重载,§5 Task2)、`infra/api-proxy.conf`(8002 代理)、本文件。
+
+---
+
+## 3. 待办与诊断(本轮新提 5 项)
+
+### Task 1 — 工程模型页内存过大/重载 ✅诊断完成 ⏳待实现
+**诊断结论:内存压力在浏览器(web 客户端),不在服务器。**
+- 服务器只构建一次 scene 存 DB;浏览器下载 **7.2MB scene JSON**,解析后在 three.js 建 **~12,500 个构件 mesh + 1500 标记**。这是 WebGL 几何 + JS 堆的主要占用,重载多因浏览器 tab OOM。
+- **解决方向(服务器多处理,web 尽量轻):**
+  1. **InstancedMesh**(最大收益):重复构件(3415 柱 / 5774 管线)用 three.js `InstancedMesh` 合批,12500 draw → 数个 → 显存/内存骤降。改 `elementsBuilder.ts`。
+  2. **按楼层/单体懒加载**:只渲染当前隔离层的几何,切层再建。
+  3. **服务端瘦身 payload**:scene 只传轻量几何(简化轮廓/去冗余点),或分块流式;`GET /model` 响应开 gzip(7MB→~1MB)。
+  4. **卸载复用**:已有 `disposeObjectTree`,确保切场景彻底释放。
+- 优先级:①InstancedMesh ②懒加载 ③gzip。
+
+### Task 2 — compose build 坏了 ✅根因定位 ✅方案就绪
+**根因**:本机 Docker Desktop(4.81.0)的 `docker compose` 为**非常规 v5.x**(官方是 v2.x),`docker compose build` 空操作、端口 `!override` 失效、`up` 会把 8002 端口串给 worker/beat。
+- **镜像打包(正式部署)**:改用直接构建,不用 `docker compose build`:
+  ```
+  docker build -t cad-api:local -f apps/api/Dockerfile apps
+  docker build -t cad-web:local -f apps/web/Dockerfile apps/web
+  ```
+- **测试热重载(不重建镜像)**:已提供 `infra/docker-compose.dev.yml`(挂载源码 + `uvicorn --reload`)。用法见该文件头注释。前端 dev 建议本机 `npm run dev`(node 24)。
+- **端口 8002**:因 `!override` 失效,当前靠 nginx 代理容器 `cad_api_proxy`(`infra/api-proxy.conf`)转发 8002→cad_api:8000。新机器若 compose 正常,直接用 alt-ports 的 8002 映射即可,删掉代理。
+
+### Task 3 — web 页面缺「操作手册」入口 ⏳待实现
+- 现状:手册在 `docs/MODEL_MANUAL_*.md`,但**前端没有查看入口**(此前的 Help 页未落盘/未部署)。
+- **方案**:加 `/help` 路由 + 左侧菜单或头部「帮助中心」入口;页面 fetch 手册(把 md 拷进 `public/manual/` + 轻量渲染,或后端出一个只读端点)。按角色区分:普通用户看用户版、管理员多看管理员版。
+- 载体二选一:平台内 md 渲染页 / 直接内嵌图文 HTML。参考构建+部署流程见 §4。
+
+### Task 4 — OCR 识别图纸全部文字(核心功能)⚠️ 大功能,已探明前置
+- **背景**:CAD 导出 PDF 的正文标注(标高、轴号、构件名、说明)是**矢量绘制的字形,非可提取文本**——`page.get_text` 只拿到标题栏。文字对模型完整性/图纸拼接理解很重要(用户强调)。
+- **已探明**:PaddleOCR/tesseract **未安装**;临时装的 tesseract 在真实工程图上**读不出**(细线稀疏,力不从心)。渲染出的标高对人眼**清晰可读**(见 `MODEL_EVAL_SGOH.md`)——说明**OCR 可行,但需强引擎 PaddleOCR**。
+- **推进方案(作为核心功能):**
+  1. 依赖:`requirements` 加 `paddleocr`+`paddlepaddle`(重,约数百 MB;镜像层需正式 build)。
+  2. 管线:图纸 → fitz 渲染高 DPI 位图 → PaddleOCR(中文)→ 结构化文本(内容+坐标+置信度)。
+  3. 消费:文本喂入①楼层/标高识别(补 section-z,自动打底人工校正)②轴号→图纸拼接配准③构件名/说明→语义。
+  4. 纪律:**置信门槛 + 人工复核**,低置信不采纳(读错比缺失更糟)。先在几张真实图上验准确率再全量。
+  5. 注意:多为基坑/围护剖面(地下标高),地上层剖面稀少——地上层高仍主要靠人工录入(Task 3 已建通道)。
+
+### Task 5 — 本交接记录 ✅(本文件)
+
+---
+
+## 4. 如何运行 / 构建 / 部署(本机现状)
+
+### 起停
+- 全栈已在跑:`cad_postgres/redis/minio/chroma`(基础)、`cad_api`(内部 8000)、`cad_celery_worker/beat`、`cad_web`(nginx,3002)、`cad_api_proxy`(8002→api)。
+- DB 直连:`docker exec cad_postgres psql -U cad_user -d cad_db`。
+
+### 改后端代码(本机 build 坏,用 cp 注入)
+```
+for c in cad_api cad_celery_worker; do docker cp apps/api/<改动文件> $c:/app/<路径>; done
+docker restart cad_api cad_celery_worker
+```
+应用迁移:`docker exec -i cad_postgres psql -U cad_user -d cad_db < apps/api/migrations/xxx.sql`
+
+### 改前端代码
+```
+cd apps/web && npm run build           # node_modules 已在
+docker exec cad_web sh -c "rm -rf /usr/share/nginx/html/*"
+docker cp dist/. cad_web:/usr/share/nginx/html/
+```
+
+### 触发模型重建 + 看进度
+```
+docker exec cad_api python3 -c "from tasks.model_build import build_project_model; print(build_project_model.delay('<PID>').id)"
+docker exec cad_postgres psql -U cad_user -d cad_db -t -A -c "select status,progress->>'stage' from project_models where project_id='<PID>';"
+```
+
+### 截图验证(Playwright,node 24)
+- 脚本在 `<scratchpad>/walk/`(opera.js 等):登录 admin/admin123 → 打开 `localhost:3002/model/<PID>` → 截图。
+
+---
+
+## 5. 环境坑速查(务必先读)
+
+1. **compose v5.x**:`docker compose build` 空操作、`!override` 失效、`up` 端口串漏。→ 直接 `docker build`;dev 用 `docker-compose.dev.yml` 挂载热重载。
+2. **镜像重建会丢 docker cp 的代码**:本机改动是 cp 进容器的,容器 recreate 即回退旧镜像。要么正常 build 打包,要么 recreate 后重新 cp。
+3. **MinIO 公网端点**:`MINIO_PUBLIC_ENDPOINT=localhost:9002` 必须设,否则贴图 ERR_NAME_NOT_RESOLVED。
+4. **Bash/分类器偶发不可用**:只读操作(读文件/搜代码)不受影响;docker/git 命令偶尔要重试。
+5. **OCR 依赖未装**:paddleocr/tesseract 都没有;Task 4 要正式装。
+6. **演示层高**:歌剧院 2层=6.0/3层=5.4 是测试录入(非真实),可在「楼层标高校正」清空后重建恢复自动值。
+
+---
+
+## 6. 建议的下一步优先级
+
+1. **Task 2 收尾**:新机器上验证标准 compose,删代理容器,跑通 `docker-compose.dev.yml` 热重载 → 开发体验恢复正常。
+2. **Task 1 InstancedMesh** → 解决内存/重载(用户体验硬伤)。
+3. **Task 3 帮助入口** → 快速可见价值。
+4. **Task 4 OCR** → 立项作为核心功能,按 §3 Task4 分步,先验准确率。
+5. push 分支 + 开 PR(全部改动已在 `fix/model-3d-quality`)。
