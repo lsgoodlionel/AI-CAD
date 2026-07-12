@@ -76,7 +76,7 @@ a188a4b chore(phase-c,docs): 清除签字门禁弱密码 + 3D 模型操作手册
 ### Task 2 — compose「build 坏了」✅ 已复核:compose 没坏,是误用
 **复核结论(2026-07-12 实测,推翻此前"非常规 fork"判断)**:
 - **compose v5.x 是 2026 年的正常版本**:Docker Desktop 4.81.0 自带的官方 compose 就是 v5.2.0(`/Applications/Docker.app/Contents/Resources/cli-plugins/docker-compose`);`~/.docker/modules/cli-plugins/docker-compose` v5.3.0 是 Docker Desktop **官方模块更新机制**,不是 rogue fork。
-- **`docker compose build` 正常**:`docker compose --profile app build --dry-run web api` 明确输出「Image cad-web:local Building / cad-api:local Building」。真实构建也能启动(仅在拉未缓存基础镜像 `node:20-alpine` 时受网络影响,与 compose 无关)。
+- **`docker compose build` 正常**:`docker compose --profile app build --dry-run web api` 明确输出「Image cad-web:local Building / cad-api:local Building」。**真实构建已完整跑通**:`docker compose -p cad -f docker-compose.yml -f docker-compose.alt-ports.yml --profile app build web` 成功产出新 `cad-web:local`(镜像时间戳刷新)。此前唯一阻塞是本机拉基础镜像 `node:20-alpine`/`nginx:1.27-alpine` 时网络超时(纯环境问题,`docker pull` 预热后即通),与 compose 无关。
 - **`!override` 正常**:`docker compose -f docker-compose.yml -f docker-compose.alt-ports.yml --profile app config` 输出 api→8002、postgres→5434、web→3002,端口正确重映射。
 - **此前症状是误用**:①api/web/celery 在 `profiles: [app]` 后面,不加 `--profile app` 就不会被 build/up;②`docker compose up -d`(不带 `--build`)会**复用旧镜像**——这是 compose 标准行为,不是"空操作";要重建须显式 `build` 或 `up --build`。
 - **`cad_api_proxy` 代理容器多余**:alt-ports 的 `!override` 直接把 8002 映到 api 容器即可;新环境不需要该代理,可 `docker rm -f cad_api_proxy`。
