@@ -51,6 +51,7 @@ import type {
 import CollapsiblePanel from './CollapsiblePanel'
 import DrawingAnnotationQueue from './DrawingAnnotationQueue'
 import ModelQualityPanel from './ModelQualityPanel'
+import StoryHeightPanel from './StoryHeightPanel'
 import ModelViewer from './ModelViewer'
 import FragmentsScene from './FragmentsScene'
 import SemanticReviewQueue from './SemanticReviewQueue'
@@ -1071,6 +1072,14 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
                 storyOptionsByBuilding={storyOptionsByBuilding}
                 onSave={handleSaveAnnotation}
               />
+            </CollapsiblePanel>
+            <CollapsiblePanel
+              title="楼层标高校正"
+              defaultOpen={false}
+              maxBodyHeight={460}
+              style={{ marginTop: 12 }}
+            >
+              <StoryHeightPanel projectId={projectId} onSaved={handleRebuild} />
             </CollapsiblePanel>
           </Col>
         </Row>

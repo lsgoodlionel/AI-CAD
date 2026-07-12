@@ -34,6 +34,7 @@ from services import (
     model_ifc_integration,
     model_semantics,
     model_story,
+    model_story_manual,
     model_topology,
     section_z_recovery,
     vlm_semantics,
@@ -776,6 +777,52 @@ def _clip_elements_to_envelope(floors: list[dict]) -> None:
         floor["element_stats"] = model_elements.element_stats(elements)
 
 
+def _accumulate_manual_elevations(normalization, overrides: dict) -> dict:
+    """按累加层高计算每层真实底标高,补全 override 的 elevation_bottom_m。
+
+    标高默认按 order 独立算((order-1)×层高),改层高不会抬升上层。此处对含
+    override 的单体,以 ±0.000(order=1)为锚点,用各层层高(override 优先,否则
+    现层高)向上/向下累加真实底标高,写入 override,使人工层高真正生效。
+    """
+    default_h = model_story.DEFAULT_STORY_HEIGHT_M
+    result = dict(overrides)
+    affected_units = {unit for (unit, _story) in overrides}
+
+    def height_of(unit_key: str, level) -> float:
+        override = overrides.get((unit_key, level.story_key))
+        if override and override.get("height_m"):
+            return float(override["height_m"])
+        return float(getattr(level, "height_m", None) or default_h)
+
+    for unit_key, levels in normalization.stories_by_building.items():
+        if unit_key not in affected_units:
+            continue
+        ordered = sorted(levels, key=lambda lv: lv.story_order)
+        if not ordered:
+            continue
+        elevations = [0.0] * len(ordered)
+        anchor = next((i for i, lv in enumerate(ordered) if lv.story_order == 1), None)
+        if anchor is None:
+            elevations[0] = float(getattr(ordered[0], "elevation_m", None) or 0.0)
+            for i in range(1, len(ordered)):
+                elevations[i] = round(elevations[i - 1] + height_of(unit_key, ordered[i - 1]), 3)
+        else:
+            elevations[anchor] = 0.0
+            for i in range(anchor + 1, len(ordered)):
+                elevations[i] = round(elevations[i - 1] + height_of(unit_key, ordered[i - 1]), 3)
+            for i in range(anchor - 1, -1, -1):
+                elevations[i] = round(elevations[i + 1] - height_of(unit_key, ordered[i]), 3)
+        for level, elevation in zip(ordered, elevations):
+            existing = result.get((unit_key, level.story_key), {})
+            result[(unit_key, level.story_key)] = {
+                "height_m": height_of(unit_key, level),
+                "elevation_bottom_m": elevation,
+                "source": existing.get("source", "manual"),
+                "confidence": existing.get("confidence", 1.0),
+            }
+    return result
+
+
 def _apply_real_elevations(floors: list[dict]) -> None:
     """由图纸标高文本推导楼层真实标高（米）→ floor.elevation_m。
 
@@ -1078,9 +1125,14 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     normalization = model_story.normalize_story_table(drawings, annotation_overrides)
     # B-05：跨视图 z 恢复（仅剖面标高）——有剖面则以实测层高重归一化并点亮 gate；无剖面 no-op。
     section_z = await _recover_section_z(drawings, normalization)
-    if section_z.z_overrides:
+    # Task 3：人工录入层高作为最高优先级 override（覆盖剖面/估算），消除均匀默认层高。
+    manual_overrides = await model_story_manual.fetch_manual_overrides(db, project_id)
+    combined_overrides = {**(section_z.z_overrides or {}), **manual_overrides}
+    if combined_overrides:
+        # 按累加层高补全每层真实底标高（锚定 ±0.000），使人工层高真正抬升上层楼层。
+        combined_overrides = _accumulate_manual_elevations(normalization, combined_overrides)
         normalization = model_story.normalize_story_table(
-            drawings, annotation_overrides, z_overrides=section_z.z_overrides
+            drawings, annotation_overrides, z_overrides=combined_overrides
         )
     semantic_payload = vlm_semantics.merge_vlm_into_semantic_payload(
         _semantic_scene_payload(drawings), vlm_by_drawing
