@@ -78,5 +78,8 @@ ultralytics==8.3.202
 Pillow==10.4.0
 
 # ── 可选：重量级 OCR（按需安装，graceful degradation）──
+# 图纸全文 OCR（core/model3d/ocr）：CAD PDF 正文标注为矢量字形，get_text 取不到，
+# 需高 DPI 栅格化 + PaddleOCR 中文识别。未安装时 backend=none，链路优雅降级不报错。
+# 镜像约增数百 MB，仅在需要真实 OCR 的部署放开：
 # paddlepaddle==2.6.1
 # paddleocr==2.8.1
