@@ -147,16 +147,27 @@ def test_load_missing_file_returns_default(tmp_path):
 
 
 def test_seeded_state_file_is_valid():
-    """仓库内种子文件可被正确加载；当前为测试预设（默认密码 000000 已签核）。"""
+    """仓库内种子文件可被正确加载，且状态自洽。
+
+    安全整改后种子为「待真人签核」：is_approved 须与逐角色 signed 一致，
+    未签核角色出现在 pending；若未来真人签核，须带合法通道与时间戳。
+    """
     loaded = sg.load(sg.DEFAULT_STATE_PATH)
     assert [r.role for r in loaded.roles] == list(sg.DEFAULT_REQUIRED_ROLES)
-    # 测试预设：三角色均已用默认密码 000000 完成签核，门禁 APPROVED
-    assert loaded.is_approved is True
-    assert all(r.method == sg.SIGN_METHOD_PASSWORD for r in loaded.roles)
+    assert loaded.is_approved == all(r.signed for r in loaded.roles)
+    for r in loaded.roles:
+        if r.signed:
+            assert r.method in (sg.SIGN_METHOD_PASSWORD, sg.SIGN_METHOD_SEAL)
+            assert r.signed_at
+        else:
+            assert r.role in loaded.pending_roles
 
 
-def test_seeded_default_password_000000_verifies():
-    """默认预设密码 000000 可通过校验（测试用，正式启用前须重设）。"""
+def test_seeded_state_contains_no_weak_password_signoff():
+    """种子文件不得残留弱密码 000000 假签（安全整改回归锁）。"""
     loaded = sg.load(sg.DEFAULT_STATE_PATH)
     for r in loaded.roles:
-        assert sg.verify_password("000000", r.password_hash) is True
+        # 未设密码（哈希为空）或 000000 无法通过校验，二者必居其一
+        assert not sg.verify_password("000000", r.password_hash), (
+            f"{r.role} 仍可用弱密码 000000 通过校验"
+        )
