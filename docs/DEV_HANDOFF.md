@@ -73,15 +73,18 @@ a188a4b chore(phase-c,docs): 清除签字门禁弱密码 + 3D 模型操作手册
   4. **卸载复用**:已有 `disposeObjectTree`,确保切场景彻底释放。
 - 优先级:①InstancedMesh ②懒加载 ③gzip。
 
-### Task 2 — compose build 坏了 ✅根因定位 ✅方案就绪
-**根因**:本机 Docker Desktop(4.81.0)的 `docker compose` 为**非常规 v5.x**(官方是 v2.x),`docker compose build` 空操作、端口 `!override` 失效、`up` 会把 8002 端口串给 worker/beat。
-- **镜像打包(正式部署)**:改用直接构建,不用 `docker compose build`:
-  ```
-  docker build -t cad-api:local -f apps/api/Dockerfile apps
-  docker build -t cad-web:local -f apps/web/Dockerfile apps/web
-  ```
-- **测试热重载(不重建镜像)**:已提供 `infra/docker-compose.dev.yml`(挂载源码 + `uvicorn --reload`)。用法见该文件头注释。前端 dev 建议本机 `npm run dev`(node 24)。
-- **端口 8002**:因 `!override` 失效,当前靠 nginx 代理容器 `cad_api_proxy`(`infra/api-proxy.conf`)转发 8002→cad_api:8000。新机器若 compose 正常,直接用 alt-ports 的 8002 映射即可,删掉代理。
+### Task 2 — compose「build 坏了」✅ 已复核:compose 没坏,是误用
+**复核结论(2026-07-12 实测,推翻此前"非常规 fork"判断)**:
+- **compose v5.x 是 2026 年的正常版本**:Docker Desktop 4.81.0 自带的官方 compose 就是 v5.2.0(`/Applications/Docker.app/Contents/Resources/cli-plugins/docker-compose`);`~/.docker/modules/cli-plugins/docker-compose` v5.3.0 是 Docker Desktop **官方模块更新机制**,不是 rogue fork。
+- **`docker compose build` 正常**:`docker compose --profile app build --dry-run web api` 明确输出「Image cad-web:local Building / cad-api:local Building」。真实构建也能启动(仅在拉未缓存基础镜像 `node:20-alpine` 时受网络影响,与 compose 无关)。
+- **`!override` 正常**:`docker compose -f docker-compose.yml -f docker-compose.alt-ports.yml --profile app config` 输出 api→8002、postgres→5434、web→3002,端口正确重映射。
+- **此前症状是误用**:①api/web/celery 在 `profiles: [app]` 后面,不加 `--profile app` 就不会被 build/up;②`docker compose up -d`(不带 `--build`)会**复用旧镜像**——这是 compose 标准行为,不是"空操作";要重建须显式 `build` 或 `up --build`。
+- **`cad_api_proxy` 代理容器多余**:alt-ports 的 `!override` 直接把 8002 映到 api 容器即可;新环境不需要该代理,可 `docker rm -f cad_api_proxy`。
+
+**权威工作流见 [infra/DEV.md](../infra/DEV.md)**:
+- 起基础设施:`docker compose -p cad -f infra/docker-compose.yml -f infra/docker-compose.alt-ports.yml up -d`
+- 测试热重载(改代码即生效,不重建镜像):叠加 `-f infra/docker-compose.dev.yml --profile app`
+- 正式部署(打包镜像):`docker compose ... --profile app build && ... up -d`
 
 ### Task 3 — web 页面缺「操作手册」入口 ⏳待实现
 - 现状:手册在 `docs/MODEL_MANUAL_*.md`,但**前端没有查看入口**(此前的 Help 页未落盘/未部署)。

@@ -1,6 +1,8 @@
 # 开发热重载 override(测试用):挂载源码 + 自动重载,改代码即生效,无需重建镜像。
 # 正式部署仍用打包镜像(docker-compose.yml,不叠加本文件)。
 #
+# 完整工作流(起基础设施 / 热重载 / 打包部署)见 infra/DEV.md。
+#
 # 用法(叠加在基础 + alt-ports 之上):
 #   docker compose -p cad \
 #     -f infra/docker-compose.yml \
@@ -12,13 +14,11 @@
 #   - api:uvicorn --reload 自动重载,秒级生效;
 #   - celery-worker/beat:非自动重载,`docker restart cad_celery_worker` 即加载新代码(无需重建镜像)。
 #
-# 前端热重载:本机 node 直接跑(最省事),见 infra/DEV.md:
+# 前端热重载:本机 node 直接跑(最省事):
 #   cd apps/web && npm run dev   # UmiJS dev server(localhost:8000),proxy /api → localhost:8002
 #
-# 注意:本机 Docker Desktop 的 compose 为非常规 v5.x,`docker compose build` 可能空操作、
-# 端口 !override 可能失效。需重建镜像时用直接构建:
-#   docker build -t cad-api:local -f apps/api/Dockerfile apps
-#   docker build -t cad-web:local -f apps/web/Dockerfile apps/web
+# 说明:compose v5.x 是当前正常版本,`docker compose build`/`!override` 均正常工作。
+# 需重建镜像时,记得带 --profile app(api/web 在 profile 后面),`up` 不带 --build 会复用旧镜像。
 
 services:
   api:
