@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "copy-thatopen-assets": "node scripts/copy-thatopen-assets.mjs",
-    "predev": "node scripts/copy-thatopen-assets.mjs",
-    "prebuild": "node scripts/copy-thatopen-assets.mjs",
+    "copy-manuals": "node scripts/copy-manuals.mjs",
+    "predev": "node scripts/copy-thatopen-assets.mjs && node scripts/copy-manuals.mjs",
+    "prebuild": "node scripts/copy-thatopen-assets.mjs && node scripts/copy-manuals.mjs",
     "dev": "max dev",
     "build": "max build",
     "start": "npm run dev",
