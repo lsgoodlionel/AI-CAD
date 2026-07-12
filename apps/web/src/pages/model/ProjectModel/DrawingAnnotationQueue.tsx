@@ -31,6 +31,9 @@ import {
 
 const { Text } = Typography
 
+// 待人工识别队列每页项数（每项含 3 个 AutoComplete，全量渲染会撑爆 DOM/内存）
+const ANNOTATION_PAGE_SIZE = 20
+
 const DRAWING_TYPE_OPTIONS = ['平面图', '立面图', '剖面图', '节点详图', '机电平面']
 
 // 9 类 taxonomy（对齐后端 layer_conventions / 迁移 024）
@@ -115,6 +118,12 @@ function FloorAssignmentQueue({
     <List
       itemLayout="vertical"
       dataSource={items}
+      // 分页仅渲染当前页(每项含 3 个重表单控件)，避免上千项一次性挂满 DOM
+      pagination={
+        items.length > ANNOTATION_PAGE_SIZE
+          ? { pageSize: ANNOTATION_PAGE_SIZE, size: 'small', showSizeChanger: false }
+          : false
+      }
       renderItem={(item) => {
         const draft = drafts[item.id] ?? initialDraft(item, buildingUnits)
         const matchedUnit = buildingUnits.find((unit) => unit.label === draft.buildingUnitName)

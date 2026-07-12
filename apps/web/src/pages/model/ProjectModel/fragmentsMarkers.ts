@@ -4,7 +4,7 @@
  * Phase A 只做**楼层级**对齐：markers 的 (x,y)∈[0,1] 归一化平面坐标按所在楼层的
  * 标高 + 平面尺寸映射到 Fragments/three.js 世界坐标（Y 向上）。构件级精确锚定见 Phase B。
  *
- * 坐标约定与现有 three.js 贴图/挤出场景（sceneBuilder.buildMarkerSphere）保持一致：
+ * 坐标约定与现有 three.js 贴图/挤出场景（sceneBuilder.buildMarkerInstances）保持一致：
  *   worldX = center.x + (marker.x - 0.5) * planWidth
  *   worldZ = center.z + (marker.y - 0.5) * planDepth
  *   worldY = elevation + markerLift

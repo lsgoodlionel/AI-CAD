@@ -46,9 +46,12 @@ export default function CollapsiblePanel({
       }
       styles={open ? undefined : { body: { display: 'none' } }}
     >
-      <div style={{ maxHeight: maxBodyHeight, overflowY: 'auto', paddingRight: 2 }}>
-        {children}
-      </div>
+      {/* 折叠时卸载子树而非仅 CSS 隐藏——释放其 DOM/组件实例内存 */}
+      {open ? (
+        <div style={{ maxHeight: maxBodyHeight, overflowY: 'auto', paddingRight: 2 }}>
+          {children}
+        </div>
+      ) : null}
     </Card>
   )
 }

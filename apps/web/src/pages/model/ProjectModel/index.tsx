@@ -1042,6 +1042,7 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
             </Card>
             <CollapsiblePanel
               title="语义审查"
+              defaultOpen={false}
               style={{ marginBottom: 12 }}
               maxBodyHeight={420}
               extra={quality.pendingCandidateCount > 0 ? <Tag color="gold">{quality.pendingCandidateCount}</Tag> : null}
@@ -1063,6 +1064,7 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
             </CollapsiblePanel>
             <CollapsiblePanel
               title="待人工识别"
+              defaultOpen={false}
               maxBodyHeight={420}
               extra={quality.pendingManualCount > 0 ? <Tag color="gold">{quality.pendingManualCount}</Tag> : null}
             >
