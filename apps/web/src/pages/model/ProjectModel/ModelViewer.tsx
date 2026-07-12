@@ -6,6 +6,18 @@
  * - 卸载时 dispose 全部 geometry / material / texture / renderer
  */
 import { useEffect, useRef } from 'react'
+import { Button, Tooltip } from 'antd'
+import {
+  ArrowDownOutlined,
+  ArrowLeftOutlined,
+  ArrowRightOutlined,
+  ArrowUpOutlined,
+  MinusOutlined,
+  PlusOutlined,
+  RedoOutlined,
+  ReloadOutlined,
+  UndoOutlined,
+} from '@ant-design/icons'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { ModelScene, SceneDrawing, SceneMarker } from '@/services/projectModel'
@@ -174,6 +186,57 @@ export default function ModelViewer({
     highlightRef.current = outline
   }
 
+  // ── 默认取景（scene 变化与「复位」按钮共用）──────────────────
+  const frameDefault = () => {
+    const graph = graphRef.current
+    const controls = controlsRef.current
+    const camera = cameraRef.current
+    if (!graph || !controls || !camera) return
+    const ys = [...graph.floorYByKey.values()]
+    const midY = ys.length
+      ? (Math.min(...ys) + Math.max(...ys)) / 2
+      : graph.totalHeight / 2
+    const radius = Math.max(graph.fitRadius, 16)
+    controls.target.set(0, midY, 0)
+    camera.position.set(radius * 1.15, midY + radius * 0.85, radius * 1.45)
+    controls.update()
+  }
+
+  // ── 按钮控制：环绕旋转 / 推拉缩放 / 屏幕平移（鼠标之外的显式操作）──
+  const orbit = (deltaAzimuth: number, deltaPolar: number) => {
+    const camera = cameraRef.current
+    const controls = controlsRef.current
+    if (!camera || !controls) return
+    const offset = camera.position.clone().sub(controls.target)
+    const spherical = new THREE.Spherical().setFromVector3(offset)
+    spherical.theta += deltaAzimuth
+    spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi + deltaPolar))
+    offset.setFromSpherical(spherical)
+    camera.position.copy(controls.target).add(offset)
+    controls.update()
+  }
+  const dolly = (factor: number) => {
+    const camera = cameraRef.current
+    const controls = controlsRef.current
+    if (!camera || !controls) return
+    const offset = camera.position.clone().sub(controls.target).multiplyScalar(factor)
+    camera.position.copy(controls.target).add(offset)
+    controls.update()
+  }
+  const pan = (dxFrac: number, dyFrac: number) => {
+    const camera = cameraRef.current
+    const controls = controlsRef.current
+    if (!camera || !controls) return
+    const distance = camera.position.distanceTo(controls.target)
+    const scale = distance * 0.18
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0)
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1)
+    const move = right.multiplyScalar(dxFrac * scale).add(up.multiplyScalar(dyFrac * scale))
+    camera.position.add(move)
+    controls.target.add(move)
+    controls.update()
+  }
+
   // ── 初始化 renderer / camera / controls / 灯光 / RAF / resize ──
   useEffect(() => {
     const container = containerRef.current
@@ -302,14 +365,7 @@ export default function ModelViewer({
     applyVisibility()
 
     // 默认取景（有焦点图纸时由 applyFocus 覆盖）：按取景半径与楼层跨度适配
-    const ys = [...graph.floorYByKey.values()]
-    const midY = ys.length
-      ? (Math.min(...ys) + Math.max(...ys)) / 2
-      : graph.totalHeight / 2
-    const radius = Math.max(graph.fitRadius, 16)
-    controls.target.set(0, midY, 0)
-    camera.position.set(radius * 1.15, midY + radius * 0.85, radius * 1.45)
-    controls.update()
+    frameDefault()
     applyFocus()
 
     // 有 image_key 的图纸面板：换取 presigned URL 后异步贴图
@@ -413,6 +469,94 @@ export default function ModelViewer({
             待人工识别: {pendingAnnotationCount}
           </div>
         ) : null}
+      </div>
+
+      {/* 视角控制：鼠标之外的显式按钮（旋转 / 平移 / 缩放 / 复位）*/}
+      <div
+        style={{
+          position: 'absolute',
+          right: 12,
+          bottom: 12,
+          padding: 8,
+          borderRadius: 8,
+          background: 'rgba(255,255,255,0.92)',
+          border: '1px solid rgba(5,5,5,0.1)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+          display: 'flex',
+          gap: 10,
+          alignItems: 'flex-start',
+        }}
+      >
+        <ControlPad
+          label="旋转"
+          up={<ArrowUpOutlined />}
+          down={<ArrowDownOutlined />}
+          left={<UndoOutlined />}
+          right={<RedoOutlined />}
+          center={<Tooltip title="复位视角"><ReloadOutlined /></Tooltip>}
+          onUp={() => orbit(0, -ORBIT_STEP)}
+          onDown={() => orbit(0, ORBIT_STEP)}
+          onLeft={() => orbit(-ORBIT_STEP, 0)}
+          onRight={() => orbit(ORBIT_STEP, 0)}
+          onCenter={frameDefault}
+        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: '#8c8c8c' }}>缩放</span>
+          <Tooltip title="放大"><Button size="small" icon={<PlusOutlined />} onClick={() => dolly(0.8)} /></Tooltip>
+          <Tooltip title="缩小"><Button size="small" icon={<MinusOutlined />} onClick={() => dolly(1.25)} /></Tooltip>
+        </div>
+        <ControlPad
+          label="平移"
+          up={<ArrowUpOutlined />}
+          down={<ArrowDownOutlined />}
+          left={<ArrowLeftOutlined />}
+          right={<ArrowRightOutlined />}
+          onUp={() => pan(0, PAN_STEP)}
+          onDown={() => pan(0, -PAN_STEP)}
+          onLeft={() => pan(-PAN_STEP, 0)}
+          onRight={() => pan(PAN_STEP, 0)}
+        />
+      </div>
+    </div>
+  )
+}
+
+const ORBIT_STEP = 0.26
+const PAN_STEP = 0.5
+
+interface ControlPadProps {
+  label: string
+  up: JSX.Element
+  down: JSX.Element
+  left: JSX.Element
+  right: JSX.Element
+  center?: JSX.Element
+  onUp: () => void
+  onDown: () => void
+  onLeft: () => void
+  onRight: () => void
+  onCenter?: () => void
+}
+
+function ControlPad(props: ControlPadProps): JSX.Element {
+  const cell: React.CSSProperties = { width: 28, height: 28 }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+      <span style={{ fontSize: 11, color: '#8c8c8c' }}>{props.label}</span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 28px)', gap: 4 }}>
+        <span />
+        <Button size="small" style={cell} icon={props.up} onClick={props.onUp} />
+        <span />
+        <Button size="small" style={cell} icon={props.left} onClick={props.onLeft} />
+        {props.center ? (
+          <Button size="small" style={cell} icon={props.center} onClick={props.onCenter} />
+        ) : (
+          <span />
+        )}
+        <Button size="small" style={cell} icon={props.right} onClick={props.onRight} />
+        <span />
+        <Button size="small" style={cell} icon={props.down} onClick={props.onDown} />
+        <span />
       </div>
     </div>
   )
