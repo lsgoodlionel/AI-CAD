@@ -181,7 +181,34 @@ def _resolve_story_height(
     return height, "default", 0.55, True, note
 
 
+# ── 楼层可信度约束 ────────────────────────────────────────────────────
+# 只有 title/drawing_no 是可信楼层来源；file_key/folder_path/ocr 等弱来源里的
+# 数字常是轴号/图号/尺寸,不能凭空造出可信范围外的楼层(实测会造出 52 层/98 层
+# 等幻影层,把模型标高冲到 ±400m)。弱来源仅可确认已由可信来源建立的楼层范围。
+_TRUSTED_STORY_SOURCES = frozenset({"title", "drawing_no"})
+_FOUNDATION_SENTINEL_MAX = -90   # order ≤ 此值为基础/桩基哨兵(非线性楼层)
+_ROOF_SENTINEL_MIN = 99          # order ≥ 此值为屋面哨兵
+
+
+def _is_story_sentinel(order: int) -> bool:
+    """基础/屋面哨兵:由关键词命中,可信,不参与数值范围约束与线性标高。"""
+    return order <= _FOUNDATION_SENTINEL_MAX or order >= _ROOF_SENTINEL_MIN
+
+
+def _order_in_trusted_band(order: int, band: tuple[int, int] | None) -> bool:
+    if _is_story_sentinel(order):
+        return True
+    if band is None:
+        return True
+    low, high = band
+    return low - 1 <= order <= high + 1
+
+
 def _default_story_elevation(story_order: int, highest_story_order: int) -> float:
+    if story_order <= _FOUNDATION_SENTINEL_MAX:
+        # 基础层哨兵:不做 order×层高 的线性换算(否则 -98×4.2≈-411.6m),
+        # 置于地下一层之下一个基础层高处,由调用方按真实最低层再校正。
+        return round(-DEFAULT_BASEMENT_HEIGHT_M * 2, 3)
     if story_order < 0:
         return round(story_order * DEFAULT_BASEMENT_HEIGHT_M, 3)
     if story_order == 0:
@@ -249,7 +276,15 @@ def detect_building_unit(
 def extract_story_candidate(
     drawing: dict[str, Any],
     annotation: dict[str, Any] | None = None,
+    *,
+    trusted_band: tuple[int, int] | None = None,
 ) -> StoryCandidate:
+    """从图纸提取楼层候选。
+
+    ``trusted_band``:由 title/drawing_no 建立的可信楼层数值范围 (min, max)。
+    传入时,来自弱来源(file_key/folder_path/ocr)的楼层若落在范围外,视为
+    轴号/图号/尺寸伪匹配而丢弃——防止造出 52 层/98 层等幻影层。不传时行为不变。
+    """
     annotation = annotation or {}
     story_key = str(annotation.get("story_key") or "").strip()
     display_name = str(annotation.get("story_display_name") or "").strip()
@@ -268,25 +303,29 @@ def extract_story_candidate(
         )
 
     for source, text in _text_fragments(drawing):
+        trusted_source = source in _TRUSTED_STORY_SOURCES
         if _FIRST_FLOOR_RE.search(text):
             return StoryCandidate(
                 story_key="F1",
                 display_name="1层",
                 story_order=1,
                 elevation_m=_story_elevation(annotation, drawing),
-                confidence=0.76 if source in {"title", "drawing_no"} else 0.58,
+                confidence=0.76 if trusted_source else 0.58,
                 source=source,
             )
         parsed = parse_floor(text)
         if parsed is None:
             continue
         story_key, display_name, story_order = parsed
+        # 弱来源楼层须落在可信范围内,否则丢弃(继续找下一个片段)
+        if not trusted_source and not _order_in_trusted_band(story_order, trusted_band):
+            continue
         return StoryCandidate(
             story_key=story_key,
             display_name=display_name,
             story_order=story_order,
             elevation_m=_story_elevation(annotation, drawing),
-            confidence=0.82 if source in {"title", "drawing_no"} else 0.64,
+            confidence=0.82 if trusted_source else 0.64,
             source=source,
         )
 
@@ -309,6 +348,31 @@ def _serialize_candidate_sources(value: Any) -> list[dict[str, Any]]:
     return list(value) if isinstance(value, list) else []
 
 
+def _trusted_story_band(
+    drawings: list[dict[str, Any]],
+    annotations: dict[str, dict[str, Any]] | None,
+) -> tuple[int, int] | None:
+    """由可信来源(title/drawing_no)与人工标注确定真实楼层数值范围 (min, max)。
+
+    仅取非哨兵的数值楼层;无可信楼层时返回 None(不约束弱来源,保持兼容)。
+    """
+    annotations = annotations or {}
+    orders: set[int] = set()
+    for drawing in drawings:
+        annotation = annotations.get(str(drawing["id"])) or {}
+        manual_order = annotation.get("story_order")
+        if manual_order is not None:
+            orders.add(int(manual_order))
+        for key in _TRUSTED_STORY_SOURCES:
+            parsed = parse_floor(str(drawing.get(key) or ""))
+            if parsed is not None:
+                orders.add(parsed[2])
+    numeric = [o for o in orders if not _is_story_sentinel(o)]
+    if not numeric:
+        return None
+    return (min(numeric), max(numeric))
+
+
 def normalize_story_table(
     drawings: list[dict[str, Any]],
     annotations: dict[str, dict[str, Any]] | None = None,
@@ -327,13 +391,17 @@ def normalize_story_table(
     unclassified_drawings: list[dict[str, Any]] = []
     issues: list[ModelQualityIssue] = []
 
+    # 先由可信来源(title/drawing_no + 人工标注)建立真实楼层数值范围,
+    # 用于约束弱来源(文件路径/OCR)的楼层,过滤幻影层。
+    trusted_band = _trusted_story_band(drawings, annotations)
+
     for drawing in drawings:
         drawing_id = str(drawing["id"])
         annotation = dict(annotations.get(drawing_id) or {})
         if annotation.get("candidate_sources") is not None:
             annotation["candidate_sources"] = _serialize_candidate_sources(annotation["candidate_sources"])
         unit = detect_building_unit(drawing, annotation)
-        story = extract_story_candidate(drawing, annotation)
+        story = extract_story_candidate(drawing, annotation, trusted_band=trusted_band)
 
         building_units.setdefault(
             unit.unit_key,
@@ -422,6 +490,17 @@ def normalize_story_table(
     for unit_key, stories in grouped.items():
         highest_order = max((entry["story_order"] for entry in stories.values()), default=1)
         ordered = sorted(stories.values(), key=lambda item: (item["story_order"], item["story_key"]))
+        # 基础层默认标高:置于最低真实楼层之下一个基础层高处(而非 -98×层高)
+        real_orders = [
+            int(e["story_order"]) for e in ordered if not _is_story_sentinel(int(e["story_order"]))
+        ]
+        lowest_real_order = min(real_orders) if real_orders else 1
+        highest_real_order = max(real_orders) if real_orders else 1
+        foundation_default = round(
+            _default_story_elevation(lowest_real_order, highest_order) - DEFAULT_BASEMENT_HEIGHT_M, 3
+        )
+        # 屋面默认标高:置于最高真实楼层顶部(而非 order 99 走线性得 441m)
+        roof_default = round(highest_real_order * DEFAULT_STORY_HEIGHT_M, 3)
         previous: float | None = None
         levels: list[StoryLevel] = []
         for entry in ordered:
@@ -436,7 +515,14 @@ def normalize_story_table(
                 chosen = round(float(override_elev), 3)
             else:
                 explicit = sorted(set(round(value, 3) for value in entry["elevations"]))
-                chosen = explicit[0] if explicit else _default_story_elevation(story_order, highest_order)
+                if explicit:
+                    chosen = explicit[0]
+                elif story_order <= _FOUNDATION_SENTINEL_MAX:
+                    chosen = foundation_default
+                elif story_order >= _ROOF_SENTINEL_MIN:
+                    chosen = roof_default
+                else:
+                    chosen = _default_story_elevation(story_order, highest_order)
                 if previous is not None and chosen - previous < MIN_STORY_SPACING_M:
                     detected_spacing = round(chosen - previous, 3)
                     issues.append(

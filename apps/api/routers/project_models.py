@@ -15,7 +15,13 @@ from pydantic import BaseModel
 from core.storage import presigned_get_url
 from dependencies import get_db, get_current_user
 from services.audit import write_audit
-from services import model_annotations, model_qto_summary, model_semantics, model_story
+from services import (
+    model_annotations,
+    model_qto_summary,
+    model_semantics,
+    model_story,
+    model_story_manual,
+)
 from services.model_qto import compute_rebar_quantities
 from services.model_semantics import SemanticHierarchyError, SemanticVersionConflict
 from tasks.model_build import build_project_model
@@ -396,3 +402,108 @@ async def get_model_asset_url(
     if not key.startswith(allowed_prefix):
         raise HTTPException(403, "ASSET_FORBIDDEN")
     return {"url": presigned_get_url(key, expires_seconds=ASSET_URL_EXPIRES_SECONDS)}
+
+
+# ── 楼层标高人工录入/校正（Task 3：自动识别打底 → 人工校正）──────────────
+
+def _auto_story_rows_from_scene(scene: dict | None) -> list[dict]:
+    """从 scene.floors 提取每层「自动识别」参考:标高 + 由标高差推层高,按单体分组。"""
+    if not isinstance(scene, dict):
+        return []
+    floors = scene.get("floors") or []
+    # 按单体分组(floor.building_key，缺省 main)
+    by_scope: dict[str, list[dict]] = {}
+    for floor in floors:
+        if not isinstance(floor, dict):
+            continue
+        scope = str(floor.get("building_key") or "main")
+        by_scope.setdefault(scope, []).append(floor)
+    rows: list[dict] = []
+    for scope, items in by_scope.items():
+        ordered = sorted(items, key=lambda f: int(f.get("order") or 0))
+        for i, floor in enumerate(ordered):
+            elev = floor.get("elevation_m")
+            nxt = ordered[i + 1].get("elevation_m") if i + 1 < len(ordered) else None
+            auto_height = (
+                round(float(nxt) - float(elev), 3)
+                if elev is not None and nxt is not None
+                else None
+            )
+            rows.append({
+                "scope_key": scope,
+                "story_key": str(floor.get("key") or ""),
+                "story_label": str(floor.get("label") or floor.get("key") or ""),
+                "story_order": int(floor.get("order") or 0),
+                "auto_elevation_m": (round(float(elev), 3) if elev is not None else None),
+                "auto_height_m": auto_height,
+            })
+    return rows
+
+
+@router.get("/{project_id}/model/story-heights")
+async def get_model_story_heights(
+    project_id: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """楼层标高:自动识别参考值 + 人工录入值(供人工校正界面)。"""
+    row = await db.fetch_one(
+        "SELECT scene FROM project_models WHERE project_id=$1", project_id
+    )
+    scene = _parse_jsonb(row["scene"], None) if row else None
+    auto_rows = _auto_story_rows_from_scene(scene)
+    manual_rows = await model_story_manual.fetch_manual_rows(db, project_id)
+    manual_by_key = {
+        (str(m["scope_key"]), str(m["story_key"])): m for m in manual_rows
+    }
+    items = []
+    for auto in auto_rows:
+        manual = manual_by_key.get((auto["scope_key"], auto["story_key"]))
+        items.append({
+            **auto,
+            "manual_height_m": (float(manual["height_m"]) if manual else None),
+            "manual_elevation_m": (
+                float(manual["elevation_bottom_m"])
+                if manual and manual.get("elevation_bottom_m") is not None
+                else None
+            ),
+            "note": (manual.get("note") if manual else None),
+        })
+    return {"data": items, "meta": {"count": len(items)}}
+
+
+class _StoryHeightItem(BaseModel):
+    scope_key: str = "main"
+    story_key: str
+    story_order: int = 0
+    height_m: float | None = None       # <=0 或 None 视为清除(恢复自动)
+    elevation_bottom_m: float | None = None
+    note: str | None = None
+
+
+class _StoryHeightsBody(BaseModel):
+    items: list[_StoryHeightItem]
+
+
+@router.post("/{project_id}/model/story-heights")
+async def save_model_story_heights(
+    project_id: str,
+    body: _StoryHeightsBody,
+    request: Request,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """保存人工录入/校正的层高(UPSERT;下次重建生效为最高优先级 override)。"""
+    saved = await model_story_manual.save_manual_heights(
+        db,
+        project_id,
+        [item.model_dump() for item in body.items],
+        updated_by=str(current_user.get("id") or ""),
+    )
+    await write_audit(
+        db, user_id=current_user["id"], action="model.story_heights.save",
+        resource="project_model", resource_id=project_id,
+        new_state={"saved": saved},
+        ip_address=request.client.host if request.client else None,
+    )
+    return {"data": {"saved": saved}, "meta": {"note": "重建模型后生效"}}

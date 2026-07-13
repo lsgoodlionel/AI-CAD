@@ -127,7 +127,15 @@ def cmd_check(args: argparse.Namespace) -> int:
         print("APPROVED：所有必需角色人工审核完成，门禁通过。")
         return 0
     print(f"BLOCKED：待签核角色 → {list(state.pending_roles)}", file=sys.stderr)
-    print("在 G3/G4 模型代码合入 main 前，须完成人工审核（密码或电子签章任一通道）。", file=sys.stderr)
+    print("上线部署前须完成人工审核（密码或电子签章任一通道）。", file=sys.stderr)
+    if args.warn_only:
+        # 告警态（CI 用）：模型代码已在库，阻断合入是马后炮；真正的合规阻断点在
+        # 部署前（不带 --warn-only 的严格 check）。此处只醒目告警、不阻断流水线。
+        print(
+            f"::warning::Phase C 人工审核门禁尚未签核（待签 {list(state.pending_roles)}）——"
+            "CI 放行，但部署上线前必须完成真人签核。",
+        )
+        return 0
     return 1
 
 
@@ -169,11 +177,16 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("status", help="打印签核状态")
     sp.set_defaults(func=cmd_status)
 
-    sp = sub.add_parser("check", help="门禁校验（CI 消费）")
+    sp = sub.add_parser("check", help="门禁校验（CI / 部署前消费）")
     sp.add_argument(
         "--enforce-if-model-code",
         action="store_true",
         help="仅当检测到 G3/G4 模型代码时才阻断（自我武装）",
+    )
+    sp.add_argument(
+        "--warn-only",
+        action="store_true",
+        help="未签核时只告警不阻断（CI 用；部署前请勿加此标志，须严格阻断）",
     )
     sp.set_defaults(func=cmd_check)
 

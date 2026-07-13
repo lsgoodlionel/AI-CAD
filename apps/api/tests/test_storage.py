@@ -27,6 +27,10 @@ def test_storage_upload_download_url_and_delete(monkeypatch):
     client.bucket_exists.side_effect = [False, True, True]
     client.get_object.return_value = FakeObject(b"content")
     monkeypatch.setattr(storage, "_client", client)
+    # 预签名在配置了 MINIO_PUBLIC_ENDPOINT 时走公网端点专用 client
+    # (_get_presign_client → _public_client);两条路径都指向 mock,
+    # 使断言与部署配置无关。
+    monkeypatch.setattr(storage, "_public_client", client)
 
     storage.upload_file(b"abc", "a/b.pdf", "application/pdf")
     client.put_object.assert_called_once()

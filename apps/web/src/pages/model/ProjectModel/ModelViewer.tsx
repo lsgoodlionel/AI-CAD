@@ -6,6 +6,18 @@
  * - 卸载时 dispose 全部 geometry / material / texture / renderer
  */
 import { useEffect, useRef } from 'react'
+import { Button, Tooltip } from 'antd'
+import {
+  ArrowDownOutlined,
+  ArrowLeftOutlined,
+  ArrowRightOutlined,
+  ArrowUpOutlined,
+  MinusOutlined,
+  PlusOutlined,
+  RedoOutlined,
+  ReloadOutlined,
+  UndoOutlined,
+} from '@ant-design/icons'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { ModelScene, SceneDrawing, SceneMarker } from '@/services/projectModel'
@@ -14,6 +26,7 @@ import {
   FLOOR_FADED_OPACITY,
   FLOOR_OPACITY,
   FLOOR_WIDTH,
+  applyMarkerVisibility,
   buildHighlightOutline,
   buildSceneGraph,
   disposeObjectTree,
@@ -22,9 +35,9 @@ import type {
   BuiltSceneGraph,
   DrawingUserData,
   FloorUserData,
-  MarkerUserData,
 } from './sceneBuilder'
 import type { ElementUserData } from './elementsBuilder'
+import { resolveEquipmentPick } from './elementsBuilder'
 import type { ModelLodMode } from './types'
 
 const CLICK_MOVE_TOLERANCE_PX = 6
@@ -81,6 +94,8 @@ export default function ModelViewer({
   const graphRef = useRef<BuiltSceneGraph | null>(null)
   const highlightRef = useRef<THREE.LineSegments | null>(null)
   const rafRef = useRef<number>(0)
+  /** 按需渲染：交互/场景变化时才画一帧，空闲不占 CPU/GPU、不产生 RAF 垃圾 */
+  const requestRenderRef = useRef<() => void>(() => {})
   /** 场景代际号：贴图异步返回时若代际已变则丢弃，防止贴到已释放的材质上 */
   const buildGenerationRef = useRef(0)
   const pointerDownRef = useRef<{ x: number; y: number } | null>(null)
@@ -136,12 +151,15 @@ export default function ModelViewer({
         !filters.elementFilter || filters.elementFilter.includes(data.elementType)
       mesh.visible = inFloor && modeOk && filterOk
     })
-    graph.markerMeshes.forEach((mesh) => {
-      const data = mesh.userData as MarkerUserData
-      const inFloor = !iso || data.marker.floor_key === iso
-      const typeOk = !filters.markerTypeFilter || filters.markerTypeFilter.includes(data.marker.type)
-      mesh.visible = inFloor && typeOk && filters.severityFilter.includes(data.marker.severity)
-    })
+    if (graph.markerInstances) {
+      applyMarkerVisibility(graph.markerInstances, (marker) => {
+        const inFloor = !iso || marker.floor_key === iso
+        const typeOk =
+          !filters.markerTypeFilter || filters.markerTypeFilter.includes(marker.type)
+        return inFloor && typeOk && filters.severityFilter.includes(marker.severity)
+      })
+    }
+    requestRenderRef.current() // 可见性变化不移动相机，需显式请求一帧
   }
 
   // ── 焦点图纸：相机对准 + 高亮描边 ──────────────────────────
@@ -172,6 +190,59 @@ export default function ModelViewer({
     const outline = buildHighlightOutline(target)
     target.add(outline)
     highlightRef.current = outline
+    requestRenderRef.current()
+  }
+
+  // ── 默认取景（scene 变化与「复位」按钮共用）──────────────────
+  const frameDefault = () => {
+    const graph = graphRef.current
+    const controls = controlsRef.current
+    const camera = cameraRef.current
+    if (!graph || !controls || !camera) return
+    const ys = [...graph.floorYByKey.values()]
+    const midY = ys.length
+      ? (Math.min(...ys) + Math.max(...ys)) / 2
+      : graph.totalHeight / 2
+    const radius = Math.max(graph.fitRadius, 16)
+    controls.target.set(0, midY, 0)
+    camera.position.set(radius * 1.15, midY + radius * 0.85, radius * 1.45)
+    controls.update()
+    requestRenderRef.current()
+  }
+
+  // ── 按钮控制：环绕旋转 / 推拉缩放 / 屏幕平移（鼠标之外的显式操作）──
+  const orbit = (deltaAzimuth: number, deltaPolar: number) => {
+    const camera = cameraRef.current
+    const controls = controlsRef.current
+    if (!camera || !controls) return
+    const offset = camera.position.clone().sub(controls.target)
+    const spherical = new THREE.Spherical().setFromVector3(offset)
+    spherical.theta += deltaAzimuth
+    spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi + deltaPolar))
+    offset.setFromSpherical(spherical)
+    camera.position.copy(controls.target).add(offset)
+    controls.update()
+  }
+  const dolly = (factor: number) => {
+    const camera = cameraRef.current
+    const controls = controlsRef.current
+    if (!camera || !controls) return
+    const offset = camera.position.clone().sub(controls.target).multiplyScalar(factor)
+    camera.position.copy(controls.target).add(offset)
+    controls.update()
+  }
+  const pan = (dxFrac: number, dyFrac: number) => {
+    const camera = cameraRef.current
+    const controls = controlsRef.current
+    if (!camera || !controls) return
+    const distance = camera.position.distanceTo(controls.target)
+    const scale = distance * 0.18
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0)
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1)
+    const move = right.multiplyScalar(dxFrac * scale).add(up.multiplyScalar(dyFrac * scale))
+    camera.position.add(move)
+    controls.target.add(move)
+    controls.update()
   }
 
   // ── 初始化 renderer / camera / controls / 灯光 / RAF / resize ──
@@ -207,13 +278,22 @@ export default function ModelViewer({
     cameraRef.current = camera
     controlsRef.current = controls
 
-    // 简化起见持续 RAF 渲染（蓝图允许）
-    const animate = () => {
-      rafRef.current = requestAnimationFrame(animate)
-      controls.update()
-      renderer.render(threeScene, camera)
+    // ── 按需渲染：仅在需要时排队一帧 ─────────────────────────────
+    // controls.update() 在 damping 未收敛时会再次派发 'change' → 自动续帧，
+    // 收敛后停止；用户拖拽/滚轮同样经 'change' 触发。空闲时零帧。
+    let renderQueued = false
+    const requestRender = () => {
+      if (renderQueued) return
+      renderQueued = true
+      rafRef.current = requestAnimationFrame(() => {
+        renderQueued = false
+        controls.update()
+        renderer.render(threeScene, camera)
+      })
     }
-    animate()
+    requestRenderRef.current = requestRender
+    controls.addEventListener('change', requestRender)
+    requestRender() // 首帧
 
     const handleResize = () => {
       const width = container.clientWidth
@@ -222,6 +302,7 @@ export default function ModelViewer({
       camera.aspect = width / height
       camera.updateProjectionMatrix()
       renderer.setSize(width, height)
+      requestRender()
     }
     window.addEventListener('resize', handleResize)
 
@@ -243,20 +324,33 @@ export default function ModelViewer({
       pointerNdc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
       pointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
       raycaster.setFromCamera(pointerNdc, camera)
-      const candidates = [
-        ...graph.markerMeshes,
+      const candidates: THREE.Object3D[] = [
         ...graph.drawingMeshes,
         ...graph.elementMeshes,
       ].filter((mesh) => mesh.visible)
+      // 标记为合批 InstancedMesh：隐藏实例已置零缩放，不会命中
+      if (graph.markerInstances) candidates.push(graph.markerInstances.mesh)
       const hit = raycaster.intersectObjects(candidates, false)[0]
       if (!hit) return
-      const data = hit.object.userData as DrawingUserData | MarkerUserData | ElementUserData
+
+      // 标记命中：instanceId 反查
+      if (graph.markerInstances && hit.object === graph.markerInstances.mesh) {
+        const marker = graph.markerInstances.markers[hit.instanceId ?? -1]
+        if (marker) onSelectMarkerRef.current(marker)
+        return
+      }
+
+      const data = hit.object.userData as DrawingUserData | ElementUserData
       if (data.kind === 'drawing') {
         onSelectDrawingRef.current(data.drawing)
-      } else if (data.kind === 'marker') {
-        onSelectMarkerRef.current(data.marker)
       } else if (onSelectElementRef.current) {
-        onSelectElementRef.current(data)
+        // 设备合批：faceIndex 反查具体设备的 label / 来源图纸
+        if (data.elementType === 'equipment' && data.equipmentPicks && hit.faceIndex != null) {
+          const pick = resolveEquipmentPick(data.equipmentPicks, hit.faceIndex)
+          onSelectElementRef.current({ ...data, count: 1, label: pick?.label, src: pick?.src })
+        } else {
+          onSelectElementRef.current(data)
+        }
       }
     }
     renderer.domElement.addEventListener('pointerdown', handlePointerDown)
@@ -264,7 +358,9 @@ export default function ModelViewer({
 
     return () => {
       cancelAnimationFrame(rafRef.current)
+      requestRenderRef.current = () => {}
       window.removeEventListener('resize', handleResize)
+      controls.removeEventListener('change', requestRender)
       renderer.domElement.removeEventListener('pointerdown', handlePointerDown)
       renderer.domElement.removeEventListener('pointerup', handlePointerUp)
       controls.dispose()
@@ -302,14 +398,7 @@ export default function ModelViewer({
     applyVisibility()
 
     // 默认取景（有焦点图纸时由 applyFocus 覆盖）：按取景半径与楼层跨度适配
-    const ys = [...graph.floorYByKey.values()]
-    const midY = ys.length
-      ? (Math.min(...ys) + Math.max(...ys)) / 2
-      : graph.totalHeight / 2
-    const radius = Math.max(graph.fitRadius, 16)
-    controls.target.set(0, midY, 0)
-    camera.position.set(radius * 1.15, midY + radius * 0.85, radius * 1.45)
-    controls.update()
+    frameDefault()
     applyFocus()
 
     // 有 image_key 的图纸面板：换取 presigned URL 后异步贴图
@@ -332,6 +421,7 @@ export default function ModelViewer({
           material.color.set('#ffffff')
           material.opacity = 1
           material.needsUpdate = true
+          requestRenderRef.current() // 贴图异步返回，请求重绘
         })
         .catch(() => {
           // 贴图失败降级为线框占位，不影响整体渲染
@@ -357,6 +447,7 @@ export default function ModelViewer({
   // ── 焦点图纸变化 ───────────────────────────────────────────
   useEffect(() => {
     applyFocus()
+    requestRenderRef.current() // 清除高亮的提前返回分支也需重绘
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusDrawingId])
 
@@ -413,6 +504,94 @@ export default function ModelViewer({
             待人工识别: {pendingAnnotationCount}
           </div>
         ) : null}
+      </div>
+
+      {/* 视角控制：鼠标之外的显式按钮（旋转 / 平移 / 缩放 / 复位）*/}
+      <div
+        style={{
+          position: 'absolute',
+          right: 12,
+          bottom: 12,
+          padding: 8,
+          borderRadius: 8,
+          background: 'rgba(255,255,255,0.92)',
+          border: '1px solid rgba(5,5,5,0.1)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+          display: 'flex',
+          gap: 10,
+          alignItems: 'flex-start',
+        }}
+      >
+        <ControlPad
+          label="旋转"
+          up={<ArrowUpOutlined />}
+          down={<ArrowDownOutlined />}
+          left={<UndoOutlined />}
+          right={<RedoOutlined />}
+          center={<Tooltip title="复位视角"><ReloadOutlined /></Tooltip>}
+          onUp={() => orbit(0, -ORBIT_STEP)}
+          onDown={() => orbit(0, ORBIT_STEP)}
+          onLeft={() => orbit(-ORBIT_STEP, 0)}
+          onRight={() => orbit(ORBIT_STEP, 0)}
+          onCenter={frameDefault}
+        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: '#8c8c8c' }}>缩放</span>
+          <Tooltip title="放大"><Button size="small" icon={<PlusOutlined />} onClick={() => dolly(0.8)} /></Tooltip>
+          <Tooltip title="缩小"><Button size="small" icon={<MinusOutlined />} onClick={() => dolly(1.25)} /></Tooltip>
+        </div>
+        <ControlPad
+          label="平移"
+          up={<ArrowUpOutlined />}
+          down={<ArrowDownOutlined />}
+          left={<ArrowLeftOutlined />}
+          right={<ArrowRightOutlined />}
+          onUp={() => pan(0, PAN_STEP)}
+          onDown={() => pan(0, -PAN_STEP)}
+          onLeft={() => pan(-PAN_STEP, 0)}
+          onRight={() => pan(PAN_STEP, 0)}
+        />
+      </div>
+    </div>
+  )
+}
+
+const ORBIT_STEP = 0.26
+const PAN_STEP = 0.5
+
+interface ControlPadProps {
+  label: string
+  up: JSX.Element
+  down: JSX.Element
+  left: JSX.Element
+  right: JSX.Element
+  center?: JSX.Element
+  onUp: () => void
+  onDown: () => void
+  onLeft: () => void
+  onRight: () => void
+  onCenter?: () => void
+}
+
+function ControlPad(props: ControlPadProps): JSX.Element {
+  const cell: React.CSSProperties = { width: 28, height: 28 }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+      <span style={{ fontSize: 11, color: '#8c8c8c' }}>{props.label}</span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 28px)', gap: 4 }}>
+        <span />
+        <Button size="small" style={cell} icon={props.up} onClick={props.onUp} />
+        <span />
+        <Button size="small" style={cell} icon={props.left} onClick={props.onLeft} />
+        {props.center ? (
+          <Button size="small" style={cell} icon={props.center} onClick={props.onCenter} />
+        ) : (
+          <span />
+        )}
+        <Button size="small" style={cell} icon={props.right} onClick={props.onRight} />
+        <span />
+        <Button size="small" style={cell} icon={props.down} onClick={props.onDown} />
+        <span />
       </div>
     </div>
   )

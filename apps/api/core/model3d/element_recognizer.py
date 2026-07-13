@@ -148,7 +148,7 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str) -> Floor
         ]
     else:
         result.walls = pairs[:_CAPS["walls"]]
-    result.slabs = _find_slabs(polys, axis_x, axis_y, ctx)
+    result.slabs = _find_slabs(polys, axis_x, axis_y, ctx, result.columns)
     _clip_to_axes(result)
     return result
 
@@ -385,7 +385,11 @@ def _is_beam_drawing(all_text: str) -> bool:
     return "梁" in all_text and "图" in all_text
 
 
-def _find_slabs(polys: list, axis_x: list[float], axis_y: list[float], ctx: _Ctx) -> list[dict]:
+def _find_slabs(
+    polys: list, axis_x: list[float], axis_y: list[float], ctx: _Ctx,
+    columns: list[dict] | None = None,
+) -> list[dict]:
+    columns = columns or []
     best: list | None = None
     best_area = 0.0
     for poly in polys:
@@ -402,7 +406,37 @@ def _find_slabs(polys: list, axis_x: list[float], axis_y: list[float], ctx: _Ctx
         y0, y1 = min(ys), max(ys)
         outline = [ctx.to_m(x0, y0), ctx.to_m(x1, y0), ctx.to_m(x1, y1), ctx.to_m(x0, y1)]
         return [{"outline": outline, "thickness": 0.12, "src": ctx.src}]
-    return []
+    # 兜底:无大多边形、无 2×2 轴网,但已识别出柱 → 用柱包络(米)生成楼板,
+    # 让缺清晰轴网的楼层也有楼板参与体量/算量(否则该层无板)。
+    slab = _slab_from_columns(columns)
+    return [slab] if slab is not None else []
+
+
+# 由柱包络生成楼板的最小柱数与外扩边距(米)
+_SLAB_FROM_COLUMNS_MIN = 4
+_SLAB_ENVELOPE_MARGIN_M = 1.0
+
+
+def _slab_from_columns(columns: list[dict]) -> dict | None:
+    """无多边形/轴网时,由柱外轮廓包络(已是米坐标)生成楼板兜底。"""
+    pts: list[tuple[float, float]] = []
+    for column in columns:
+        for point in column.get("outline") or []:
+            if len(point) >= 2:
+                pts.append((float(point[0]), float(point[1])))
+    if len(columns) < _SLAB_FROM_COLUMNS_MIN or len(pts) < 3:
+        return None
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    m = _SLAB_ENVELOPE_MARGIN_M
+    x0, x1, y0, y1 = min(xs) - m, max(xs) + m, min(ys) - m, max(ys) + m
+    if (x1 - x0) * (y1 - y0) < _SLAB_MIN_AREA_M2:
+        return None
+    return {
+        "outline": [[x0, y0], [x1, y0], [x1, y1], [x0, y1]],
+        "thickness": 0.12,
+        "src": "columns-envelope",
+    }
 
 
 # 轴网范围外允许的构件溢出边距（米）——超出视为图框/图例等离群图形

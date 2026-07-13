@@ -96,6 +96,23 @@ export interface MarkerUserData {
   marker: SceneMarker
 }
 
+export interface MarkerInstancesUserData {
+  kind: 'markerInstances'
+}
+
+/**
+ * 标记合批（InstancedMesh）：1500+ 问题标记共享一份球体 geometry/material，
+ * 仅逐实例矩阵（位置）与颜色（severity）不同。相比逐球独立 Mesh，draw call 与
+ * geometry/material 对象数从 N 降到 1，是本页浏览器内存与渲染的主要优化点。
+ * - markers 与实例下标一一对齐（拾取用 instanceId 反查）
+ * - baseMatrices 为各实例的「显示」矩阵，隐藏时写入零缩放矩阵（退化三角形不参与光栅/拾取）
+ */
+export interface MarkerInstances {
+  mesh: THREE.InstancedMesh
+  markers: SceneMarker[]
+  baseMatrices: THREE.Matrix4[]
+}
+
 export interface FloorUserData {
   kind: 'floor'
   floorKey: string
@@ -105,9 +122,10 @@ export interface BuiltSceneGraph {
   root: THREE.Group
   floorMeshes: THREE.Mesh[]
   drawingMeshes: THREE.Mesh[]
-  markerMeshes: THREE.Mesh[]
   /** V2 构件网格（userData.kind === 'element'） */
   elementMeshes: THREE.Mesh[]
+  /** 问题标记合批（InstancedMesh）；无可放置标记时为 null */
+  markerInstances: MarkerInstances | null
   /** 楼层 key → 板片中心 Y 坐标 */
   floorYByKey: Map<string, number>
   /** 场景整体高度（相机初始化用） */
@@ -187,23 +205,65 @@ function buildDrawingPanel(
   return mesh
 }
 
-function buildMarkerSphere(
-  marker: SceneMarker, floorY: number,
-  floorW = FLOOR_WIDTH, floorD = FLOOR_DEPTH, radius = MARKER_RADIUS,
-): THREE.Mesh {
-  const geometry = new THREE.SphereGeometry(radius, 16, 12)
-  const material = new THREE.MeshLambertMaterial({
-    color: SEVERITY_COLORS[marker.severity] ?? SEVERITY_COLORS.info,
-  })
-  const mesh = new THREE.Mesh(geometry, material)
-  mesh.position.set(
-    (marker.x - 0.5) * floorW,
-    floorY + FLOOR_THICKNESS / 2 + radius + 0.05,
-    (marker.y - 0.5) * floorD,
-  )
-  const userData: MarkerUserData = { kind: 'marker', marker }
+/** 隐藏实例：零缩放矩阵（退化三角形，既不光栅也不被拾取） */
+const MARKER_HIDDEN_MATRIX = new THREE.Matrix4().makeScale(0, 0, 0)
+
+/**
+ * 构建全部问题标记的 InstancedMesh（合批）。跳过所在楼层缺失的标记；
+ * 无可放置标记时返回 null。markers/baseMatrices 与实例下标对齐。
+ */
+export function buildMarkerInstances(
+  markers: SceneMarker[],
+  floorYByKey: Map<string, number>,
+  floorW = FLOOR_WIDTH,
+  floorD = FLOOR_DEPTH,
+  radius = MARKER_RADIUS,
+): MarkerInstances | null {
+  const placeable: SceneMarker[] = []
+  const baseMatrices: THREE.Matrix4[] = []
+  const colors: THREE.Color[] = []
+  for (const marker of markers) {
+    const floorY = floorYByKey.get(marker.floor_key)
+    if (floorY === undefined) continue
+    baseMatrices.push(
+      new THREE.Matrix4().makeTranslation(
+        (marker.x - 0.5) * floorW,
+        floorY + FLOOR_THICKNESS / 2 + radius + 0.05,
+        (marker.y - 0.5) * floorD,
+      ),
+    )
+    colors.push(new THREE.Color(SEVERITY_COLORS[marker.severity] ?? SEVERITY_COLORS.info))
+    placeable.push(marker)
+  }
+  if (!placeable.length) return null
+
+  const geometry = new THREE.SphereGeometry(radius, 12, 8)
+  const material = new THREE.MeshLambertMaterial()
+  const mesh = new THREE.InstancedMesh(geometry, material, placeable.length)
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage) // filters 变化时逐实例更新矩阵
+  for (let i = 0; i < placeable.length; i += 1) {
+    mesh.setMatrixAt(i, baseMatrices[i])
+    mesh.setColorAt(i, colors[i])
+  }
+  mesh.instanceMatrix.needsUpdate = true
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+  const userData: MarkerInstancesUserData = { kind: 'markerInstances' }
   mesh.userData = userData
-  return mesh
+  return { mesh, markers: placeable, baseMatrices }
+}
+
+/** 按谓词逐实例切换标记可见性（显示=还原矩阵，隐藏=零缩放矩阵） */
+export function applyMarkerVisibility(
+  inst: MarkerInstances,
+  isVisible: (marker: SceneMarker) => boolean,
+): void {
+  for (let i = 0; i < inst.markers.length; i += 1) {
+    inst.mesh.setMatrixAt(
+      i,
+      isVisible(inst.markers[i]) ? inst.baseMatrices[i] : MARKER_HIDDEN_MATRIX,
+    )
+  }
+  inst.mesh.instanceMatrix.needsUpdate = true
 }
 
 /** 全场景构件包围盒（跨楼层聚合）；无任何构件坐标 → null */
@@ -249,7 +309,6 @@ export function buildSceneGraph(scene: ModelScene): BuiltSceneGraph {
   const root = new THREE.Group()
   const floorMeshes: THREE.Mesh[] = []
   const drawingMeshes: THREE.Mesh[] = []
-  const markerMeshes: THREE.Mesh[] = []
   const elementMeshes: THREE.Mesh[] = []
   const floorYByKey = new Map<string, number>()
   const renderElements = scene.schema_version === 2
@@ -312,13 +371,10 @@ export function buildSceneGraph(scene: ModelScene): BuiltSceneGraph {
     }
   })
 
-  scene.markers.forEach((marker) => {
-    const floorY = floorYByKey.get(marker.floor_key)
-    if (floorY === undefined) return
-    const sphere = buildMarkerSphere(marker, floorY, floorW, floorD, markerRadius)
-    markerMeshes.push(sphere)
-    root.add(sphere)
-  })
+  const markerInstances = buildMarkerInstances(
+    scene.markers, floorYByKey, floorW, floorD, markerRadius,
+  )
+  if (markerInstances) root.add(markerInstances.mesh)
 
   const minY = Math.min(...elevations, 0)
   const maxY = Math.max(...elevations, 0)
@@ -326,8 +382,8 @@ export function buildSceneGraph(scene: ModelScene): BuiltSceneGraph {
     root,
     floorMeshes,
     drawingMeshes,
-    markerMeshes,
     elementMeshes,
+    markerInstances,
     floorYByKey,
     totalHeight: maxY - minY,
     fitRadius: realScale
@@ -368,5 +424,8 @@ export function disposeObjectTree(object: THREE.Object3D): void {
         disposeMaterial(mesh.material)
       }
     }
+    // InstancedMesh 还需释放 instanceMatrix / instanceColor GPU 缓冲
+    const inst = child as THREE.InstancedMesh
+    if ((inst as unknown as { isInstancedMesh?: boolean }).isInstancedMesh) inst.dispose()
   })
 }

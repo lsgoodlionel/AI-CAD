@@ -1,0 +1,44 @@
+# 开发热重载 override(测试用):挂载源码 + 自动重载,改代码即生效,无需重建镜像。
+# 正式部署仍用打包镜像(docker-compose.yml,不叠加本文件)。
+#
+# 完整工作流(起基础设施 / 热重载 / 打包部署)见 infra/DEV.md。
+#
+# 用法(叠加在基础 + alt-ports 之上):
+#   docker compose -p cad \
+#     -f infra/docker-compose.yml \
+#     -f infra/docker-compose.alt-ports.yml \
+#     -f infra/docker-compose.dev.yml \
+#     --profile app up -d api celery-worker celery-beat
+#
+# 之后改 apps/api/**.py:
+#   - api:uvicorn --reload 自动重载,秒级生效;
+#   - celery-worker/beat:非自动重载,`docker restart cad_celery_worker` 即加载新代码(无需重建镜像)。
+#
+# 前端热重载:本机 node 直接跑(最省事):
+#   cd apps/web && npm run dev   # UmiJS dev server(localhost:8000),proxy /api → localhost:8002
+#
+# 说明:compose v5.x 是当前正常版本,`docker compose build`/`!override` 均正常工作。
+# 需重建镜像时,记得带 --profile app(api/web 在 profile 后面),`up` 不带 --build 会复用旧镜像。
+
+services:
+  api:
+    volumes:
+      - ../apps/api:/app
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    environment:
+      # aarch64(Apple Silicon Docker): paddlepaddle 原生引擎构造 predictor 时
+      # SIGSEGV(进程级),显式禁用后 OCR 走 RapidOCR 回退。x86_64 部署不设此变量。
+      CAD_OCR_DISABLE_PADDLE: "1"
+
+  celery-worker:
+    volumes:
+      - ../apps/api:/app
+    # celery 无热重载;改代码后 `docker restart cad_celery_worker` 加载(挂载已就位,无需重建)
+    environment:
+      CAD_OCR_DISABLE_PADDLE: "1"
+
+  celery-beat:
+    volumes:
+      - ../apps/api:/app
+    environment:
+      CAD_OCR_DISABLE_PADDLE: "1"

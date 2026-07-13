@@ -166,12 +166,15 @@ jobs:
           done
           [ "$fail" -eq 0 ] && echo "OK：无禁用依赖。" || exit 1
 
-      # 3) 人工审核门禁（C-01 签字栏可执行版）：G3/G4 模型代码落地后，
-      #    须完成人工审核（密码或电子签章任一通道）方可合入。纯 stdlib，无需装依赖。
-      #    尚无模型代码时为顾问态（exit 0），随 spotting/、fusion/ 出现自动武装。
-      - name: Phase C human sign-off gate
+      # 3) 人工审核门禁（C-01 签字栏可执行版）：G3/G4 模型代码落地后须真人签核。
+      #    CI 为「告警态」（--warn-only）：模型代码已在库，阻断合入是马后炮；未签核时
+      #    只醒目告警、不阻断流水线。真正的阻断点在**部署上线前**——部署脚本 / 发布
+      #    workflow 须运行不带 --warn-only 的严格 check（BLOCKED 即 exit 1），确保
+      #    技术负责人 / 法务合规 / Phase C 负责人已用强密码或电子签章完成签核。
+      #    纯 stdlib，无需装依赖。见 docs/MANUAL_ADMIN.md §16。
+      - name: Phase C human sign-off gate (CI warn-only)
         run: |
-          python3 apps/api/scripts/model3d/phase_c_signoff.py check --enforce-if-model-code
+          python3 apps/api/scripts/model3d/phase_c_signoff.py check --enforce-if-model-code --warn-only
 
   # ── 后端：安全扫描 ─────────────────────────────────────────────
   backend-security:

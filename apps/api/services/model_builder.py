@@ -34,6 +34,7 @@ from services import (
     model_ifc_integration,
     model_semantics,
     model_story,
+    model_story_manual,
     model_topology,
     section_z_recovery,
     vlm_semantics,
@@ -46,7 +47,9 @@ from services.model_lod import ModelScopeEvidence, aggregate_lod_modes, evaluate
 logger = logging.getLogger(__name__)
 
 _executor = ThreadPoolExecutor(max_workers=2)
-_SECTION_TIMEOUT_SEC = 20  # 单张剖面标高抽取超时（与构件识别同量级）
+# 单张剖面标高抽取超时：矢量路径秒级；OCR 兜底路径（矢量文本抽不到标高时）
+# 首图含模型加载 ~10s + 大图分块识别 ~25s，须给足余量
+_SECTION_TIMEOUT_SEC = 90
 
 RENDER_DPI = 110
 MAX_TEXTURE_PX = 1600
@@ -60,6 +63,9 @@ MARKER_TITLE_MAX = 80
 COORD_MIN, COORD_MAX = 0.1, 0.9
 CLUSTER_STEP = 0.02
 SEVERITY_KEYS = ("critical", "major", "minor", "info")
+# 成果标记按严重度封顶:避免上万条问题全部布点导致视口红点堆叠、可读性差。
+# 各级保留代表性样本(总量 ≤ ~1500),完整问题数仍在 stats.by_severity 与 AI 报告中。
+MAX_MARKERS_PER_SEVERITY = {"critical": 500, "major": 500, "minor": 300, "info": 200}
 CROSS_LINK_KINDS = ("接口缺图", "问题聚类", "版本冲突", "重复图号")
 
 _PROJECT_SQL = "SELECT id, name FROM projects WHERE id=:project_id"
@@ -462,9 +468,12 @@ def _marker_of_issue(
 def _build_markers(
     issues_by_drawing: dict[str, list[dict]], floor_of: dict[str, str]
 ) -> list[dict]:
-    """成果标记层：issues.location_json(levels) → floor_key + 稳定坐标。"""
-    markers: list[dict] = []
-    cluster_counters: dict[tuple[str, str], int] = {}
+    """成果标记层：issues.location_json(levels) → floor_key + 稳定坐标。
+
+    按严重度分组并各自封顶(见 MAX_MARKERS_PER_SEVERITY),避免上万条问题全部
+    布点造成红点堆叠;严重/较大优先,各级保留代表性样本。
+    """
+    by_severity: dict[str, list[tuple[dict, str]]] = {key: [] for key in SEVERITY_KEYS}
     for drawing_id, issues in issues_by_drawing.items():
         fallback_key = floor_of.get(drawing_id, "UNZONED")
         for issue in issues:
@@ -475,6 +484,14 @@ def _build_markers(
                 None,
             )
             floor_key = parsed[0] if parsed else fallback_key
+            severity = str(issue.get("severity") or "info")
+            by_severity.setdefault(severity, []).append((issue, floor_key))
+
+    markers: list[dict] = []
+    cluster_counters: dict[tuple[str, str], int] = {}
+    for severity in SEVERITY_KEYS:
+        cap = MAX_MARKERS_PER_SEVERITY.get(severity, 200)
+        for issue, floor_key in by_severity.get(severity, [])[:cap]:
             markers.append(_marker_of_issue(issue, floor_key, cluster_counters))
     return markers
 
@@ -585,10 +602,16 @@ def _serialize_quality_issue(issue: model_story.ModelQualityIssue) -> dict[str, 
     }
 
 
-def _quality_payload(normalization: model_story.StoryNormalizationResult) -> dict[str, Any]:
+def _quality_payload(
+    normalization: model_story.StoryNormalizationResult,
+    extra_issues: list | None = None,
+) -> dict[str, Any]:
+    # extra_issues：normalization 之外链路的质量问题（如剖面 z 恢复的
+    # z_story_count_mismatch / z_anchor_mismatch），此前被静默丢弃。
+    all_issues = [*normalization.issues, *(extra_issues or [])]
     story_conflicts = [
         _serialize_quality_issue(issue)
-        for issue in normalization.issues
+        for issue in all_issues
         if issue.issue_type == "story_spacing_too_small"
     ]
     low_confidence_units = [
@@ -607,7 +630,7 @@ def _quality_payload(normalization: model_story.StoryNormalizationResult) -> dic
         "story_conflict_count": len(story_conflicts),
         "story_conflicts": story_conflicts,
         "low_confidence_building_units": low_confidence_units,
-        "issues": [_serialize_quality_issue(issue) for issue in normalization.issues],
+        "issues": [_serialize_quality_issue(issue) for issue in all_issues],
     }
 
 
@@ -668,6 +691,16 @@ async def _attach_floor_elements(
             "recognize", "识别楼层构件（柱/墙/梁/板/管线/设备）",
             str(floor.get("label") or floor["key"]), index, len(floors),
         ))
+        if floor["key"] == "UNZONED":
+            # 未分层图纸(多为详图/系统图/说明,非平面图)未定位到楼层,不注入楼层
+            # 构件几何——否则其数千个"构件"会在基座平面堆叠成噪声(挤在一起)。
+            # 这些图在待人工识别队列中,人工归层后重建即可正确落层。
+            floor["elements"] = {k: [] for k in model_elements.EMPTY_ELEMENTS}
+            floor["element_stats"] = model_elements.element_stats(floor["elements"])
+            floor["_elevation_candidates"] = []
+            floor["_lod_registered_drawings"] = 0
+            floor["_lod_evidence"] = {}
+            continue
         floor_drawings = drawings_by_floor.get(floor["key"], [])
         try:
             elements, yolo_count, meta = await model_elements.build_floor_elements(
@@ -690,6 +723,112 @@ async def _attach_floor_elements(
         yolo_total += yolo_count
     _apply_real_elevations(floors)
     return yolo_total
+
+
+# 建筑包络裁剪参数:柱定义可信包络,构件质心超出即视为比例/配准离群
+_ENVELOPE_MIN_COLUMNS = 20        # 柱点少于此值不足以定包络,跳过裁剪
+_ENVELOPE_MARGIN_RATIO = 0.35     # 包络在柱 p2~p98 范围外再放宽的比例
+_ENVELOPE_MARGIN_MIN_M = 30.0     # 放宽下限(米)
+_MAX_ELEMENT_SPAN_M = 300.0       # 单构件自身跨度上限(超出=比例错误的离群构件)
+
+
+def _robust_bounds(values: list[float]) -> tuple[float, float]:
+    """分位数抗离群边界(p2~p98)+ 放宽边距。"""
+    ordered = sorted(values)
+    count = len(ordered)
+    low = ordered[int(count * 0.02)]
+    high = ordered[min(int(count * 0.98), count - 1)]
+    margin = max((high - low) * _ENVELOPE_MARGIN_RATIO, _ENVELOPE_MARGIN_MIN_M)
+    return low - margin, high + margin
+
+
+def _clip_elements_to_envelope(floors: list[dict]) -> None:
+    """裁掉质心落在建筑包络外的离群构件。
+
+    机电图比例检测出错时,管线/设备坐标会冲到数千米(实测 2416m),把模型撑成
+    巨大的扁平 sprawl。以可靠的**柱**坐标(分位数抗离群)建立建筑包络,凡质心
+    远超包络的构件视为比例/配准离群并剔除。柱本身定义包络,全部保留。
+    """
+    col_x: list[float] = []
+    col_y: list[float] = []
+    for floor in floors:
+        for column in (floor.get("elements") or {}).get("columns") or []:
+            for point in column.get("outline") or []:
+                if len(point) >= 2:
+                    col_x.append(float(point[0]))
+                    col_y.append(float(point[1]))
+    if len(col_x) < _ENVELOPE_MIN_COLUMNS:
+        return
+    x0, x1 = _robust_bounds(col_x)
+    y0, y1 = _robust_bounds(col_y)
+
+    for floor in floors:
+        elements = floor.get("elements") or {}
+        for kind, items in list(elements.items()):
+            kept = []
+            for element in items:
+                pts = [
+                    p for key in ("outline", "path")
+                    for p in (element.get(key) or []) if len(p) >= 2
+                ]
+                if not pts:
+                    kept.append(element)
+                    continue
+                xs = [float(p[0]) for p in pts]
+                ys = [float(p[1]) for p in pts]
+                cx = sum(xs) / len(xs)
+                cy = sum(ys) / len(ys)
+                span = max(max(xs) - min(xs), max(ys) - min(ys))
+                if x0 <= cx <= x1 and y0 <= cy <= y1 and span <= _MAX_ELEMENT_SPAN_M:
+                    kept.append(element)
+            elements[kind] = kept
+        floor["element_stats"] = model_elements.element_stats(elements)
+
+
+def _accumulate_manual_elevations(normalization, overrides: dict) -> dict:
+    """按累加层高计算每层真实底标高,补全 override 的 elevation_bottom_m。
+
+    标高默认按 order 独立算((order-1)×层高),改层高不会抬升上层。此处对含
+    override 的单体,以 ±0.000(order=1)为锚点,用各层层高(override 优先,否则
+    现层高)向上/向下累加真实底标高,写入 override,使人工层高真正生效。
+    """
+    default_h = model_story.DEFAULT_STORY_HEIGHT_M
+    result = dict(overrides)
+    affected_units = {unit for (unit, _story) in overrides}
+
+    def height_of(unit_key: str, level) -> float:
+        override = overrides.get((unit_key, level.story_key))
+        if override and override.get("height_m"):
+            return float(override["height_m"])
+        return float(getattr(level, "height_m", None) or default_h)
+
+    for unit_key, levels in normalization.stories_by_building.items():
+        if unit_key not in affected_units:
+            continue
+        ordered = sorted(levels, key=lambda lv: lv.story_order)
+        if not ordered:
+            continue
+        elevations = [0.0] * len(ordered)
+        anchor = next((i for i, lv in enumerate(ordered) if lv.story_order == 1), None)
+        if anchor is None:
+            elevations[0] = float(getattr(ordered[0], "elevation_m", None) or 0.0)
+            for i in range(1, len(ordered)):
+                elevations[i] = round(elevations[i - 1] + height_of(unit_key, ordered[i - 1]), 3)
+        else:
+            elevations[anchor] = 0.0
+            for i in range(anchor + 1, len(ordered)):
+                elevations[i] = round(elevations[i - 1] + height_of(unit_key, ordered[i - 1]), 3)
+            for i in range(anchor - 1, -1, -1):
+                elevations[i] = round(elevations[i + 1] - height_of(unit_key, ordered[i]), 3)
+        for level, elevation in zip(ordered, elevations):
+            existing = result.get((unit_key, level.story_key), {})
+            result[(unit_key, level.story_key)] = {
+                "height_m": height_of(unit_key, level),
+                "elevation_bottom_m": elevation,
+                "source": existing.get("source", "manual"),
+                "confidence": existing.get("confidence", 1.0),
+            }
+    return result
 
 
 def _apply_real_elevations(floors: list[dict]) -> None:
@@ -745,7 +884,12 @@ def _marker_building_keys(
 
 
 def _section_levels_sync(data: bytes, ext: str):
-    """同步：字节 → 几何 → 剖面标高序列（任何失败返回 None，绝不抛）。"""
+    """同步：字节 → 几何 → 剖面标高序列（任何失败返回 None，绝不抛）。
+
+    PDF 且矢量文本抽不到标高时走 OCR 兜底：CAD 导出 PDF 的正文标高多为
+    矢量字形（get_text 取不到），把高置信 OCR 标高 token 合成几何文本后
+    重抽，完整复用标高线绑定/线性标定/置信逻辑。OCR 不可用时行为不变。
+    """
     try:
         from core.model3d import geometry_extractor
         from core.model3d.section_level_extractor import extract_section_levels
@@ -755,10 +899,50 @@ def _section_levels_sync(data: bytes, ext: str):
             if ext == "pdf"
             else geometry_extractor.extract_dxf_geometry(data)
         )
-        return extract_section_levels(geom)
+        levels = extract_section_levels(geom)
+        if levels.marks or ext != "pdf":
+            return levels
+        return _section_levels_ocr_fallback(data, geom, levels)
     except Exception as exc:  # noqa: BLE001 — 剖面识别失败跳过
         logger.warning("[ModelBuilder] 剖面标高抽取跳过: %s", exc)
         return None
+
+
+def _section_levels_ocr_fallback(data: bytes, geom, vector_levels):
+    """OCR 标高 token → 合成几何文本 → 重抽标高。失败一律回退矢量结果。"""
+    try:
+        from dataclasses import replace
+
+        from core.model3d.ocr import run_ocr
+        from core.model3d.ocr.consume import as_geometry_texts
+        from core.model3d.section_level_extractor import (
+            SectionLevels,
+            extract_section_levels,
+        )
+
+        ocr_result = run_ocr(data, "pdf")
+        if not ocr_result.available:
+            return vector_levels
+        ocr_texts = as_geometry_texts(ocr_result)  # 仅 ≥0.8 置信标高 token
+        if not ocr_texts:
+            return vector_levels
+        merged = replace(geom, texts=[*geom.texts, *ocr_texts])
+        ocr_levels = extract_section_levels(merged)
+        if not ocr_levels.marks:
+            return vector_levels
+        logger.info(
+            "[ModelBuilder] 剖面标高 OCR 兜底命中: %d 个标高（backend=%s）",
+            len(ocr_levels.marks), ocr_result.backend,
+        )
+        # fit 标注来源，供下游/评测追溯（marks 的置信仍由 extractor 标定逻辑给出）
+        return SectionLevels(
+            marks=ocr_levels.marks,
+            reason=None,
+            fit={**ocr_levels.fit, "ocr_fallback": True, "ocr_backend": ocr_result.backend},
+        )
+    except Exception as exc:  # noqa: BLE001 — OCR 兜底失败不影响矢量结果
+        logger.warning("[ModelBuilder] 剖面标高 OCR 兜底跳过: %s", exc)
+        return vector_levels
 
 
 async def _recover_section_z(
@@ -994,9 +1178,14 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     normalization = model_story.normalize_story_table(drawings, annotation_overrides)
     # B-05：跨视图 z 恢复（仅剖面标高）——有剖面则以实测层高重归一化并点亮 gate；无剖面 no-op。
     section_z = await _recover_section_z(drawings, normalization)
-    if section_z.z_overrides:
+    # Task 3：人工录入层高作为最高优先级 override（覆盖剖面/估算），消除均匀默认层高。
+    manual_overrides = await model_story_manual.fetch_manual_overrides(db, project_id)
+    combined_overrides = {**(section_z.z_overrides or {}), **manual_overrides}
+    if combined_overrides:
+        # 按累加层高补全每层真实底标高（锚定 ±0.000），使人工层高真正抬升上层楼层。
+        combined_overrides = _accumulate_manual_elevations(normalization, combined_overrides)
         normalization = model_story.normalize_story_table(
-            drawings, annotation_overrides, z_overrides=section_z.z_overrides
+            drawings, annotation_overrides, z_overrides=combined_overrides
         )
     semantic_payload = vlm_semantics.merge_vlm_into_semantic_payload(
         _semantic_scene_payload(drawings), vlm_by_drawing
@@ -1004,6 +1193,7 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     assets, ifc_models, ifc_skipped = await _build_assets(project_id, drawings, progress_cb)
     floors, floor_of = _build_floors(drawings, issues_by_drawing, assets, normalization)
     yolo_total = await _attach_floor_elements(floors, drawings, floor_of, progress_cb)
+    _clip_elements_to_envelope(floors)  # 裁掉离群构件(机电比例错误致管线冲到数千米)
     # B-07：剖面/详图截面回填构件（实测覆盖硬编码默认；无标注时全默认→无副作用）。
     component_sections = await _recover_component_sections(drawings)
     model_component_sections.apply_component_sections(floors, component_sections)
@@ -1057,7 +1247,7 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
         "semantic_tree": semantic_payload["semantic_tree"],
         "unassigned_drawings": semantic_payload["unassigned_drawings"],
         "semantic_version": semantic_payload["semantic_version"],
-        "quality": _quality_payload(normalization),
+        "quality": _quality_payload(normalization, extra_issues=section_z.issues),
         "annotation_queue": normalization.unclassified_drawings,
         "building_units": {
             "detected": normalization.building_units,

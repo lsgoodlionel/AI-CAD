@@ -37,6 +37,16 @@ const PLAN_MARGIN = 0.9 // 构件平面占板片比例
 // 单层构件三角形预算（超出降级贴图由调用方处理）
 export const ELEMENT_TRIANGLE_BUDGET = 100_000
 
+/**
+ * 设备合批网格的逐设备拾取索引：设备几何按顺序合并后，faceEnd 为该设备
+ * 结束处的累计三角形数（exclusive）。命中 faceIndex 落在哪个区间即哪台设备。
+ */
+export interface EquipmentPick {
+  faceEnd: number
+  label?: string
+  src?: string
+}
+
 export interface ElementUserData {
   kind: 'element'
   /** columns | walls | beams | slabs | equipment | pipes:<system> */
@@ -46,6 +56,19 @@ export interface ElementUserData {
   count: number
   label?: string
   src?: string
+  /** 仅设备合批网格：逐设备拾取区间（按 faceEnd 升序），供 raycast faceIndex 反查 */
+  equipmentPicks?: EquipmentPick[]
+}
+
+/** 由命中的 faceIndex 反查是哪台设备（区间按 faceEnd 升序，取首个 faceIndex < faceEnd） */
+export function resolveEquipmentPick(
+  picks: EquipmentPick[],
+  faceIndex: number,
+): EquipmentPick | null {
+  for (const pick of picks) {
+    if (faceIndex < pick.faceEnd) return pick
+  }
+  return picks.length ? picks[picks.length - 1] : null
 }
 
 interface PlanTransform {
@@ -167,20 +190,38 @@ function mergedMesh(
   return mesh
 }
 
-function buildEquipmentMesh(
-  item: ElementEquipment, t: PlanTransform, floorY: number,
+/**
+ * 设备合批网格：整层设备挤出几何合并为一个 Mesh（1799→1 draw call/geometry），
+ * 同时记录逐设备三角形区间以支持点击 faceIndex 反查该设备的 label/来源图纸。
+ */
+function buildEquipmentMergedMesh(
+  items: ElementEquipment[], t: PlanTransform, floorY: number,
   floorKey: string, buildingKey: string,
 ): THREE.Mesh | null {
-  const shape = outlineShape(item.outline, t)
-  if (!shape) return null
-  const height = Math.max(item.height * t.scale, 0.4)
+  const geometries: THREE.BufferGeometry[] = []
+  const picks: EquipmentPick[] = []
+  let faceAcc = 0
+  for (const item of items) {
+    const shape = outlineShape(item.outline, t)
+    if (!shape) continue
+    const height = Math.max(item.height * t.scale, 0.4)
+    const geometry = extrudeUp(shape, height, floorY)
+    const position = geometry.getAttribute('position')
+    faceAcc += position ? position.count / 3 : 0
+    picks.push({ faceEnd: faceAcc, label: item.label, src: item.src })
+    geometries.push(geometry)
+  }
+  if (!geometries.length) return null
+  const merged = geometries.length === 1 ? geometries[0] : mergeGeometries(geometries)
+  if (!merged) return null
+  if (geometries.length > 1) geometries.forEach((g) => g.dispose())
   const mesh = new THREE.Mesh(
-    extrudeUp(shape, height, floorY),
+    merged,
     new THREE.MeshLambertMaterial({ color: ELEMENT_COLORS.equipment }),
   )
   const data: ElementUserData = {
     kind: 'element', elementType: 'equipment', floorKey, buildingKey,
-    count: 1, label: item.label, src: item.src,
+    count: picks.length, equipmentPicks: picks,
   }
   mesh.userData = data
   return mesh
@@ -258,10 +299,8 @@ export function buildFloorElementMeshes(
 
   meshes.push(...buildPipeMeshes(elements, t, baseY, floorKey, buildingKey))
 
-  for (const item of elements.equipment) {
-    const mesh = buildEquipmentMesh(item, t, baseY, floorKey, buildingKey)
-    if (mesh) meshes.push(mesh)
-  }
+  const equipmentMesh = buildEquipmentMergedMesh(elements.equipment, t, baseY, floorKey, buildingKey)
+  if (equipmentMesh) meshes.push(equipmentMesh)
 
   if (!meshes.length) return null
   if (triangleCount(meshes) > ELEMENT_TRIANGLE_BUDGET) {

@@ -4,9 +4,22 @@
 
 ---
 
-## 当前版本：v0.6.1-dev（feat/batch-review-and-model-base）
+## 当前版本：v0.6.2-dev（fix/model-3d-quality）
 
-当前最新开发线为 `feat/batch-review-and-model-base`。截至 2026-07-10，本轮继续推进**批量读图 / 整套审图（Phase 5）**、**工程 3D 模型基座（Phase 6）** 和 **3D 模型高精度重建（Phase 7）**，并把上海大歌剧院图纸验证中暴露的“固定三单体假设”升级为通用语义图谱、可审查候选、人工校正和 LOD 证据门控。
+当前最新开发线为 `fix/model-3d-quality`（PR [#11](https://github.com/lsgoodlionel/AI-CAD/pull/11)）。截至 2026-07-12，本轮以旗舰真实项目**上海大歌剧院（2309 张竣工图）**为验证基准，修复工程 3D 模型建模的致命问题，完成模型页 UX、楼层标高人工录入通道、Web 帮助中心、**工程模型页内存优化（1.1GB→115MB）**、**图纸全文 OCR 基座（核心功能）**，并复核更正了「compose build 坏了」的误判。完整交接见 [docs/DEV_HANDOFF.md](docs/DEV_HANDOFF.md)。
+
+### v0.6.2-dev 更新摘要（2026-07-12）
+
+| 类别 | 更新内容 |
+|------|----------|
+| 建模致命修复（P0/P1/P2） | 三维渲染由全空白→正常显示 13 层堆叠建筑；幻影楼层 42→13；标高 -411~441m→真实 -16.8~31.5m；横向 sprawl 2583m→397m（柱分位数包络裁剪离群构件）；贴图 ERR_NAME_NOT_RESOLVED→0 报错（MinIO 公网端点）；红点标记 23417→1500（按严重度封顶）；未分层噪声构件 2777→0。评测报告见 [docs/MODEL_EVAL_SGOH.md](docs/MODEL_EVAL_SGOH.md) |
+| 工程模型页 UX | 右栏面板可折叠（展开/收起 + 限高滚动）；3D 区蓝色边框 + 视角控制按钮（旋转/平移/缩放/复位，鼠标之外的显式操作） |
+| 楼层标高人工录入/校正 | 自动识别打底 → 人工录入校正；按累加层高补全真实底标高，层高真正抬升上层（migration 025 + `model_story_manual.py` + `StoryHeightPanel` + `GET/POST /model/story-heights`） |
+| Web 帮助中心 | 左侧菜单「帮助中心」`/help`；零依赖 Markdown 渲染；按角色切用户手册 / 管理员手册；`copy-manuals` 构建前把 docs 手册同步到 `public/manual/` |
+| 工程模型页内存优化 | **1.1GB→115MB（-89%，上海大歌剧院实测）**。CDP 逐层定位真凶=「待人工识别」队列给 1061 项各渲染 3 个 AutoComplete 表单（3183 Select、69191 DOM 节点）+ 常开 RAF 持续产垃圾。修复：队列分页 + 折叠即卸载子树 + 重队列默认折叠 + 按需渲染（空闲 0 帧、CPU/GPU 归零）+ 标记 1500 球体转单个 InstancedMesh + 设备 1799 挤出逐层合并（faceIndex 保留点击 label）。实测 DOM 69191→2337、空闲堆持平不再增长 |
+| 图纸全文 OCR（核心功能，**真实推理已落地**） | `core/model3d/ocr`：高 DPI 栅格化 + PaddleOCR/RapidOCR 有序回退（paddle 在 linux/aarch64 SIGSEGV，`CAD_OCR_DISABLE_PADDLE=1` 显式禁用后走 RapidOCR）+ **大图分块识别**（A0 图正文小字从 26 token→261，标高 0→13）+ 语义分类（标高/轴号/尺寸/楼层/房间/说明）；歌剧院剖面图实测 **13 标高候选全部置信 0.96~1.00**（-31.900~+16.200）；`consume.py` 三个下游接入缝；置信门槛+人工复核纪律；CLI + 34 单测全绿 + [docs/MODEL_OCR.md](docs/MODEL_OCR.md) |
+| 开发环境认知更正 | 复核推翻「compose v5.x 坏了」误判——compose 没坏（v5.x 是当前正常版本，`build`/`!override` 均正常，真实 `docker compose build` 已完整跑通）；真因是漏 `--profile app`、`up` 不带 `--build` 复用旧镜像。新增权威工作流文档 [infra/DEV.md](infra/DEV.md)（起基础设施/热重载测试/打包部署 + 误区对照表） |
+| 安全 | Phase C 签字门禁清除弱密码 + 密码强度校验 |
 
 ### v0.6.1-dev 更新摘要（2026-07-10）
 
@@ -315,6 +328,9 @@ docker compose --profile app up -d --build
 # API: http://127.0.0.1:8000
 ```
 
+> ⚠️ 两个常见误区：① api/web/celery 在 `profiles: [app]` 后面，**必须带 `--profile app`** 否则不会构建/启动；② `docker compose up -d`（不带 `--build`）会**复用旧镜像**（compose 标准行为，非 bug），改了代码要重建须显式 `--build`。
+> 端口重映射（避开占用）、热重载测试、打包部署的完整工作流见 [infra/DEV.md](infra/DEV.md)。
+
 ### 3. 初始化数据库（首次部署或新库）
 
 ```bash
@@ -331,6 +347,7 @@ psql $DATABASE_URL -f migrations/005_regulation_import_status.sql
 psql $DATABASE_URL -f migrations/006_project_user_management.sql
 psql $DATABASE_URL -f migrations/007_review_audit.sql        # 会审审查引擎 V1
 psql $DATABASE_URL -f migrations/008_review_audit_v2.sql     # 会审审查引擎 V2（须在 007 之后）
+# … 依序执行 migrations/ 下全部脚本，直至最新 025_model_story_manual_heights.sql（楼层标高人工录入）
 ```
 
 ### 4. 启动后端
@@ -466,6 +483,10 @@ npx playwright test
 | PWA | ✅ | manifest.json + Service Worker（Cache First / Network First）|
 | CI/CD | ✅ | GitHub Actions：pytest + bandit + tsc + build + Playwright E2E |
 | K8s 生产部署 | ✅ | Kustomize base/production + HPA + Ingress（cert-manager）+ Prometheus + Grafana |
+| 工程 3D 模型（构件级重建）| ✅ | 楼层堆叠 + 柱墙梁板管设备构件级挤出 + 语义树 + 问题标记；three.js 按需渲染 + InstancedMesh 合批（内存 115MB）|
+| 楼层标高人工录入/校正 | ✅ | 自动打底 → 人工校正，累加层高抬升上层（migration 025）|
+| Web 帮助中心 | ✅ | `/help` 操作手册（用户/管理员版按角色切换）|
+| 图纸全文 OCR | ✅ 真实推理已落地 | `core/model3d/ocr`：栅格化 + PaddleOCR/RapidOCR 有序回退 + 大图分块识别 + 分类 + 下游接入缝，34 单测；歌剧院剖面图实测 13 标高候选置信 0.96~1.00（[docs/MODEL_OCR.md](docs/MODEL_OCR.md)）|
 
 ---
 
@@ -494,9 +515,10 @@ npx playwright test
 | 中 | 重大变更多人审批 | 集团工程研究院 + 集团商务总监多人审批路径 |
 | 低 | 标准图集管理 | 企业级图集版本管理（F-KB-002）|
 | 低 | 错漏碰缺案例库 | AI 相似性检索 + 年度评优（F-KB-003）|
+| 高 | OCR 下游 wiring | 真实推理已落地（RapidOCR + 分块，歌剧院实测）；下一步把标高候选/轴号锚点/空间图名接入 section-z、跨图配准、语义树（接入缝 `consume.py` 已就绪，见 [docs/MODEL_OCR.md](docs/MODEL_OCR.md)）|
 | 低 | 安全审计 | 依赖漏洞扫描 / SQL 注入测试 / 日志审查 |
 | 低 | 数据备份策略 | 每日全量备份，保留 30 天 |
-| 低 | 用户操作手册 | 分角色文档（管理员/总工/经济师/设计师）|
+| ✅ 已完成 | 用户操作手册 | Web「帮助中心」`/help` 用户/管理员版，随功能迭代更新 |
 
 ---
 

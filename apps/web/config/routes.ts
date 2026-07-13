@@ -142,6 +142,14 @@ const routes: IRoute[] = [
     ],
   },
 
+  // ── 帮助中心（全体登录用户可见；管理员手册页内按角色切换）────────
+  {
+    name: '帮助中心',
+    path: '/help',
+    icon: 'QuestionCircleOutlined',
+    component: './Help',
+  },
+
   // ── 404 ──────────────────────────────────────────────────────
   {
     path: '*',

@@ -48,8 +48,10 @@ import type {
   SceneFloorV2,
   SceneMarker,
 } from '@/services/projectModel'
+import CollapsiblePanel from './CollapsiblePanel'
 import DrawingAnnotationQueue from './DrawingAnnotationQueue'
 import ModelQualityPanel from './ModelQualityPanel'
+import StoryHeightPanel from './StoryHeightPanel'
 import ModelViewer from './ModelViewer'
 import FragmentsScene from './FragmentsScene'
 import SemanticReviewQueue from './SemanticReviewQueue'
@@ -951,7 +953,17 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
 
           <Col flex="auto">
             <Card size="small" styles={{ body: { padding: 0 } }}>
-              <div style={{ position: 'relative', height: 'calc(100vh - 260px)', minHeight: 520 }}>
+              <div
+                style={{
+                  position: 'relative',
+                  height: 'calc(100vh - 260px)',
+                  minHeight: 520,
+                  border: '2px solid #1677ff',
+                  borderRadius: 8,
+                  overflow: 'hidden',
+                  boxShadow: 'inset 0 0 0 1px rgba(22,119,255,0.15)',
+                }}
+              >
                 {viewMode === 'ifc' && fragKey ? (
                   <>
                     <FragmentsScene
@@ -1028,10 +1040,11 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
                 selectedScopeQuality={selectedScopeQuality}
               />
             </Card>
-            <Card
-              size="small"
+            <CollapsiblePanel
               title="语义审查"
+              defaultOpen={false}
               style={{ marginBottom: 12 }}
+              maxBodyHeight={420}
               extra={quality.pendingCandidateCount > 0 ? <Tag color="gold">{quality.pendingCandidateCount}</Tag> : null}
             >
               <SemanticReviewQueue
@@ -1048,10 +1061,11 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
                 onSubmitOperation={handleSubmitSemanticOperation}
                 onRefreshRequested={refreshSemanticGraph}
               />
-            </Card>
-            <Card
-              size="small"
+            </CollapsiblePanel>
+            <CollapsiblePanel
               title="待人工识别"
+              defaultOpen={false}
+              maxBodyHeight={420}
               extra={quality.pendingManualCount > 0 ? <Tag color="gold">{quality.pendingManualCount}</Tag> : null}
             >
               <DrawingAnnotationQueue
@@ -1060,7 +1074,15 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
                 storyOptionsByBuilding={storyOptionsByBuilding}
                 onSave={handleSaveAnnotation}
               />
-            </Card>
+            </CollapsiblePanel>
+            <CollapsiblePanel
+              title="楼层标高校正"
+              defaultOpen={false}
+              maxBodyHeight={460}
+              style={{ marginTop: 12 }}
+            >
+              <StoryHeightPanel projectId={projectId} onSaved={handleRebuild} />
+            </CollapsiblePanel>
           </Col>
         </Row>
       ) : (

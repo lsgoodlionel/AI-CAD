@@ -101,6 +101,45 @@ def test_mark_count_below_story_count_not_matched_and_issue():
 
 
 @pytest.mark.unit
+def test_pit_section_rejected_by_zero_anchor():
+    """基坑围护剖面：标高数量凑巧兼容但整体错位 → 零锚校验拒绝 + issue。
+
+    2 层楼（F1 底 ±0.000），剖面标高 (-30, -25, -20)——数量 3 落在窗口
+    [2, 4] 内，旧口径会误采写坏整楼标高；零锚要求 F1 配对标高 ≈0。
+    """
+    plan_drawings, normalization = _two_story_plan()
+    section = _drawing("sec1", "围护体剖面图", "A-901")
+    recovery = recover_section_z(
+        [*plan_drawings, section], {"sec1": _marks(-30.0, -25.0, -20.0)}, normalization
+    )
+    assert "main" not in recovery.matched_units
+    assert recovery.z_overrides == {}
+    assert any(issue.issue_type == "z_anchor_mismatch" for issue in recovery.issues)
+
+
+@pytest.mark.unit
+def test_compatible_section_wins_over_mark_richest():
+    """多候选：标高最多的一张（25 个，基坑剖面）超窗口，兼容的楼层剖面胜出。
+
+    旧口径「盲选标高最多再判」会让整单体错失兼容剖面；新口径把选择延迟到
+    数量窗口 + 零锚校验之后。
+    """
+    plan_drawings, normalization = _two_story_plan()
+    pit = _drawing("pit", "基坑围护剖面", "A-902")
+    real = _drawing("real", "1-1剖面图", "A-501")
+    section_levels = {
+        "pit": _marks(*[-32.0 + i * 1.5 for i in range(25)]),  # 25 个施工标高
+        "real": _marks(0.0, 3.6, 7.2),
+    }
+    recovery = recover_section_z(
+        [*plan_drawings, pit, real], section_levels, normalization
+    )
+    assert "main" in recovery.matched_units
+    assert recovery.z_overrides[("main", "F1")]["elevation_bottom_m"] == pytest.approx(0.0)
+    assert recovery.z_overrides[("main", "F1")]["height_m"] == pytest.approx(3.6)
+
+
+@pytest.mark.unit
 def test_empty_section_marks_ignored():
     plan_drawings, normalization = _two_story_plan()
     section = _drawing("sec1", "剖面图", "A-501")

@@ -25,7 +25,7 @@ _CN_DIGITS = {
 _CN_UNITS = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九"]
 
 _RE_ROOF = re.compile(r"屋面|屋顶")
-_RE_FOUNDATION = re.compile(r"基础|承台")
+_RE_FOUNDATION = re.compile(r"基础|承台|桩基")
 _RE_BASEMENT = re.compile(
     r"B(\d{1,2})(?!\d)|地下([0-9一二两三四五六七八九十]{1,3})层?|负([0-9一二两三四五六七八九十]{1,3})层",
     re.IGNORECASE,

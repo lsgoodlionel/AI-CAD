@@ -383,6 +383,41 @@ export const getModelAssetUrl = (projectId: string, key: string) =>
     params: { key },
   })
 
+// ── Task 3：楼层标高人工录入/校正 ────────────────────────────────
+export interface StoryHeightRow {
+  scope_key: string
+  story_key: string
+  story_label: string
+  story_order: number
+  auto_elevation_m: number | null
+  auto_height_m: number | null
+  manual_height_m: number | null
+  manual_elevation_m: number | null
+  note: string | null
+}
+
+export interface StoryHeightSaveItem {
+  scope_key: string
+  story_key: string
+  story_order: number
+  height_m: number | null
+  elevation_bottom_m?: number | null
+  note?: string | null
+}
+
+/** 读取楼层标高:自动识别参考值 + 人工录入值 */
+export const getModelStoryHeights = (projectId: string) =>
+  request<{ data: StoryHeightRow[]; meta: { count: number } }>(
+    `${BASE}/${projectId}/model/story-heights`,
+  )
+
+/** 保存人工录入/校正的层高（重建后生效） */
+export const saveModelStoryHeights = (projectId: string, items: StoryHeightSaveItem[]) =>
+  request<{ data: { saved: number }; meta: { note: string } }>(
+    `${BASE}/${projectId}/model/story-heights`,
+    { method: 'POST', data: { items } },
+  )
+
 // ── Phase A / WS2：程序化 IFC + Fragments 加载相关类型（仅新增，不改现有）──
 // 对齐 docs/PHASE_A_TASKS.md A-05：scene.model_ifc = {ifc_key, frag_key, build_mode, is_estimated, generated_at}
 // 以及 A-08：Fragments 构件拾取返回的选中 item 形状。
