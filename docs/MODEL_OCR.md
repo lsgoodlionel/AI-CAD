@@ -101,14 +101,19 @@ elevs = elevation_candidates(result)   # [{value_m, center, bbox, confidence, te
 3. 网络不稳时容器内安装用清华源 + `--resume-retries 8` 断点续传。
 4. 本地 dev 容器装好后 `docker commit cad_api cad-api:local` 烘焙持久化（防 recreate 丢包）。
 
-## 下游接入缝（待逐步 wiring）
+## 下游接入（第一缝已通，2026-07-13）
 
-`consume.py` 三个函数即为接入点，默认不改变现有行为：
-
-- `elevation_candidates` → `services/section_z_recovery` / `model_story`（自动打底标高，
-  与已有人工层高录入通道 migration 025 互补：OCR 打底 → 人工校正）
-- `axis_anchors` → `core/model3d/grid_anchor_extractor` / `cross_view_registration`
-- `space_labels` → `services/model_semantics`
+- ✅ **标高 → section-z 楼层恢复**（`as_geometry_texts`）：矢量文本抽不到标高的 PDF
+  剖面自动 OCR 兜底，合成 `DrawingGeometry.texts` 同构条目喂 `extract_section_levels`，
+  完整复用绑线/标定/置信逻辑。歌剧院端到端实测：22 张剖面命中（12~25 标高/张）。
+  连带修复 z 恢复两处缺陷：①选择策略从「盲选标高最多」改为「数量窗口+零锚校验后
+  选最佳」（基坑围护剖面 25+ 施工标高恰恰最多，盲选会废掉整单体）；②新增 **±0.000
+  零锚校验**把数量凑巧兼容的围护剖面确定性拒掉（`z_anchor_mismatch` issue 浮出，
+  实测 payload 首标高 -24.8~-27.8 确凿为基坑标高）。歌剧院 `cross_view_match=false`
+  是诚实结果——该套图纸无全楼建筑剖面；含建筑剖面的项目录入后 gate 将自动点亮。
+- ⏳ `axis_anchors` → `grid_anchor_extractor` / `cross_view_registration`（轴号召回
+  需先定向增强）
+- ⏳ `space_labels` → `services/model_semantics`
 
 ## 已知边界
 
