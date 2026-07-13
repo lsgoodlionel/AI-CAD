@@ -17,7 +17,7 @@
 | 楼层标高人工录入/校正 | 自动识别打底 → 人工录入校正；按累加层高补全真实底标高，层高真正抬升上层（migration 025 + `model_story_manual.py` + `StoryHeightPanel` + `GET/POST /model/story-heights`） |
 | Web 帮助中心 | 左侧菜单「帮助中心」`/help`；零依赖 Markdown 渲染；按角色切用户手册 / 管理员手册；`copy-manuals` 构建前把 docs 手册同步到 `public/manual/` |
 | 工程模型页内存优化 | **1.1GB→115MB（-89%，上海大歌剧院实测）**。CDP 逐层定位真凶=「待人工识别」队列给 1061 项各渲染 3 个 AutoComplete 表单（3183 Select、69191 DOM 节点）+ 常开 RAF 持续产垃圾。修复：队列分页 + 折叠即卸载子树 + 重队列默认折叠 + 按需渲染（空闲 0 帧、CPU/GPU 归零）+ 标记 1500 球体转单个 InstancedMesh + 设备 1799 挤出逐层合并（faceIndex 保留点击 label）。实测 DOM 69191→2337、空闲堆持平不再增长 |
-| 图纸全文 OCR 基座（核心功能） | `core/model3d/ocr`：高 DPI 栅格化 + PaddleOCR 中文识别（懒加载/优雅降级）+ 离线 mock；产出带坐标+置信度+语义分类（标高/轴号/尺寸/楼层/房间/说明）的结构化 token；`consume.py` 三个下游接入缝（标高候选/轴号锚点/空间图名）；置信门槛+人工复核纪律；CLI + 24 单测全绿 + [docs/MODEL_OCR.md](docs/MODEL_OCR.md)。真实推理待放开 paddle 依赖正式 build |
+| 图纸全文 OCR（核心功能，**真实推理已落地**） | `core/model3d/ocr`：高 DPI 栅格化 + PaddleOCR/RapidOCR 有序回退（paddle 在 linux/aarch64 SIGSEGV，`CAD_OCR_DISABLE_PADDLE=1` 显式禁用后走 RapidOCR）+ **大图分块识别**（A0 图正文小字从 26 token→261，标高 0→13）+ 语义分类（标高/轴号/尺寸/楼层/房间/说明）；歌剧院剖面图实测 **13 标高候选全部置信 0.96~1.00**（-31.900~+16.200）；`consume.py` 三个下游接入缝；置信门槛+人工复核纪律；CLI + 34 单测全绿 + [docs/MODEL_OCR.md](docs/MODEL_OCR.md) |
 | 开发环境认知更正 | 复核推翻「compose v5.x 坏了」误判——compose 没坏（v5.x 是当前正常版本，`build`/`!override` 均正常，真实 `docker compose build` 已完整跑通）；真因是漏 `--profile app`、`up` 不带 `--build` 复用旧镜像。新增权威工作流文档 [infra/DEV.md](infra/DEV.md)（起基础设施/热重载测试/打包部署 + 误区对照表） |
 | 安全 | Phase C 签字门禁清除弱密码 + 密码强度校验 |
 
@@ -486,7 +486,7 @@ npx playwright test
 | 工程 3D 模型（构件级重建）| ✅ | 楼层堆叠 + 柱墙梁板管设备构件级挤出 + 语义树 + 问题标记；three.js 按需渲染 + InstancedMesh 合批（内存 115MB）|
 | 楼层标高人工录入/校正 | ✅ | 自动打底 → 人工校正，累加层高抬升上层（migration 025）|
 | Web 帮助中心 | ✅ | `/help` 操作手册（用户/管理员版按角色切换）|
-| 图纸全文 OCR 基座 | 🟡 基座就绪 | `core/model3d/ocr`：栅格化 + PaddleOCR（懒加载/降级）+ 分类 + 下游接入缝，24 单测；真实推理待放开 paddle 依赖 |
+| 图纸全文 OCR | ✅ 真实推理已落地 | `core/model3d/ocr`：栅格化 + PaddleOCR/RapidOCR 有序回退 + 大图分块识别 + 分类 + 下游接入缝，34 单测；歌剧院剖面图实测 13 标高候选置信 0.96~1.00（[docs/MODEL_OCR.md](docs/MODEL_OCR.md)）|
 
 ---
 
@@ -515,7 +515,7 @@ npx playwright test
 | 中 | 重大变更多人审批 | 集团工程研究院 + 集团商务总监多人审批路径 |
 | 低 | 标准图集管理 | 企业级图集版本管理（F-KB-002）|
 | 低 | 错漏碰缺案例库 | AI 相似性检索 + 年度评优（F-KB-003）|
-| 高 | OCR 真实推理落地 | 放开 `paddleocr`/`paddlepaddle` 正式 build，在真实工程图验准确率后接入楼层/拼接/语义（基座已就绪，见 [docs/MODEL_OCR.md](docs/MODEL_OCR.md)）|
+| 高 | OCR 下游 wiring | 真实推理已落地（RapidOCR + 分块，歌剧院实测）；下一步把标高候选/轴号锚点/空间图名接入 section-z、跨图配准、语义树（接入缝 `consume.py` 已就绪，见 [docs/MODEL_OCR.md](docs/MODEL_OCR.md)）|
 | 低 | 安全审计 | 依赖漏洞扫描 / SQL 注入测试 / 日志审查 |
 | 低 | 数据备份策略 | 每日全量备份，保留 30 天 |
 | ✅ 已完成 | 用户操作手册 | Web「帮助中心」`/help` 用户/管理员版，随功能迭代更新 |

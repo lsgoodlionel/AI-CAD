@@ -1,6 +1,6 @@
 # CAD — 图纸深化全过程管理平台
 
-> 最后更新：2026-07-12 | 实现进度：Phase 0~4B 全部完成；会审审查 V4（方法论）已并入 AI 审图；Phase 5 批量读图与整套审图完成；Phase 6 工程 3D 模型基座完成（模型成为全平台成果展示主通道之一）；超级工程建模 Phase A（AI 读图→IFC/Fragments）已合并 main；超级工程建模 Phase B（算量级：跨视图 z 恢复 + 构件拓扑 + IFC-QTO 算量 + 创效打通）完成（B-01~B-24）；**Phase C（BIM 级）离线可交付部分全部完成：泳道 A 合规门禁（C-01 许可审计 + 人工审核双通道门禁 + C-11 隔离）、泳道 B 数据关键路径（C-02~C-07）、泳道 C 模型（契约基座 + C-08/C-10/C-12/C-13）、泳道 D 审校（C-15/C-16/C-17）、C-14 评测基座、C-18 验收 Demo，累计 227 测试全绿、双门禁 PASS；里程碑 M2（审校收敛返工点）达成，M1（符号识别超纯规则）基座就绪、终评数字待 C-09 真实微调（卡 GPU/脱敏数据/权重）**；**分支 `fix/model-3d-quality`（PR #11）：上海大歌剧院实测驱动的建模致命修复（渲染/幻影层/标高/sprawl/贴图/红点/未分层）+ 模型页 UX + 楼层标高人工录入通道（migration 025）+ Web 帮助中心 `/help` + 工程模型页内存优化 1.1GB→115MB（队列分页/折叠卸载/按需渲染/InstancedMesh）+ 图纸全文 OCR 基座（`core/model3d/ocr`，24 单测，`docs/MODEL_OCR.md`）；并复核更正「compose build 坏了」误判（实为漏 `--profile app`/`up` 不带 `--build`，见 `infra/DEV.md`）**
+> 最后更新：2026-07-12 | 实现进度：Phase 0~4B 全部完成；会审审查 V4（方法论）已并入 AI 审图；Phase 5 批量读图与整套审图完成；Phase 6 工程 3D 模型基座完成（模型成为全平台成果展示主通道之一）；超级工程建模 Phase A（AI 读图→IFC/Fragments）已合并 main；超级工程建模 Phase B（算量级：跨视图 z 恢复 + 构件拓扑 + IFC-QTO 算量 + 创效打通）完成（B-01~B-24）；**Phase C（BIM 级）离线可交付部分全部完成：泳道 A 合规门禁（C-01 许可审计 + 人工审核双通道门禁 + C-11 隔离）、泳道 B 数据关键路径（C-02~C-07）、泳道 C 模型（契约基座 + C-08/C-10/C-12/C-13）、泳道 D 审校（C-15/C-16/C-17）、C-14 评测基座、C-18 验收 Demo，累计 227 测试全绿、双门禁 PASS；里程碑 M2（审校收敛返工点）达成，M1（符号识别超纯规则）基座就绪、终评数字待 C-09 真实微调（卡 GPU/脱敏数据/权重）**；**分支 `fix/model-3d-quality`（PR #11）：上海大歌剧院实测驱动的建模致命修复（渲染/幻影层/标高/sprawl/贴图/红点/未分层）+ 模型页 UX + 楼层标高人工录入通道（migration 025）+ Web 帮助中心 `/help` + 工程模型页内存优化 1.1GB→115MB（队列分页/折叠卸载/按需渲染/InstancedMesh）+ 图纸全文 OCR **真实推理落地**（RapidOCR aarch64 回退 + 大图分块识别，歌剧院剖面图实测 13 标高候选置信 0.96~1.00，`core/model3d/ocr`，34 单测，`docs/MODEL_OCR.md`）；并复核更正「compose build 坏了」误判（实为漏 `--profile app`/`up` 不带 `--build`，见 `infra/DEV.md`）**
 
 ## 项目概述
 
@@ -82,7 +82,7 @@
 | `fix/model-3d-quality`｜楼层标高人工录入/校正通道（自动打底→人工校正，累加层高抬升上层）| ✅ | migration 025、`services/model_story_manual.py`、`routers/project_models.py`、`StoryHeightPanel.tsx` |
 | `fix/model-3d-quality`｜Web 帮助中心 `/help`（用户/管理员手册按角色切，零依赖 md 渲染，构建前同步 docs→public/manual）| ✅ | `pages/Help/{index,Markdown}.tsx`、`scripts/copy-manuals.mjs`、`config/routes.ts` |
 | `fix/model-3d-quality`｜工程模型页内存优化 **1.1GB→115MB**（队列分页/折叠即卸载/重队列默认折叠/按需渲染/标记 InstancedMesh/设备逐层合并 faceIndex）| ✅ | `pages/model/ProjectModel/{DrawingAnnotationQueue,CollapsiblePanel,ModelViewer,sceneBuilder,elementsBuilder,index}.tsx`、`__tests__/instancing.test.ts` |
-| `fix/model-3d-quality`｜图纸全文 OCR 基座（核心功能：栅格化 + PaddleOCR 降级 + 离线 mock + 分类 + 下游接入缝，置信门槛+人工复核）| 🟡 基座就绪（真实推理待放开 paddle 正式 build）| `core/model3d/ocr/{types,classify,paddle_backend,mock_backend,service,consume}.py`、`scripts/model3d/ocr_drawing.py`、`tests/test_model3d_ocr.py`、`docs/MODEL_OCR.md` |
+| `fix/model-3d-quality`｜图纸全文 OCR（核心功能）**真实推理落地**：PaddleOCR/RapidOCR 有序回退（paddle 在 linux/aarch64 SIGSEGV → `CAD_OCR_DISABLE_PADDLE=1` + RapidOCR）+ 大图分块识别（26→261 token）+ 分类 + 下游接入缝；歌剧院剖面图实测 13 标高候选置信 0.96~1.00 | ✅（下一步：wiring 到 section-z/配准/语义）| `core/model3d/ocr/{types,classify,paddle_backend,rapid_backend,mock_backend,service,consume}.py`、`scripts/model3d/ocr_drawing.py`、`tests/test_model3d_ocr.py`（34 例）、`docs/MODEL_OCR.md` |
 | `fix/model-3d-quality`｜开发环境认知更正（compose 没坏，是漏 `--profile app`/`up` 不带 `--build`）+ 权威工作流文档 | ✅ | `infra/DEV.md`、`infra/docker-compose.dev.yml`、`docs/DEV_HANDOFF.md` |
 
 ---

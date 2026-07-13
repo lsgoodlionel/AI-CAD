@@ -16,7 +16,7 @@
 上海大歌剧院实测驱动:**建模致命修复**(渲染/幻影层/标高/sprawl/贴图/红点/未分层)+ **模型页 UX** + **楼层标高人工录入通道** + **Web 帮助中心** + **内存优化 1.1GB→115MB** + **图纸全文 OCR 基座** + **compose 认知更正**。所有前端 63 单测、OCR 24 单测全绿,真实 `docker compose build` 已跑通。
 
 ### 后续升级路线(优先级)
-1. **OCR 真实推理落地**(高):放开 `requirements` 的 paddle 依赖正式 build → 真实图验准确率 → 逐步 wiring 到 `section_z`/`grid_anchor`/`semantics`(接入缝 `core/model3d/ocr/consume.py` 已就绪)。见 [MODEL_OCR.md](MODEL_OCR.md)。
+1. ~~OCR 真实推理落地~~ ✅ **已完成(2026-07-13)**:RapidOCR aarch64 回退 + 大图分块识别,歌剧院剖面图实测 13 标高候选置信 0.96~1.00。**下一步改为 OCR 下游 wiring**(高):把 `consume.py` 的标高候选/轴号锚点/空间图名接入 `section_z_recovery`/`cross_view_registration`/`model_semantics`。见 [MODEL_OCR.md](MODEL_OCR.md) 实测章节。
 2. **PR #11 合并**(高):CI 通过后合入 `main`。
 3. **建模精度继续**(中):地上层高剖面稀少,仍依赖人工录入通道;跨视图 z 恢复(section-z)可接 OCR 标高候选自动打底。
 4. **内存进阶**(低):当前 115MB 已够用;如需更进一步可对 scene JSON 开 gzip、按楼层懒加载。
@@ -100,14 +100,20 @@ a188a4b chore(phase-c,docs): 清除签字门禁弱密码 + 3D 模型操作手册
 - **方案**:加 `/help` 路由 + 左侧菜单或头部「帮助中心」入口;页面 fetch 手册(把 md 拷进 `public/manual/` + 轻量渲染,或后端出一个只读端点)。按角色区分:普通用户看用户版、管理员多看管理员版。
 - 载体二选一:平台内 md 渲染页 / 直接内嵌图文 HTML。参考构建+部署流程见 §4。
 
-### Task 4 — OCR 识别图纸全部文字(核心功能)✅ 基座落地(待真实权重验证)
-**已交付(2026-07-12)**:`core/model3d/ocr` 模块 + 24 单测全绿 + CLI + 特性文档 `docs/MODEL_OCR.md`。
-- 契约先行、后端可插拔(PaddleOCR 懒加载/降级 + 离线 mock)、渲染→识别→坐标换算→
-  分类(标高/轴号/尺寸/楼层/房间/说明)全链路离线可跑;`consume.py` 三个下游接入缝
+### Task 4 — OCR 识别图纸全部文字(核心功能)✅ **真实推理已落地并验证(2026-07-13)**
+**已交付**:`core/model3d/ocr` 模块 + 34 单测全绿 + CLI + 特性文档 `docs/MODEL_OCR.md`。
+- 契约先行、后端可插拔:**PaddleOCR → RapidOCR → mock/none 有序回退**;渲染→识别→
+  坐标换算→分类(标高/轴号/尺寸/楼层/房间/说明)全链路;`consume.py` 三个下游接入缝
   (标高候选/轴号锚点/空间图名)就绪,默认不改现有行为。
+- **真实图实测**(上海大歌剧院,RapidOCR + 分块):「10围护体剖面图(一)」261 token,
+  **13 个标高候选全部置信 0.96~1.00**(-31.900~+16.200),31 尺寸、5 楼层名,22.5s/图。
+- **关键落地经验**:①paddlepaddle 3.x 原生引擎在 linux/aarch64 容器 SIGSEGV(进程级,
+  try/except 拦不住)→ `CAD_OCR_DISABLE_PADDLE=1` 显式禁用走 RapidOCR;②A0 大图必须
+  分块识别(整图缩边后正文小字全丢:26→261 token);③容器 pip 装大包用清华源 +
+  `--resume-retries` 断点续传;④装好后 `docker commit cad_api cad-api:local` 烘焙。
 - **纪律**:置信门槛 + 人工复核双重把关(默认 0.6)。
-- **待续**:①放开 requirements 的 paddle 依赖正式 build;②真实图验准确率;③逐步 wiring
-  到 section_z/grid_anchor/semantics。详见 `docs/MODEL_OCR.md`。
+- **待续**:wiring 到 section_z/grid_anchor/semantics(接入缝已就绪);轴号(圆圈单字符)
+  召回低可定向增强;celery worker 跑 OCR 需 recreate 用新烘焙镜像。详见 `docs/MODEL_OCR.md`。
 
 <details><summary>原始规划(存档)</summary>
 - **背景**:CAD 导出 PDF 的正文标注(标高、轴号、构件名、说明)是**矢量绘制的字形,非可提取文本**——`page.get_text` 只拿到标题栏。文字对模型完整性/图纸拼接理解很重要(用户强调)。
