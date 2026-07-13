@@ -25,12 +25,20 @@ services:
     volumes:
       - ../apps/api:/app
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    environment:
+      # aarch64(Apple Silicon Docker): paddlepaddle 原生引擎构造 predictor 时
+      # SIGSEGV(进程级),显式禁用后 OCR 走 RapidOCR 回退。x86_64 部署不设此变量。
+      CAD_OCR_DISABLE_PADDLE: "1"
 
   celery-worker:
     volumes:
       - ../apps/api:/app
     # celery 无热重载;改代码后 `docker restart cad_celery_worker` 加载(挂载已就位,无需重建)
+    environment:
+      CAD_OCR_DISABLE_PADDLE: "1"
 
   celery-beat:
     volumes:
       - ../apps/api:/app
+    environment:
+      CAD_OCR_DISABLE_PADDLE: "1"

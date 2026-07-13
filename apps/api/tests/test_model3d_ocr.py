@@ -264,6 +264,56 @@ def test_parse_rapid_output_none():
     assert parse_rapid_output(None) == []
 
 
+def test_as_geometry_texts_filters_and_formats():
+    from core.model3d.ocr.consume import as_geometry_texts
+
+    result = OcrResult(
+        tokens=(
+            TextToken("±0.000", (100, 200, 160, 220), 0.98, "elevation", 0.0),
+            TextToken("+3.600", (100, 100, 160, 120), 0.75, "elevation", 3.6),  # <0.8 剔除
+            TextToken("会议室", (0, 0, 10, 10), 0.99, "room_name"),             # 非标高剔除
+        ),
+        backend="mock",
+    )
+    texts = as_geometry_texts(result)
+    # 仅高置信标高，(x_min, y_min, text) 与 fitz words 口径一致
+    assert texts == [(100.0, 200.0, "±0.000")]
+
+
+def test_ocr_elevation_tokens_feed_section_extractor():
+    """端到端合成链：OCR 标高 token → 合成几何文本 → extract_section_levels 出 marks。
+
+    这是 section-z OCR 兜底的核心正确性：合成条目必须能被现有 extractor 的
+    标高解析、水平线绑定与线性标定完整消费（斜率为负：页面 y 向下、标高向上）。
+    """
+    from dataclasses import replace
+
+    from core.model3d.ocr.consume import as_geometry_texts
+    from core.model3d.section_level_extractor import extract_section_levels
+    from core.model3d.types import DrawingGeometry
+
+    # 三条水平标高线（y=100/400/700）+ 对应 OCR 标高 token（文本顶贴近线）
+    geom = DrawingGeometry(
+        page_w=1000, page_h=800,
+        lines=[(50, 100, 950, 100), (50, 400, 950, 400), (50, 700, 950, 700)],
+    )
+    result = OcrResult(
+        tokens=(
+            TextToken("+7.200", (100, 95, 160, 115), 0.99, "elevation", 7.2),
+            TextToken("+3.600", (100, 395, 160, 415), 0.98, "elevation", 3.6),
+            TextToken("±0.000", (100, 695, 160, 715), 0.97, "elevation", 0.0),
+        ),
+        backend="mock",
+    )
+    merged = replace(geom, texts=[*geom.texts, *as_geometry_texts(result)])
+    levels = extract_section_levels(merged)
+
+    assert [m.elevation_m for m in levels.marks] == [0.0, 3.6, 7.2]
+    assert all(m.source_ref["bound"] for m in levels.marks)      # 全部绑上标高线
+    assert levels.fit["slope_m_per_pt"] < 0                       # 标定方向正确
+    assert all(m.confidence >= 0.8 for m in levels.marks)
+
+
 def test_axis_anchors_and_space_labels():
     from core.model3d.ocr.consume import axis_anchors, space_labels
 

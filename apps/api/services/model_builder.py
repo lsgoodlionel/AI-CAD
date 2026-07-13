@@ -47,7 +47,9 @@ from services.model_lod import ModelScopeEvidence, aggregate_lod_modes, evaluate
 logger = logging.getLogger(__name__)
 
 _executor = ThreadPoolExecutor(max_workers=2)
-_SECTION_TIMEOUT_SEC = 20  # 单张剖面标高抽取超时（与构件识别同量级）
+# 单张剖面标高抽取超时：矢量路径秒级；OCR 兜底路径（矢量文本抽不到标高时）
+# 首图含模型加载 ~10s + 大图分块识别 ~25s，须给足余量
+_SECTION_TIMEOUT_SEC = 90
 
 RENDER_DPI = 110
 MAX_TEXTURE_PX = 1600
@@ -876,7 +878,12 @@ def _marker_building_keys(
 
 
 def _section_levels_sync(data: bytes, ext: str):
-    """同步：字节 → 几何 → 剖面标高序列（任何失败返回 None，绝不抛）。"""
+    """同步：字节 → 几何 → 剖面标高序列（任何失败返回 None，绝不抛）。
+
+    PDF 且矢量文本抽不到标高时走 OCR 兜底：CAD 导出 PDF 的正文标高多为
+    矢量字形（get_text 取不到），把高置信 OCR 标高 token 合成几何文本后
+    重抽，完整复用标高线绑定/线性标定/置信逻辑。OCR 不可用时行为不变。
+    """
     try:
         from core.model3d import geometry_extractor
         from core.model3d.section_level_extractor import extract_section_levels
@@ -886,10 +893,50 @@ def _section_levels_sync(data: bytes, ext: str):
             if ext == "pdf"
             else geometry_extractor.extract_dxf_geometry(data)
         )
-        return extract_section_levels(geom)
+        levels = extract_section_levels(geom)
+        if levels.marks or ext != "pdf":
+            return levels
+        return _section_levels_ocr_fallback(data, geom, levels)
     except Exception as exc:  # noqa: BLE001 — 剖面识别失败跳过
         logger.warning("[ModelBuilder] 剖面标高抽取跳过: %s", exc)
         return None
+
+
+def _section_levels_ocr_fallback(data: bytes, geom, vector_levels):
+    """OCR 标高 token → 合成几何文本 → 重抽标高。失败一律回退矢量结果。"""
+    try:
+        from dataclasses import replace
+
+        from core.model3d.ocr import run_ocr
+        from core.model3d.ocr.consume import as_geometry_texts
+        from core.model3d.section_level_extractor import (
+            SectionLevels,
+            extract_section_levels,
+        )
+
+        ocr_result = run_ocr(data, "pdf")
+        if not ocr_result.available:
+            return vector_levels
+        ocr_texts = as_geometry_texts(ocr_result)  # 仅 ≥0.8 置信标高 token
+        if not ocr_texts:
+            return vector_levels
+        merged = replace(geom, texts=[*geom.texts, *ocr_texts])
+        ocr_levels = extract_section_levels(merged)
+        if not ocr_levels.marks:
+            return vector_levels
+        logger.info(
+            "[ModelBuilder] 剖面标高 OCR 兜底命中: %d 个标高（backend=%s）",
+            len(ocr_levels.marks), ocr_result.backend,
+        )
+        # fit 标注来源，供下游/评测追溯（marks 的置信仍由 extractor 标定逻辑给出）
+        return SectionLevels(
+            marks=ocr_levels.marks,
+            reason=None,
+            fit={**ocr_levels.fit, "ocr_fallback": True, "ocr_backend": ocr_result.backend},
+        )
+    except Exception as exc:  # noqa: BLE001 — OCR 兜底失败不影响矢量结果
+        logger.warning("[ModelBuilder] 剖面标高 OCR 兜底跳过: %s", exc)
+        return vector_levels
 
 
 async def _recover_section_z(

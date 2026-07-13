@@ -13,6 +13,8 @@ from .types import OcrResult
 
 # 默认人工复核门槛：标高/轴号影响几何配准，取较高置信
 _DEFAULT_MIN_CONF = 0.6
+# 进几何配准管线（section-z 标定）的更严门槛：读错标高比缺失更糟
+_GEOMETRY_MIN_CONF = 0.8
 
 
 def _center(bbox: tuple[float, float, float, float]) -> tuple[float, float]:
@@ -42,6 +44,26 @@ def elevation_candidates(
             "text": t.text,
         })
     out.sort(key=lambda d: d["value_m"])
+    return out
+
+
+def as_geometry_texts(
+    result: OcrResult, *, min_confidence: float = _GEOMETRY_MIN_CONF
+) -> list[tuple[float, float, str]]:
+    """标高 token → ``DrawingGeometry.texts`` 同构条目 ``[(x, y, text), ...]``。
+
+    供 section-z 兜底：CAD PDF 正文标高是矢量字形，``page.get_text`` 取不到；
+    把 OCR 标高 token 合成几何文本后喂现有 ``extract_section_levels``，
+    完整复用其标高线绑定 / 线性标定 / 置信度逻辑。
+
+    坐标口径与 fitz ``get_text("words")`` 一致：(x_min, y_min) 文本框左上角、
+    页面点、左上原点——extractor 的 ±10pt 绑线容差按同一语义工作。
+    """
+    out: list[tuple[float, float, str]] = []
+    for t in result.of_kind("elevation"):
+        if t.confidence < min_confidence:
+            continue
+        out.append((t.bbox[0], t.bbox[1], t.text))
     return out
 
 
