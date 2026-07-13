@@ -20,6 +20,9 @@ from services.model_story import (
 
 # 剖面标高数相对楼层数的容差（含屋顶/女儿墙标高）
 _MARK_SURPLUS_TOLERANCE = 2
+# 零锚校验：楼层表中视为 ±0.000 层的容差 / 配对标高允许偏差（米）
+_ANCHOR_STORY_TOL_M = 0.3
+_ANCHOR_MARK_TOL_M = 0.5
 
 
 @dataclass(frozen=True)
@@ -34,31 +37,69 @@ def recover_section_z(
     section_levels_by_drawing: dict[str, SectionLevels],
     normalization: StoryNormalizationResult,
 ) -> SectionZRecovery:
-    """剖面标高 → 楼层层高覆盖 + 匹配单体集。纯函数，无 IO。"""
-    best_section = _best_section_per_unit(drawings, section_levels_by_drawing)
+    """剖面标高 → 楼层层高覆盖 + 匹配单体集。纯函数，无 IO。
+
+    选择策略：每单体在「与楼层数兼容（数量窗口）且通过零锚校验」的候选中，
+    取标高最多、残差最小者。不再盲选标高最多的一张——大型项目常含基坑
+    围护剖面（冠梁/支撑/坑底等施工标高，25+ 个），标高数量最多的恰恰不是
+    楼层剖面；盲选会让整个单体错失兼容剖面或写入错误标高。
+    """
+    sections_by_unit = _sections_per_unit(drawings, section_levels_by_drawing)
 
     z_overrides: dict[tuple[str, str], dict] = {}
     matched_units: set[str] = set()
     issues: list[ModelQualityIssue] = []
 
-    for unit_key, section in best_section.items():
+    for unit_key, sections in sections_by_unit.items():
         stories = _ordered_stories(normalization, unit_key)
         if not stories:
             continue
-        marks = list(section.marks)
-        if not _marks_align_stories(marks, len(stories)):
+
+        compatible = [
+            section for section in sections
+            if _marks_align_stories(list(section.marks), len(stories))
+        ]
+        if not compatible:
             issues.append(
                 ModelQualityIssue(
                     issue_type="z_story_count_mismatch",
                     severity="warning",
-                    message="剖面标高数与平面楼层数不一致，未采用剖面标高（回落默认层高）",
+                    message="无剖面的标高数与平面楼层数兼容，未采用剖面标高（回落默认层高）",
                     building_unit_key=unit_key,
-                    payload={"mark_count": len(marks), "story_count": len(stories)},
+                    payload={
+                        "mark_counts": sorted(len(s.marks) for s in sections),
+                        "story_count": len(stories),
+                    },
                 )
             )
             continue
 
-        _assign_overrides(z_overrides, unit_key, stories, marks)
+        anchored = [
+            section for section in compatible
+            if _anchor_ok(stories, list(section.marks))
+        ]
+        if not anchored:
+            issues.append(
+                ModelQualityIssue(
+                    issue_type="z_anchor_mismatch",
+                    severity="warning",
+                    message="剖面标高与 ±0.000 楼层锚不符（疑为基坑/围护剖面），未采用（回落默认层高）",
+                    building_unit_key=unit_key,
+                    payload={
+                        "story_count": len(stories),
+                        "candidate_first_marks": [
+                            round(s.marks[0].elevation_m, 3) for s in compatible[:5]
+                        ],
+                    },
+                )
+            )
+            continue
+
+        best = max(
+            anchored,
+            key=lambda s: (len(s.marks), -float(s.fit.get("residual", 1.0))),
+        )
+        _assign_overrides(z_overrides, unit_key, stories, list(best.marks))
         matched_units.add(unit_key)
 
     return SectionZRecovery(
@@ -66,24 +107,36 @@ def recover_section_z(
     )
 
 
-def _best_section_per_unit(
+def _sections_per_unit(
     drawings: list[dict],
     section_levels_by_drawing: dict[str, SectionLevels],
-) -> dict[str, SectionLevels]:
-    """每单体选「标高最多、残差最小」的一张剖面。"""
-    best: dict[str, tuple[SectionLevels, tuple[int, float]]] = {}
+) -> dict[str, list[SectionLevels]]:
+    """按单体归组全部有标高的剖面（候选集，选择延迟到主循环按楼层数裁决）。"""
+    grouped: dict[str, list[SectionLevels]] = {}
     for drawing in drawings:
         drawing_id = str(drawing.get("id") or "")
         section = section_levels_by_drawing.get(drawing_id)
         if section is None or not section.marks:
             continue
         unit_key = detect_building_unit(drawing).unit_key
-        residual = float(section.fit.get("residual", 1.0))
-        score = (len(section.marks), -residual)  # 标高多者优先，残差小者次之
-        current = best.get(unit_key)
-        if current is None or score > current[1]:
-            best[unit_key] = (section, score)
-    return {unit_key: entry[0] for unit_key, entry in best.items()}
+        grouped.setdefault(unit_key, []).append(section)
+    return grouped
+
+
+def _anchor_ok(stories: list, marks: list) -> bool:
+    """零锚校验：楼层表存在 ±0.000 层时，逐层配对后该层标高必须 ≈0。
+
+    把「标高数量凑巧兼容但整体错位」的语义错配（典型：基坑围护剖面的
+    冠梁/支撑/坑底标高）确定性拒之门外。楼层表无零标高层（如纯地下
+    阶段）→ 无锚可校，放行（数量窗口仍在把关）。
+    """
+    for index, story in enumerate(stories):
+        if abs(story.elevation_m) <= _ANCHOR_STORY_TOL_M:
+            return (
+                index < len(marks)
+                and abs(marks[index].elevation_m) <= _ANCHOR_MARK_TOL_M
+            )
+    return True
 
 
 def _ordered_stories(normalization: StoryNormalizationResult, unit_key: str) -> list:

@@ -602,10 +602,16 @@ def _serialize_quality_issue(issue: model_story.ModelQualityIssue) -> dict[str, 
     }
 
 
-def _quality_payload(normalization: model_story.StoryNormalizationResult) -> dict[str, Any]:
+def _quality_payload(
+    normalization: model_story.StoryNormalizationResult,
+    extra_issues: list | None = None,
+) -> dict[str, Any]:
+    # extra_issues：normalization 之外链路的质量问题（如剖面 z 恢复的
+    # z_story_count_mismatch / z_anchor_mismatch），此前被静默丢弃。
+    all_issues = [*normalization.issues, *(extra_issues or [])]
     story_conflicts = [
         _serialize_quality_issue(issue)
-        for issue in normalization.issues
+        for issue in all_issues
         if issue.issue_type == "story_spacing_too_small"
     ]
     low_confidence_units = [
@@ -624,7 +630,7 @@ def _quality_payload(normalization: model_story.StoryNormalizationResult) -> dic
         "story_conflict_count": len(story_conflicts),
         "story_conflicts": story_conflicts,
         "low_confidence_building_units": low_confidence_units,
-        "issues": [_serialize_quality_issue(issue) for issue in normalization.issues],
+        "issues": [_serialize_quality_issue(issue) for issue in all_issues],
     }
 
 
@@ -1241,7 +1247,7 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
         "semantic_tree": semantic_payload["semantic_tree"],
         "unassigned_drawings": semantic_payload["unassigned_drawings"],
         "semantic_version": semantic_payload["semantic_version"],
-        "quality": _quality_payload(normalization),
+        "quality": _quality_payload(normalization, extra_issues=section_z.issues),
         "annotation_queue": normalization.unclassified_drawings,
         "building_units": {
             "detected": normalization.building_units,
