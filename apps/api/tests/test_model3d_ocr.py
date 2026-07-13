@@ -140,6 +140,130 @@ def test_elevation_candidates_dedup_sort_and_threshold():
     assert [c["value_m"] for c in cands] == [0.0, 3.6]  # 升序、去重、过滤
 
 
+def test_parse_paddle_output_v3_dict_structure():
+    from core.model3d.ocr.paddle_backend import parse_paddle_output
+
+    page = {
+        "rec_texts": ["±0.000", "会议室"],
+        "rec_scores": [0.98, 0.87],
+        "rec_polys": [
+            [(100, 200), (160, 200), (160, 220), (100, 220)],
+            [(300, 300), (360, 300), (360, 320), (300, 320)],
+        ],
+    }
+    out = parse_paddle_output([page])
+    assert out == [
+        ("±0.000", (100.0, 200.0, 160.0, 220.0), 0.98),
+        ("会议室", (300.0, 300.0, 360.0, 320.0), 0.87),
+    ]
+
+
+def test_parse_paddle_output_v3_rec_boxes_fallback():
+    from core.model3d.ocr.paddle_backend import parse_paddle_output
+
+    page = {"rec_texts": ["A"], "rec_scores": [0.9], "rec_polys": [], "rec_boxes": [[10, 20, 30, 40]]}
+    out = parse_paddle_output([page])
+    assert out == [("A", (10.0, 20.0, 30.0, 40.0), 0.9)]
+
+
+def test_parse_paddle_output_v2_nested_list():
+    from core.model3d.ocr.paddle_backend import parse_paddle_output
+
+    page = [
+        [[(100, 200), (160, 200), (160, 220), (100, 220)], ("+3.600", 0.91)],
+        ["garbled"],  # 畸形行跳过
+    ]
+    out = parse_paddle_output([page])
+    assert out == [("+3.600", (100.0, 200.0, 160.0, 220.0), 0.91)]
+
+
+def test_parse_paddle_output_empty_and_none():
+    from core.model3d.ocr.paddle_backend import parse_paddle_output
+
+    assert parse_paddle_output(None) == []
+    assert parse_paddle_output([None]) == []
+
+
+def test_tile_origins_cover_full_length_without_gap():
+    from core.model3d.ocr.service import _TILE_OVERLAP_PX, _tile_origins
+
+    assert _tile_origins(1000, 1600, 200) == [0]  # 小于块长不切
+    origins = _tile_origins(9500, 1600, 200)
+    assert origins[0] == 0
+    assert origins[-1] == 9500 - 1600  # 末块贴齐末端
+    # 相邻块重叠 ≥ overlap，全覆盖无缝隙
+    for prev, nxt in zip(origins, origins[1:]):
+        assert nxt - prev <= 1600 - _TILE_OVERLAP_PX
+
+
+def test_dedup_raw_keeps_highest_confidence_on_overlap():
+    from core.model3d.ocr.service import _dedup_raw
+
+    raw = [
+        ("±0.000", (100.0, 100.0, 160.0, 120.0), 0.90),
+        ("±0.000", (102.0, 101.0, 161.0, 121.0), 0.95),  # 重叠区重复识别
+        ("A", (500.0, 500.0, 520.0, 520.0), 0.80),        # 不重叠保留
+    ]
+    kept = _dedup_raw(raw)
+    assert len(kept) == 2
+    assert ("±0.000", (102.0, 101.0, 161.0, 121.0), 0.95) in kept
+    assert kept[-1][0] in ("±0.000", "A")
+
+
+def test_recognize_tiled_translates_coords_back_to_full_image():
+    from PIL import Image
+
+    from core.model3d.ocr.service import _recognize_tiled
+
+    class EchoBackend:
+        """每块都在本块 (10,10)-(50,30) 报一个 token——验证平移与去重。"""
+
+        name = "echo"
+
+        def is_available(self):
+            return True
+
+        def recognize(self, image_rgb, warnings):
+            return [("T", (10.0, 10.0, 50.0, 30.0), 0.9)]
+
+    # 3000x1000 → x 向 3 块(0/1400/... 贴齐末端), y 向 1 块
+    image = Image.new("RGB", (3000, 1000), "white")
+    out = _recognize_tiled(EchoBackend(), image, [])
+    xs = sorted(round(t[1][0]) for t in out)
+    assert xs[0] == 10                      # 第一块原位
+    assert all(x > 10 for x in xs[1:])      # 其余块坐标已平移
+    assert len(out) == len(set(xs))         # 平移后不重叠,全保留
+
+
+def test_parse_rapid_output_legacy_list():
+    from core.model3d.ocr.rapid_backend import parse_rapid_output
+
+    raw = [
+        [[(100, 200), (160, 200), (160, 220), (100, 220)], "±0.000", 0.97],
+        ["bad"],  # 畸形行跳过
+    ]
+    out = parse_rapid_output(raw)
+    assert out == [("±0.000", (100.0, 200.0, 160.0, 220.0), 0.97)]
+
+
+def test_parse_rapid_output_object_form():
+    from core.model3d.ocr.rapid_backend import parse_rapid_output
+
+    class FakeOut:
+        boxes = [[(10, 10), (50, 10), (50, 30), (10, 30)]]
+        txts = ["会议室"]
+        scores = [0.88]
+
+    out = parse_rapid_output(FakeOut())
+    assert out == [("会议室", (10.0, 10.0, 50.0, 30.0), 0.88)]
+
+
+def test_parse_rapid_output_none():
+    from core.model3d.ocr.rapid_backend import parse_rapid_output
+
+    assert parse_rapid_output(None) == []
+
+
 def test_axis_anchors_and_space_labels():
     from core.model3d.ocr.consume import axis_anchors, space_labels
 

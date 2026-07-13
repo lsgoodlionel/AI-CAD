@@ -1,0 +1,30 @@
+# ---------------------------------------------------------------------------
+# 图纸全文 OCR 推理依赖（core/model3d/ocr）—— 独立 extra，按需安装
+#
+# ⚠️ 不并入主 requirements.txt：
+#   paddlepaddle + paddleocr 体积大（数百 MB 镜像层 + 首次运行下载 PP-OCRv5 中文
+#   权重），且依赖树重（opencv 等）。API 主服务不装本文件即可运行——缺失时
+#   PaddleOcrBackend.is_available() 返回 False，OCR 链路优雅降级到 none/mock。
+#
+# 需要真实 OCR 的部署环境安装：
+#   pip install -r requirements-ocr.txt
+#   # 首次运行会自动下载中文识别权重（需联网到 bcebos，或预置 ~/.paddlex 权重目录）
+#
+# 平台支持：paddlepaddle 3.x 提供 linux x86_64 / aarch64 / macOS arm64 wheel
+#（2.x 无 linux aarch64 wheel）。paddle_backend.py 已兼容 paddleocr 2.x/3.x 双 API。
+#
+# ⚠️ aarch64 已知问题（2026-07 实测）：paddlepaddle 3.0/3.1/3.2 原生推理引擎在
+# linux/aarch64 容器（Apple Silicon Docker）构造 predictor 时 SIGSEGV。
+# 服务已内置有序回退：paddle 崩/缺 → RapidOCR（PP-OCR 模型的 onnxruntime 移植，
+# aarch64 稳定、依赖轻、精度同代）。aarch64 环境可只装 rapidocr 一行；
+# x86_64 GPU/CPU 环境两者都装则优先走 paddle。
+#
+# 许可：paddlepaddle / paddleocr / rapidocr(Apache-2.0) 均可商用。
+# ---------------------------------------------------------------------------
+
+# 首选（x86_64 或已修复的 paddle 版本）
+paddlepaddle==3.2.2
+paddleocr==3.7.0
+
+# aarch64 稳定回退（PP-OCR ONNX + onnxruntime）
+rapidocr-onnxruntime==1.4.4
