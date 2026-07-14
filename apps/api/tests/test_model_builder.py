@@ -548,8 +548,11 @@ async def test_do_build_marks_ready_and_bumps_version():
         result = await _do_build(PROJECT_ID)
 
     assert result == {"project_id": PROJECT_ID, "status": "ready", "version": 4}
-    update_sql = db.fetch_one.await_args.args[0]
-    assert "status='ready'" in update_sql and "version=version+1" in update_sql
+    # 在全部 fetch_one 调用里精确定位 ready 更新（model.built 事件发射会在其后
+    # 追加一次 pipeline_events INSERT，故不能假设「最后一次 fetch_one」即 ready 更新）。
+    fetch_sqls = [c.args[0] for c in db.fetch_one.await_args_list if c.args]
+    ready_update = next(sql for sql in fetch_sqls if "status='ready'" in sql)
+    assert "version=version+1" in ready_update
     db.disconnect.assert_awaited_once()
 
 

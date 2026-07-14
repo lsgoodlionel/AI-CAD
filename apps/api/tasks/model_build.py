@@ -102,6 +102,15 @@ async def _do_build(project_id: str) -> dict:
         )
         version = row["version"] if row is not None else None
         logger.info("模型基座构建完成: project_id=%s version=%s", project_id, version)
+
+        # ── 发射 model.built 管线事件（D-08） ──────────────────────
+        # try/except 包裹：事件编排层是自动化增强，发射失败绝不能影响建模主流程。
+        try:
+            from core.pipeline.handlers import emit_model_built_event
+            await emit_model_built_event(db, project_id=project_id, version=version)
+        except Exception as exc:  # noqa: BLE001 — 事件发射失败仅告警
+            logger.debug("model.built 事件发射失败: %s", exc)
+
         return {"project_id": project_id, "status": "ready", "version": version}
     finally:
         await db.disconnect()
