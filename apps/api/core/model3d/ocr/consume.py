@@ -6,6 +6,15 @@
   - ``space_labels``：房间/图名 → 语义树
 
 统一执行「置信门槛」纪律：低于阈值的 token 不进自动管线（读错比缺失更糟）。
+
+D-10 三馈线下游接线状态：
+  - ``elevation_candidates`` → ``services/model_z_levels.py`` / ``section_z_recovery.py``（已接，早于本块）
+  - ``axis_anchors`` → ``services/cross_view_registration.py::register_views``
+    （``plan_ocr_anchors`` 参数 / ``SectionView.ocr_axis_anchors`` / ``ElevationView.ocr_axis_anchors``，
+    仅补几何轴网未识别到的标签，geometry 命中永远优先）
+  - ``space_labels`` → ``services/model_semantics.py::ocr_space_label_candidates``
+    （经 ``merge_into_semantics_input`` 挂到 ``drawing["ocr_space_labels"]``，
+    ``build_semantic_graph`` 按此键读取，未挂该键的调用方行为不变）
 """
 from __future__ import annotations
 
@@ -101,3 +110,14 @@ def space_labels(
             "confidence": t.confidence,
         })
     return out
+
+
+def merge_into_semantics_input(
+    drawing: dict, result: OcrResult, *, min_confidence: float = _DEFAULT_MIN_CONF
+) -> dict:
+    """把 ``space_labels`` 挂到 ``model_semantics.build_semantic_graph`` 认的可选键上。
+
+    不改 ``drawing`` 原对象，返回新 dict（不可变约定）；``drawing`` 里已有的
+    ``ocr_space_labels``（若有）会被本次结果覆盖，其余键原样透传。
+    """
+    return {**drawing, "ocr_space_labels": space_labels(result, min_confidence=min_confidence)}

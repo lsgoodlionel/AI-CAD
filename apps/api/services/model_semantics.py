@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import re
+from dataclasses import dataclass, field, replace
 from typing import Any, Mapping
 
 from services.drawing_semantics import SemanticCandidate, extract_semantic_candidates
@@ -13,6 +14,87 @@ CANONICAL_NODE_TYPES = {
     "functional_space",
     "construction_zone",
 }
+
+# D-10：OCR room_name 候选置信封顶——与 drawing_semantics 里同量级正则命中的置信对齐
+# （functional_space 正则命中固定给 0.8），避免单条 OCR 读数在融合前就虚高。
+_OCR_ROOM_NAME_CONFIDENCE_CAP = 0.8
+_NORMALIZE_KEY_RE = re.compile(r"[^0-9A-Za-z\u4e00-\u9fff]+")
+
+
+def _normalize_key(label: str) -> str:
+    """与 drawing_semantics._normalize_key 同规则的本地副本（该函数为私有，不跨模块复用）。"""
+    return _NORMALIZE_KEY_RE.sub("", label).lower()
+
+
+def ocr_space_label_candidates(
+    labels: list[Mapping[str, Any]] | None,
+    *,
+    drawing_id: str | None = None,
+) -> list[SemanticCandidate]:
+    """OCR ``space_labels``（core/model3d/ocr/consume.py）→ 语义候选。
+
+    - ``room_name``：直接作为 functional_space 候选（OCR 已判定是房间名，无需再跑
+      drawing_semantics 的正则猜测），置信取「OCR 自身置信」与「与正则命中同量级的
+      封顶值」两者较小者——绝不虚高。
+    - ``title``：复用 ``extract_semantic_candidates`` 对 filename/title 的既有正则
+      （建筑单体/子分区/施工区等），把 OCR 识别到的图名文本当作另一条独立证据源，
+      标注 source="ocr_title" 以便与文件名解析的 "title" 区分，两者凑齐时可触发
+      resolve_candidates 的双源自动确认。
+    - ``level_name``：楼层名不落在本模块 CANONICAL_NODE_TYPES（建筑单体/子分区/
+      功能空间/施工区）任一类里，暂不接入语义树——留给楼层链路（model_story）消费，
+      这里显式跳过而不是强凑一个不对应的节点类型。
+    """
+    if not labels:
+        return []
+    candidates: list[SemanticCandidate] = []
+    for item in labels:
+        text = str(item.get("text") or "").strip()
+        kind = item.get("kind")
+        confidence = float(item.get("confidence") or 0.0)
+        if not text or confidence <= 0:
+            continue
+        if kind == "room_name":
+            candidates.append(_room_name_candidate(text, confidence, drawing_id))
+        elif kind == "title":
+            candidates.extend(_title_candidates(text, confidence, drawing_id))
+    return candidates
+
+
+def _room_name_candidate(
+    text: str, confidence: float, drawing_id: str | None
+) -> SemanticCandidate:
+    return SemanticCandidate(
+        node_type="functional_space",
+        label=text,
+        normalized_key=_normalize_key(text),
+        confidence=round(min(confidence, _OCR_ROOM_NAME_CONFIDENCE_CAP), 4),
+        source="ocr_room_name",
+        source_value=text,
+        context={"drawing_id": drawing_id, "match_reason": "ocr_room_name"},
+    )
+
+
+def _title_candidates(
+    text: str, ocr_confidence: float, drawing_id: str | None
+) -> list[SemanticCandidate]:
+    raw = extract_semantic_candidates({"title": text})
+    result: list[SemanticCandidate] = []
+    for candidate in raw:
+        # 取「正则命中置信」与「OCR 读数置信」两者较小者——两个独立不确定性源都不虚高。
+        capped_confidence = round(min(candidate.confidence, ocr_confidence), 4)
+        result.append(
+            replace(
+                candidate,
+                source="ocr_title",
+                confidence=capped_confidence,
+                context={
+                    **candidate.context,
+                    "drawing_id": drawing_id,
+                    "ocr_confidence": round(ocr_confidence, 4),
+                },
+            )
+        )
+    return result
 
 
 class SemanticVersionConflict(Exception):
@@ -303,6 +385,12 @@ def _assert_no_cycle(by_id: dict[str, SemanticNode], node_id: str, parent_id: st
 
 
 async def build_semantic_graph(db, project_id: str, drawings: list[Mapping[str, Any]]) -> SemanticGraph:
+    """构建语义树候选图。
+
+    D-10：每条 ``drawing`` 若带有可选键 ``ocr_space_labels``（``ocr.consume.space_labels``
+    的输出，调用方在拉取图纸元数据后按需附加），其房间名/图名候选会与既有 filename/title
+    正则候选合并后一起 resolve——未带该键的调用方行为不变（``.get`` 缺省为空列表）。
+    """
     all_nodes: list[SemanticNode] = []
     all_evidence: list[SemanticEvidence] = []
     conflicts: list[dict[str, Any]] = []
@@ -310,7 +398,11 @@ async def build_semantic_graph(db, project_id: str, drawings: list[Mapping[str, 
 
     for drawing in drawings:
         drawing_id = str(drawing.get("id") or drawing.get("drawing_id") or "")
-        graph = resolve_candidates(extract_semantic_candidates(drawing), drawing_id=drawing_id)
+        candidates = [
+            *extract_semantic_candidates(drawing),
+            *ocr_space_label_candidates(drawing.get("ocr_space_labels"), drawing_id=drawing_id),
+        ]
+        graph = resolve_candidates(candidates, drawing_id=drawing_id)
         if not graph.nodes:
             unassigned.append(
                 {

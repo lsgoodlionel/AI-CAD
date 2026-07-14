@@ -8,6 +8,7 @@ import {
   getSettlementReview, submitSettlementNodes, uploadQuotaSheet,
   approveSettlementReview, rejectSettlementReview,
 } from '@/services/drawings'
+import HelpTip from '@/components/HelpTip'
 
 const PM_ROLES = ['project_manager', 'group_admin', 'group_chief_engineer']
 
@@ -136,7 +137,18 @@ export default function SettlementReviewPanel({ drawingId, userRole, onRefresh }
   ]
 
   return (
-    <Card title="三审 — 结算合规化" size="small">
+    <Card
+      title={
+        <>
+          三审 — 结算合规化
+          <HelpTip
+            content="配置结算节点并上传《限额领料单》，两者是发布图纸至班组的硬约束——领料单未上传，发布将被系统拒绝。"
+            anchor=""
+          />
+        </>
+      }
+      size="small"
+    >
       {/* 限额领料单状态 */}
       {data?.quota_sheet_uploaded ? (
         <Alert

@@ -14,6 +14,7 @@ celery_app = Celery(
         "tasks.regulation_api_sync",
         "tasks.batch_review",
         "tasks.model_build",
+        "tasks.pipeline",
     ],
 )
 
@@ -39,6 +40,9 @@ celery_app.conf.update(
         "tasks.proposal_notice.*": {"queue": "default"},
         "tasks.batch_review.*": {"queue": "default"},
         "tasks.model_build.*": {"queue": "default"},
+        # pipeline 编排任务：只做轻量建议生成，走 default 队列即可，
+        # 不与 ai_review/regulation_import 等重负载队列争抢。
+        "tasks.pipeline.*": {"queue": "default"},
     },
     # Celery beat 定时任务
     beat_schedule={

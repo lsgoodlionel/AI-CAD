@@ -18,8 +18,15 @@ export const getDrawing = (id: string) =>
 export const getDownloadUrl = (id: string) =>
   request(`${BASE}/drawings/${id}/download-url`)
 
+export interface UploadDrawingResult {
+  drawing_id: string
+  object_key: string
+  status: string
+  message: string
+}
+
 export const uploadDrawing = (formData: FormData) =>
-  request(`${BASE}/drawings`, {
+  request<UploadDrawingResult>(`${BASE}/drawings`, {
     method: 'POST',
     data: formData,
     requestType: 'form',

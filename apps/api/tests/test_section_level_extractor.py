@@ -9,6 +9,7 @@ from core.model3d.section_level_extractor import (
     LevelMark,
     SectionLevels,
     extract_section_levels,
+    filter_main_sequence,
 )
 from core.model3d.types import DrawingGeometry
 
@@ -142,3 +143,68 @@ def test_empty_geometry_returns_reason():
     result = extract_section_levels(DrawingGeometry())
     assert result.marks == ()
     assert result.reason == "no_elevation_text"
+
+
+# ── 阶段A 鲁棒筛标高：filter_main_sequence（女儿墙/设备夹层噪声）────────────
+
+
+def _mark(elevation_m: float, confidence: float = 0.9) -> LevelMark:
+    return LevelMark(elevation_m=elevation_m, label=f"{elevation_m:+.3f}", confidence=confidence, source_ref={})
+
+
+@pytest.mark.unit
+def test_filter_main_sequence_drops_close_gap_keeping_higher_confidence():
+    """屋面 12.6 + 女儿墙 13.0（间距 0.4m < 2.8m 噪声阈）：置信度更高者留存。"""
+    marks = [_mark(0.0), _mark(3.6), _mark(12.6, confidence=0.6), _mark(13.0, confidence=0.95)]
+    result = filter_main_sequence(marks)
+    values = [m.elevation_m for m in result]
+    assert values == [0.0, 3.6, 13.0]
+
+
+@pytest.mark.unit
+def test_filter_main_sequence_ties_keep_lower_elevation():
+    """同置信度：保留靠前（更低标高）者，丢弃紧随其后的噪声标高。"""
+    marks = [_mark(0.0), _mark(3.6), _mark(7.2), _mark(7.6)]  # 7.2/7.6 间距 0.4
+    result = filter_main_sequence(marks)
+    values = [m.elevation_m for m in result]
+    assert values == [0.0, 3.6, 7.2]
+
+
+@pytest.mark.unit
+def test_filter_main_sequence_preserves_uniform_real_gaps():
+    marks = [_mark(0.0), _mark(3.6), _mark(7.2), _mark(10.8)]
+    result = filter_main_sequence(marks)
+    assert [m.elevation_m for m in result] == [0.0, 3.6, 7.2, 10.8]
+
+
+@pytest.mark.unit
+def test_filter_main_sequence_stops_at_two_marks_even_if_close():
+    """只剩 2 个标高时不再判定"过近"（样本太少），交由下游门槛把关。"""
+    marks = [_mark(0.0), _mark(0.5)]
+    result = filter_main_sequence(marks)
+    assert [m.elevation_m for m in result] == [0.0, 0.5]
+
+
+@pytest.mark.unit
+def test_filter_main_sequence_iterates_multiple_noise_clusters():
+    """多处噪声簇（女儿墙 + 设备夹层）需迭代多轮才能全部剔除。"""
+    marks = [
+        _mark(0.0), _mark(3.6),
+        _mark(6.9, confidence=0.5), _mark(7.2, confidence=0.9),  # 设备夹层噪声（0.3m）
+        _mark(10.8),
+        _mark(13.9, confidence=0.5), _mark(14.2, confidence=0.9),  # 女儿墙噪声（0.3m）
+    ]
+    result = filter_main_sequence(marks)
+    values = [m.elevation_m for m in result]
+    assert values == [0.0, 3.6, 7.2, 10.8, 14.2]
+
+
+@pytest.mark.unit
+def test_extract_section_levels_filters_noise_end_to_end():
+    """端到端：抽取器输出已过滤女儿墙噪声（14.2 附近 0.4m 内的噪声点被剔除）。"""
+    geom = _make_section_geom(
+        [(900, 0.0), (700, 3.6), (500, 7.2), (300, 10.8), (100, 11.2)]
+    )
+    result = extract_section_levels(geom)
+    values = [round(m.elevation_m, 3) for m in result.marks]
+    assert values == [0.0, 3.6, 7.2, 10.8]

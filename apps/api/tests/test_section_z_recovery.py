@@ -40,6 +40,22 @@ def _two_story_plan():
     return drawings, normalize_story_table(drawings)
 
 
+def _three_story_plan():
+    drawings = [
+        _drawing("p1", "一层平面图", "A-101"),
+        _drawing("p2", "二层平面图", "A-201"),
+        _drawing("p3", "三层平面图", "A-301"),
+    ]
+    return drawings, normalize_story_table(drawings)
+
+
+def _n_story_plan(n: int):
+    drawings = [
+        _drawing(f"p{i}", f"{i}层平面图", f"A-{100 * i + 1}") for i in range(1, n + 1)
+    ]
+    return drawings, normalize_story_table(drawings)
+
+
 # ── 匹配成功 ────────────────────────────────────────────────────
 
 @pytest.mark.unit
@@ -150,3 +166,119 @@ def test_empty_section_marks_ignored():
     )
     assert recovery.matched_units == set()
     assert recovery.z_overrides == {}
+
+
+# ── 阶段A：最近邻配准（放宽标高数≈楼层数强绑定）──────────────────────────
+
+
+@pytest.mark.unit
+def test_nonuniform_real_heights_recovered_beyond_old_surplus_tolerance():
+    """真实非均匀层高（大堂 5.4m + 上部标准层 3.6m）+ 2 个额外标高（旧口径
+
+    surplus 容差仅 +2，会直接拒绝）——阶段A 用滑窗最近邻配准挑出与楼层数
+    等长、零锚校验通过、间距最均匀的连续子序列，不再受数量强绑定限制。
+    """
+    plan_drawings, normalization = _three_story_plan()
+    section = _drawing("sec1", "1-1剖面图", "A-501")
+    # F1 底 0.0（大堂层高 5.4）、F2 底 5.4（层高 3.6）、F3 底 9.0（层高 3.6）、
+    # 屋面 12.6，外加机电夹层 16.0——标高数 6，楼层数 3，surplus=+3 超旧容差(+2)。
+    section_levels = {"sec1": _marks(0.0, 5.4, 9.0, 12.6, 16.0, 19.0)}
+
+    recovery = recover_section_z(
+        [*plan_drawings, section], section_levels, normalization
+    )
+
+    assert "main" in recovery.matched_units
+    assert recovery.z_overrides[("main", "F1")]["height_m"] == pytest.approx(5.4)
+    assert recovery.z_overrides[("main", "F1")]["elevation_bottom_m"] == pytest.approx(0.0)
+    assert recovery.z_overrides[("main", "F2")]["height_m"] == pytest.approx(3.6)
+    assert recovery.z_overrides[("main", "F2")]["elevation_bottom_m"] == pytest.approx(5.4)
+    assert recovery.z_overrides[("main", "F3")]["height_m"] == pytest.approx(3.6)
+    assert recovery.z_overrides[("main", "F3")]["elevation_bottom_m"] == pytest.approx(9.0)
+    # 层高非均匀（5.4 与 3.6 并存）——验证不再一律回落默认 4.5m 均匀层高
+    heights = {
+        recovery.z_overrides[("main", key)]["height_m"] for key in ("F1", "F2", "F3")
+    }
+    assert heights == {5.4, 3.6}
+
+
+@pytest.mark.unit
+def test_partial_coverage_at_threshold_boundary_matches():
+    """10 层楼、剖面仅给出底部 7 层标高（覆盖率恰为 70%）——达门槛，判定 matched。
+
+    未覆盖的 F8~F10 留给 `_resolve_story_height` 默认兜底（estimated=True），
+    不影响已覆盖楼层的实测层高写入。
+    """
+    plan_drawings, normalization = _n_story_plan(10)
+    section = _drawing("sec1", "1-1剖面图", "A-501")
+    marks = [round(i * 3.6, 3) for i in range(7)]  # F1~F7 底标高，层高均 3.6
+    recovery = recover_section_z(
+        [*plan_drawings, section], {"sec1": _marks(*marks)}, normalization
+    )
+
+    assert "main" in recovery.matched_units
+    for order in range(1, 8):
+        key = f"F{order}"
+        assert recovery.z_overrides[("main", key)]["height_m"] == pytest.approx(3.6)
+    # 未覆盖楼层不写 override（回落默认层高，绝不虚高）
+    assert ("main", "F8") not in recovery.z_overrides
+    assert ("main", "F9") not in recovery.z_overrides
+    assert ("main", "F10") not in recovery.z_overrides
+
+
+@pytest.mark.unit
+def test_coverage_below_threshold_falls_back_to_default():
+    """10 层楼、剖面仅给出 6 层标高（覆盖率 60% < 70% 门槛）——不判定 matched。"""
+    plan_drawings, normalization = _n_story_plan(10)
+    section = _drawing("sec1", "1-1剖面图", "A-501")
+    marks = [round(i * 3.6, 3) for i in range(6)]  # 覆盖率 6/10 = 0.6
+    recovery = recover_section_z(
+        [*plan_drawings, section], {"sec1": _marks(*marks)}, normalization
+    )
+
+    assert "main" not in recovery.matched_units
+    assert recovery.z_overrides == {}
+    issue = next(
+        issue for issue in recovery.issues if issue.issue_type == "z_story_count_mismatch"
+    )
+    assert issue.payload["best_coverage"] == pytest.approx(0.6)
+    assert issue.payload["min_coverage_required"] == pytest.approx(0.7)
+
+
+@pytest.mark.unit
+def test_noisy_close_marks_filtered_before_matching():
+    """剖面标高含女儿墙噪声（12.6 屋面 + 13.0 女儿墙，间距 0.4m < 2.8m 噪声阈）：
+
+    过滤后不影响主楼面序列匹配（对齐 `filter_main_sequence` 同口径）。
+    """
+    plan_drawings, normalization = _two_story_plan()
+    section = _drawing("sec1", "1-1剖面图", "A-501")
+    section_levels = {"sec1": _marks(0.0, 3.6, 7.2, 7.6)}  # 7.6 为女儿墙噪声
+
+    recovery = recover_section_z(
+        [*plan_drawings, section], section_levels, normalization
+    )
+
+    assert "main" in recovery.matched_units
+    assert recovery.z_overrides[("main", "F1")]["height_m"] == pytest.approx(3.6)
+    assert recovery.z_overrides[("main", "F2")]["height_m"] == pytest.approx(3.6)
+
+
+@pytest.mark.unit
+def test_no_zero_anchor_falls_back_to_spacing_consistency_gate():
+    """楼层表无 ±0.000 层（纯地下单体）：无锚可校，仅靠覆盖率+间距一致性把关。
+
+    2 层地下楼层表（B1/B2，无 ±0.000），剖面标高间距均匀 → 应判定 matched；
+    是对「无锚放行」路径的显式覆盖（原测试套件对此路径无覆盖）。
+    """
+    drawings = [
+        _drawing("p1", "地下一层平面图", "A-B101"),
+        _drawing("p2", "地下二层平面图", "A-B201"),
+    ]
+    normalization = normalize_story_table(drawings)
+    section = _drawing("sec1", "1-1剖面图", "A-501")
+    # B2 底 -8.4、B1 底 -4.2（升序），层高均 4.2
+    recovery = recover_section_z(
+        [*drawings, section], {"sec1": _marks(-8.4, -4.2)}, normalization
+    )
+    assert "main" in recovery.matched_units

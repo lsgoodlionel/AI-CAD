@@ -62,6 +62,27 @@ export default function HelpPage(): JSX.Element {
     }
   }, [current])
 
+  // 深链定位：内容渲染完成后若 URL 带 hash，滚动到对应锚点小节
+  // （渲染是异步的，延时一帧等 DOM 就绪后再查找 id）
+  useEffect(() => {
+    if (loading || error || !content) return
+
+    const scrollToHash = (): void => {
+      const hash = window.location.hash.replace(/^#/, '')
+      if (!hash) return
+      const target = document.getElementById(decodeURIComponent(hash))
+      target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+
+    const timer = setTimeout(scrollToHash, 100)
+    // 已在 /help 页内、由 HelpTip 深链切换到另一锚点时（hash 变化但页面不重挂载）也需定位
+    window.addEventListener('hashchange', scrollToHash)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('hashchange', scrollToHash)
+    }
+  }, [loading, error, content])
+
   return (
     <PageContainer
       title="帮助中心"

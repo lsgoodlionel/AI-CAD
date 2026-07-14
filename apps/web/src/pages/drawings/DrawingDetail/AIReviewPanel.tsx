@@ -9,6 +9,7 @@ import {
   CheckCircleOutlined,
 } from '@ant-design/icons'
 import { getAiReviewIssues, getAiReviewReportPdfUrl, getAiReviewReportExcelUrl } from '@/services/drawings'
+import HelpTip from '@/components/HelpTip'
 import ReviewFindings from './ReviewFindings'
 
 const { Text } = Typography
@@ -168,7 +169,15 @@ export default function AIReviewPanel({ drawingId, aiReport }: Props) {
   return (
     <Card
       data-testid="ai-review-panel"
-      title="AI 审查报告"
+      title={
+        <>
+          AI 审查报告
+          <HelpTip
+            content="规则引擎、知识图谱、RAG 检索、视觉 OCR 四引擎与会审审查自动发现的问题清单，按严重度排序；严重（强条）问题必须全部关闭才能通过一审。"
+            anchor=""
+          />
+        </>
+      }
       size="small"
       style={{ marginTop: 16 }}
       extra={

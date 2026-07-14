@@ -6,7 +6,8 @@ AI 审图 Celery 异步任务 — Phase 2 四引擎实现。
   2. 启动 Orchestrator（Vision → Rules/KG/RAG 并行）
   3. 写入 ai_review_issues + 更新 ai_review_reports
   4. 将图纸状态更新为 ai_done（current_stage → technical_review）
-  5. 失败时回退至 draft，最多重试 3 次
+  5. 发射 ai_review.completed 管线事件（D-08，失败不影响本任务主流程）
+  6. 失败时回退至 draft，最多重试 3 次
 """
 import asyncio
 import json
@@ -19,6 +20,7 @@ from redis.asyncio import Redis
 from core.celery_app import celery_app
 from core.config import settings
 from core.ai_review import DrawingContext, Orchestrator
+from core.pipeline import events as pipeline_events
 from services.ai_review_progress import estimate_total_seconds, progress_payload
 
 logger = logging.getLogger(__name__)
@@ -165,6 +167,27 @@ async def _do_review(drawing_id: str) -> dict:
             summary["critical_issues"],
             summary["processing_ms"],
         )
+
+        # ── 5. 发射 ai_review.completed 管线事件（D-08） ────────
+        # try/except 包裹：事件编排层是自动化增强，发射失败绝不能影响审图主流程。
+        try:
+            await pipeline_events.emit_event(
+                db,
+                event_type=pipeline_events.EVENT_AI_REVIEW_COMPLETED,
+                project_id=str(row["project_id"]),
+                source_id=drawing_id,
+                payload={
+                    "report_id": report_id,
+                    "total_issues": summary["total_issues"],
+                    "critical_issues": summary["critical_issues"],
+                },
+            )
+        except Exception:
+            logger.exception(
+                "ai_review.completed 事件发射失败: drawing_id=%s（不影响审图主流程）",
+                drawing_id,
+            )
+
         return {"drawing_id": drawing_id, **summary}
 
     finally:
