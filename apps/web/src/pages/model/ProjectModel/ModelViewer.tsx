@@ -57,6 +57,8 @@ export interface ModelViewerProps {
   renderMode?: RenderMode
   /** V2 构件图层：['columns','walls','beams','slabs','pipes:给排水',...,'equipment']；不传全显 */
   elementFilter?: string[]
+  /** 只看模型本体：隐藏楼层板片/图纸面板/外壳/标记球等参照辅助，仅保留图纸识别出的构件；缺省 false */
+  modelBodyOnly?: boolean
   resolveAssetUrl: (key: string) => Promise<string>
   onSelectDrawing: (drawing: SceneDrawing) => void
   onSelectMarker: (marker: SceneMarker) => void
@@ -77,6 +79,7 @@ export default function ModelViewer({
   isolatedFloorKey,
   renderMode = 'mixed',
   elementFilter,
+  modelBodyOnly = false,
   resolveAssetUrl,
   onSelectDrawing,
   onSelectMarker,
@@ -113,11 +116,11 @@ export default function ModelViewer({
   // ── 可见性（filters / 楼层隔离 / 渲染模式，仅切换 visible 与透明度）──
   const filtersRef = useRef({
     disciplineFilter, severityFilter, markerTypeFilter, isolatedFloorKey,
-    renderMode, elementFilter,
+    renderMode, elementFilter, modelBodyOnly,
   })
   filtersRef.current = {
     disciplineFilter, severityFilter, markerTypeFilter, isolatedFloorKey,
-    renderMode, elementFilter,
+    renderMode, elementFilter, modelBodyOnly,
   }
 
   const applyVisibility = () => {
@@ -126,10 +129,13 @@ export default function ModelViewer({
     const filters = filtersRef.current
     const iso = filters.isolatedFloorKey ?? null
 
+    // 「只看模型本体」：楼层板片是纯示意堆叠板（非图纸楼板），整体隐藏
+    const bodyOnly = filters.modelBodyOnly
     graph.floorMeshes.forEach((mesh) => {
       const data = mesh.userData as FloorUserData
       const material = mesh.material as THREE.MeshLambertMaterial
       material.opacity = iso && data.floorKey !== iso ? FLOOR_FADED_OPACITY : FLOOR_OPACITY
+      mesh.visible = !bodyOnly
     })
     // 有构件的楼层集合：构件模式下这些层隐藏贴图面板（无构件层保留贴图回退）
     const elementFloorKeys = new Set(
@@ -140,8 +146,9 @@ export default function ModelViewer({
       const inFloor = !iso || data.floorKey === iso
       const modeOk =
         filters.renderMode !== 'elements' || !elementFloorKeys.has(data.floorKey)
+      // 图纸贴图/图框面板属于参照辅助，只看本体时一并隐藏
       mesh.visible =
-        inFloor && modeOk && filters.disciplineFilter.includes(data.drawing.discipline)
+        !bodyOnly && inFloor && modeOk && filters.disciplineFilter.includes(data.drawing.discipline)
     })
     graph.elementMeshes.forEach((mesh) => {
       const data = mesh.userData as ElementUserData
@@ -149,10 +156,13 @@ export default function ModelViewer({
       const modeOk = filters.renderMode !== 'texture'
       const filterOk =
         !filters.elementFilter || filters.elementFilter.includes(data.elementType)
-      mesh.visible = inFloor && modeOk && filterOk
+      // 外壳（shell）是体量近似示意、非图纸构件，只看本体时隐藏；其余构件保留
+      const auxHidden = bodyOnly && data.elementType === 'shell'
+      mesh.visible = inFloor && modeOk && filterOk && !auxHidden
     })
     if (graph.markerInstances) {
       applyMarkerVisibility(graph.markerInstances, (marker) => {
+        if (bodyOnly) return false // 只看本体时隐藏审图标记球
         const inFloor = !iso || marker.floor_key === iso
         const typeOk =
           !filters.markerTypeFilter || filters.markerTypeFilter.includes(marker.type)
@@ -442,7 +452,7 @@ export default function ModelViewer({
   useEffect(() => {
     applyVisibility()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [disciplineFilter, severityFilter, markerTypeFilter, isolatedFloorKey, renderMode, elementFilter])
+  }, [disciplineFilter, severityFilter, markerTypeFilter, isolatedFloorKey, renderMode, elementFilter, modelBodyOnly])
 
   // ── 焦点图纸变化 ───────────────────────────────────────────
   useEffect(() => {
