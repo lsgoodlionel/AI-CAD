@@ -4,6 +4,7 @@
 GET /dashboard/group                  集团级看板（仅 group_admin）
 GET /dashboard/project/{id}           项目级看板（所有已登录用户）
 GET /dashboard/model-review-metrics   Phase C 返工点埋点与审校收敛度量（所有已登录用户）
+GET /dashboard/north-star-metrics     Phase D D-24 三北极星指标（所有已登录用户）
 """
 from __future__ import annotations
 
@@ -14,6 +15,14 @@ from typing import Any, Callable, Mapping, Sequence
 from fastapi import APIRouter, Depends, HTTPException
 
 from dependencies import get_db, get_current_user, require_admin
+from services.north_star_metrics import (
+    compute_adoption_metric,
+    compute_critical_path_metric,
+    compute_review_duration_metric,
+    fetch_critical_path_rows,
+    fetch_pipeline_suggestion_rows,
+    fetch_review_action_timing_rows,
+)
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -354,4 +363,39 @@ def _compute_review_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]
         "byDiscipline": _group_rework(rows, lambda r: r.get("discipline")),
         "byCategory": _group_rework(rows, _category_of),
         "trend": _compute_trend(rows),
+    }
+
+
+# ── D-24 三北极星指标 ──────────────────────────────────────────
+#
+# 口径详见 services/north_star_metrics.py 模块 docstring（唯一口径来源，
+# 此处不重复定义，避免两处描述漂移）。本端点只做取数编排 + 统一信封包装，
+# 计算逻辑全部是纯函数（services 层），可脱离数据库单测。
+
+@router.get("/north-star-metrics")
+async def north_star_metrics(
+    project_id: str | None = None,
+    db=Depends(get_db),
+    _: dict = Depends(get_current_user),
+):
+    """三北极星指标：①关键路径完成时长 ②建模自动触发采纳率 ③审校单条耗时。"""
+    try:
+        critical_path_rows = await fetch_critical_path_rows(db, project_id)
+        suggestion_rows = await fetch_pipeline_suggestion_rows(db, project_id)
+        review_timing_rows = await fetch_review_action_timing_rows(db, project_id)
+        data = {
+            "criticalPathDuration": compute_critical_path_metric(critical_path_rows),
+            "modelAutoTriggerAdoption": compute_adoption_metric(suggestion_rows),
+            "reviewActionDuration": compute_review_duration_metric(review_timing_rows),
+        }
+    except Exception as exc:  # noqa: BLE001 — 边界兜底，避免看板整体 500
+        return {"success": False, "data": None, "error": str(exc), "meta": {}}
+    return {
+        "success": True,
+        "data": data,
+        "error": None,
+        "meta": {
+            "project_id": project_id,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        },
     }

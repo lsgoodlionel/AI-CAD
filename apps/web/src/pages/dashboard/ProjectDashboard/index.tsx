@@ -17,6 +17,7 @@ import {
 import { getProjectDashboard } from '@/services/dashboard'
 import { listProjects } from '@/services/projects'
 import PipelineStatusPanel from '../PipelineStatusPanel'
+import NorthStarMetricsPanel from '../NorthStarMetricsPanel'
 
 const { Text } = Typography
 
@@ -164,6 +165,9 @@ export default function ProjectDashboard() {
               </Card>
             </Col>
           </Row>
+
+          {/* 三北极星指标（Phase D D-24 度量埋点接入看板） */}
+          <NorthStarMetricsPanel projectId={projectId} />
 
           {/* 管线待办建议（Phase D D-08 事件编排层 → D-15 接入看板） */}
           <PipelineStatusPanel projectId={projectId} />
