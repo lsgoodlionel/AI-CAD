@@ -57,6 +57,8 @@ export interface ModelViewerProps {
   renderMode?: RenderMode
   /** V2 构件图层：['columns','walls','beams','slabs','pipes:给排水',...,'equipment']；不传全显 */
   elementFilter?: string[]
+  /** 楼层板片（蓝色半透明堆叠体）显隐；缺省 true */
+  showFloorBoards?: boolean
   resolveAssetUrl: (key: string) => Promise<string>
   onSelectDrawing: (drawing: SceneDrawing) => void
   onSelectMarker: (marker: SceneMarker) => void
@@ -77,6 +79,7 @@ export default function ModelViewer({
   isolatedFloorKey,
   renderMode = 'mixed',
   elementFilter,
+  showFloorBoards = true,
   resolveAssetUrl,
   onSelectDrawing,
   onSelectMarker,
@@ -113,11 +116,11 @@ export default function ModelViewer({
   // ── 可见性（filters / 楼层隔离 / 渲染模式，仅切换 visible 与透明度）──
   const filtersRef = useRef({
     disciplineFilter, severityFilter, markerTypeFilter, isolatedFloorKey,
-    renderMode, elementFilter,
+    renderMode, elementFilter, showFloorBoards,
   })
   filtersRef.current = {
     disciplineFilter, severityFilter, markerTypeFilter, isolatedFloorKey,
-    renderMode, elementFilter,
+    renderMode, elementFilter, showFloorBoards,
   }
 
   const applyVisibility = () => {
@@ -130,6 +133,7 @@ export default function ModelViewer({
       const data = mesh.userData as FloorUserData
       const material = mesh.material as THREE.MeshLambertMaterial
       material.opacity = iso && data.floorKey !== iso ? FLOOR_FADED_OPACITY : FLOOR_OPACITY
+      mesh.visible = filters.showFloorBoards
     })
     // 有构件的楼层集合：构件模式下这些层隐藏贴图面板（无构件层保留贴图回退）
     const elementFloorKeys = new Set(
@@ -442,7 +446,7 @@ export default function ModelViewer({
   useEffect(() => {
     applyVisibility()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [disciplineFilter, severityFilter, markerTypeFilter, isolatedFloorKey, renderMode, elementFilter])
+  }, [disciplineFilter, severityFilter, markerTypeFilter, isolatedFloorKey, renderMode, elementFilter, showFloorBoards])
 
   // ── 焦点图纸变化 ───────────────────────────────────────────
   useEffect(() => {

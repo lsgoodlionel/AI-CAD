@@ -12,7 +12,21 @@ const routes: IRoute[] = [
   // ── 根重定向 ─────────────────────────────────────────────────
   {
     path: '/',
-    redirect: '/drawings',
+    redirect: '/hub',
+  },
+
+  // ── 项目工作台 ───────────────────────────────────────────────
+  {
+    name: '项目工作台',
+    path: '/hub',
+    icon: 'AppstoreOutlined',
+    component: './project/Hub',
+  },
+  {
+    path: '/projects/:id/hub',
+    component: './project/Hub',
+    hideInMenu: true,
+    name: '项目工作台详情',
   },
 
   // ── 数据看板 ─────────────────────────────────────────────────
@@ -46,16 +60,16 @@ const routes: IRoute[] = [
         path: '/drawings',
         component: './drawings/DrawingList',
       },
+      // 套图审查独立页已并入「审查中心」（D-06）；旧路由重定向，页面文件本身保留不删。
       {
-        name: '套图审查',
         path: '/drawings/review-batches',
-        component: './drawings/ReviewBatch',
+        redirect: '/review',
       },
       {
         path: '/drawings/review-batches/:id',
-        component: './drawings/ReviewBatch/Detail',
+        redirect: '/review',
         hideInMenu: true,
-        name: '套图详情',
+        name: '套图详情（已迁移）',
       },
       {
         path: '/drawings/:id',
@@ -64,6 +78,20 @@ const routes: IRoute[] = [
         name: '图纸详情',
       },
     ],
+  },
+
+  // ── 审查中心（Phase D D-06：合并单图 AI 审图/会审审查/套图审查三处入口）─────
+  {
+    name: '审查中心',
+    path: '/review',
+    icon: 'FileSearchOutlined',
+    component: './review/Center',
+  },
+  {
+    path: '/projects/:id/review',
+    component: './review/Center',
+    hideInMenu: true,
+    name: '审查中心详情',
   },
 
   // ── 工程模型 ─────────────────────────────────────────────────
@@ -78,6 +106,20 @@ const routes: IRoute[] = [
     component: './model/ProjectModel',
     hideInMenu: true,
     name: '工程模型详情',
+  },
+
+  // ── 算量中心（Phase D D-12：合并 IFC-QTO 汇总 + 钢筋翻样明细）───────
+  {
+    name: '算量中心',
+    path: '/quantities',
+    icon: 'CalculatorOutlined',
+    component: './quantities',
+  },
+  {
+    path: '/projects/:id/quantities',
+    component: './quantities',
+    hideInMenu: true,
+    name: '算量中心详情',
   },
 
   // 会审审查已并入「图纸管理 → AI 审查报告 → 会审审查」Tab，不再独立成模块。

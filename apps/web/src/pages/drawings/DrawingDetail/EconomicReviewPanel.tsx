@@ -8,6 +8,7 @@ import {
   getEconomicReview, submitEconomicAlternatives, signEconomicReview,
   approveEconomicReview, rejectEconomicReview,
 } from '@/services/drawings'
+import HelpTip from '@/components/HelpTip'
 
 const ECONOMIST_ROLES = ['economist', 'group_admin', 'group_commercial_director']
 
@@ -137,7 +138,18 @@ export default function EconomicReviewPanel({ drawingId, userRole, onRefresh }: 
   ]
 
   return (
-    <Card title="二审 — 经济最优化" size="small">
+    <Card
+      title={
+        <>
+          二审 — 经济最优化
+          <HelpTip
+            content="至少提交 2 种方案对比，经济师在线签字确认最优方案后方可解锁进入三审——签字是系统硬约束节点，未签字无法通过。"
+            anchor=""
+          />
+        </>
+      }
+      size="small"
+    >
       {/* 签字状态提示 */}
       {review?.economist_signed ? (
         <Alert

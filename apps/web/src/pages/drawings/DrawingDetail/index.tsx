@@ -4,7 +4,7 @@ import {
   Card, Descriptions, Button, Spin, Space, Alert, Divider, Tag, Badge,
   Progress, Timeline, Typography, message,
 } from 'antd'
-import { ArrowLeftOutlined, BuildOutlined, DownloadOutlined, EyeOutlined, EyeInvisibleOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, BuildOutlined, CalculatorOutlined, DownloadOutlined, EyeOutlined, EyeInvisibleOutlined } from '@ant-design/icons'
 import {
   getDrawing,
   getDownloadUrl,
@@ -387,10 +387,21 @@ export default function DrawingDetail() {
 
       {/* 经济测算面板（二审及之后阶段始终可用） */}
       {['economic_review', 'settlement_review', 'published'].includes(status) && (
-        <EconomicCalcPanel
-          drawingId={id!}
-          drawingNo={drawing.drawing_no}
-        />
+        <>
+          <div style={{ marginBottom: 8, textAlign: 'right' }}>
+            <Button
+              type="link"
+              icon={<CalculatorOutlined />}
+              onClick={() => navigate(`/projects/${drawing.project_id}/quantities`)}
+            >
+              算量中心（项目汇总）
+            </Button>
+          </div>
+          <EconomicCalcPanel
+            drawingId={id!}
+            drawingNo={drawing.drawing_no}
+          />
+        </>
       )}
 
       {status === 'rejected' && (

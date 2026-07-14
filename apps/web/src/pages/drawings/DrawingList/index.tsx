@@ -2,20 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@umijs/max'
 import { ProTable } from '@ant-design/pro-components'
 import type { ActionType, ProColumns, ProFormInstance } from '@ant-design/pro-components'
-import {
-  Button, Space, Modal, Form, Input, Select, InputNumber,
-  Upload, Table, message, Badge,
-} from 'antd'
-import type { TableProps, UploadFile } from 'antd'
+import { Button, Modal, message, Badge } from 'antd'
 import type { PresetStatusColorType } from 'antd/es/_util/colors'
 import {
-  UploadOutlined, PlusOutlined, EyeOutlined, RobotOutlined, AppstoreOutlined, BuildOutlined,
+  PlusOutlined, EyeOutlined, RobotOutlined, AppstoreOutlined, BuildOutlined,
 } from '@ant-design/icons'
-import {
-  listDrawings, uploadDrawing, batchUploadDrawings, createReviewBatch,
-} from '@/services/drawings'
-import type { BatchUploadResult, CreateReviewBatchResult } from '@/services/drawings'
+import { listDrawings, createReviewBatch } from '@/services/drawings'
+import type { CreateReviewBatchResult } from '@/services/drawings'
 import { listProjects } from '@/services/projects'
+import UploadWizard, { DISCIPLINE_OPTIONS, DISCIPLINE_LABEL, extractErrorMessage } from './UploadWizard'
 
 const STATUS_MAP: Record<string, { color: string; text: string }> = {
   draft:              { color: 'default',    text: '草稿' },
@@ -40,19 +35,6 @@ function renderStatusBadge(color: string, text: string) {
   return <Badge color={color} text={text} />
 }
 
-const DISCIPLINE_OPTIONS = [
-  { label: '结构', value: 'structure' },
-  { label: '建筑', value: 'architecture' },
-  { label: '机电', value: 'mep' },
-  { label: '幕墙', value: 'curtain_wall' },
-  { label: '精装', value: 'decoration' },
-  { label: '其他', value: 'other' },
-]
-
-const DISCIPLINE_LABEL: Record<string, string> = Object.fromEntries(
-  DISCIPLINE_OPTIONS.map(({ value, label }) => [value, label])
-)
-
 interface DrawingRow {
   id: string
   drawing_no: string
@@ -73,54 +55,11 @@ interface ProjectOption {
   code?: string
 }
 
-/** 上传 Modal 中每个待上传文件的可编辑元数据行 */
-interface UploadMetaRow {
-  uid: string
-  filename: string
-  drawing_no: string
-  discipline: string
-  version: string
-  title: string
-}
-
-/** 与后端 services/drawing_filename_parser.py 同规则的前端简版：图号首个匹配 */
-const DRAWING_NO_RE = /[A-Za-z一-龥]{1,4}[-_ ]?\d{1,4}/
-
-/** 文件名预解析：专业前缀 + 图号，解析不出的字段给安全默认值 */
-function parseFilenameMeta(filename: string): Omit<UploadMetaRow, 'uid' | 'filename'> {
-  const stem = filename.replace(/\.[^.]+$/, '')
-  let discipline = 'other'
-  if (/结施|GS/i.test(stem)) discipline = 'structure'
-  else if (/建施|JS/i.test(stem)) discipline = 'architecture'
-  else if (/水施|电施|暖施/.test(stem)) discipline = 'mep'
-  else if (/装施/.test(stem)) discipline = 'decoration'
-  const noMatch = stem.match(DRAWING_NO_RE)
-  return {
-    drawing_no: noMatch ? noMatch[0] : stem,
-    discipline,
-    version: 'A',
-    title: stem,
-  }
-}
-
-/** 从未知错误中提取后端 detail/error 文案 */
-function extractErrorMessage(error: unknown, fallback: string): string {
-  if (error && typeof error === 'object') {
-    const resp = (error as { response?: { data?: { detail?: string; error?: string } } }).response
-    return resp?.data?.detail ?? resp?.data?.error ?? fallback
-  }
-  return fallback
-}
-
 export default function DrawingList() {
   const actionRef = useRef<ActionType>()
   const formRef = useRef<ProFormInstance>()
   const navigate = useNavigate()
   const [uploadOpen, setUploadOpen] = useState(false)
-  const [form] = Form.useForm()
-  const [uploading, setUploading] = useState(false)
-  const [fileList, setFileList] = useState<UploadFile[]>([])
-  const [metaRows, setMetaRows] = useState<UploadMetaRow[]>([])
   const [selectedRows, setSelectedRows] = useState<DrawingRow[]>([])
   const [projects, setProjects] = useState<ProjectOption[]>([])
 
@@ -285,156 +224,6 @@ export default function DrawingList() {
     navigate(`/model/${projectFilter}`)
   }
 
-  // ── 上传 Modal ─────────────────────────────────────────────
-  const syncMetaRows = (fl: UploadFile[]) => {
-    setFileList(fl)
-    setMetaRows((prev) =>
-      fl.map(
-        (f) =>
-          prev.find((r) => r.uid === f.uid) ?? {
-            uid: f.uid,
-            filename: f.name,
-            ...parseFilenameMeta(f.name),
-          }
-      )
-    )
-  }
-
-  const updateMetaRow = (uid: string, field: keyof UploadMetaRow, value: string) => {
-    setMetaRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, [field]: value } : r)))
-  }
-
-  const closeUploadModal = () => {
-    setUploadOpen(false)
-    form.resetFields()
-    setFileList([])
-    setMetaRows([])
-  }
-
-  const handleUpload = async () => {
-    const values = await form.validateFields()
-    if (!fileList.length) {
-      message.error('请选择图纸文件')
-      return
-    }
-    const missingNo = metaRows.find((r) => !r.drawing_no.trim())
-    if (missingNo) {
-      message.error(`请填写文件「${missingNo.filename}」的图号`)
-      return
-    }
-    setUploading(true)
-    try {
-      if (fileList.length === 1) {
-        // 单文件走原有单张接口保持兼容
-        const row = metaRows[0]
-        const file = fileList[0].originFileObj
-        if (!file) {
-          message.error('文件读取失败，请重新选择')
-          return
-        }
-        const fd = new FormData()
-        fd.append('project_id', values.project_id)
-        fd.append('drawing_no', row.drawing_no.trim())
-        fd.append('discipline', row.discipline)
-        fd.append('version', row.version.trim() || 'A')
-        fd.append('title', row.title)
-        if (values.estimated_impact) {
-          fd.append('estimated_impact', String(values.estimated_impact))
-        }
-        fd.append('file', file)
-        await uploadDrawing(fd)
-        message.success('图纸已上传，AI 审图任务已触发')
-      } else {
-        // 多文件组装 items_meta + files 走批量接口
-        const fd = new FormData()
-        fd.append('project_id', values.project_id)
-        fd.append(
-          'items_meta',
-          JSON.stringify(
-            metaRows.map(({ filename, drawing_no, discipline, version, title }) => ({
-              filename,
-              drawing_no: drawing_no.trim(),
-              discipline,
-              version: version.trim() || 'A',
-              title,
-            }))
-          )
-        )
-        for (const f of fileList) {
-          if (f.originFileObj) fd.append('files', f.originFileObj)
-        }
-        const res: BatchUploadResult = await batchUploadDrawings(fd)
-        if (res.failed.length) {
-          message.warning(
-            `成功 ${res.created.length} 张，失败 ${res.failed.length} 张：` +
-            res.failed.map((x) => `${x.filename}（${x.error}）`).join('、')
-          )
-        } else {
-          message.success(`已上传 ${res.created.length} 张图纸，触发 ${res.review_triggered} 个 AI 审图任务`)
-        }
-      }
-      closeUploadModal()
-      actionRef.current?.reload()
-    } catch (e: unknown) {
-      message.error(extractErrorMessage(e, '上传失败'))
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const metaColumns: TableProps<UploadMetaRow>['columns'] = [
-    { title: '文件名', dataIndex: 'filename', width: 180, ellipsis: true },
-    {
-      title: '图号',
-      dataIndex: 'drawing_no',
-      width: 130,
-      render: (_, row) => (
-        <Input
-          size="small"
-          value={row.drawing_no}
-          onChange={(e) => updateMetaRow(row.uid, 'drawing_no', e.target.value)}
-        />
-      ),
-    },
-    {
-      title: '专业',
-      dataIndex: 'discipline',
-      width: 110,
-      render: (_, row) => (
-        <Select
-          size="small"
-          style={{ width: '100%' }}
-          options={DISCIPLINE_OPTIONS}
-          value={row.discipline}
-          onChange={(v: string) => updateMetaRow(row.uid, 'discipline', v)}
-        />
-      ),
-    },
-    {
-      title: '版本',
-      dataIndex: 'version',
-      width: 70,
-      render: (_, row) => (
-        <Input
-          size="small"
-          value={row.version}
-          onChange={(e) => updateMetaRow(row.uid, 'version', e.target.value)}
-        />
-      ),
-    },
-    {
-      title: '标题',
-      dataIndex: 'title',
-      render: (_, row) => (
-        <Input
-          size="small"
-          value={row.title}
-          onChange={(e) => updateMetaRow(row.uid, 'title', e.target.value)}
-        />
-      ),
-    },
-  ]
-
   return (
     <div style={{ padding: 24 }}>
       <ProTable<DrawingRow>
@@ -491,55 +280,12 @@ export default function DrawingList() {
         ]}
       />
 
-      <Modal
-        title="上传图纸（支持多文件批量）"
+      <UploadWizard
         open={uploadOpen}
-        onCancel={closeUploadModal}
-        onOk={handleUpload}
-        confirmLoading={uploading}
-        width={860}
-      >
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="project_id" label="所属项目" rules={[{ required: true }]}>
-            <Select
-              showSearch
-              optionFilterProp="label"
-              placeholder="选择项目"
-              options={projectSelectOptions}
-            />
-          </Form.Item>
-          {fileList.length <= 1 && (
-            <Form.Item name="estimated_impact" label="预估影响金额（元）">
-              <InputNumber style={{ width: '100%' }} min={0} step={10000} />
-            </Form.Item>
-          )}
-          <Form.Item label="图纸文件" required>
-            <Upload
-              accept=".pdf,.dwg,.dxf,.ifc"
-              multiple
-              fileList={fileList}
-              beforeUpload={() => false}
-              onChange={({ fileList: fl }) => syncMetaRows(fl)}
-            >
-              <Button icon={<UploadOutlined />}>
-                选择文件（PDF / DWG / DXF / IFC，单文件 ≤200MB，可多选）
-              </Button>
-            </Upload>
-          </Form.Item>
-          {metaRows.length > 0 && (
-            <Space direction="vertical" style={{ width: '100%' }} size={4}>
-              <Table<UploadMetaRow>
-                size="small"
-                rowKey="uid"
-                columns={metaColumns}
-                dataSource={metaRows}
-                pagination={false}
-                scroll={{ y: 280 }}
-              />
-            </Space>
-          )}
-        </Form>
-      </Modal>
+        projectSelectOptions={projectSelectOptions}
+        onClose={() => setUploadOpen(false)}
+        onUploaded={() => actionRef.current?.reload()}
+      />
     </div>
   )
 }
