@@ -31,15 +31,22 @@ _COLUMN_SIZE = (0.2, 1.5)
 _COLUMN_MAX_ASPECT = 4.0
 _WALL_GAP = (0.1, 0.4)
 _BEAM_GAP = (0.15, 0.5)
+# 图层已确认为墙时放宽间距上限：地下室外墙/挡土墙/人防墙常达 0.3~0.8m（甚至更厚），
+# 会被普通 _WALL_GAP 上限 0.4m 结构性丢弃；仅当成对两线均落在墙图层时才启用宽上限。
+_WIDE_WALL_GAP_MAX = 1.0
 _PAIR_MIN_OVERLAP_M = 1.0
 _PIPE_MIN_LEN_M = 3.0
 _EQUIPMENT_SIZE = (0.5, 5.0)
 _SLAB_MIN_AREA_M2 = 10.0
+_SLAB_THICKNESS_M = 0.12              # 普通楼板默认厚（无实测标注时）
+_RAFT_THICKNESS_M = 0.5              # 基础底板/筏板/承台默认厚（远厚于楼板）
+# 筏板/底板/承台判定（在已归类为 slab 的多边形上再细分，给更厚默认值）
+_RAFT_RE = re.compile(r"筏板|底板|承台|筏形|基础底板|RAFT|^(?:FB|DB|CT|JC)\d", re.IGNORECASE)
 _AXIS_MIN_RATIO = 0.6                 # 轴线长度 ≥60% 页幅
 _LINE_STRAIGHT_TOL_PT = 2.0
 
 # 输出上限（防爆场景）
-_CAPS = {"columns": 2000, "walls": 2000, "beams": 2000, "pipes": 1000, "equipment": 300}
+_CAPS = {"columns": 2000, "walls": 2000, "beams": 2000, "slabs": 500, "pipes": 1000, "equipment": 300}
 
 _SYSTEM_KEYWORDS = (
     ("消防", ("消防", "喷淋", "消火栓")),
@@ -139,7 +146,9 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str) -> Floor
     )
     pairs_are_beams = _is_beam_drawing(all_text)
     pairs = _find_parallel_pairs(
-        lines, axis_lines, _BEAM_GAP if pairs_are_beams else _WALL_GAP, ctx
+        lines, line_layers, axis_lines,
+        _BEAM_GAP if pairs_are_beams else _WALL_GAP, ctx,
+        allow_wide_walls=not pairs_are_beams,
     )
     if pairs_are_beams:
         result.beams = [
@@ -148,7 +157,7 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str) -> Floor
         ]
     else:
         result.walls = pairs[:_CAPS["walls"]]
-    result.slabs = _find_slabs(polys, axis_x, axis_y, ctx, result.columns)
+    result.slabs = _find_slabs(polys, poly_layers, poly_blocks, axis_x, axis_y, ctx, result.columns)
     _clip_to_axes(result)
     return result
 
@@ -333,40 +342,51 @@ def _poly_bbox(poly: list) -> tuple[float, float, float, float]:
 
 
 def _find_parallel_pairs(
-    lines: list, axis_idx: set[int], gap_range: tuple[float, float], ctx: _Ctx,
+    lines: list, line_layers: list, axis_idx: set[int],
+    gap_range: tuple[float, float], ctx: _Ctx, *, allow_wide_walls: bool = False,
 ) -> list[dict]:
-    """同向平行线对（间距在范围内、重叠 >1m）→ 中线构件（墙/梁通用）。"""
-    horizontal: list[tuple[float, float, float]] = []  # (y, x_start, x_end)
-    vertical: list[tuple[float, float, float]] = []
+    """同向平行线对（间距在范围内、重叠 >1m）→ 中线构件（墙/梁通用）。
+
+    allow_wide_walls=True 时，成对两线均落在墙图层则放宽间距上限到
+    _WIDE_WALL_GAP_MAX，召回被普通 _WALL_GAP 上限丢弃的地下室外墙/挡土墙。
+    """
+    # 元组末位标记该线是否落在墙图层（几何无凭时为 False，行为等同旧逻辑）。
+    horizontal: list[tuple[float, float, float, bool]] = []  # (y, x_start, x_end, wall)
+    vertical: list[tuple[float, float, float, bool]] = []
     for i, (x0, y0, x1, y1) in enumerate(lines):
         if i in axis_idx:
             continue
+        wall_layer = allow_wide_walls and classify_by_layer(_at(line_layers, i)) == "wall"
         if abs(y0 - y1) <= _LINE_STRAIGHT_TOL_PT:
-            horizontal.append(((y0 + y1) / 2, min(x0, x1), max(x0, x1)))
+            horizontal.append(((y0 + y1) / 2, min(x0, x1), max(x0, x1), wall_layer))
         elif abs(x0 - x1) <= _LINE_STRAIGHT_TOL_PT:
-            vertical.append(((x0 + x1) / 2, min(y0, y1), max(y0, y1)))
+            vertical.append(((x0 + x1) / 2, min(y0, y1), max(y0, y1), wall_layer))
     pairs = _pair_up(horizontal, gap_range, ctx, horizontal_dir=True)
     pairs += _pair_up(vertical, gap_range, ctx, horizontal_dir=False)
     return pairs
 
 
 def _pair_up(
-    segments: list[tuple[float, float, float]],
+    segments: list[tuple[float, float, float, bool]],
     gap_range: tuple[float, float], ctx: _Ctx, *, horizontal_dir: bool,
 ) -> list[dict]:
     segments = sorted(segments)
     used: set[int] = set()
     result: list[dict] = []
-    for i, (pos_a, s_a, e_a) in enumerate(segments):
+    for i, (pos_a, s_a, e_a, wall_a) in enumerate(segments):
         if i in used:
             continue
         for j in range(i + 1, len(segments)):
             if j in used:
                 continue
-            pos_b, s_b, e_b = segments[j]
+            pos_b, s_b, e_b, wall_b = segments[j]
             gap_m = ctx.len_m(pos_b - pos_a)
-            if gap_m > gap_range[1]:
+            eff_max = _WIDE_WALL_GAP_MAX if (wall_a and wall_b) else gap_range[1]
+            # 升序排列：间距超过最宽可能上限后，更远的 j 只会更大 → 停止扫描。
+            if gap_m > _WIDE_WALL_GAP_MAX:
                 break
+            if gap_m > eff_max:  # 超本类上限（普通墙/梁对）→ 跳过，留待可能的墙宽对
+                continue
             overlap = min(e_a, e_b) - max(s_a, s_b)
             if gap_range[0] <= gap_m and ctx.len_m(overlap) >= _PAIR_MIN_OVERLAP_M:
                 mid = (pos_a + pos_b) / 2
@@ -385,27 +405,54 @@ def _is_beam_drawing(all_text: str) -> bool:
     return "梁" in all_text and "图" in all_text
 
 
+def _is_raft_layer(layer: str, block: str) -> bool:
+    """在已归类为 slab 的多边形上，进一步判定是否为基础底板/筏板/承台（更厚）。"""
+    return bool(_RAFT_RE.search(layer or "") or _RAFT_RE.search(block or ""))
+
+
 def _find_slabs(
-    polys: list, axis_x: list[float], axis_y: list[float], ctx: _Ctx,
+    polys: list, poly_layers: list, poly_blocks: list,
+    axis_x: list[float], axis_y: list[float], ctx: _Ctx,
     columns: list[dict] | None = None,
 ) -> list[dict]:
     columns = columns or []
+    # 1) 图层命中优先：逐个收集所有被图层/块名判定为 slab 的多边形，
+    #    支持多分区筏板/多板块（修复「每图仅一块板」），并区分筏板/底板（更厚）。
+    layered: list[dict] = []
     best: list | None = None
     best_area = 0.0
-    for poly in polys:
+    for i, poly in enumerate(polys):
         _x, _y, w, h = _poly_bbox(poly)
         area = ctx.len_m(w) * ctx.len_m(h)
         if area > best_area:
             best, best_area = poly, area
+        if area < _SLAB_MIN_AREA_M2:
+            continue
+        layer, block = _at(poly_layers, i), _at(poly_blocks, i)
+        if classify_by_layer(layer, block) != "slab":
+            continue
+        is_raft = _is_raft_layer(layer, block)
+        layered.append({
+            "outline": [ctx.to_m(x, y) for x, y in poly],
+            "thickness": _RAFT_THICKNESS_M if is_raft else _SLAB_THICKNESS_M,
+            "kind": "raft" if is_raft else "slab",
+            "src": ctx.src,
+        })
+        if len(layered) >= _CAPS["slabs"]:
+            break
+    if layered:
+        return layered
+    # 2) 无图层命中 → 沿用「最大闭合多边形」作为整层单板
     if best is not None and best_area >= _SLAB_MIN_AREA_M2:
-        return [{"outline": [ctx.to_m(x, y) for x, y in best], "thickness": 0.12, "src": ctx.src}]
+        return [{"outline": [ctx.to_m(x, y) for x, y in best],
+                 "thickness": _SLAB_THICKNESS_M, "src": ctx.src}]
     if len(axis_x) >= 2 and len(axis_y) >= 2:
         xs = [pos for _label, pos in axis_x]
         ys = [pos for _label, pos in axis_y]
         x0, x1 = min(xs), max(xs)
         y0, y1 = min(ys), max(ys)
         outline = [ctx.to_m(x0, y0), ctx.to_m(x1, y0), ctx.to_m(x1, y1), ctx.to_m(x0, y1)]
-        return [{"outline": outline, "thickness": 0.12, "src": ctx.src}]
+        return [{"outline": outline, "thickness": _SLAB_THICKNESS_M, "src": ctx.src}]
     # 兜底:无大多边形、无 2×2 轴网,但已识别出柱 → 用柱包络(米)生成楼板,
     # 让缺清晰轴网的楼层也有楼板参与体量/算量(否则该层无板)。
     slab = _slab_from_columns(columns)
@@ -434,7 +481,7 @@ def _slab_from_columns(columns: list[dict]) -> dict | None:
         return None
     return {
         "outline": [[x0, y0], [x1, y0], [x1, y1], [x0, y1]],
-        "thickness": 0.12,
+        "thickness": _SLAB_THICKNESS_M,
         "src": "columns-envelope",
     }
 
