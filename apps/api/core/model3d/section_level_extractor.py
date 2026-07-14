@@ -26,6 +26,11 @@ _BASE_TEXT_ONLY = 0.6    # 仅文本、无邻近线
 _UNVALIDATED_FIT_QUALITY = 0.6  # 单点无法拟合线性映射时的 fit_quality 上限
 _WRONG_SIGN_FIT_QUALITY = 0.4   # 斜率符号错误（非负）时的 fit_quality
 
+# 阶段A 鲁棒筛标高（P2 §2 阶段A 第2点）：小于此间距的相邻标高视为女儿墙/
+# 设备夹层/施工阶段标高噪声，非独立楼层标高。与楼层归一化
+# services.model_story.MIN_STORY_SPACING_M 同口径，保持"过近即噪声"判据一致。
+_MIN_PLAUSIBLE_STORY_GAP_M = 2.8
+
 
 @dataclass(frozen=True)
 class LevelMark:
@@ -70,7 +75,38 @@ def extract_section_levels(geom: DrawingGeometry) -> SectionLevels:
         )
         for mark in sorted(deduped, key=lambda m: m.elevation_m)
     )
+    marks = tuple(filter_main_sequence(list(marks)))
     return SectionLevels(marks=marks, reason=None, fit=fit)
+
+
+def filter_main_sequence(marks: list[LevelMark]) -> list[LevelMark]:
+    """RANSAC-lite 主楼面标高序筛选（P2 阶段A 鲁棒筛标高）。
+
+    ``marks`` 须已按标高升序去重（`extract_section_levels` 内部调用；也可直接
+    喂已构造好的 `LevelMark` 序列，供 `section_z_recovery` 对绕过抽取器构造的
+    标高做同口径过滤）。
+
+    迭代查找相邻间距 < `_MIN_PLAUSIBLE_STORY_GAP_M` 的一对，保留置信度更高者
+    （同置信度保留靠前者，即更低标高的一个），直至相邻间距全部达标，或只剩
+    ≤2 个标高（样本太少判不出"过近"，交由下游覆盖率/间距一致性门槛把关）。
+    绝不抛异常、绝不臆造标高——只做剔除，不新增。
+    """
+    result = list(marks)
+    while len(result) > 2:
+        pair_index = _first_small_gap(result)
+        if pair_index is None:
+            break
+        low_idx, high_idx = pair_index, pair_index + 1
+        drop = low_idx if result[low_idx].confidence < result[high_idx].confidence else high_idx
+        del result[drop]
+    return result
+
+
+def _first_small_gap(marks: list[LevelMark]) -> int | None:
+    for index in range(len(marks) - 1):
+        if marks[index + 1].elevation_m - marks[index].elevation_m < _MIN_PLAUSIBLE_STORY_GAP_M:
+            return index
+    return None
 
 
 def _horizontal_line_ys(lines: list) -> list[float]:
