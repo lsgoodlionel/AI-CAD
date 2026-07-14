@@ -379,6 +379,7 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
   const [severityFilter, setSeverityFilter] = useState<string[]>(ALL_SEVERITIES)
   const [markerTypeFilter, setMarkerTypeFilter] = useState<string[]>(ALL_MARKER_TYPES)
   const [isolatedFloorKey, setIsolatedFloorKey] = useState<string | null>(null)
+  const [modelBodyOnly, setModelBodyOnly] = useState(false)
   const [selection, setSelection] = useState<Selection | null>(null)
   const [viewMode, setViewMode] = useState<ModelViewMode>('mixed')
   const fragmentsSceneRef = useRef<FragmentsSceneHandle>(null)
@@ -795,6 +796,15 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
               options={viewModeOptions}
             />
           ) : null}
+          <Tooltip title="只显示从图纸识别出的构件本体（柱/墙/梁/楼板/管线/设备），隐藏楼层板片、图纸图框面板、外壳与审图标记球等参照辅助">
+            <Button
+              size="small"
+              type={modelBodyOnly ? 'primary' : 'default'}
+              onClick={() => setModelBodyOnly((v) => !v)}
+            >
+              {modelBodyOnly ? '显示全部' : '只看模型本体'}
+            </Button>
+          </Tooltip>
         </Space>
 
         {model.status === 'building' ? (
@@ -1009,6 +1019,7 @@ function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
                     isolatedFloorKey={isolatedFloorKey}
                     renderMode={viewMode === 'ifc' ? 'mixed' : (viewMode as RenderMode)}
                     elementFilter={elementFilter}
+                    modelBodyOnly={modelBodyOnly}
                     resolveAssetUrl={resolveAssetUrl}
                     onSelectDrawing={(drawing) => setSelection({ type: 'drawing', drawing })}
                     onSelectMarker={(marker) => setSelection({ type: 'marker', marker })}
