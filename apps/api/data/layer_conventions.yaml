@@ -37,19 +37,29 @@ conventions:
     substrings: ["梁"]
     patterns: ['^(?:S|STR)[-_]?BEA']
 
-  # 结构板 / 楼板：S-SLAB / 中文「板」「楼板」
+  # 结构板 / 楼板 / 基础底板 / 筏板 / 承台：S-SLAB / 中文「板」「楼板」「筏板」「底板」「承台」
+  #   注：底板/筏板/顶板/叠合板等中文名含「板」子串已可命中；此处补充承台（无「板」字）
+  #       与筏板/底板/顶板的英文/拼音代号（FB/DB/CT/JC/RAFT），提升基础平面图覆盖。
   - kind: slab
-    aliases: ["S-SLAB", "STRU-SLAB", "结构板", "楼板", "现浇板", "SLAB", "FLOOR-SLAB"]
-    prefixes: ["S-SLAB", "S-SLB", "S-FLOR", "结-板", "结构-板"]
-    substrings: ["楼板", "现浇板", "板"]
-    patterns: ['^(?:S|STR)[-_]?SL']
+    aliases: ["S-SLAB", "STRU-SLAB", "结构板", "楼板", "现浇板", "筏板", "底板", "基础底板",
+              "承台", "顶板", "叠合板", "悬挑板", "屋面板", "SLAB", "FLOOR-SLAB", "RAFT"]
+    prefixes: ["S-SLAB", "S-SLB", "S-FLOR", "S-RAFT", "S-FND", "结-板", "结构-板",
+               "FB-", "DB-", "WB-", "TB-", "CT-", "JC-", "筏板-", "底板-", "承台-"]
+    substrings: ["楼板", "现浇板", "筏板", "底板", "承台", "顶板", "叠合板", "悬挑板", "屋面板", "板"]
+    patterns: ['^(?:S|STR)[-_]?SL', '^(?:S[-_]?)?(?:RAFT|FND)', '^(?:FB|DB|WB|TB|CT|JC)\d']
 
-  # 墙：S-WALL 剪力墙 / A-WALL 建筑墙 / 中文「墙」「剪力墙」「砌体」
+  # 墙：S-WALL 剪力墙 / A-WALL 建筑墙 / 地下室外墙 / 挡土墙 / 人防墙 / 中文「墙」
+  #   注：含「墙」的中文名（外墙/内墙/挡土墙/人防墙/承重墙/女儿墙…）已可经子串「墙」命中；
+  #       此处补充拼音/英文代号（DWQ 地下室外墙 / RFQ 人防墙 / DTQ 挡土墙）与精确别名。
   - kind: wall
-    aliases: ["S-WALL", "A-WALL", "剪力墙", "建筑墙", "砌体墙", "填充墙", "WALL", "Q"]
-    prefixes: ["S-WALL", "A-WALL", "S-WAL", "A-WAL", "建-墙", "结-墙", "墙-"]
-    substrings: ["剪力墙", "砌体", "填充墙", "墙"]
-    patterns: ['^[AS][-_]?WAL']
+    aliases: ["S-WALL", "A-WALL", "剪力墙", "建筑墙", "砌体墙", "填充墙", "地下室外墙", "挡土墙",
+              "人防墙", "外墙", "内墙", "承重墙", "女儿墙", "幕墙", "栏板墙", "WALL", "Q",
+              "DWQ", "RFQ", "DTQ"]
+    prefixes: ["S-WALL", "A-WALL", "S-WAL", "A-WAL", "S-RETW", "建-墙", "结-墙", "墙-",
+               "DWQ-", "RFQ-", "DTQ-", "外墙-", "挡土墙-"]
+    substrings: ["剪力墙", "砌体", "填充墙", "地下室外墙", "挡土墙", "人防墙", "承重墙", "女儿墙",
+                 "幕墙", "栏板墙", "外墙", "内墙", "墙"]
+    patterns: ['^[AS][-_]?WAL', '^(?:DWQ|RFQ|DTQ)']
 
   # 门（洞口）：门 / DOOR / M- 门编号 / A-DOOR
   #   注：门窗多为「块（block）」命名，加载器优先用块名匹配。

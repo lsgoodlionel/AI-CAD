@@ -23,7 +23,7 @@ _MAX_BEAM_PLANS = 2
 _MAX_MEP_PLANS = 3
 _RECOGNIZE_TIMEOUT_SEC = 20
 
-_STRUCTURE_TITLE_RE = re.compile(r"墙柱|结构平面|模板")
+_STRUCTURE_TITLE_RE = re.compile(r"墙柱|结构平面|模板|基础|筏板|底板|承台|地下室|桩")
 _BEAM_TITLE_RE = re.compile(r"梁")
 
 # 单体识别：图名/标题正则 → building key
