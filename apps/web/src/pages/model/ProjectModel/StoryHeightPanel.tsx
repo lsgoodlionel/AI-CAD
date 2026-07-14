@@ -36,7 +36,7 @@ export default function StoryHeightPanel({ projectId, onSaved }: StoryHeightPane
         setRows(data)
         // 初始化编辑态：已有人工值则回填，否则留空（占位显示自动参考值）
         const init: Record<string, EditState> = {}
-        data.forEach((r) => {
+        data.forEach((r: StoryHeightRow) => {
           init[`${r.scope_key}:${r.story_key}`] = {
             height: r.manual_height_m,
             note: r.note ?? '',

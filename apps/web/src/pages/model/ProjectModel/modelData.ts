@@ -180,7 +180,7 @@ function collectBuildingUnits(model: ProjectModelResponse): BuildingUnitOption[]
 
 function collectLowConfidenceUnits(value: unknown): LowConfidenceBuildingUnit[] {
   return asArray(value)
-    .map((raw) => {
+    .map((raw): LowConfidenceBuildingUnit | null => {
       const record = asRecord(raw)
       if (!record) return null
       const label = readString(
@@ -197,12 +197,12 @@ function collectLowConfidenceUnits(value: unknown): LowConfidenceBuildingUnit[] 
         confidence: readNumber(record.confidence),
       }
     })
-    .filter((item): item is LowConfidenceBuildingUnit => Boolean(item))
+    .filter((item): item is LowConfidenceBuildingUnit => item != null)
 }
 
 function collectFloorConflicts(value: unknown): FloorConflictSummary[] {
   return asArray(value)
-    .map((raw, index) => {
+    .map((raw, index): FloorConflictSummary | null => {
       const record = asRecord(raw)
       if (!record) return null
       const message = readString(record.message, record.detail, record.reason)
@@ -219,7 +219,7 @@ function collectFloorConflicts(value: unknown): FloorConflictSummary[] {
         count: readNumber(record.count, record.affected_count),
       }
     })
-    .filter((item): item is FloorConflictSummary => Boolean(item))
+    .filter((item): item is FloorConflictSummary => item != null)
 }
 
 function semanticNodeFromRaw(raw: unknown, treeVersion: number): SemanticNode | null {
@@ -347,7 +347,7 @@ function semanticReviewQueueFromModel(
       }))
 
   return queueSource
-    .map((raw) => {
+    .map((raw): SemanticReviewItemView | null => {
       const record = asRecord(raw) as UnknownRecord | null
       if (!record) return null
       const nodeId = readString(record.node_id, record.id)
@@ -378,7 +378,7 @@ function semanticReviewQueueFromModel(
         version: readNumber(record.version) ?? semanticTreeVersion,
         confidence: readNumber(record.confidence, semanticNodeMap[nodeId]?.confidence) ?? 0,
         evidence: asArray(record.evidence)
-          .map((evidence, index) => {
+          .map((evidence, index): SemanticReviewItemView['evidence'][number] | null => {
             const item = asRecord(evidence)
             if (!item) return null
             const label = readString(item.label, item.title, item.name)
@@ -392,12 +392,12 @@ function semanticReviewQueueFromModel(
               sourceDrawingId: readString(item.source_drawing_id, item.drawing_id),
             }
           })
-          .filter((item): item is SemanticReviewItemView['evidence'][number] => Boolean(item)),
+          .filter((item): item is SemanticReviewItemView['evidence'][number] => item != null),
         mergeTargets: readStringArray(validTargets.merge),
         reparentTargets: readStringArray(validTargets.reparent),
       }
     })
-    .filter((item): item is SemanticReviewItemView => Boolean(item))
+    .filter((item): item is SemanticReviewItemView => item != null)
 }
 
 function lodCapabilityMapFromModel(
@@ -414,7 +414,7 @@ function lodCapabilityMapFromModel(
 
   return Object.fromEntries(
     Object.entries(raw)
-      .map(([scopeId, value]) => {
+      .map(([scopeId, value]): readonly [string, SemanticScopeLodView] | null => {
         const capability = asRecord(value)
         if (!capability) return null
         const availableModes = readStringArray(capability.available_modes)
@@ -437,7 +437,7 @@ function lodCapabilityMapFromModel(
           } satisfies SemanticScopeLodView,
         ] as const
       })
-      .filter((entry): entry is readonly [string, SemanticScopeLodView] => Boolean(entry)),
+      .filter((entry): entry is readonly [string, SemanticScopeLodView] => entry != null),
   )
 }
 
@@ -508,7 +508,7 @@ function annotationQueueFromModel(model: ProjectModelResponse): AnnotationQueueI
   )
 
   return asArray(queueSource)
-    .map((raw, index) => {
+    .map((raw, index): AnnotationQueueItem | null => {
       const record = asRecord(raw)
       if (!record) return null
       const drawing = asRecord(record.drawing)
@@ -567,7 +567,7 @@ function annotationQueueFromModel(model: ProjectModelResponse): AnnotationQueueI
         ),
       }
     })
-    .filter((item): item is AnnotationQueueItem => Boolean(item))
+    .filter((item): item is AnnotationQueueItem => item != null)
 }
 
 function lodModesFromModel(model: ProjectModelResponse): LodModeOption[] {
