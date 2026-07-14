@@ -230,9 +230,8 @@ async def handle_model_built(db, event: dict[str, Any]) -> dict[str, Any]:
 async def emit_model_built_event(db, *, project_id: str, version: int | None = None) -> str | None:
     """供 tasks/model_build.py 在模型构建成功落库后调用的发射函数。
 
-    本工作块的文件边界不包含 tasks/model_build.py，因此接线点暂不落地；
-    集成方式：在该文件模型构建成功（``project_models.status='ready'`` 或等价
-    成功分支）落库后，调用：
+    接线点已落地：`tasks/model_build._do_build` 在 ``project_models.status='ready'``
+    落库后以 try/except 包裹调用本函数（发射失败不影响建模主流程）。
 
         from core.pipeline.handlers import emit_model_built_event
         await emit_model_built_event(db, project_id=project_id, version=version)
