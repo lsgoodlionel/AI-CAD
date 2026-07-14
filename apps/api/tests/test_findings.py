@@ -280,6 +280,33 @@ async def test_list_findings_merges_sorts_and_summarizes(fake_db, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_list_findings_skips_failing_source_and_keeps_others(fake_db, monkeypatch):
+    """某来源抓取抛错（如该来源表在当前部署缺失/未迁移）时，聚合应跳过该源、
+    仍返回其余来源，而非整体 500——审查中心核心页需优雅降级。"""
+    engine_items = [{
+        "source": "engine", "source_key": "e1", "project_id": PROJECT_ID, "drawing_id": "d1",
+        "severity": "high", "title": "e", "description": "", "location": None,
+        "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc), "native_status": "open",
+    }]
+
+    async def _boom(db, project_id):
+        raise RuntimeError('relation "review_audit_findings" does not exist')
+
+    monkeypatch.setitem(finding_service._FETCHERS, "engine", _stub_fetcher(engine_items))
+    monkeypatch.setitem(finding_service._FETCHERS, "review", _boom)  # 该源缺表报错
+    monkeypatch.setitem(finding_service._FETCHERS, "cross", _stub_fetcher([]))
+    monkeypatch.setitem(finding_service._FETCHERS, "semantic", _stub_fetcher([]))
+    monkeypatch.setitem(finding_service._FETCHERS, "symbol", _stub_fetcher([]))
+    fake_db.fetch_all.return_value = []
+
+    items, summary = await finding_service.list_findings(fake_db, PROJECT_ID)
+
+    assert [it["id"] for it in items] == ["engine:e1"]  # review 源被跳过，engine 仍在
+    assert summary["total"] == 1
+    assert "review" not in summary["by_source"]
+
+
+@pytest.mark.asyncio
 async def test_list_findings_filters_by_severity_and_source(fake_db, monkeypatch):
     items_a = [{
         "source": "engine", "source_key": "e1", "project_id": PROJECT_ID, "drawing_id": None,

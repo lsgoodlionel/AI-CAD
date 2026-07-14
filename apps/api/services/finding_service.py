@@ -342,6 +342,17 @@ _FETCHERS: dict[str, Callable[[Any, str], Awaitable[list[dict]]]] = {
 }
 
 
+async def _safe_fetch(src: str, db, project_id: str) -> list[dict]:
+    """单个来源的容错抓取：该源查询失败（如某来源表在当前部署缺失/未迁移）
+    只记警告并跳过该源，不让统一聚合整体 500——审查中心是核心页，
+    单源不可用应优雅降级而非全页失败。"""
+    try:
+        return await _FETCHERS[src](db, project_id)
+    except Exception as exc:  # noqa: BLE001 — 单源失败降级，不阻断其余来源聚合
+        logger.warning("Finding 来源 %s 抓取失败，已跳过：%s", src, exc)
+        return []
+
+
 def _default_status(source: str, native_status: str | None) -> str:
     if source == "engine":
         return _ENGINE_STATUS_DEFAULT.get(native_status or "", "pending")
@@ -532,7 +543,7 @@ async def list_findings(
 
     raw_items: list[dict] = []
     for src in sources:
-        raw_items.extend(await _FETCHERS[src](db, project_id))
+        raw_items.extend(await _safe_fetch(src, db, project_id))
 
     overlay = await _fetch_status_overlay(db, project_id)
     items = [_finalize(item, overlay) for item in raw_items]
@@ -563,7 +574,7 @@ async def get_finding(db, project_id: str, source: str, source_key: str) -> dict
     if source not in VALID_SOURCES:
         raise ValueError(f"invalid source: {source}")
 
-    raw_items = await _FETCHERS[source](db, project_id)
+    raw_items = await _safe_fetch(source, db, project_id)
     match = next((it for it in raw_items if it["source_key"] == source_key), None)
     if match is None:
         return None
