@@ -1,6 +1,6 @@
 # 工程 3D 模型 · 操作手册(管理员版)
 
-> 版本 V1.1 ｜ 最后更新 2026-07-14 ｜ 适用对象:系统管理员、运维、后端负责人、技术负责人
+> 版本 V1.2 ｜ 最后更新 2026-07-14 ｜ 适用对象:系统管理员、运维、后端负责人、技术负责人
 >
 > 配套文档:一线业务用户请见《[工程 3D 模型 · 操作手册(用户版)](MODEL_MANUAL_USER.md)》。
 >
@@ -25,7 +25,9 @@
 13. [部署、开关与依赖](#13-部署开关与依赖)
 14. [运维与故障排查](#14-运维与故障排查)
 15. [安全遗留项(上线前必处理)](#15-安全遗留项上线前必处理)
-16. [手册维护约定](#16-手册维护约定)
+16. [事件编排层与管线建议(Phase D)](#16-事件编排层与管线建议phase-d)
+17. [路由迁移与重定向(Phase D)](#17-路由迁移与重定向phase-d)
+18. [手册维护约定](#18-手册维护约定)
 
 ---
 
@@ -114,6 +116,8 @@
 
 `to-proposal` 请求体 `QtoToProposalBody`:`rebar_inputs`、`rebar_params`、`extra_saving_yuan`、`title`。写 `incentive_proposals`(type=`B`,仅 draft;下游 calculate/签字硬约束不被绕过)。
 
+> ⚠️ **前端缺口(如实记录)**:`POST /{id}/model/quantities/to-proposal` 端点本身可用,但截至 2026-07-14,`apps/web/src` 中**没有任何页面调用它**(模型页「算量模式」`QuantityModePanels.tsx` 只展示汇总 + 跳转算量中心,不含转提案按钮;算量中心 `pages/quantities/` 同样没有)。即该接口目前只能靠直接调用 API 使用,不在任何前端用户旅程里。与之对照,同为 Phase D 新增的 `POST /{id}/findings/{source}/{key}/to-proposal`(见 §4.6 Finding 统一聚合)**已经**接了前端按钮(审查中心「转创效提案」)。补齐 QTO 转提案的前端入口是已知待办,不在本次 D-22 文档同步范围内。
+
 ### 4.2 符号识别 — `routers/model_spotting.py`
 
 | 方法 | 路径 | 说明 | 失败码 |
@@ -145,6 +149,29 @@ Query:`target_kind`(topology/naming/compliance/element/symbol)、`discipline`、
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/v1/dashboard/model-review-metrics?project_id=&discipline=` | 确认/改类/否定/补框率 by 专业 by 类别 + 按天收敛趋势。返工率 = reclass+reject+addbox |
+
+### 4.6 Finding 统一聚合 — `routers/findings.py`(Phase D · D-05/D-06/D-07,migration 026)
+
+前缀同为 `/api/v1/projects`。把五类割裂的问题/发现(单图 AI 审图 `ai_review_issues` / 会审 `review_audit_findings` / 跨图 `review_batches.cross_findings` / 语义审校 `project_models.scene` 派生 / 符号待审 `model_symbol_annotations`)统一读取为一个 **Finding** 抽象,供前端「审查中心」(`pages/review/Center/`)消费。**不修改**上述任一来源表的结构或写入路径——聚合只发生在 `services/finding_service.py` 应用层;新增的唯一持久化表是状态覆盖表 `finding_status`(见 [§12](#12-数据库表速查))。
+
+| 方法 | 路径 | 说明 | 失败码 |
+|---|---|---|---|
+| GET | `/{id}/findings` | 列表:`source`(engine/review/cross/semantic/symbol)/`severity`/`status`/`drawing_id` 筛选 + 分页 + 汇总(含 `saving_potential_count`) | — |
+| GET | `/{id}/findings/{source}/{source_key}` | 单条详情(含 `has_saving_potential` 规则判别标) | — |
+| POST | `/{id}/findings/{source}/{source_key}/status` | 状态流转:`pending→acknowledged→remediated→closed`,**单向不可回退** | 409(非法/回退流转) |
+| POST | `/{id}/findings/{source}/{source_key}/to-proposal` | 一键转创效提案**草稿**;规则优先判别创效潜力,`use_llm=True` 时可选走 `ModelRouter` 增强召回;仅造 draft,三审签字硬约束不被绕过 | 409 `NO_SAVING_POTENTIAL` |
+
+`source_key` 按来源语义不同:engine/review 用来源表 UUID;symbol 用 `model_symbol_annotations.id`(bigint 字符串化);semantic 用 `build_review_queue` 派生稳定 id(如 `host:o1`);cross 用 `{batch_id}:{category}:{key}` 组合 key。
+
+### 4.7 管线建议待办 — `routers/pipeline.py`(Phase D · D-08,migration 027)
+
+前缀同为 `/api/v1/projects`。事件编排层只生成「建议/待办」并落库,本路由仅提供查询与人工采纳/忽略的出口——**采纳建议本身不触发任何重建/创建提案等硬动作**,前端/调用方仍需自行调用 `POST /{id}/model/rebuild`、`POST /{id}/model/quantities/to-proposal` 等既有端点完成实际操作。详见 [§16](#16-事件编排层与管线建议phase-d)。
+
+| 方法 | 路径 | 说明 | 失败码 |
+|---|---|---|---|
+| GET | `/{id}/pipeline/suggestions?status=` | 列出建议待办,缺省只看 `open` | 422 `INVALID_STATUS` |
+| POST | `/{id}/pipeline/suggestions/{sid}/accept` | 标记已采纳(不代为执行) | 404 `SUGGESTION_NOT_FOUND` / 409 `SUGGESTION_ALREADY_RESOLVED` |
+| POST | `/{id}/pipeline/suggestions/{sid}/dismiss` | 标记已忽略 | 同上 |
 
 ---
 
@@ -290,6 +317,9 @@ CLI:`scripts/model3d/eval_harness.py --demo`(合成)或 `--manifest`(冻结 test
 | 022 | `model_quantities` | 混凝土净/毛、模板、钢筋、estimated_ratio、payload 下钻 |
 | 023 | `symbol_spotting_logs` + 引擎种子 | spotting 调用日志 + primary/fallback 配置 |
 | 024 | `model_review_actions`(append-only)+ `model_symbol_annotations` | 人审埋点(C-17 度量)+ 符号框金标签 |
+| 025 | `story_levels` 人工标高列 | 楼层标高人工录入/校正通道 |
+| 026 | `finding_status` | Finding 统一状态覆盖表(pending/acknowledged/remediated/closed),不回写来源表 |
+| 027 | `pipeline_events` + `pipeline_suggestions` | 管线事件流水 + 建议待办(rebuild_model/create_proposal),同类型同项目仅保留一条 open |
 
 ---
 
@@ -346,7 +376,70 @@ CLI:`scripts/model3d/eval_harness.py --demo`(合成)或 `--manifest`(冻结 test
 
 ---
 
-## 16. 手册维护约定
+## 16. 事件编排层与管线建议(Phase D)
+
+Phase D · D-08 新增一个轻量「事件编排层」(`apps/api/core/pipeline/`,路由 `routers/pipeline.py`,迁移 `migrations/027_pipeline_events.sql`),目标是把「审图完成」「模型建成」这类事件,转成人工可采纳的**建议待办**,而不是自动触发有副作用的动作。**设计铁律:自动打底、人工确认**——沿用楼层标高人工录入通道的成功模式。
+
+### 16.1 两个建议类型
+
+| 事件 | 建议 | 触发条件(默认阈值) |
+|---|---|---|
+| `ai_review.completed` | `rebuild_model`(建议重建模型) | 自上次建模以来变更的图纸数 ≥ `rebuild_impact_min_drawings`(默认 **1**,常量 `DEFAULT_REBUILD_IMPACT_MIN_DRAWINGS`) |
+| `model.built` | `create_proposal`(建议创建创效提案) | 模型重建后钢筋等节约额 ≥ `auto_proposal_min_saving`(复用经济测算引擎既有参数,默认 **5000 元**) |
+
+同一项目同一 `suggestion_type` 同时只保留一条 `open` 状态记录(`pipeline_suggestions` 唯一索引保证幂等,重复触发只刷新已有一条,不会无限堆积)。
+
+### 16.2 开关:两个当前只能靠直接写库/裸 API 配置的键
+
+开关**复用既有 `engine_params` 表**,`scope='pipeline'`:
+
+| `param_key` | 说明 | 默认(无记录时) |
+|---|---|---|
+| `ai_review_to_rebuild_suggestion_enabled` | 全局开关 | `True`(缺省开) |
+| `{project_id}:ai_review_to_rebuild_suggestion_enabled` | 项目级覆盖,优先于全局键 | 覆盖上一行 |
+| `model_built_to_proposal_suggestion_enabled` | 全局开关 | `True`(缺省开) |
+| `{project_id}:model_built_to_proposal_suggestion_enabled` | 项目级覆盖 | 覆盖上一行 |
+
+> ⚠️ **已知产品缺口(如实记录)**:这两个开关**目前没有任何管理界面可配置**——`routers/admin/engine_params.py` 的 `EngineScope = Literal["kg", "economic", "ai_review", "rebar"]` **不包含 `"pipeline"`**,现有 `/admin/engine-params/{scope}` 系列端点会直接拒绝 `scope=pipeline` 的请求(路径参数类型校验失败),管理后台「引擎参数配置」页也没有对应 Tab。`core/pipeline/config.py` 的读取逻辑本身走的是裸 SQL(`SELECT param_value FROM engine_params WHERE scope=:scope AND param_key=:key`),不经过这个 admin 路由,所以**唯一可行的配置方式是直接对 `engine_params` 表执行 SQL**,例如:
+>
+> ```sql
+> INSERT INTO engine_params (scope, param_key, param_value, updated_at)
+> VALUES ('pipeline', 'ai_review_to_rebuild_suggestion_enabled', 'false', now())
+> ON CONFLICT (scope, param_key) DO UPDATE SET param_value = 'false', updated_at = now();
+> ```
+>
+> 要接入管理后台 UI,需要按 `core/pipeline/config.py` 顶部注释指引,在 `EngineScope` 中加入 `"pipeline"` 并在 `routers/admin/engine_params.py` 补充一份 schema(参照 `ECONOMIC_PARAM_SCHEMA` 写法)。这不在 D-22(文档同步)范围内,留作后续工作块。
+
+### 16.3 前端消费现状
+
+截至 2026-07-14,**数据看板的项目视图**(`pages/dashboard/PipelineStatusPanel`,D-15)已接入 `GET /{id}/pipeline/suggestions`,展示当前项目的未处理建议待办(「建议重建模型」「建议创建创效提案」),并提供「去处理」(accept + 跳转到对应模块)与「忽略」(dismiss)操作;无未处理建议时不渲染,保持安静。项目工作台、审查中心、模型页暂不展示这些建议。如需在界面外查询,可直接调用 API:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "$API_BASE/api/v1/projects/{project_id}/pipeline/suggestions?status=open"
+```
+
+数据看板已提供入口;在项目工作台/审查中心/模型页内联展示建议是后续增强(不在本次 D-22 范围)。
+
+---
+
+## 17. 路由迁移与重定向(Phase D)
+
+Phase D 合并了多处同类入口(见 `docs/PHASE_D_BLUEPRINT.md` §0.3),前端路由层通过 `redirect` 做兼容,**旧路由不会 404,也没有删除对应页面源文件**(仅路由不再可达):
+
+| 旧路径 | 新路径 | 说明 |
+|---|---|---|
+| `/` | `/hub` | 根路径重定向到项目工作台(原先无根路径重定向或指向图纸列表) |
+| `/drawings/review-batches` | `/review` | 套图审查列表页并入审查中心 |
+| `/drawings/review-batches/:id` | `/review` | 套图审查详情页并入审查中心;**注意:重定向到审查中心首页,不带 `:id` 参数**,不会自动定位到原批次,需在审查中心手动按项目/Tab 筛选 |
+
+`apps/web/src/pages/drawings/ReviewBatch/` 目录下的旧页面源码**予以保留未删除**,仅路由层不再指向它,便于后续如需回滚或复用局部逻辑。
+
+> 未发现 `docs/PHASE_D_BLUEPRINT.md` 曾设想的 `economic-calc → 算量中心` 重定向——因为钢筋翻样面板此前本就没有独立顶级路由(只嵌在图纸详情页内),不存在需要重定向的旧地址;算量中心(`/quantities`)是纯新增入口,不是替换。
+
+---
+
+## 18. 手册维护约定
 
 **「边开发边更新」执行规则:**
 
@@ -359,6 +452,8 @@ CLI:`scripts/model3d/eval_harness.py --demo`(合成)或 `--manifest`(冻结 test
    - 数据库迁移涉及模型表(§12)
    - 依赖/开关变化(§13)
    - 安全项处理进展(§15)
+   - 管线建议开关/阈值变化(§16)
+   - 路由合并/重定向变化(§17)
 2. 每次更新在两份手册文末「版本历史」各登记一行(版本号 + 日期 + 变更摘要)。
 3. C-09 真实微调完成后,须更新 §2 的 M1 状态、§6 能力边界表、§8 评测结论。
 4. 建议将本手册纳入 PR 检查清单:「是否需要更新 MODEL_MANUAL_*?」
@@ -371,3 +466,4 @@ CLI:`scripts/model3d/eval_harness.py --demo`(合成)或 `--manifest`(冻结 test
 |---|---|---|
 | V1.0 | 2026-07-11 | 首版:覆盖 Phase 6/7 + 超级工程建模 Phase A/B/C 的架构、构建流程、API、能力边界、算量、融合评测、合规、降级、运维与安全遗留项 |
 | V1.1 | 2026-07-14 | 阶段 3 楼板/墙识别接入 `classify_by_layer` 图层先验:楼板多板块收集 + 基础底板/筏板/承台(kind=raft, 0.5m)+ 地下室外墙宽缝召回(`_WIDE_WALL_GAP_MAX`);扩充 layer_conventions.yaml 与专业路由关键词。前端新增「楼层板片显隐」切换(用户手册 §7.6) |
+| V1.2 | 2026-07-14 | Phase D(D-22 手册同步):新增第 16 章《事件编排层与管线建议》(D-08 两个建议类型/阈值、`engine_params scope=pipeline` 开关及其「无管理界面,只能直接写库」的已知缺口、前端消费现状——数据看板项目视图已接入)、第 17 章《路由迁移与重定向》(`/`→`/hub`、套图审查旧路由→`/review`,旧页面源码保留未删);§4 新增 4.6 Finding 统一聚合 API(`routers/findings.py`,migration 026)与 4.7 管线建议 API(`routers/pipeline.py`,migration 027),并在 4.1 补充 QTO 转创效提案端点当前无前端入口的说明;§12 补登 migration 025–027;§18(原§16)维护约定增补两条触发项 |
