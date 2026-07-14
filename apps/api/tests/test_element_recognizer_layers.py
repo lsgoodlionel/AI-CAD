@@ -72,6 +72,77 @@ def test_equipment_recognized_via_layer_block():
     assert result.equipment[0]["label"] == "水泵"
 
 
+def _square_poly(cx: float, cy: float, side_m: float) -> list[tuple[float, float]]:
+    """以 (cx,cy) 为左下角、边长 side_m（米）的闭合方形多边形（页面点坐标）。"""
+    s = side_m * PT_PER_M
+    return [(cx, cy), (cx + s, cy), (cx + s, cy + s), (cx, cy + s)]
+
+
+def _plan_with_slab_polys(layers: list[str]) -> DrawingGeometry:
+    """基础平面图：为每个 layer 放一块 5m×5m(=25㎡) 闭合板多边形。"""
+    geom = DrawingGeometry(page_w=PAGE_W, page_h=PAGE_H)
+    for idx, layer in enumerate(layers):
+        geom.polys.append(_square_poly(120.0 + idx * 220.0, 150.0, 5.0))
+        geom.poly_layers.append(layer)
+        geom.poly_blocks.append("")
+    geom.texts.append((60.0, 40.0, "1:100"))
+    geom.texts.append((360.0, 20.0, "地下室基础平面图"))
+    return geom
+
+
+@pytest.mark.unit
+def test_raft_slab_recognized_via_layer_with_thicker_default():
+    """底板图层的多边形识别为筏板（kind=raft）且默认厚度远厚于普通楼板。"""
+    result = recognize(_plan_with_slab_polys(["底板"]), "structure", "df")
+    assert len(result.slabs) == 1
+    slab = result.slabs[0]
+    assert slab["kind"] == "raft"
+    assert slab["thickness"] == pytest.approx(0.5)
+
+
+@pytest.mark.unit
+def test_multiple_slab_polys_all_collected():
+    """多块 slab 图层多边形全部产出（修复「每图仅一块板」）。"""
+    result = recognize(_plan_with_slab_polys(["S-SLAB", "S-SLAB"]), "structure", "df")
+    assert len(result.slabs) == 2
+    assert all(s["kind"] == "slab" and s["thickness"] == pytest.approx(0.12) for s in result.slabs)
+
+
+@pytest.mark.unit
+def test_ordinary_slab_layer_not_tagged_raft():
+    """普通楼板图层不误判为筏板，厚度取楼板默认值。"""
+    result = recognize(_plan_with_slab_polys(["S-SLAB"]), "structure", "df")
+    assert result.slabs[0]["kind"] == "slab"
+
+
+def _plan_thick_parallel_wall(layer: str, gap_m: float) -> DrawingGeometry:
+    """两条平行水平线（间距 gap_m、重叠 2m），图层=layer；无轴网干扰。"""
+    geom = DrawingGeometry(page_w=PAGE_W, page_h=PAGE_H)
+    x0, x1 = 200.0, 200.0 + 2.0 * PT_PER_M  # 重叠 2m ≥ _PAIR_MIN_OVERLAP_M
+    y = 300.0
+    for yy in (y, y + gap_m * PT_PER_M):
+        geom.lines.append((x0, yy, x1, yy))
+        geom.line_layers.append(layer)
+    geom.texts.append((60.0, 40.0, "1:100"))
+    geom.texts.append((360.0, 20.0, "地下室结构平面图"))
+    return geom
+
+
+@pytest.mark.unit
+def test_basement_exterior_wall_recognized_via_layer_wide_gap():
+    """地下室外墙(0.6m 厚)超普通间距上限，靠墙图层放宽间距被召回。"""
+    result = recognize(_plan_thick_parallel_wall("地下室外墙", 0.6), "structure", "dw")
+    assert len(result.walls) == 1
+    assert result.walls[0]["width"] == pytest.approx(0.6, abs=0.02)
+
+
+@pytest.mark.unit
+def test_thick_parallel_lines_dropped_without_wall_layer():
+    """同样 0.6m 间距但无墙图层 → 按普通上限丢弃（零回归对照）。"""
+    result = recognize(_plan_thick_parallel_wall("", 0.6), "structure", "dw")
+    assert result.walls == []
+
+
 @pytest.mark.unit
 def test_pipe_system_from_layer():
     """机电图：管线系统由图层判定（消防）优先于全图关键词。"""

@@ -20,7 +20,7 @@ _DISCIPLINE_PREFIXES: tuple[tuple[tuple[str, ...], str], ...] = (
 # 专业全称关键词（前缀未命中时按包含匹配；机电类先查——"建筑电气"应归 mep）
 _DISCIPLINE_KEYWORDS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("给排水", "电气", "暖通", "机电", "消防", "弱电"), "mep"),
-    (("钢结构", "结构", "桩基", "人防", "基坑"), "structure"),
+    (("钢结构", "结构", "桩基", "人防", "基坑", "基础", "筏板", "底板", "承台"), "structure"),
     (("建筑", "幕墙", "景观"), "architecture"),
     (("装饰", "装修"), "decoration"),
 )
