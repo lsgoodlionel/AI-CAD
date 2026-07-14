@@ -110,8 +110,8 @@ export default function ModelWorkspace({ projectId, focusDrawingId }: ModelWorks
               markerTypeFilter={state.markerTypeFilter}
               isolatedFloorKey={state.isolatedFloorKey}
               elementFilter={state.elementFilter}
-              showFloorBoards={state.showFloorBoards}
-              onShowFloorBoardsChange={state.setShowFloorBoards}
+              modelBodyOnly={state.modelBodyOnly}
+              onModelBodyOnlyChange={state.setModelBodyOnly}
               resolveAssetUrl={state.resolveAssetUrl}
               onSelect={state.setSelection}
               lodMode={state.lodMode}

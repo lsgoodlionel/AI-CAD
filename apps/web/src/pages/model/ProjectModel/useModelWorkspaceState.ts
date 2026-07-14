@@ -53,7 +53,7 @@ export function useModelWorkspaceState(projectId: string, focusDrawingId?: strin
   const [severityFilter, setSeverityFilter] = useState<string[]>(ALL_SEVERITIES)
   const [markerTypeFilter, setMarkerTypeFilter] = useState<string[]>(ALL_MARKER_TYPES)
   const [isolatedFloorKey, setIsolatedFloorKey] = useState<string | null>(null)
-  const [showFloorBoards, setShowFloorBoards] = useState(true)
+  const [modelBodyOnly, setModelBodyOnly] = useState(false)
   const [selection, setSelection] = useState<Selection | null>(null)
   const [viewMode, setViewMode] = useState<ModelViewMode>('mixed')
   const [elementFilter, setElementFilter] = useState<string[] | undefined>(undefined)
@@ -325,8 +325,8 @@ export function useModelWorkspaceState(projectId: string, focusDrawingId?: strin
     setMarkerTypeFilter,
     isolatedFloorKey,
     setIsolatedFloorKey,
-    showFloorBoards,
-    setShowFloorBoards,
+    modelBodyOnly,
+    setModelBodyOnly,
     selection,
     setSelection,
     viewMode,

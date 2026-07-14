@@ -26,8 +26,8 @@ interface ModelCanvasAreaProps {
   markerTypeFilter: string[]
   isolatedFloorKey: string | null
   elementFilter: string[] | undefined
-  showFloorBoards: boolean
-  onShowFloorBoardsChange: (visible: boolean) => void
+  modelBodyOnly: boolean
+  onModelBodyOnlyChange: (bodyOnly: boolean) => void
   resolveAssetUrl: (key: string) => Promise<string>
   onSelect: Dispatch<SetStateAction<Selection | null>>
   lodMode: ModelLodMode
@@ -54,8 +54,8 @@ export default function ModelCanvasArea({
   markerTypeFilter,
   isolatedFloorKey,
   elementFilter,
-  showFloorBoards,
-  onShowFloorBoardsChange,
+  modelBodyOnly,
+  onModelBodyOnlyChange,
   resolveAssetUrl,
   onSelect,
   lodMode,
@@ -126,7 +126,7 @@ export default function ModelCanvasArea({
                 isolatedFloorKey={isolatedFloorKey}
                 renderMode={viewMode === 'ifc' ? 'mixed' : (viewMode as RenderMode)}
                 elementFilter={elementFilter}
-                showFloorBoards={showFloorBoards}
+                modelBodyOnly={modelBodyOnly}
                 resolveAssetUrl={resolveAssetUrl}
                 onSelectDrawing={(drawing: SceneDrawing) => onSelect({ type: 'drawing', drawing })}
                 onSelectMarker={(marker: SceneMarker) => onSelect({ type: 'marker', marker })}
@@ -136,14 +136,14 @@ export default function ModelCanvasArea({
                 buildingLabel={selectedBuilding?.label}
                 pendingAnnotationCount={pendingAnnotationCount}
               />
-              <Tooltip title="楼层板片为蓝色半透明堆叠层，示意楼层分布；隐藏后仅保留构件/贴图">
+              <Tooltip title="只显示从图纸识别出的构件本体（柱/墙/梁/楼板/管线/设备），隐藏楼层板片、图纸图框面板、外壳与审图标记球等参照辅助">
                 <Button
                   size="small"
-                  type={showFloorBoards ? 'default' : 'primary'}
-                  onClick={() => onShowFloorBoardsChange(!showFloorBoards)}
+                  type={modelBodyOnly ? 'primary' : 'default'}
+                  onClick={() => onModelBodyOnlyChange(!modelBodyOnly)}
                   style={{ position: 'absolute', top: 12, right: 12 }}
                 >
-                  {showFloorBoards ? '隐藏楼层板片' : '显示楼层板片'}
+                  {modelBodyOnly ? '显示全部' : '只看模型本体'}
                 </Button>
               </Tooltip>
             </>
