@@ -243,33 +243,77 @@ def test_default_status_maps_symbol_native_statuses():
 
 
 # ══════════════════════════════════════════════════════════════
-# list_findings 聚合（monkeypatch _FETCHERS 隔离聚合逻辑本身）
+# list_findings 聚合编排（SQL 下推后：patch finding_query.query_table_source
+# 隔离聚合/归并/计数逻辑；派生来源经 _FETCHERS 全量拉取）
 # ══════════════════════════════════════════════════════════════
 
 def _stub_fetcher(items: list[dict]):
+    """派生/单条来源全量拉取桩（get_finding 等仍走 _FETCHERS 全量路径）。"""
     async def _fetch(db, project_id):
         return items
     return _fetch
 
 
+def _final_finding(source: str, key: str, severity: str, created_at=None, **over) -> dict:
+    """构造一条已 finalize 的对外 Finding（query_table_source 的返回元素形态）。"""
+    base = {
+        "id": f"{source}:{key}", "source": source, "project_id": PROJECT_ID,
+        "drawing_id": over.get("drawing_id"), "severity": severity,
+        "title": over.get("title", key), "description": over.get("description", ""),
+        "status": over.get("status", "pending"), "location": None, "note": None,
+        "status_updated_at": None, "created_at": created_at,
+        "has_saving_potential": over.get("has_saving_potential", False),
+    }
+    return base
+
+
+def _counts(source: str, *, total: int, by_severity: dict, by_status: dict, saving: int = 0) -> dict:
+    return {
+        "total": total,
+        "by_source": {source: total} if total else {},
+        "by_severity": dict(by_severity), "by_status": dict(by_status), "saving": saving,
+    }
+
+
+def _empty_counts() -> dict:
+    return {"total": 0, "by_source": {}, "by_severity": {}, "by_status": {}, "saving": 0}
+
+
+def _table_stub(mapping: dict[str, tuple[list[dict], dict]]):
+    """按 source 返回 (page, counts)；记录每次调用的 kwargs 供性能断言。"""
+    calls: list[dict] = []
+
+    async def _query(db, source, project_id, **kwargs):
+        calls.append({"source": source, **kwargs})
+        return mapping.get(source, ([], _empty_counts()))
+
+    _query.calls = calls
+    return _query
+
+
+def _stub_derived(mapping: dict[str, list[dict]]):
+    """派生来源（cross/semantic）走 _FETCHERS：返回中间态（含 native_status）。"""
+    def _make(items):
+        async def _fetch(db, project_id):
+            return items
+        return _fetch
+    return {src: _make(items) for src, items in mapping.items()}
+
+
 @pytest.mark.asyncio
 async def test_list_findings_merges_sorts_and_summarizes(fake_db, monkeypatch):
-    engine_items = [{
-        "source": "engine", "source_key": "e1", "project_id": PROJECT_ID, "drawing_id": "d1",
-        "severity": "low", "title": "e", "description": "", "location": None,
-        "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc), "native_status": "open",
-    }]
-    symbol_items = [{
-        "source": "symbol", "source_key": "s1", "project_id": PROJECT_ID, "drawing_id": "d2",
-        "severity": "critical", "title": "s", "description": "", "location": None,
-        "created_at": datetime(2026, 6, 1, tzinfo=timezone.utc), "native_status": "pending",
-    }]
-    monkeypatch.setitem(finding_service._FETCHERS, "engine", _stub_fetcher(engine_items))
-    monkeypatch.setitem(finding_service._FETCHERS, "review", _stub_fetcher([]))
-    monkeypatch.setitem(finding_service._FETCHERS, "cross", _stub_fetcher([]))
-    monkeypatch.setitem(finding_service._FETCHERS, "semantic", _stub_fetcher([]))
-    monkeypatch.setitem(finding_service._FETCHERS, "symbol", _stub_fetcher(symbol_items))
-    fake_db.fetch_all.return_value = []  # overlay 查询：无覆盖记录
+    from services import finding_query
+
+    engine_page = [_final_finding("engine", "e1", "low",
+                                  created_at=datetime(2026, 1, 1, tzinfo=timezone.utc))]
+    symbol_page = [_final_finding("symbol", "s1", "critical",
+                                  created_at=datetime(2026, 6, 1, tzinfo=timezone.utc))]
+    stub = _table_stub({
+        "engine": (engine_page, _counts("engine", total=1, by_severity={"low": 1}, by_status={"pending": 1})),
+        "symbol": (symbol_page, _counts("symbol", total=1, by_severity={"critical": 1}, by_status={"pending": 1})),
+    })
+    monkeypatch.setattr(finding_query, "query_table_source", stub)
+    fake_db.fetch_all.return_value = []  # overlay + 派生来源查询皆空
 
     items, summary = await finding_service.list_findings(fake_db, PROJECT_ID)
 
@@ -281,22 +325,21 @@ async def test_list_findings_merges_sorts_and_summarizes(fake_db, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_list_findings_skips_failing_source_and_keeps_others(fake_db, monkeypatch):
-    """某来源抓取抛错（如该来源表在当前部署缺失/未迁移）时，聚合应跳过该源、
-    仍返回其余来源，而非整体 500——审查中心核心页需优雅降级。"""
-    engine_items = [{
-        "source": "engine", "source_key": "e1", "project_id": PROJECT_ID, "drawing_id": "d1",
-        "severity": "high", "title": "e", "description": "", "location": None,
-        "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc), "native_status": "open",
-    }]
+    """某表行来源下推查询抛错（如该来源表在当前部署缺失/未迁移）时，聚合应跳过
+    该源、仍返回其余来源，而非整体 500——审查中心核心页需优雅降级。"""
+    from services import finding_query
 
-    async def _boom(db, project_id):
-        raise RuntimeError('relation "review_audit_findings" does not exist')
+    engine_page = [_final_finding("engine", "e1", "high",
+                                  created_at=datetime(2026, 1, 1, tzinfo=timezone.utc))]
 
-    monkeypatch.setitem(finding_service._FETCHERS, "engine", _stub_fetcher(engine_items))
-    monkeypatch.setitem(finding_service._FETCHERS, "review", _boom)  # 该源缺表报错
-    monkeypatch.setitem(finding_service._FETCHERS, "cross", _stub_fetcher([]))
-    monkeypatch.setitem(finding_service._FETCHERS, "semantic", _stub_fetcher([]))
-    monkeypatch.setitem(finding_service._FETCHERS, "symbol", _stub_fetcher([]))
+    async def _query(db, source, project_id, **kwargs):
+        if source == "review":
+            raise RuntimeError('relation "review_audit_findings" does not exist')
+        if source == "engine":
+            return engine_page, _counts("engine", total=1, by_severity={"high": 1}, by_status={"pending": 1})
+        return [], _empty_counts()
+
+    monkeypatch.setattr(finding_query, "query_table_source", _query)
     fake_db.fetch_all.return_value = []
 
     items, summary = await finding_service.list_findings(fake_db, PROJECT_ID)
@@ -307,37 +350,49 @@ async def test_list_findings_skips_failing_source_and_keeps_others(fake_db, monk
 
 
 @pytest.mark.asyncio
-async def test_list_findings_filters_by_severity_and_source(fake_db, monkeypatch):
-    items_a = [{
-        "source": "engine", "source_key": "e1", "project_id": PROJECT_ID, "drawing_id": None,
-        "severity": "low", "title": "a", "description": "", "location": None,
-        "created_at": None, "native_status": None,
-    }]
-    monkeypatch.setitem(finding_service._FETCHERS, "engine", _stub_fetcher(items_a))
+async def test_list_findings_filters_pushed_down_to_table_source(fake_db, monkeypatch):
+    """severity/status/drawing_id 筛选参数应原样下推给 query_table_source。"""
+    from services import finding_query
+
+    stub = _table_stub({"engine": ([], _empty_counts())})
+    monkeypatch.setattr(finding_query, "query_table_source", stub)
     fake_db.fetch_all.return_value = []
 
     items, summary = await finding_service.list_findings(
-        fake_db, PROJECT_ID, source="engine", severity="high",
+        fake_db, PROJECT_ID, source="engine", severity="high", status="pending",
+        drawing_id="d9",
     )
     assert items == []
     assert summary["total"] == 0
+    # 仅查询了指定来源，且筛选条件已下推
+    assert stub.calls == [{
+        "source": "engine", "severity": "high", "status": "pending",
+        "drawing_id": "d9", "top_n": 200,
+    }]
 
 
 @pytest.mark.asyncio
-async def test_list_findings_respects_limit_and_offset(fake_db, monkeypatch):
-    many = [{
-        "source": "engine", "source_key": f"e{i}", "project_id": PROJECT_ID, "drawing_id": None,
-        "severity": "medium", "title": f"t{i}", "description": "", "location": None,
-        "created_at": None, "native_status": None,
-    } for i in range(5)]
-    monkeypatch.setitem(finding_service._FETCHERS, "engine", _stub_fetcher(many))
+async def test_list_findings_pushes_down_limit_offset_as_top_n(fake_db, monkeypatch):
+    """性能核心：分页应下推为 LIMIT offset+limit（top_n），而非全量拉取后 Python 切片。"""
+    from services import finding_query
+
+    # 桩模拟 SQL 返回 top_n(=offset+limit=3) 行；下游 _merge_and_slice 取 [1:3]
+    page = [_final_finding("engine", f"e{i}", "medium") for i in range(3)]
+    stub = _table_stub({
+        "engine": (page, _counts("engine", total=23417, by_severity={"medium": 23417},
+                                 by_status={"pending": 23417})),
+    })
+    monkeypatch.setattr(finding_query, "query_table_source", stub)
     fake_db.fetch_all.return_value = []
 
     items, summary = await finding_service.list_findings(
         fake_db, PROJECT_ID, source="engine", limit=2, offset=1,
     )
     assert len(items) == 2
-    assert summary["total"] == 5  # 汇总统计基于筛选后全量，不受分页影响
+    # 汇总统计基于筛选后全量（SQL GROUP BY），不受分页影响
+    assert summary["total"] == 23417
+    # 下推窗口 = offset + limit（只物化窗口所需行，不拉 2.3 万条）
+    assert stub.calls[0]["top_n"] == 3
 
 
 # ══════════════════════════════════════════════════════════════

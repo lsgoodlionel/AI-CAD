@@ -369,9 +369,23 @@ FROM finding_status
 WHERE project_id = $1
 """
 
+_OVERLAY_SCOPED_SQL = """
+SELECT source, source_key, status, note, updated_at
+FROM finding_status
+WHERE project_id = $1 AND source = ANY($2)
+"""
 
-async def _fetch_status_overlay(db, project_id: str) -> dict[tuple[str, str], dict]:
-    rows = await db.fetch_all(_OVERLAY_SQL, project_id)
+
+async def _fetch_status_overlay(
+    db, project_id: str, sources: list[str] | None = None,
+) -> dict[tuple[str, str], dict]:
+    """拉取状态覆盖 overlay。``sources`` 给定时只取这些来源的覆盖行
+    （list_findings 派生来源路径用它把 overlay 收窄到 cross/semantic，避免多拉
+    engine/symbol 的覆盖行）；缺省取全部（get_finding 单条详情用）。"""
+    if sources is not None:
+        rows = await db.fetch_all(_OVERLAY_SCOPED_SQL, project_id, sources)
+    else:
+        rows = await db.fetch_all(_OVERLAY_SQL, project_id)
     overlay: dict[tuple[str, str], dict] = {}
     for raw in rows:
         row = dict(raw)
@@ -527,6 +541,81 @@ def build_finding_proposal_description(finding: dict, extra_note: str | None = N
 
 # ── 对外聚合 API ─────────────────────────────────────────────
 
+# 表行来源可 SQL 下推；派生来源（scene/cross_findings JSONB 运行时派生）不可，
+# 单独全量拉取并加数量上限（见 _cap_derived）。
+_DERIVED_SOURCES: tuple[str, ...] = ("cross", "semantic")
+# 来源处理次序（保持与旧 _FETCHERS 迭代序一致，稳定归并的并列项次序不变）
+_SOURCE_ORDER: tuple[str, ...] = ("engine", "review", "cross", "semantic", "symbol")
+
+# 派生来源（cross/semantic）单项目物化上限：这两类本就有界（cross 随批次、
+# semantic 随 scene 候选），此上限只作病态数据的安全阀。超限时按严重度保留最重要的
+# 前 N 条、其余截断并告警（不静默丢弃）；被截断的条目既不参与分页也不计入汇总统计，
+# 即 total/by_* 反映的是**可达（capped）**数量。注意：截断发生在派生来源全量拉取
+# **之后**（build_review_queue 一次性产出全部候选），故本上限约束的是归并/统计规模，
+# 而非派生来源的初始解析开销；后者随 scene/批次规模，属另一层（懒加载）优化范畴。
+MAX_DERIVED_FINDINGS = 5000
+
+
+def _apply_python_filters(
+    items: list[dict], severity: str | None, status: str | None, drawing_id: str | None,
+) -> list[dict]:
+    """派生来源在 Python 端套用与 SQL 下推等价的 severity/status/drawing_id 筛选。"""
+    if severity is not None:
+        items = [it for it in items if it["severity"] == severity]
+    if status is not None:
+        items = [it for it in items if it["status"] == status]
+    if drawing_id is not None:
+        items = [it for it in items if it.get("drawing_id") == drawing_id]
+    return items
+
+
+def _cap_derived(items: list[dict]) -> list[dict]:
+    """派生来源物化上限安全阀：超限按排序键截断保留最重要的前 N 条并告警。"""
+    if len(items) <= MAX_DERIVED_FINDINGS:
+        return items
+    logger.warning(
+        "派生来源 Finding 数 %d 超过上限 %d，已按严重度保留前 %d 条；"
+        "尾部 %d 条被截断（不参与分页，也不计入 total/by_* 汇总）",
+        len(items), MAX_DERIVED_FINDINGS, MAX_DERIVED_FINDINGS,
+        len(items) - MAX_DERIVED_FINDINGS,
+    )
+    ordered = sorted(items, key=_sort_key)
+    return ordered[:MAX_DERIVED_FINDINGS]
+
+
+def _counts_from_items(items: list[dict]) -> dict:
+    """从已 finalize 的条目列表算计数结构（派生来源用；与表行计数结构同构）。"""
+    return {
+        "total": len(items),
+        "by_source": _count_by(items, "source"),
+        "by_severity": _count_by(items, "severity"),
+        "by_status": _count_by(items, "status"),
+        "saving": sum(1 for it in items if it["has_saving_potential"]),
+    }
+
+
+def _merge_counts(agg: dict, counts: dict) -> None:
+    """把单来源计数结构累加进总聚合（就地更新 agg）。"""
+    agg["total"] += counts["total"]
+    agg["saving"] += counts["saving"]
+    for field in ("by_source", "by_severity", "by_status"):
+        for key, value in counts[field].items():
+            agg[field][key] = agg[field].get(key, 0) + value
+
+
+def _merge_and_slice(pages: list[list[dict]], offset: int, limit: int) -> list[dict]:
+    """跨来源归并 + 全局分页。
+
+    每个表行来源的 page 已是其自身 top-(offset+limit)，派生来源为其全量（有界），
+    故合并后全局排序再切片 ``[offset:offset+limit]`` 即为正确窗口：落在 [0, offset+limit)
+    的任一条目必属于某来源的 top-(offset+limit)，不会被前置 LIMIT 漏掉。"""
+    combined = [item for page in pages for item in page]
+    combined.sort(key=_sort_key)
+    if not limit:
+        return combined[offset:]
+    return combined[offset: offset + limit]
+
+
 async def list_findings(
     db,
     project_id: str,
@@ -538,35 +627,58 @@ async def list_findings(
     limit: int = 200,
     offset: int = 0,
 ) -> tuple[list[dict], dict]:
-    """聚合项目全部 Finding（跨五类来源），返回 (分页后条目, 汇总统计)。"""
-    sources = [source] if source else list(_FETCHERS)
+    """聚合项目全部 Finding（跨五类来源），返回 (分页后条目, 汇总统计)。
 
-    raw_items: list[dict] = []
-    for src in sources:
-        raw_items.extend(await _safe_fetch(src, db, project_id))
+    性能路径：engine/review/symbol 三类表行来源把筛选/排序/分页下推到 SQL，
+    每源只物化 ``LIMIT offset+limit`` 行 + 一条 GROUP BY 计数（不再全量拉 2 万+ 行）；
+    cross/semantic 两类 JSONB 派生来源无法纯 SQL 分页，全量拉取 + 上限后并入归并。
+    汇总统计（total/by_source/by_severity/by_status/saving_potential_count）基于**筛选后
+    全量**，与分页无关，语义与旧实现一致。
+    """
+    # 延迟导入避免 finding_service ↔ finding_query 模块级循环依赖。
+    from services import finding_query
 
-    overlay = await _fetch_status_overlay(db, project_id)
-    items = [_finalize(item, overlay) for item in raw_items]
+    requested = [source] if source else list(_SOURCE_ORDER)
+    top_n = (offset + limit) if limit else None
 
-    if severity is not None:
-        items = [it for it in items if it["severity"] == severity]
-    if status is not None:
-        items = [it for it in items if it["status"] == status]
-    if drawing_id is not None:
-        items = [it for it in items if it.get("drawing_id") == drawing_id]
+    pages: list[list[dict]] = []
+    agg = {"total": 0, "saving": 0, "by_source": {}, "by_severity": {}, "by_status": {}}
 
-    items.sort(key=_sort_key)
+    # ① 表行来源：SQL 下推（单源失败降级，不阻断其余来源）
+    for src in [s for s in requested if s in finding_query.TABLE_SOURCES]:
+        try:
+            page, counts = await finding_query.query_table_source(
+                db, src, project_id,
+                severity=severity, status=status, drawing_id=drawing_id, top_n=top_n,
+            )
+        except Exception as exc:  # noqa: BLE001 — 单源失败降级，与 _safe_fetch 一致
+            logger.warning("Finding 来源 %s 下推查询失败，已跳过：%s", src, exc)
+            continue
+        pages.append(page)
+        _merge_counts(agg, counts)
 
+    # ② 派生来源：全量拉取 + finalize + Python 筛选 + 上限（有界）
+    derived_sources = [s for s in requested if s in _DERIVED_SOURCES]
+    if derived_sources:
+        overlay = await _fetch_status_overlay(db, project_id, sources=derived_sources)
+        derived_items: list[dict] = []
+        for src in derived_sources:
+            raw = await _safe_fetch(src, db, project_id)
+            derived_items.extend(_finalize(item, overlay) for item in raw)
+        derived_items = _apply_python_filters(derived_items, severity, status, drawing_id)
+        derived_items = _cap_derived(derived_items)
+        _merge_counts(agg, _counts_from_items(derived_items))
+        pages.append(derived_items)
+
+    page_items = _merge_and_slice(pages, offset, limit)
     summary = {
-        "total": len(items),
-        "by_source": _count_by(items, "source"),
-        "by_severity": _count_by(items, "severity"),
-        "by_status": _count_by(items, "status"),
-        "saving_potential_count": sum(1 for it in items if it["has_saving_potential"]),
+        "total": agg["total"],
+        "by_source": agg["by_source"],
+        "by_severity": agg["by_severity"],
+        "by_status": agg["by_status"],
+        "saving_potential_count": agg["saving"],
     }
-
-    page = items[offset: offset + limit] if limit else items
-    return page, summary
+    return page_items, summary
 
 
 async def get_finding(db, project_id: str, source: str, source_key: str) -> dict | None:
