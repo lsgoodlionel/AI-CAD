@@ -1,6 +1,9 @@
 /**
  * 项目级数据看板（所有已登录用户可见）
- * 图纸流转 / AI 审图质量 / 提案漏斗 / 近期活动
+ * 图纸流转 / AI 审图质量 / 提案漏斗 / 近期活动 / 管线待办建议
+ *
+ * Phase D D-15：作为「数据看板」统一入口（../index.tsx）的一个视图区块被嵌入，
+ * 不再拥有独立页面标题/外层 padding（由父组件统一提供）。
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@umijs/max'
@@ -13,6 +16,7 @@ import {
 } from '@ant-design/icons'
 import { getProjectDashboard } from '@/services/dashboard'
 import { listProjects } from '@/services/projects'
+import PipelineStatusPanel from '../PipelineStatusPanel'
 
 const { Text } = Typography
 
@@ -70,9 +74,9 @@ export default function ProjectDashboard() {
   const totalProposals = data?.proposal_funnel?.reduce((s: number, r: any) => s + Number(r.cnt), 0) ?? 0
 
   return (
-    <div style={{ padding: 24 }}>
+    <div>
       <Space style={{ marginBottom: 24 }} size="large">
-        <Typography.Title level={4} style={{ marginBottom: 0 }}>项目数据看板</Typography.Title>
+        <Text type="secondary">项目：</Text>
         <Select
           style={{ width: 240 }}
           value={projectId || undefined}
@@ -160,6 +164,9 @@ export default function ProjectDashboard() {
               </Card>
             </Col>
           </Row>
+
+          {/* 管线待办建议（Phase D D-08 事件编排层 → D-15 接入看板） */}
+          <PipelineStatusPanel projectId={projectId} />
 
           <Row gutter={16}>
             {/* 图纸状态 + 专业分布 */}

@@ -1,6 +1,9 @@
 /**
  * 集团级数据看板（仅 group_admin 可见）
  * 年度创效 / 提案漏斗 / 图纸覆盖率 / KPI预警 / LLM成本
+ *
+ * Phase D D-15：作为「数据看板」统一入口（../index.tsx）的一个视图区块被嵌入，
+ * 不再拥有独立页面标题/外层 padding（由父组件统一提供）。
  */
 import { useEffect, useState } from 'react'
 import {
@@ -47,13 +50,10 @@ export default function GroupDashboard() {
   const paidProposals = data.proposal_funnel.find((r: any) => r.status === 'paid')?.cnt ?? 0
 
   return (
-    <div style={{ padding: 24 }}>
-      <Typography.Title level={4} style={{ marginBottom: 24 }}>
-        集团数据看板
-        <Text type="secondary" style={{ fontSize: 13, marginLeft: 12, fontWeight: 400 }}>
-          {new Date(data.generated_at).toLocaleString('zh-CN')} 生成
-        </Text>
-      </Typography.Title>
+    <div>
+      <Text type="secondary" style={{ display: 'block', marginBottom: 16, fontSize: 13 }}>
+        {new Date(data.generated_at).toLocaleString('zh-CN')} 生成
+      </Text>
 
       {/* KPI 预警横幅 */}
       {data.kpi_warnings.length > 0 && (

@@ -29,24 +29,25 @@ const routes: IRoute[] = [
     name: '项目工作台详情',
   },
 
-  // ── 数据看板 ─────────────────────────────────────────────────
+  // ── 数据看板（Phase D D-15：集团/项目看板合并为一个角色自适应入口）───────
   {
     name: '数据看板',
     path: '/dashboard',
     icon: 'DashboardOutlined',
-    routes: [
-      {
-        name: '集团看板',
-        path: '/dashboard/group',
-        component: './dashboard/GroupDashboard',
-        access: 'isAdmin',
-      },
-      {
-        name: '项目看板',
-        path: '/dashboard/project',
-        component: './dashboard/ProjectDashboard',
-      },
-    ],
+    component: './dashboard',
+  },
+  // 旧路径迁移：原集团看板 / 项目看板独立菜单项已合并，页面文件本身保留不删。
+  {
+    path: '/dashboard/group',
+    redirect: '/dashboard',
+    hideInMenu: true,
+    name: '集团看板（已迁移）',
+  },
+  {
+    path: '/dashboard/project',
+    redirect: '/dashboard',
+    hideInMenu: true,
+    name: '项目看板（已迁移）',
   },
 
   // ── 图纸管理 ─────────────────────────────────────────────────
@@ -60,16 +61,17 @@ const routes: IRoute[] = [
         path: '/drawings',
         component: './drawings/DrawingList',
       },
-      // 套图审查独立页已并入「审查中心」（D-06）；旧路由重定向，页面文件本身保留不删。
+      // 套图审查「列表入口」已并入「审查中心」（D-06）：列表旧路由重定向到 /review。
+      // 但「某个批次详情」保留独立页，避免站内「查看刚创建批次」深链丢失 batch id。
       {
         path: '/drawings/review-batches',
         redirect: '/review',
       },
       {
         path: '/drawings/review-batches/:id',
-        redirect: '/review',
+        component: './drawings/ReviewBatch/Detail',
         hideInMenu: true,
-        name: '套图详情（已迁移）',
+        name: '套图详情',
       },
       {
         path: '/drawings/:id',

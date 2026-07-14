@@ -78,6 +78,8 @@ export interface Finding {
   note?: string | null
   status_updated_at?: string | null
   created_at?: string | null
+  /** D-07：创效潜力判别（规则优先，见 finding_service._rule_based_saving_potential） */
+  has_saving_potential: boolean
 }
 
 export interface FindingListMeta {
@@ -85,6 +87,8 @@ export interface FindingListMeta {
   by_source: Record<string, number>
   by_severity: Record<string, number>
   by_status: Record<string, number>
+  /** D-07：命中创效潜力判别的 Finding 数量 */
+  saving_potential_count: number
   limit: number
   offset: number
 }
@@ -141,5 +145,50 @@ export const updateFindingStatus = (
 ) =>
   request<FindingStatusUpdateEnvelope>(
     `${BASE}/${projectId}/findings/${source}/${encodeURIComponent(sourceKey)}/status`,
+    { method: 'POST', data: body, skipErrorHandler: true },
+  )
+
+// ── D-07：Finding → 创效提案草稿 ──────────────────────────────────
+
+/** assess_saving_potential 判别结果（规则 or 规则+LLM 增强，见 finding_service.py） */
+export interface FindingSavingAssessment {
+  has_saving_potential: boolean
+  source: 'rule' | 'rule+llm'
+  confidence: number | null
+  rationale: string | null
+}
+
+export interface FindingToProposalResult {
+  proposal_id: string
+  status: 'draft'
+  finding_id: string
+  saving_assessment: FindingSavingAssessment
+}
+export type FindingToProposalEnvelope = ApiEnvelope<
+  FindingToProposalResult,
+  { project_id: string }
+>
+
+export interface FindingToProposalBody {
+  title?: string
+  proposal_type?: 'A' | 'B'
+  raw_saving_est?: number
+  note?: string
+  /** 规则未命中创效潜力时，是否尝试 ModelRouter LLM 可选增强判别（缺省 false） */
+  use_llm?: boolean
+}
+
+/**
+ * POST .../to-proposal — Finding → 创效提案草稿（仅 draft，不越过三审签字硬约束）。
+ * 规则未命中创效潜力时后端返回 409（detail: "NO_SAVING_POTENTIAL"），调用方需捕获。
+ */
+export const findingToProposal = (
+  projectId: string,
+  source: FindingSource,
+  sourceKey: string,
+  body: FindingToProposalBody = {},
+) =>
+  request<FindingToProposalEnvelope>(
+    `${BASE}/${projectId}/findings/${source}/${encodeURIComponent(sourceKey)}/to-proposal`,
     { method: 'POST', data: body, skipErrorHandler: true },
   )
