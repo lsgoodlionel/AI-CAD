@@ -81,3 +81,4 @@ apps/api/data/model3d/dataset/**/*.npz
 apps/api/data/model3d/dataset/**/*.png
 apps/api/data/model3d/dataset/**/*.jpg
 apps/api/data/model3d/dataset/**/*.jpeg
+research/cadtx/
