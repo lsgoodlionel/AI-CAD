@@ -213,25 +213,30 @@ class ModelRouter:
                 response.prompt_tokens / 1_000_000 * config.input_price_per_1m +
                 response.completion_tokens / 1_000_000 * config.output_price_per_1m
             )
-        await self._execute(
-            """
-            INSERT INTO llm_call_logs
-              (engine_name, model_db_id, prompt_tokens, completion_tokens,
-               latency_ms, cost_usd, success, error_type)
-            VALUES (:engine_name,:model_db_id,:prompt_tokens,:completion_tokens,
-                    :latency_ms,:cost_usd,:success,:error_type)
-            """,
-            {
-                "engine_name": engine_name,
-                "model_db_id": config.model_db_id,
-                "prompt_tokens": response.prompt_tokens if response else 0,
-                "completion_tokens": response.completion_tokens if response else 0,
-                "latency_ms": response.latency_ms if response else 0,
-                "cost_usd": cost,
-                "success": success,
-                "error_type": error[:200] if error else None,
-            },
-        )
+        # 调用日志属可观测性、非关键路径：写入失败（如缺分区、DB 抖动）只告警，
+        # 绝不上抛打断 LLM 调用链路（审图/KG/RAG 依赖）。DEFAULT 分区兜底见 migration 028。
+        try:
+            await self._execute(
+                """
+                INSERT INTO llm_call_logs
+                  (engine_name, model_db_id, prompt_tokens, completion_tokens,
+                   latency_ms, cost_usd, success, error_type)
+                VALUES (:engine_name,:model_db_id,:prompt_tokens,:completion_tokens,
+                        :latency_ms,:cost_usd,:success,:error_type)
+                """,
+                {
+                    "engine_name": engine_name,
+                    "model_db_id": config.model_db_id,
+                    "prompt_tokens": response.prompt_tokens if response else 0,
+                    "completion_tokens": response.completion_tokens if response else 0,
+                    "latency_ms": response.latency_ms if response else 0,
+                    "cost_usd": cost,
+                    "success": success,
+                    "error_type": error[:200] if error else None,
+                },
+            )
+        except Exception as exc:  # noqa: BLE001 — 日志写入失败不得阻断调用
+            logger.warning("[%s] 调用日志写入失败（已忽略，不影响调用）: %s", engine_name, exc)
 
     async def _check_provider_health(self, row: dict) -> bool:
         api_key = os.environ.get(row.get("api_key_env") or "", "")
