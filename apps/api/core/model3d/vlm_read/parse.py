@@ -26,6 +26,15 @@ _RE_ELEVATION_VALUE = re.compile(r"[±+\-]?\d{1,3}\.\d{2,3}")
 # 合理标高范围（米），过滤模型误读/幻觉出的荒谬数值——宁可漏读不可虚高
 _ELEVATION_MIN_M = -30.0
 _ELEVATION_MAX_M = 300.0
+# 自由文本里认定「工程标高」的语境词：数值近旁须命中其一（或 token 自带 ± 前缀），
+# 否则视为普通小数（缩放系数 0.27、版本号、比例尺等）不予采信，压制误抽。
+# 语境判定口径对齐 core/model3d/ocr/consume.py 的标高纪律。
+_ELEVATION_CONTEXT_WORDS = (
+    "标高", "高程", "基础", "底板", "顶板", "楼面", "板面",
+    "地坪", "层高", "楼层", "层", "室内", "室外",
+)
+# 语境探测窗口：在数值 token 前后各取若干字符内找语境词
+_ELEVATION_CONTEXT_WINDOW = 12
 
 # 构件词表按长度降序匹配，避免"基础底板"被"基础"截断丢信息
 _COMPONENT_VOCAB = (
@@ -45,6 +54,19 @@ def _parse_elevation_value(text: str) -> float | None:
     if not (_ELEVATION_MIN_M <= value <= _ELEVATION_MAX_M):
         return None
     return value
+
+
+def _has_elevation_context(text: str, start: int, end: int, token: str) -> bool:
+    """自由文本里的数值是否具工程标高语境。
+
+    满足其一即采信为标高候选：token 自带 ± 前缀（工程图标高标记），或数值
+    前后窗口内出现标高关键词（标高/基础/底板/层……）。都不满足则判为普通
+    小数（缩放系数、版本号、比例尺等），不予采信——降低误抽。
+    """
+    if "±" in token:
+        return True
+    window = text[max(0, start - _ELEVATION_CONTEXT_WINDOW) : end + _ELEVATION_CONTEXT_WINDOW]
+    return any(word in window for word in _ELEVATION_CONTEXT_WORDS)
 
 
 def parse_discipline(raw_text: str) -> DisciplineCandidate | None:
@@ -71,21 +93,44 @@ def parse_discipline(raw_text: str) -> DisciplineCandidate | None:
 
 
 def parse_elevations(raw_text: str) -> tuple[ElevationCandidate, ...]:
-    """从 VLM 回答中提取标高候选（米）。按「标高：」行优先，去重、按数值升序。"""
-    line_match = _RE_ELEVATION_LINE.search(raw_text)
-    segment = line_match.group(1) if line_match else raw_text
-    confidence = _CONF_STRUCTURED if line_match else _CONF_FALLBACK
+    """从 VLM 回答中提取标高候选（米），去重、按数值升序。
 
-    seen: set[float] = set()
-    out: list[ElevationCandidate] = []
-    for match in _RE_ELEVATION_VALUE.finditer(segment):
+    两级互补抽取，抗格式漂移——qwen3.5 等思考模型常把精简结论放 content、
+    把标高细节散在 thinking 自由文本里，只匹配「标高：」结构行会整段漏掉：
+      1. 结构化「标高：」行：模型对提示词的显式作答，高置信；该行本身即
+         「标高」语境，行内数值不再复验语境；
+      2. 全文语境扫描：覆盖 content 散文 + thinking 推理里的标高数值，
+         须带工程标高语境（近旁标高关键词或 ± 前缀，见 ``_has_elevation_context``），
+         中置信；无语境的裸小数（缩放系数、版本号等）一律不采，压制误抽。
+    同一数值两级都命中时保留更高置信。值域 [-30, 300]m 滤幻觉。
+    守铁律：VLM 标高是候选 + 置信，抽不到宁可空，绝不编造。
+    """
+    by_value: dict[float, ElevationCandidate] = {}
+
+    # 1) 结构化「标高：」行——高置信，行内即标高语境，无需再验
+    line_match = _RE_ELEVATION_LINE.search(raw_text)
+    if line_match:
+        for match in _RE_ELEVATION_VALUE.finditer(line_match.group(1)):
+            value = _parse_elevation_value(match.group())
+            if value is None:
+                continue
+            by_value.setdefault(
+                value,
+                ElevationCandidate(value_m=value, confidence=_CONF_STRUCTURED, evidence=match.group()),
+            )
+
+    # 2) 全文语境扫描——中置信，仅采带工程标高语境的数值（含 thinking/散文形态）
+    for match in _RE_ELEVATION_VALUE.finditer(raw_text):
         value = _parse_elevation_value(match.group())
-        if value is None or value in seen:
+        if value is None or value in by_value:
             continue
-        seen.add(value)
-        out.append(ElevationCandidate(value_m=value, confidence=confidence, evidence=match.group()))
-    out.sort(key=lambda c: c.value_m)
-    return tuple(out)
+        if not _has_elevation_context(raw_text, match.start(), match.end(), match.group()):
+            continue
+        by_value[value] = ElevationCandidate(
+            value_m=value, confidence=_CONF_FALLBACK, evidence=match.group()
+        )
+
+    return tuple(sorted(by_value.values(), key=lambda c: c.value_m))
 
 
 def parse_components(raw_text: str) -> tuple[ComponentCandidate, ...]:

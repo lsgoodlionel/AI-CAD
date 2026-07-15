@@ -94,6 +94,59 @@ class TestParseElevations:
     def test_no_elevation_returns_empty(self):
         assert parse_elevations("标高：无") == ()
 
+    def test_extracts_from_thinking_when_content_line_has_no_values(self):
+        """真实 qwen3.5：content 是精简结论（「标高：见图」无数值）、thinking 是
+        详细推理并散落真实标高。合并文本喂进来时必须从自由文本稳健抽到标高，
+        而不是因结构行没命中就整段漏空。
+        """
+        content = (
+            "专业：结构\n"
+            "标高：见图\n"
+            "构件：梁、板、柱、基础底板"
+        )
+        thinking = (
+            "让我仔细看这张结构剖面图。图纸最下方标注了基础底板标高 -4.700，"
+            "往上是地下室底板标高 -3.200。首层室内地坪为 ±0.000，"
+            "屋面结构标高标注为 +15.00。整体是一栋带一层地下室的结构。"
+        )
+        raw_text = f"{content}\n{thinking}"
+        got = parse_elevations(raw_text)
+        assert [c.value_m for c in got] == [-4.7, -3.2, 0.0, 15.0]
+        # 全部来自自由文本抽取（结构行无数值）→ 中置信
+        assert all(c.confidence == 0.55 for c in got)
+
+    def test_zero_elevation_in_free_text_via_plus_minus(self):
+        # 散文里的 ±0.000 无关键词也应命中——± 前缀本身即标高标记
+        got = parse_elevations("经推断该处对应 ±0.000 的位置。")
+        assert [c.value_m for c in got] == [0.0]
+        assert got[0].confidence == 0.55
+
+    def test_structured_values_keep_high_confidence_when_also_in_prose(self):
+        """结构行给出的数值即便在 thinking 里再次出现，也保留结构行的高置信。"""
+        raw_text = (
+            "专业：结构\n标高：-3.200、+15.00\n构件：梁、柱\n"
+            "推理：底板标高 -3.200，另有女儿墙顶 +15.00，还发现 -4.700 的基础底板。"
+        )
+        got = parse_elevations(raw_text)
+        by_value = {c.value_m: c.confidence for c in got}
+        assert by_value[-3.2] == 0.85  # 结构行命中，高置信
+        assert by_value[15.0] == 0.85
+        assert by_value[-4.7] == 0.55  # 仅 thinking 命中，中置信
+        assert [c.value_m for c in got] == [-4.7, -3.2, 15.0]
+
+    def test_decimal_without_elevation_context_is_not_extracted(self):
+        # 缩放系数 0.27 / 比例等裸小数无标高语境，绝不误抽为标高
+        assert parse_elevations("图像缩放矩阵约 0.27，重编码为 PNG 后上传。") == ()
+
+    def test_version_like_decimal_not_extracted(self):
+        # 版本号「3.50」这类无语境小数不得进入标高候选
+        assert parse_elevations("模型 qwen3.50 完成本次读图。") == ()
+
+    def test_out_of_range_value_in_free_text_dropped(self):
+        # 带标高语境但数值超出 [-30, 300]（模型幻觉）→ 仍被值域过滤
+        got = parse_elevations("推理得到底板标高 -4.700 与荒谬的标高 888.000。")
+        assert [c.value_m for c in got] == [-4.7]
+
 
 # ── parse: 构件候选 ──────────────────────────────────────────────
 
@@ -264,6 +317,41 @@ class TestCallVlmChat:
         assert captured["json"]["messages"][0]["images"] == [
             __import__("base64").b64encode(b"fake-png-bytes").decode("ascii")
         ]
+
+    @pytest.mark.asyncio
+    async def test_merges_thinking_field_into_returned_text(self):
+        """思考模型（qwen3.5）把详细推理放独立 ``thinking`` 字段——须并入返回
+        文本，否则散在 thinking 的标高全丢。content 有值时二者拼接。
+        """
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "message": {
+                "content": "专业：结构\n标高：见图\n构件：梁、柱",
+                "thinking": "基础底板标高 -4.700，首层 ±0.000。",
+            }
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        class MockClient:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                pass
+
+            async def post(self, url, json=None, **kwargs):
+                return mock_response
+
+        with patch("core.model3d.vlm_read.ollama_vlm.httpx.AsyncClient", return_value=MockClient()):
+            content = await ollama_vlm.call_vlm_chat(
+                b"x", "p", base_url="http://placeholder:11434"
+            )
+
+        assert "标高：见图" in content
+        assert "-4.700" in content
+        # 拼接后交解析器应能从 thinking 抽到标高
+        got = parse_elevations(content)
+        assert [c.value_m for c in got] == [-4.7, 0.0]
 
     @pytest.mark.asyncio
     async def test_non_string_content_raises(self):

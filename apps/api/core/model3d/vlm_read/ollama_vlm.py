@@ -128,6 +128,13 @@ async def call_vlm_chat(
     content = message.get("content", "")
     if not isinstance(content, str):
         raise ValueError(f"意外的 VLM 响应结构（message.content 非字符串）: {type(content)!r}")
+
+    # qwen3.5 等思考模型把详细推理放独立的 ``thinking`` 字段、精简结论放 content；
+    # 标高等语义线索常只出现在 thinking，合并后一并交解析器（parse 侧带语境守卫，
+    # 不会因多出的推理文本误抽）。无 thinking 字段时行为不变。
+    thinking = message.get("thinking")
+    if isinstance(thinking, str) and thinking.strip():
+        return f"{content}\n{thinking}" if content.strip() else thinking
     return content
 
 
