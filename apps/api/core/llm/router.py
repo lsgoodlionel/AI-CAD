@@ -149,7 +149,7 @@ class ModelRouter:
 
         rows = await self._fetch_all(
             """
-            SELECT emc.engine_name, emc.task_type, emc.id AS model_db_id,
+            SELECT emc.engine_name, emc.task_type, emc.model_id AS model_db_id,
                    emc.temperature, emc.max_tokens, emc.top_p,
                    emc.frequency_penalty, emc.prompt_template_version, emc.extra_params,
                    lm.model_id, lm.input_price_per_1m, lm.output_price_per_1m,

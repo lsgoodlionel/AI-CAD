@@ -4,9 +4,32 @@
 
 ---
 
-## 当前版本：v0.6.2-dev（fix/model-3d-quality）
+## 当前版本：v0.7.0-dev（Phase D — 全模块串联 · 操作简化 · 前沿升级）
 
-当前最新开发线为 `fix/model-3d-quality`（PR [#11](https://github.com/lsgoodlionel/AI-CAD/pull/11)）。截至 2026-07-12，本轮以旗舰真实项目**上海大歌剧院（2309 张竣工图）**为验证基准，修复工程 3D 模型建模的致命问题，完成模型页 UX、楼层标高人工录入通道、Web 帮助中心、**工程模型页内存优化（1.1GB→115MB）**、**图纸全文 OCR 基座（核心功能）**，并复核更正了「compose build 坏了」的误判。完整交接见 [docs/DEV_HANDOFF.md](docs/DEV_HANDOFF.md)。
+Phase D 把 Phase A/B/C 逐块建成的能力**串成产品**：打通模块间断点、合并同类入口、给专业流程配引导，并吸收 2025-2026 前沿升级。蓝图见 [docs/PHASE_D_BLUEPRINT.md](docs/PHASE_D_BLUEPRINT.md)，6 泳道 24 工作块。**泳道 1-4 已合并 main**（PR [#12](https://github.com/lsgoodlionel/AI-CAD/pull/12)、[#15](https://github.com/lsgoodlionel/AI-CAD/pull/15)，CI 全绿）；**泳道 5 前沿升级 + 后续工程**在 `feat/phase-d`（待 PR）。后端全量 **1443 测试**、前端 tsc 零新错 / vitest 72。
+
+### Phase D 泳道 1-4（模块串联 · 操作简化，已合 main）
+
+| 泳道 | 交付 |
+|------|------|
+| 1 工作台/引导 | **项目工作台** `/hub`（流程 Steps + 5 张流水线卡，登录默认落地）、**统一上传向导**（单一拖拽自动分流单张/批量/ZIP）、**帮助内嵌化**（HelpTip 气泡 + 手册锚点深链）|
+| 2 审查合并 | **Finding 统一模型**（五源问题聚合 + 四态闭环状态机，migration 026）、**审查中心** `/projects/:id/review`（合并单图/会审/套图三处入口）、**审图→创效线索**（一键转提案草稿，三审硬约束不变）|
+| 3 建模串联 | **事件编排层**（migration 027，审图/建模完成→建议待办，仅建议不自动执行）、**spotting 融合回灌建模**、**OCR 三馈线接满**、**LOD300 剖面层高最近邻配准**、**算量中心**（QTO + 钢筋翻样统一口径）|
+| 4 模型页/看板 | **模型页三模式重构**（浏览/审校/算量，1100 行拆 20 文件，两审校队列合并统一收件箱）、**看板角色自适应合并** + 管线建议面板 |
+| 6 收尾 | 路由迁移兼容、手册同步 V1.2、E2E 验收 Demo、**北极星指标度量埋点**（关键路径时长/建模采纳率/审校单条耗时）|
+
+### Phase D 泳道 5 — 前沿技术升级（研究型，`feat/phase-d`）
+
+| 工作块 | 交付 | 真跑/结论 |
+|------|------|------|
+| D-16 OCR 底座 | 离线 OCR 后端评测基座 + PaddleOCR-VL 适配器 stub | 歌剧院 139 图真跑：标高 1051/conf 0.988、轴号 1898/0.956、说明 16004/0.984 |
+| D-16 VL 读图 | **远程 VLM 读图适配器**（qwen3.5-vision）判专业/读标高/识构件 | 实证读懂真实结构剖面图；接成 **section-z 第二标高源**（矢量/OCR 不足时补，绝不虚高）|
+| D-17 规范导入 | docling(MIT) 适配器 + 抽取质量 A/B 评测 + PDF 来源清单 | 真 A/B 待 docling 版面模型(HF)+文本型 GB PDF |
+| D-18 合规审查 | **GraphRAG 融合层** + 合规评价标准 + **接入审图编排**(灰度关) + 评测 harness + 从 migration024 自举金标准 | 远程 qwen3.5 核查实证通；真数字待标注飞轮 |
+| D-19 符号 spotting | VecFormer/CADSpotting 权重跟踪 | 权重未释放，每月复查 |
+| D-20 符号微调 | **实测本地 Mac 训练 CADTransformer 可行**（dgl 1.1.x，非 GPU 硬限制）；真实 CADTransformer 前向+反向+optimizer.step 在 Mac 跑通 loss 单调降 | 全量微调宜 Linux CUDA；smoke 已证 |
+
+关键工程：远程 ollama 接入（qwen3.5 结构化输出，地址不入 git）、`llm_call_logs` 月分区维护 + router 日志健壮性、Finding 聚合分页下推 SQL。诊断结论：歌剧院「0 实测层高」根因是竣工图缺建筑楼层剖面（24 剖面 20 张围护/基坑），非算法——「绝不虚高」正确回落。详见 `docs/PHASE_D_*.md`。
 
 ### v0.6.2-dev 更新摘要（2026-07-12）
 

@@ -22,7 +22,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from core.model3d.section_level_extractor import SectionLevels, filter_main_sequence
+from core.model3d.section_level_extractor import LevelMark, SectionLevels, filter_main_sequence
+from core.model3d.vlm_read.types import ElevationCandidate
 from services.model_story import (
     ModelQualityIssue,
     StoryNormalizationResult,
@@ -38,6 +39,18 @@ _MIN_MATCH_COVERAGE = 0.7
 # 窗口内相邻标高差变异系数（标准差/均值）上限：过高说明间距忽大忽小，
 # 大概率不是同一套真实楼层序列（配对残差门槛，绝不虚高兜底）
 _MAX_SPACING_CV = 0.6
+
+# ── VLM 第二标高源（后续工作 item1）──────────────────────────────
+# VLM 候选标高置信度硬顶：低于矢量/OCR 文本基线置信度（见 section_level_extractor
+# ._BASE_TEXT_ONLY=0.6），确保矢量/OCR 确定性源永远优先，VLM 仅补空、绝不越权
+# 盖过更可信的源（即便 VLM 自报置信度更高，也要在本管线内被压低）。
+_VLM_CONFIDENCE_CAP = 0.5
+# 主源（矢量/OCR）标高数低于此才视为「不足」，允许 VLM 候选介入补充；与
+# section_level_extractor._fit_calibration 的最小拟合点数(2)同口径——不足 2 点
+# 连基本线性标定/两点配准都做不到。
+_MIN_PRIMARY_MARKS = 2
+# VLM 标高与已有标高视为同一实体标高的容差（米）：避免同一层高被计入两次
+_VLM_DEDUPE_TOL_M = 0.05
 
 
 @dataclass(frozen=True)
@@ -69,13 +82,22 @@ def recover_section_z(
     drawings: list[dict],
     section_levels_by_drawing: dict[str, SectionLevels],
     normalization: StoryNormalizationResult,
+    vlm_elevations_by_drawing: dict[str, tuple[ElevationCandidate, ...]] | None = None,
 ) -> SectionZRecovery:
     """剖面标高 → 楼层层高覆盖 + 匹配单体集。纯函数，无 IO。
 
     每单体在全部候选剖面中，取通过置信门槛（覆盖率 ≥70% + 间距变异系数达标）
     且覆盖率最高、间距最均匀者。无一通过 → 回落默认层高 + 发 ModelQualityIssue。
+
+    ``vlm_elevations_by_drawing``（可选）：VLM 读图产出的标高候选，作为矢量/OCR
+    之外的**第二标高源**——仅当某剖面主源标高数不足（< `_MIN_PRIMARY_MARKS`）时
+    才补入，且置信度硬顶到 `_VLM_CONFIDENCE_CAP`（矢量/OCR 优先，VLM 仅补空，
+    绝不越权覆盖）。合并后仍走本函数既有的覆盖率/零锚/间距一致性门禁——VLM
+    候选凑不齐达标序列，一样回落默认层高（绝不虚高）。为空/None → 原样按矢量/OCR
+    单源恢复，零差异回归。
     """
-    sections_by_unit = _sections_per_unit(drawings, section_levels_by_drawing)
+    merged_levels = _merge_vlm_elevations(section_levels_by_drawing, vlm_elevations_by_drawing)
+    sections_by_unit = _sections_per_unit(drawings, merged_levels)
 
     z_overrides: dict[tuple[str, str], dict] = {}
     matched_units: set[str] = set()
@@ -140,6 +162,76 @@ def _sections_per_unit(
         unit_key = detect_building_unit(drawing).unit_key
         grouped.setdefault(unit_key, []).append(section)
     return grouped
+
+
+def _merge_vlm_elevations(
+    section_levels_by_drawing: dict[str, SectionLevels],
+    vlm_elevations_by_drawing: dict[str, tuple[ElevationCandidate, ...]] | None,
+) -> dict[str, SectionLevels]:
+    """矢量/OCR 主源标高不足的剖面，用 VLM 候选标高补上（第二标高源）。
+
+    仅对 ``vlm_elevations_by_drawing`` 中列出、且主源 marks 数 < `_MIN_PRIMARY_MARKS`
+    的剖面生效；主源已足够时 VLM 候选让位（确定性优先，绝不越权覆盖）。
+    为空/None → 原样返回同一 dict（零差异回归）。
+    """
+    if not vlm_elevations_by_drawing:
+        return section_levels_by_drawing
+    merged = dict(section_levels_by_drawing)
+    for drawing_id, candidates in vlm_elevations_by_drawing.items():
+        if not candidates:
+            continue
+        primary = merged.get(drawing_id)
+        if primary is not None and len(primary.marks) >= _MIN_PRIMARY_MARKS:
+            continue  # 主源已足够，VLM 候选让位
+        vlm_marks = _vlm_marks_from_candidates(candidates)
+        if not vlm_marks:
+            continue
+        merged[drawing_id] = _combine_with_vlm(primary, vlm_marks)
+    return merged
+
+
+def _vlm_marks_from_candidates(
+    candidates: tuple[ElevationCandidate, ...],
+) -> list[LevelMark]:
+    """VLM ElevationCandidate → LevelMark，置信度硬顶到 `_VLM_CONFIDENCE_CAP`。"""
+    marks: list[LevelMark] = []
+    for candidate in candidates:
+        value = round(float(candidate.value_m), 3)
+        marks.append(
+            LevelMark(
+                elevation_m=value,
+                label=candidate.evidence or f"{value:+.3f}",
+                confidence=round(min(float(candidate.confidence), _VLM_CONFIDENCE_CAP), 4),
+                source_ref={"vlm": True, "evidence": candidate.evidence},
+            )
+        )
+    return marks
+
+
+def _combine_with_vlm(
+    primary: SectionLevels | None, vlm_marks: list[LevelMark]
+) -> SectionLevels:
+    """主源标高（若有）+ 去重后的 VLM 标高，合并为一个 SectionLevels。
+
+    去重：VLM 标高与已有标高相差 < `_VLM_DEDUPE_TOL_M` 视为同一实体标高，
+    保留主源侧（避免同一层高被计入两次、也避免 VLM 置信度覆盖主源置信度）。
+    """
+    primary_marks = list(primary.marks) if primary is not None else []
+    combined = list(primary_marks)
+    for vlm_mark in vlm_marks:
+        if any(
+            abs(vlm_mark.elevation_m - existing.elevation_m) < _VLM_DEDUPE_TOL_M
+            for existing in combined
+        ):
+            continue
+        combined.append(vlm_mark)
+    combined_sorted = tuple(sorted(combined, key=lambda mark: mark.elevation_m))
+    fit = {
+        **(primary.fit if primary is not None else {}),
+        "vlm_supplement": True,
+        "vlm_mark_count": len(vlm_marks),
+    }
+    return SectionLevels(marks=combined_sorted, reason=None, fit=fit)
 
 
 def _ordered_stories(normalization: StoryNormalizationResult, unit_key: str) -> list:
