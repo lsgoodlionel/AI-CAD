@@ -51,6 +51,28 @@ _executor = ThreadPoolExecutor(max_workers=2)
 # 首图含模型加载 ~10s + 大图分块识别 ~25s，须给足余量
 _SECTION_TIMEOUT_SEC = 90
 
+# ── 剖面标高 VLM 第二源兜底（后续工作 item1，灰度开关）───────────
+# 默认关闭：远程 VLM 单图推理 ~25s，绝不能拖慢常规 7 分钟建模主链。显式设
+# 1/true/yes 开启；仅结构专业剖面 + 矢量/OCR 标高不足时才会触发。
+_VLM_SECTION_Z_ENV = "VLM_SECTION_Z_ENABLED"
+# 与 section_z_recovery._MIN_PRIMARY_MARKS 同口径：主源标高数低于此才需要 VLM 补充
+_VLM_SECTION_Z_MIN_MARKS = 2
+# 单图 VLM 读图超时（秒）：留够 qwen3.5 ~25s 推理余量，但不能无界拖慢构建
+_VLM_SECTION_Z_TIMEOUT_SEC = 45
+# 单次构建最多送 VLM 的剖面数（保护主链：大套图不会因大量薄弱剖面拖垮构建，
+# 实测歌剧院仅 2 张真建筑结构剖面，此上限留足余量）
+_VLM_SECTION_Z_MAX_DRAWINGS = 6
+# VLM 自报置信度低于此律绝不采信（铁律：绝不虚高，宁缺毋滥）
+_VLM_SECTION_Z_MIN_CONFIDENCE = 0.6
+# VLM 读图渲染 PDF 首页的 dpi：只需看清标高标注文字，读图内部还会二次缩放，
+# 给个够用的中等值即可（对齐 scripts/model3d/vlm_read_drawing.py 默认值）
+_VLM_SECTION_Z_RENDER_DPI = 150
+
+
+def _vlm_section_z_enabled() -> bool:
+    """灰度开关读取（env `VLM_SECTION_Z_ENABLED`，缺省关）。"""
+    return os.environ.get(_VLM_SECTION_Z_ENV, "").strip().lower() in ("1", "true", "yes")
+
 RENDER_DPI = 110
 MAX_TEXTURE_PX = 1600
 # 全量套图保护：超大矢量 PDF 渲染可卡死线程（无法强杀），从源头限制
@@ -976,7 +998,99 @@ async def _recover_section_z(
         if levels is not None and getattr(levels, "marks", ()):
             levels_by_drawing[str(drawing["id"])] = levels
 
-    return section_z_recovery.recover_section_z(drawings, levels_by_drawing, normalization)
+    vlm_elevations_by_drawing: dict[str, Any] = {}
+    if _vlm_section_z_enabled():
+        vlm_elevations_by_drawing = await _vlm_section_z_fallback(
+            section_drawings, levels_by_drawing
+        )
+
+    return section_z_recovery.recover_section_z(
+        drawings,
+        levels_by_drawing,
+        normalization,
+        vlm_elevations_by_drawing=vlm_elevations_by_drawing,
+    )
+
+
+def _needs_vlm_elevation(drawing: dict, levels_by_drawing: dict[str, Any]) -> bool:
+    """仅结构专业 + 主源（矢量/OCR）标高数不足才需要 VLM 补充（绝不逢图必调）。"""
+    if str(drawing.get("discipline") or "").strip().lower() != "structure":
+        return False
+    levels = levels_by_drawing.get(str(drawing.get("id") or ""))
+    marks = getattr(levels, "marks", ()) if levels is not None else ()
+    return len(marks) < _VLM_SECTION_Z_MIN_MARKS
+
+
+async def _vlm_section_z_fallback(
+    section_drawings: list[dict],
+    levels_by_drawing: dict[str, Any],
+) -> dict[str, tuple]:
+    """结构剖面 + 矢量/OCR 标高不足时，VLM 读标高补第二源（灰度开关，慢，~25s/图）。
+
+    仅 PDF、仅 discipline=='structure'、仅主源 marks 数不足的剖面才会调用；单图
+    渲染/调用失败或超时一律跳过，绝不阻断整链（与 `_section_levels_sync` 同一
+    降级纪律）。`read_drawing_vlm` 本身已优雅降级（端点未配置/网络失败一律返回
+    ``backend="none"``，不抛异常），这里额外做超时与置信度双重把关。
+
+    返回 {drawing_id: (ElevationCandidate, ...)}，已按 VLM 自报置信度过滤
+    （< `_VLM_SECTION_Z_MIN_CONFIDENCE` 的候选丢弃——宁缺毋滥，绝不虚高）。
+    """
+    targets = [
+        drawing for drawing in section_drawings
+        if _needs_vlm_elevation(drawing, levels_by_drawing)
+    ][:_VLM_SECTION_Z_MAX_DRAWINGS]
+    candidates: dict[str, tuple] = {}
+    if not targets:
+        return candidates
+
+    from core.model3d.vlm_read import read_drawing_vlm
+
+    loop = asyncio.get_event_loop()
+    for drawing in targets:
+        drawing_id = str(drawing.get("id") or "")
+        file_key = str(drawing.get("file_key") or "")
+        if not file_key or not file_key.lower().endswith(".pdf"):
+            continue  # DXF/DWG 渲染成本高、场景稀少，最小改动不纳入本轮兜底
+        try:
+            data = await loop.run_in_executor(_executor, get_file_bytes, file_key)
+            image_bytes = await asyncio.wait_for(
+                loop.run_in_executor(_executor, _pdf_first_page_png_sync, data),
+                timeout=_SECTION_TIMEOUT_SEC,
+            )
+            if not image_bytes:
+                continue
+            result = await read_drawing_vlm(
+                image_bytes, timeout=_VLM_SECTION_Z_TIMEOUT_SEC
+            )
+        except Exception as exc:  # noqa: BLE001 — 单图 VLM 兜底失败跳过，不阻断整链
+            logger.warning("[ModelBuilder] 剖面标高 VLM 兜底跳过 %s: %s", drawing_id, exc)
+            continue
+        filtered = result.filter_confidence(_VLM_SECTION_Z_MIN_CONFIDENCE)
+        if filtered.elevations:
+            candidates[drawing_id] = filtered.elevations
+            logger.info(
+                "[ModelBuilder] 剖面标高 VLM 兜底命中: drawing=%s %d 个候选（backend=%s）",
+                drawing_id, len(filtered.elevations), result.backend,
+            )
+    return candidates
+
+
+def _pdf_first_page_png_sync(data: bytes) -> bytes:
+    """PDF 首页 → PNG 字节（供 VLM 读图）。失败返回空字节，调用方据此跳过。"""
+    try:
+        import fitz
+
+        doc = fitz.open(stream=data, filetype="pdf")
+        try:
+            if len(doc) == 0:
+                return b""
+            pix = doc[0].get_pixmap(dpi=_VLM_SECTION_Z_RENDER_DPI)
+            return pix.tobytes("png")
+        finally:
+            doc.close()
+    except Exception as exc:  # noqa: BLE001 — 渲染失败降级空字节，VLM 兜底跳过
+        logger.warning("[ModelBuilder] 剖面 PDF 渲染失败（VLM 兜底）: %s", exc)
+        return b""
 
 
 def _section_texts_sync(data: bytes, ext: str) -> list[str]:

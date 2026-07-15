@@ -6,6 +6,7 @@
 import pytest
 
 from core.model3d.section_level_extractor import LevelMark, SectionLevels
+from core.model3d.vlm_read.types import ElevationCandidate
 from services.model_story import normalize_story_table
 from services.section_z_recovery import recover_section_z
 
@@ -54,6 +55,26 @@ def _n_story_plan(n: int):
         _drawing(f"p{i}", f"{i}层平面图", f"A-{100 * i + 1}") for i in range(1, n + 1)
     ]
     return drawings, normalize_story_table(drawings)
+
+
+def _mark(elevation: float, confidence: float = 0.9) -> LevelMark:
+    return LevelMark(elevation_m=elevation, label=f"{elevation:+.3f}", confidence=confidence, source_ref={})
+
+
+def _levels(*marks: LevelMark) -> SectionLevels:
+    return SectionLevels(
+        marks=tuple(sorted(marks, key=lambda m: m.elevation_m)),
+        reason=None,
+        fit={"slope_m_per_pt": -0.02, "residual": 0.0, "tie_point_count": len(marks)},
+    )
+
+
+def _vlm_candidates(*pairs: tuple[float, float]) -> tuple[ElevationCandidate, ...]:
+    """(value_m, confidence) 序列 → ElevationCandidate 元组（VLM 读图产物形状）。"""
+    return tuple(
+        ElevationCandidate(value_m=value, confidence=confidence, evidence=f"vlm:{value:+.3f}")
+        for value, confidence in pairs
+    )
 
 
 # ── 匹配成功 ────────────────────────────────────────────────────
@@ -314,3 +335,129 @@ def test_no_zero_anchor_falls_back_to_spacing_consistency_gate():
         [*drawings, section], {"sec1": _marks(-8.4, -4.2)}, normalization
     )
     assert "main" in recovery.matched_units
+
+
+# ── VLM 第二标高源（后续工作 item1）────────────────────────────────
+# 铁律核对：VLM 候选仅在矢量/OCR 主源不足时补空；置信度必须硬顶到低于矢量/OCR
+# 基线；合并后仍走同一套覆盖率/零锚/间距一致性门禁，绝不虚高。
+
+
+@pytest.mark.unit
+def test_vlm_candidates_supplement_missing_primary_and_pass_gates():
+    """矢量/OCR 完全抽不到标高（无 key）时，VLM 候选顶上并能点亮匹配。"""
+    plan_drawings, normalization = _two_story_plan()
+    section = _drawing("sec1", "1-1剖面图", "A-501")
+    # VLM 自报高置信(0.95)，但管线须硬顶到 _VLM_CONFIDENCE_CAP(0.5) 以下。
+    vlm_by_drawing = {"sec1": _vlm_candidates((0.0, 0.95), (3.6, 0.9), (7.2, 0.85))}
+
+    recovery = recover_section_z(
+        [*plan_drawings, section], {}, normalization,
+        vlm_elevations_by_drawing=vlm_by_drawing,
+    )
+
+    assert "main" in recovery.matched_units
+    f1 = recovery.z_overrides[("main", "F1")]
+    assert f1["height_m"] == pytest.approx(3.6)
+    assert f1["elevation_bottom_m"] == pytest.approx(0.0)
+    # 绝不越权：即便 VLM 自报 0.95，最终置信度也必须低于矢量/OCR 文本基线(0.6)。
+    assert f1["confidence"] <= 0.5
+    assert f1["confidence"] < 0.6
+
+
+@pytest.mark.unit
+def test_vlm_disabled_by_default_no_param_regression():
+    """不传 vlm_elevations_by_drawing（默认 None）→ 行为与传参前完全一致（零回归）。"""
+    plan_drawings, normalization = _two_story_plan()
+    section = _drawing("sec1", "1-1剖面图", "A-501")
+    section_levels = {"sec1": _marks(0.0, 3.6, 7.2)}
+
+    baseline = recover_section_z([*plan_drawings, section], section_levels, normalization)
+    explicit_none = recover_section_z(
+        [*plan_drawings, section], section_levels, normalization,
+        vlm_elevations_by_drawing=None,
+    )
+
+    assert baseline.z_overrides == explicit_none.z_overrides
+    assert baseline.matched_units == explicit_none.matched_units
+
+
+@pytest.mark.unit
+def test_vlm_ignored_when_primary_marks_already_sufficient():
+    """矢量/OCR 主源已足够（≥2 个标高）时，VLM 候选让位，绝不覆盖确定性源。"""
+    plan_drawings, normalization = _two_story_plan()
+    section = _drawing("sec1", "1-1剖面图", "A-501")
+    section_levels = {"sec1": _marks(0.0, 3.6, 7.2)}  # 主源充足
+    # VLM 给出明显错误/不兼容的标高（若被采信会污染结果）
+    vlm_by_drawing = {"sec1": _vlm_candidates((100.0, 0.99), (200.0, 0.99))}
+
+    with_vlm = recover_section_z(
+        [*plan_drawings, section], section_levels, normalization,
+        vlm_elevations_by_drawing=vlm_by_drawing,
+    )
+    without_vlm = recover_section_z([*plan_drawings, section], section_levels, normalization)
+
+    assert with_vlm.z_overrides == without_vlm.z_overrides
+    assert with_vlm.z_overrides[("main", "F1")]["confidence"] == pytest.approx(0.9)
+
+
+@pytest.mark.unit
+def test_vlm_candidates_failing_anchor_check_fall_back_to_default():
+    """VLM 候选本身未通过零锚校验 → 不判定 matched，回落默认层高（绝不虚高）。"""
+    plan_drawings, normalization = _two_story_plan()
+    section = _drawing("sec1", "A-A剖面图", "A-901")
+    # 整体错位的 VLM 候选（无 ±0.000 附近标高）——对齐既有零锚拒绝用例语义。
+    vlm_by_drawing = {"sec1": _vlm_candidates((-30.0, 0.9), (-25.0, 0.9), (-20.0, 0.9))}
+
+    recovery = recover_section_z(
+        [*plan_drawings, section], {}, normalization,
+        vlm_elevations_by_drawing=vlm_by_drawing,
+    )
+
+    assert "main" not in recovery.matched_units
+    assert recovery.z_overrides == {}
+    assert any(issue.issue_type == "z_anchor_mismatch" for issue in recovery.issues)
+
+
+@pytest.mark.unit
+def test_vlm_supplements_partial_primary_marks_combined():
+    """主源仅 1 个标高（不足）+ VLM 补 2 个 → 合并后覆盖全部楼层；各自置信度分层保留。"""
+    plan_drawings, normalization = _two_story_plan()
+    section = _drawing("sec1", "1-1剖面图", "A-501")
+    section_levels = {"sec1": _levels(_mark(0.0, confidence=0.85))}  # 仅 1 个，主源不足
+    vlm_by_drawing = {"sec1": _vlm_candidates((3.6, 0.9), (7.2, 0.9))}
+
+    recovery = recover_section_z(
+        [*plan_drawings, section], section_levels, normalization,
+        vlm_elevations_by_drawing=vlm_by_drawing,
+    )
+
+    assert "main" in recovery.matched_units
+    f1 = recovery.z_overrides[("main", "F1")]
+    f2 = recovery.z_overrides[("main", "F2")]
+    assert f1["height_m"] == pytest.approx(3.6)
+    assert f2["height_m"] == pytest.approx(3.6)
+    # F1 底标高来自主源（0.85），保留原置信度，未被 VLM 覆盖
+    assert f1["confidence"] == pytest.approx(0.85)
+    # F2 底标高来自 VLM 补充，必须低于矢量/OCR 基线
+    assert f2["confidence"] <= 0.5
+
+
+@pytest.mark.unit
+def test_vlm_duplicate_elevation_deduped_prefers_primary():
+    """VLM 标高与主源标高几乎重合（<0.05m）→ 视为同一实体，保留主源侧，不重复计入。"""
+    plan_drawings, normalization = _two_story_plan()
+    section = _drawing("sec1", "1-1剖面图", "A-501")
+    section_levels = {"sec1": _levels(_mark(0.0, confidence=0.9))}  # 主源仅 1 个，触发补充
+    # 0.02 与主源 0.0 相差 <0.05m 容差 → 应被去重，不重复计入
+    vlm_by_drawing = {"sec1": _vlm_candidates((0.02, 0.95), (3.6, 0.9), (7.2, 0.9))}
+
+    recovery = recover_section_z(
+        [*plan_drawings, section], section_levels, normalization,
+        vlm_elevations_by_drawing=vlm_by_drawing,
+    )
+
+    assert "main" in recovery.matched_units
+    f1 = recovery.z_overrides[("main", "F1")]
+    # 去重保留主源置信度(0.9)，未被 VLM 的 0.02 标高（置信度会被硬顶到 0.5）顶替
+    assert f1["confidence"] == pytest.approx(0.9)
+    assert f1["elevation_bottom_m"] == pytest.approx(0.0)
