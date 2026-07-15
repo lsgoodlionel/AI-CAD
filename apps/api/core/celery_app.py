@@ -15,6 +15,7 @@ celery_app = Celery(
         "tasks.batch_review",
         "tasks.model_build",
         "tasks.pipeline",
+        "tasks.partition_maintenance",
     ],
 )
 
@@ -43,6 +44,7 @@ celery_app.conf.update(
         # pipeline 编排任务：只做轻量建议生成，走 default 队列即可，
         # 不与 ai_review/regulation_import 等重负载队列争抢。
         "tasks.pipeline.*": {"queue": "default"},
+        "tasks.partition_maintenance.*": {"queue": "default"},
     },
     # Celery beat 定时任务
     beat_schedule={
@@ -53,6 +55,13 @@ celery_app.conf.update(
         "sync-regulation-api-sources": {
             "task": "tasks.regulation_api_sync.sync_due_sources_task",
             "schedule": crontab(minute=5),       # 每小时 :05 执行，错开整点高峰
+        },
+        # 每月 1 号与 15 号 00:30 滚动创建 llm_call_logs 当月+未来两月分区。
+        # 双日兜底：即便 1 号漏跑，15 号仍会在月中补齐下月分区（有 default 分区兜底，
+        # 不构成硬依赖，仅为让日志落入按月裁剪的正式分区）。
+        "ensure-llm-log-partitions": {
+            "task": "tasks.partition_maintenance.ensure_llm_log_partitions",
+            "schedule": crontab(minute=30, hour=0, day_of_month="1,15"),
         },
     },
 )
