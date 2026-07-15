@@ -78,6 +78,36 @@ def test_section_marks_matching_plan_stories_produce_overrides():
 
 
 @pytest.mark.unit
+def test_retaining_section_excluded_but_building_section_recovers():
+    """围护/基坑剖面（标高非楼层）被前置剔除，不污染候选；同项目建筑剖面正常点亮。"""
+    plan_drawings, normalization = _two_story_plan()
+    retaining = _drawing("r1", "20舞台深坑围护体剖面图（一）", "W-501")
+    building = _drawing("sec1", "1-1剖面图", "A-501")
+    section_levels = {
+        # 围护标高（基坑/挡土），若未剔除会挤占配准窗口 / 冒充楼层
+        "r1": _marks(-24.8, -9.3, -5.5, 5.5, 16.2),
+        # 真建筑楼层标高
+        "sec1": _marks(0.0, 3.6, 7.2),
+    }
+    recovery = recover_section_z(
+        [*plan_drawings, retaining, building], section_levels, normalization
+    )
+    assert "main" in recovery.matched_units
+    assert recovery.z_overrides[("main", "F1")]["height_m"] == pytest.approx(3.6)
+
+
+@pytest.mark.unit
+def test_only_retaining_sections_yields_no_match():
+    """仅有围护/基坑剖面（无建筑剖面）→ 不点亮 matched，回落估算（绝不虚高）。"""
+    plan_drawings, normalization = _two_story_plan()
+    retaining = _drawing("r1", "舞台深坑围护体剖面图", "W-501")
+    recovery = recover_section_z(
+        [*plan_drawings, retaining], {"r1": _marks(-24.8, -9.3, 5.5)}, normalization
+    )
+    assert recovery.matched_units == set()
+
+
+@pytest.mark.unit
 def test_recovered_overrides_feed_normalize_story_table():
     """端到端：恢复的 overrides 回灌 normalize → 实测层高、非估算。"""
     plan_drawings, normalization = _two_story_plan()
@@ -124,7 +154,9 @@ def test_pit_section_rejected_by_zero_anchor():
     [2, 4] 内，旧口径会误采写坏整楼标高；零锚要求 F1 配对标高 ≈0。
     """
     plan_drawings, normalization = _two_story_plan()
-    section = _drawing("sec1", "围护体剖面图", "A-901")
+    # 标题中性（不含围护/基坑关键词，不会被 _NON_FLOOR_SECTION_RE 前置剔除），
+    # 但标高整体错位 → 到达零锚校验并被其拒绝，验证锚点兜底仍有效。
+    section = _drawing("sec1", "A-A剖面图", "A-901")
     recovery = recover_section_z(
         [*plan_drawings, section], {"sec1": _marks(-30.0, -25.0, -20.0)}, normalization
     )
