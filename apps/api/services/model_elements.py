@@ -441,6 +441,7 @@ async def build_floor_elements(
     elevations: list[float] = []
     ref_axes: dict | None = None
     ref_axes_drawing_id: str | None = None
+    aggregated_axes: dict | None = None  # 跨该层所有图配准对齐后聚合的轴网
     registered = 0
     for drawing, discipline, kinds in tasks:
         result = await _recognize_one(loop, executor, drawing, discipline, file_getter)
@@ -454,36 +455,89 @@ async def build_floor_elements(
             if ref_axes is None:
                 ref_axes = axes
                 ref_axes_drawing_id = str(drawing.get("id") or "")
+                aligned_axes = axes
             else:
                 dx, dy = register_offset(ref_axes, axes)
                 part = _shift_elements(part, dx, dy)
+                aligned_axes = _shift_axes(axes, dx, dy)
                 registered += 1
+            # E2 覆盖提升：聚合本层所有已识别图的轴网（对齐到同一坐标系），
+            # 不再只取首张——多张结构/梁图各识别到部分轴线，并集才完整。
+            aggregated_axes = _merge_axes(aggregated_axes, aligned_axes)
         _merge_elements(elements, part, kinds)
 
     yolo_count = await _yolo_supplement(loop, executor, picked["mep"], elements, file_getter)
     meta = {
         "elevations": sorted(set(elevations)),
         "registered": registered,
-        # E2 轴网层：配准参考轴网以 scene 格式带出（此前算完配准即弃）
-        "axes": _axes_scene_payload(ref_axes, ref_axes_drawing_id),
+        "axes": _axes_scene_payload(aggregated_axes, ref_axes_drawing_id),
     }
     return elements, yolo_count, meta
 
 
+_AXIS_MERGE_TOL_M = 0.3  # 同轴线去重容差（米）
+
+
+def _shift_axes(axes: dict, dx: float, dy: float) -> dict:
+    """按配准偏移平移轴网坐标（x 位置移 dx、y 位置移 dy），对齐到参考坐标系。"""
+    return {
+        "x": [[label, float(pos) + dx] for label, pos in (axes.get("x") or [])],
+        "y": [[label, float(pos) + dy] for label, pos in (axes.get("y") or [])],
+    }
+
+
+def _merge_axes(agg: dict | None, new: dict) -> dict:
+    """并入一张图的轴网：按坐标去重（容差内视为同轴），无标签者被有标签者升级。"""
+    if agg is None:
+        agg = {"x": [], "y": []}
+    for direction in ("x", "y"):
+        existing = agg[direction]
+        for label, pos in (new.get(direction) or []):
+            pos = float(pos)
+            hit = next(
+                (e for e in existing if abs(e[1] - pos) < _AXIS_MERGE_TOL_M), None
+            )
+            if hit is None:
+                existing.append([label, pos])
+            elif not str(hit[0]).strip() and str(label).strip():
+                hit[0] = label  # 无标签轴线 → 升级为带标签
+    return agg
+
+
+def _is_grid_label(label: str) -> bool:
+    """真实轴号判定：纯数字(1,2,3…)、1–2 位字母(A,B,AA)、或分区号(1/A)。
+
+    去噪：滤掉说明文字/超长串等误分类为轴号的噪声（>3 字符且非上述形态）。
+    """
+    s = (label or "").strip()
+    if not s or len(s) > 3:
+        return False
+    if s.isdigit():
+        return True
+    if "/" in s and len(s) <= 3:
+        return True
+    if s.isalpha() and len(s) <= 2:
+        return True
+    return False
+
+
 def _axes_scene_payload(axes: dict | None, source_drawing_id: str | None) -> dict | None:
-    """配准参考轴网 → scene floor.axes 载荷；无带标签轴网返回 None。
+    """聚合轴网 → scene floor.axes 载荷；无带标签轴网返回 None。
 
     输出：{"x": [{"label","coord"}...], "y": [...], "source_drawing_id"}，
-    坐标为米（与构件同坐标系），仅收带标签轴线（未识别标签的轴线不进 scene）。
+    坐标为米（与构件同坐标系），仅收带标签且通过去噪的轴线，按坐标排序。
     """
     if not axes:
         return None
+
     def _entries(direction: str) -> list[dict]:
-        return [
-            {"label": str(label), "coord": round(float(pos), 3)}
+        out = [
+            {"label": str(label).strip(), "coord": round(float(pos), 3)}
             for label, pos in (axes.get(direction) or [])
-            if str(label or "").strip()
+            if _is_grid_label(str(label or ""))
         ]
+        return sorted(out, key=lambda e: e["coord"])
+
     x_entries = _entries("x")
     y_entries = _entries("y")
     if not x_entries and not y_entries:

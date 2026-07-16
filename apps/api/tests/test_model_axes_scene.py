@@ -49,6 +49,43 @@ async def test_build_floor_elements_carries_axes_in_meta(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_axes_aggregate_across_multiple_drawings(monkeypatch):
+    """跨该层多张图聚合轴网:第二张图补充第一张没有的轴线(同坐标系)。"""
+    calls = iter([
+        _recognize_result({"x": [("1", 0.0), ("2", 8.4)], "y": [("A", 0.0)],
+                           "elevations": []}),
+        _recognize_result({"x": [("1", 0.0), ("3", 16.8)], "y": [("B", 12.5)],
+                           "elevations": []}),
+    ])
+
+    async def _fake_recognize(*a, **k):
+        return next(calls, None)
+    monkeypatch.setattr(model_elements, "_recognize_one", _fake_recognize)
+
+    drawings = [
+        {"id": "d1", "title": "一层结构平面图", "discipline": "structure", "file_key": "a.pdf"},
+        {"id": "d2", "title": "一层梁配筋图", "discipline": "structure", "file_key": "b.pdf"},
+    ]
+    _e, _y, meta = await model_elements.build_floor_elements(None, drawings, lambda k: b"")
+
+    axes = meta["axes"]
+    x_labels = {e["label"] for e in axes["x"]}
+    y_labels = {e["label"] for e in axes["y"]}
+    # 两张图的轴线并集(1/2 来自第一张,3 来自第二张;A/B 各一张)
+    assert {"1", "2", "3"} <= x_labels
+    assert {"A", "B"} <= y_labels
+
+
+def test_axes_payload_denoises_junk_labels():
+    from services.model_elements import _axes_scene_payload
+    axes = {"x": [("1", 0.0), ("说明文字很长的噪声", 5.0), ("2", 8.4)], "y": []}
+    payload = _axes_scene_payload(axes, "d1")
+    labels = {e["label"] for e in payload["x"]}
+    assert "1" in labels and "2" in labels
+    assert "说明文字很长的噪声" not in labels  # 超长非轴号被去噪
+
+
+@pytest.mark.asyncio
 async def test_build_floor_elements_axes_absent_without_labels(monkeypatch):
     """无带轴号图时 meta 不携带 axes(前端判空不渲染)。"""
     unlabeled = {"x": [], "y": [], "elevations": []}
