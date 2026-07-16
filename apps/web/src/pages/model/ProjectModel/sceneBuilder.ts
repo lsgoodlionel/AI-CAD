@@ -73,6 +73,7 @@ export function pickDefaultViewMode(scene: ModelScene): ModelViewMode {
 
 // eslint-disable-next-line import/no-cycle -- elementsBuilder 仅引用本文件常量
 import {
+  buildFloorAxes,
   buildFloorElementMeshes,
   buildFloorShell,
   elementsBounds,
@@ -123,7 +124,8 @@ export interface BuiltSceneGraph {
   floorMeshes: THREE.Mesh[]
   drawingMeshes: THREE.Mesh[]
   /** V2 构件网格（userData.kind === 'element'） */
-  elementMeshes: THREE.Mesh[]
+  /** 构件对象（Mesh 为主;轴网层为 Group,统一按 userData.elementType 显隐） */
+  elementMeshes: THREE.Object3D[]
   /** 问题标记合批（InstancedMesh）；无可放置标记时为 null */
   markerInstances: MarkerInstances | null
   /** 楼层 key → 板片中心 Y 坐标 */
@@ -309,7 +311,7 @@ export function buildSceneGraph(scene: ModelScene): BuiltSceneGraph {
   const root = new THREE.Group()
   const floorMeshes: THREE.Mesh[] = []
   const drawingMeshes: THREE.Mesh[] = []
-  const elementMeshes: THREE.Mesh[] = []
+  const elementMeshes: THREE.Object3D[] = []
   const floorYByKey = new Map<string, number>()
   const renderElements = scene.schema_version === 2
 
@@ -367,6 +369,17 @@ export function buildSceneGraph(scene: ModelScene): BuiltSceneGraph {
           elementMeshes.push(shell)
           root.add(shell)
         }
+      }
+    }
+    // ── E2 轴网层（识别出的轴线+轴号，独立图层可开关；仅真实坐标模式）──
+    if (renderElements && realScale && bounds && floor.axes) {
+      const axesGroup = buildFloorAxes(
+        floor.axes, y, floor.key, 'main',
+        { center, storyHeight: storyH }, bounds,
+      )
+      if (axesGroup) {
+        elementMeshes.push(axesGroup)
+        root.add(axesGroup)
       }
     }
   })

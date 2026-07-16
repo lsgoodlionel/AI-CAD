@@ -99,12 +99,21 @@ export interface SceneElementStats {
   equipment: number
 }
 
+/** 楼层轴网（E2：配准参考轴网入 scene，坐标为米、与构件同坐标系） */
+export interface SceneFloorAxes {
+  x: { label: string; coord: number }[]
+  y: { label: string; coord: number }[]
+  source_drawing_id: string
+}
+
 /** V2 楼层：V1 字段全保留，追加 elements / element_stats / 真实标高 */
 export interface SceneFloorV2 extends SceneFloor {
   /** 图纸标高文本推导的真实标高（米）；无法确定时为 null */
   elevation_m?: number | null
   elements?: SceneFloorElements
   element_stats?: SceneElementStats
+  /** 楼层轴网（无带轴号图时为 null/缺省，前端判空不渲染） */
+  axes?: SceneFloorAxes | null
 }
 
 /** 单体（南区/北区/main…）；origin 后端恒 [0,0]，布局由前端计算 */

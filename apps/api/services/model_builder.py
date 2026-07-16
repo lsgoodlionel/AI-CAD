@@ -735,6 +735,8 @@ async def _attach_floor_elements(
             )
         floor["elements"] = elements
         floor["element_stats"] = model_elements.element_stats(elements)
+        # E2 轴网层：楼层配准参考轴网入 scene（前端「轴网」构件图层数据源）
+        floor["axes"] = meta.get("axes") or None
         floor["_elevation_candidates"] = meta.get("elevations") or []
         floor["_lod_registered_drawings"] = int(meta.get("registered") or 0)
         floor["_lod_evidence"] = (

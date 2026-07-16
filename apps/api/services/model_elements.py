@@ -440,6 +440,7 @@ async def build_floor_elements(
     elements: dict[str, list] = empty
     elevations: list[float] = []
     ref_axes: dict | None = None
+    ref_axes_drawing_id: str | None = None
     registered = 0
     for drawing, discipline, kinds in tasks:
         result = await _recognize_one(loop, executor, drawing, discipline, file_getter)
@@ -452,6 +453,7 @@ async def build_floor_elements(
         if _has_labeled_axes(axes):
             if ref_axes is None:
                 ref_axes = axes
+                ref_axes_drawing_id = str(drawing.get("id") or "")
             else:
                 dx, dy = register_offset(ref_axes, axes)
                 part = _shift_elements(part, dx, dy)
@@ -459,8 +461,34 @@ async def build_floor_elements(
         _merge_elements(elements, part, kinds)
 
     yolo_count = await _yolo_supplement(loop, executor, picked["mep"], elements, file_getter)
-    meta = {"elevations": sorted(set(elevations)), "registered": registered}
+    meta = {
+        "elevations": sorted(set(elevations)),
+        "registered": registered,
+        # E2 轴网层：配准参考轴网以 scene 格式带出（此前算完配准即弃）
+        "axes": _axes_scene_payload(ref_axes, ref_axes_drawing_id),
+    }
     return elements, yolo_count, meta
+
+
+def _axes_scene_payload(axes: dict | None, source_drawing_id: str | None) -> dict | None:
+    """配准参考轴网 → scene floor.axes 载荷；无带标签轴网返回 None。
+
+    输出：{"x": [{"label","coord"}...], "y": [...], "source_drawing_id"}，
+    坐标为米（与构件同坐标系），仅收带标签轴线（未识别标签的轴线不进 scene）。
+    """
+    if not axes:
+        return None
+    def _entries(direction: str) -> list[dict]:
+        return [
+            {"label": str(label), "coord": round(float(pos), 3)}
+            for label, pos in (axes.get(direction) or [])
+            if str(label or "").strip()
+        ]
+    x_entries = _entries("x")
+    y_entries = _entries("y")
+    if not x_entries and not y_entries:
+        return None
+    return {"x": x_entries, "y": y_entries, "source_drawing_id": source_drawing_id or ""}
 
 
 async def _yolo_supplement(
