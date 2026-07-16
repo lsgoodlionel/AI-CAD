@@ -18,6 +18,16 @@ from core.config import settings
 
 logger = logging.getLogger(__name__)
 
+
+def _task_db() -> databases.Database:
+    """单图任务专用小池连接。
+
+    asyncpg 池默认 min_size=10——扇出场景 8 并发 worker × 10 = 80+ 连接,
+    会打爆 PG max_connections(实测 too many clients)。单图任务串行查写,
+    1~2 条连接绰绰有余。
+    """
+    return databases.Database(settings.database_url, min_size=1, max_size=2)
+
 _SELECT_PROJECT_DRAWINGS = """
 SELECT id, project_id, file_key, title
 FROM drawings
@@ -82,7 +92,7 @@ def extract_project_drawing_info(self, project_id: str) -> dict:
 
 
 async def _fanout_project(project_id: str) -> dict:
-    db = databases.Database(settings.database_url)
+    db = _task_db()
     await db.connect()
     try:
         rows = [dict(r) for r in await db.fetch_all(
@@ -116,7 +126,7 @@ def extract_single_drawing_info(self, drawing_id: str, version: int | None = Non
 
 
 async def _do_extract_single(drawing_id: str, version: int | None = None) -> dict:
-    db = databases.Database(settings.database_url)
+    db = _task_db()
     await db.connect()
     try:
         row = await db.fetch_one(_SELECT_ONE_DRAWING, {"drawing_id": drawing_id})
