@@ -1,8 +1,11 @@
 # Phase E 升级蓝图与实施计划
 
-> 版本 V1.0 ｜ 2026-07-16 ｜ 状态:待评审
-> 范围:8 项需求(3 新功能 + 1 缺陷修复 + 3 验证优化 + 1 全局原则)
+> 版本 V2.0 ｜ 2026-07-16 ｜ 状态:执行中
+> 范围:8 项需求(3 新功能 + 1 缺陷修复 + 3 验证优化 + 1 全局原则)+ **架构主线升级:图纸信息档案层**
 > 事实基线:基于 main(含 Phase D)代码摸底 + 上海大歌剧院 2309 图实测数据(2026-07-15 重建,version 21)
+>
+> **V2 变更**:确立「图纸信息档案层」为全平台数据主线(见 §0.5)——把原 E1/E2/E4 收编成
+> 「抽取一次 · 单一真相源 · 人审在环 · 分层消费」一条主线;E0 已完成。
 
 ---
 
@@ -20,6 +23,82 @@
 | 8 | 通用型系统原则 | 📐 原则 | 贯穿全部 | — |
 
 **依赖关系**:E0 独立可立即做 → E1 的「抽取结果持久化基座」是 E2(轴网)和 E4(VLM/OCR 结果落库)的前提 → E3 建模增强消费 E1/E2 的数据并反哺工程信息。
+
+---
+
+## 0.5 架构主线:图纸信息档案层(V2 核心升级)
+
+> 本节是 V2 新增,确立整个 Phase E 的组织原则。原 8 项需求在此主线下各归其位。
+
+### 0.5.1 问题:读图信息各自为战、重复劳动、不一致
+
+V1 摸底暴露的根因不止「产物不落库」,更深的是**同一张图被多个消费方各自重复读**、且**人工修正无法回流**:
+
+- 建模对剖面图临时跑 OCR 取标高(`model_builder._section_levels_ocr_fallback`),**算完即弃**;
+- 工程信息(E1)对全部图跑 OCR 落 `drawing_extracted_info`;
+- 两者**重复 OCR 同一张图**,且建模那遍结果不落库、与工程信息页不一致;
+- 人工在 `model_story_manual`(标高)、`model_semantic_evidence`(语义)各改各的,**无统一入口、无法反哺建模标高/轴网**。
+
+### 0.5.2 方案:每图一份「信息档案」,做全平台单一真相源
+
+**核心原则:抽取一次 · 单一真相源 · 人审在环 · 分层消费。**
+
+图纸导入即抽取(OCR + VLM 读图 + 矢量文字 + 图签),整理成**每图一份信息档案**,固定入库、可查看、可人工复核修正;此后**工程信息、建模、审图、算量全部从档案读**,不再各自重跑。
+
+```
+ 导入图纸(单/批量/ZIP)
+      │ 完成事件(pipeline_events)
+      ▼
+┌──────────────────────────────────────────────────────┐
+│  档案层(Foundation)  ——  单一真相源                     │
+│  drawing_extracted_info(auto) + 人审修正(verified)        │
+│  抽取器:矢量文字 · OCR · VLM读图 · 文件名/图签             │
+│  档案状态:pending → extracting → ready → reviewed          │
+└──────────────────────────────────────────────────────┘
+      │  稳定读取契约(生效值:verified > 高置信 auto)
+      ├────────────┬─────────────┬────────────┐
+      ▼            ▼             ▼            ▼
+   工程信息页    建模            审图         算量
+  (查看/复核)  (标高/轴网/     (依据档案     (量基于
+                语义 从档案读)   信息核查)     确认的模型)
+      │ 人审修正回写档案 │  档案 verified 变更 → pipeline_events → 增量重建
+      └─────────────────┘
+```
+
+### 0.5.3 四个关键设计决策(已拍板)
+
+**① 导入即抽取 → 异步 + 档案状态机**
+OCR 单图 10–30s,批量导入不可同步阻塞上传。档案状态:
+`pending(刚导入) → extracting(抽取中) → ready(自动完成) → reviewed(人工核过)`。
+上传秒返回,档案后台填充(复用 E1 扇出任务模式)。
+
+**② 人审修正层:auto 与 verified 分离,verified 永远赢且不被重抽覆盖**(正确性地基)
+每条信息带 `source ∈ {auto, verified}` + `is_active`。人工修正写 verified 并置原 auto 行 `is_active=false`(**留痕:AI 原读成啥 / 人改成啥,供审图追责**)。**生效值 = verified 优先,其次按 confidence 排的 active auto**。下游只读生效值,永不见脏值。重抽只覆盖 auto 行,verified 不动。
+
+**③ 单一真相源消费契约:下游通过稳定 API 读档案,不碰抽取器**
+```
+GET /drawings/{id}/archive               → 单图完整档案(生效值 + 状态)
+GET /projects/{id}/archive/elevations    → 全项目生效标高(建模 section-z 读此,不再自跑 OCR)
+GET /projects/{id}/archive/axes          → 全项目生效轴网(轴网层/配准读此)
+```
+
+**④ 档案粒度:per-drawing 档案是「聚合视图」,不新增重复存储**
+`drawing_extracted_info` 行级表继续做底座;「一张图一份档案」= 按 drawing_id 聚合 + 合并 verified 后的呈现层。
+
+### 0.5.4 事件驱动的顺序推进(综合建模→审图→算量)
+
+人在工程信息页改一条标高 → 写 verified → 触发 `pipeline_events`(migration 027 已有)→ 建模增量重建 → 算量/审图跟随更新。这就是「综合建模、综合审图、算量一系列顺序推进」的落地机制。
+
+### 0.5.5 现状对照:基座已有 ~60%,散着待收敛
+
+| 能力 | 现状 | 缺口 |
+|------|------|------|
+| 每图信息档案表 | ✅ `drawing_extracted_info`(E1) | per-item 行,缺人审层 + 档案状态 + 聚合视图 |
+| 导入即触发 | ⚠️ 手动 `POST /info/extract` | 挂到上传/批量导入完成事件 |
+| 人工复核修正 | ⚠️ 散在 `model_story_manual`/`model_semantic_evidence`/标注队列 | 收敛到档案层统一入口 |
+| 事件驱动下游重建 | ✅ `pipeline_events`(027) | 接「档案 verified 变更 → 重建」 |
+| 建模消费档案 | ❌ 建模自跑 OCR | **E2-consume 核心改造** |
+| VLM 读图入档案 | ⚠️ 仅喂 section-z | schema 已留 `extractor='vlm'`,接上落档 |
 
 ---
 
@@ -251,24 +330,73 @@ floor.axes = { "x": [{"label":"1","coord":0.0},...], "y": [{"label":"A","coord":
 
 ---
 
-## 8. 实施排期与里程碑
+## 8. 实施排期与里程碑(V2 重排:档案层为主线)
 
-| 阶段 | 泳道 | 内容 | 预估 | 前置 |
+| 阶段 | 泳道 | 内容 | 预估 | 状态 |
 |------|------|------|------|------|
-| W1 上 | E0 | 500 修复 + OCR 入镜像 | 1d | — |
-| W1 | E1-1/2 | 抽取持久化基座 + 工程信息 API | 2d | E0-2 |
-| W1 下~W2 上 | E1-3/4 | 工程信息前端 + 全站预览组件 | 3d | E1-2 |
-| W2 | E2 | 轴网 scene 数据 + 3D 渲染显隐 | 2d | E1-1 |
-| W2 下 | E4-1 | OCR 评测调优 | 2d | E0-2, E1-1 |
-| W3~W4 上 | E3 | 建模覆盖增强(审计→分类法→外墙→立面→板→验证) | 10d | E1-1(双写) |
-| W4 | E4-2 | VLM 批测与路由调优 | 2d | E0-1(看板) |
-| W4 末 | 收口 | 歌剧院全链路回归 + 手册/评测文档更新 + 验收 Demo | 1d | 全部 |
+| E0 | 缺陷+OCR | 健康看板 500 修复 + OCR 入镜像(RapidOCR) | 1d | ✅ 完成 |
+| E1 | 档案存储底座 | `drawing_extracted_info` + 抽取编排 + 工程信息 API/页 + 全站预览 | 5d | ✅ 完成 |
+| **E1.5** | **档案层升级(V2 新增)** | ①人审 verified 层(migration 030)②导入即触发抽取 ③档案读取契约 API(archive/elevations/axes)④工程信息页人审修正 UI | 2.5d | ⏳ 进行中 |
+| **E2-consume** | **建模消费档案** | 建模 section-z 标高/轴网改从档案读(去重,不再自跑 OCR);轴网 3D 显隐(前端已完成) | 2d | ⏳ 后端待改 |
+| **E-pipeline** | **事件驱动** | 档案 verified 变更 → `pipeline_events` → 建模增量重建 → 算量/审图跟随 | 1d | 待做 |
+| E3 | 建模覆盖增强 | 审计→分类法(幕墙/钢构)→外墙闭合→立面进管线→板恢复→验证 | 10d | 待做 |
+| E4 | OCR/VLM 评测 | OCR 调优 + VLM 本地/远程批测(VLM 作为档案的一个抽取器落档) | 4d | 待做 |
+| 收口 | 全链路回归 | 歌剧院档案→建模→审图→算量全链路 + 手册/评测文档 + 验收 Demo | 1d | 待做 |
 
 **里程碑**:
-- **M-E1**(W2 末):工程信息模块上线,任意图纸信息可溯源可预览;轴网可显隐。
-- **M-E2**(W4 末):歌剧院模型覆盖指标达标(§5 验收);OCR/VLM 评测报告落档;健康看板零 500。
+- **M-E1**(已达成):工程信息模块上线,任意图纸信息可溯源可预览;轴网前端可显隐。
+- **M-E-archive**(E1.5+E2-consume 完成):图纸导入即建档案 → 人工可复核修正 → 建模/工程信息/审图/算量共用同一档案单一真相源;OCR 不再重复劳动;人审标高反哺建模。
+- **M-E2**(E3/E4 完成):歌剧院模型覆盖指标达标(§5 验收);OCR/VLM 评测报告落档;健康看板零 500。
 
 **测试要求**(全局约定):TDD,新增代码 80%+ 覆盖;migration 幂等(IF NOT EXISTS);三审状态机等既有边界不动。
+
+---
+
+## 8.5 档案层实施细则(E1.5 / E2-consume,V2 新增)
+
+### E1.5-1 人审 verified 层(migration 030)
+
+在 `drawing_extracted_info` 增列(幂等 ALTER):
+```sql
+ALTER TABLE drawing_extracted_info
+  ADD COLUMN IF NOT EXISTS source_kind VARCHAR(10) NOT NULL DEFAULT 'auto',  -- auto | verified
+  ADD COLUMN IF NOT EXISTS is_active   BOOLEAN     NOT NULL DEFAULT true,     -- 被 verified 推翻的 auto 行置 false 留痕
+  ADD COLUMN IF NOT EXISTS reviewed_by UUID,
+  ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS supersedes  UUID;   -- verified 行指向它修正的 auto 行(可回溯 AI 原值)
+```
+新增 `drawing_archive_status` 表(每图档案状态机):
+```sql
+CREATE TABLE IF NOT EXISTS drawing_archive_status (
+  drawing_id UUID PRIMARY KEY REFERENCES drawings(id) ON DELETE CASCADE,
+  project_id UUID NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'pending',  -- pending|extracting|ready|reviewed
+  extractors_done JSONB, extraction_version INT, updated_at TIMESTAMPTZ DEFAULT now()
+);
+```
+**生效值规则**(所有读取契约统一):同 (drawing_id, category, 归一化 key) 取 `source_kind='verified'` 优先,否则 `is_active AND source_kind='auto'` 里 confidence 最高。重抽只 upsert auto 行(先删旧 auto、保留 verified)。
+
+### E1.5-2 导入即触发抽取
+
+`routers/drawings.py` 上传/批量/ZIP 导入成功后,对每条新 drawing 发 `extract_single_drawing_info.delay(id)`(已有任务);置 `drawing_archive_status=pending→extracting`。**已导入的存量图**用一次性 `extract_project_drawing_info` 扇出回填(歌剧院 2309 图)。
+
+### E1.5-3 档案读取契约 API
+
+`routers/drawing_archive.py`(新):
+- `GET /drawings/{id}/archive` — 单图档案(生效值 by category + 状态 + 有无人审)
+- `GET /projects/{id}/archive/elevations` — 生效标高列表(建模消费)
+- `GET /projects/{id}/archive/axes` — 生效轴网(建模/配准消费)
+- `POST /drawings/{id}/archive/verify` — 人审修正:写 verified 行 + 置原 auto `is_active=false` + audit + 发 `pipeline_events`(档案变更)
+
+### E1.5-4 工程信息页人审修正 UI
+
+工程信息明细表每行加「修正」入口(改值/确认/否定),写 `/archive/verify`;verified 行高亮「已人工核对」。
+
+### E2-consume 建模改读档案
+
+- `model_builder._recover_section_z`:从 `GET archive/elevations`(生效标高)读,**删除 `_section_levels_ocr_fallback` 自跑 OCR 分支**(档案已含 OCR 结果);无档案时优雅降级回原矢量路径(向后兼容未建档项目)。
+- `cross_view_registration`:轴号锚点从 `archive/axes` 读。
+- 效果:建模不再为 OCR 卡 1–2 小时(查库 ms 级);建模标高 = 工程信息页所见;人审修正即时反哺。
 
 ---
 
