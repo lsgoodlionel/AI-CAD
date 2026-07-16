@@ -697,27 +697,44 @@ async def _fetch_inputs(db, project_id: str) -> tuple[dict, list[dict], dict, di
     return dict(project), drawings, issues_by_drawing, cross
 
 
-async def _load_archive_axes(db, project_id: str) -> tuple[dict, dict]:
-    """取档案轴号(按 drawing 分组)+ 每图坐标变换;任一缺失返回 ({},{})（降级）。"""
+async def _load_archive_axes(db, project_id: str) -> tuple[dict, dict, dict]:
+    """取档案轴号 + 构件类型标签文字(按 drawing 分组)+ 每图坐标变换。
+
+    返回 (axes_by_drawing, text_by_drawing, transforms);任一缺失返回 ({},{},{})降级。
+    - axes_by_drawing：category='axis'(A2 轴号升级)
+    - text_by_drawing：category∈room_name/other/level_name(C-下一步 构件类型标签)
+    """
     try:
-        from services.drawing_archive import fetch_project_category
+        from services.drawing_archive import (
+            fetch_project_categories,
+            fetch_project_category,
+        )
         from services.drawing_transform import fetch_project_transforms
 
         axis_items = await fetch_project_category(db, project_id, "axis")
-        by_drawing: dict[str, list] = {}
+        axes_by_drawing: dict[str, list] = {}
         for item in axis_items:
-            by_drawing.setdefault(str(item.get("drawing_id")), []).append(item)
+            axes_by_drawing.setdefault(str(item.get("drawing_id")), []).append(item)
+
+        text_items = await fetch_project_categories(
+            db, project_id, ["room_name", "other", "level_name"]
+        )
+        text_by_drawing: dict[str, list] = {}
+        for item in text_items:
+            text_by_drawing.setdefault(str(item.get("drawing_id")), []).append(item)
+
         transforms = await fetch_project_transforms(db, project_id)
-        return by_drawing, transforms
+        return axes_by_drawing, text_by_drawing, transforms
     except Exception as exc:  # noqa: BLE001 — 档案/变换不可用则不增强,识别路径照旧
-        logger.info("[ModelBuilder] 档案轴号加载跳过(降级识别路径): %s", exc)
-        return {}, {}
+        logger.info("[ModelBuilder] 档案数据加载跳过(降级识别路径): %s", exc)
+        return {}, {}, {}
 
 
 async def _attach_floor_elements(
     floors: list[dict], drawings: list[dict], floor_of: dict[str, str],
     progress_cb=None,
     archive_axes_by_drawing: dict | None = None, transforms: dict | None = None,
+    archive_text_by_drawing: dict | None = None,
 ) -> int:
     """为每楼层识别构件（V2）：floor 增 elements/element_stats；返回 YOLO 设备数。"""
     drawings_by_floor: dict[str, list[dict]] = {}
@@ -745,7 +762,7 @@ async def _attach_floor_elements(
         try:
             elements, yolo_count, meta = await model_elements.build_floor_elements(
                 _executor, floor_drawings, get_file_bytes,
-                archive_axes_by_drawing, transforms,
+                archive_axes_by_drawing, transforms, archive_text_by_drawing,
             )
         except Exception as exc:  # noqa: BLE001 — 构件层失败回退贴图
             logger.warning("[ModelBuilder] 楼层构件识别失败 %s: %s", floor["key"], exc)
@@ -1394,11 +1411,12 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     )
     assets, ifc_models, ifc_skipped = await _build_assets(project_id, drawings, progress_cb)
     floors, floor_of = _build_floors(drawings, issues_by_drawing, assets, normalization)
-    # A2：取档案轴号(好标签)+ 每图坐标变换,供构件层升级识别轴网标签/补覆盖。
-    archive_axes_by_drawing, transforms = await _load_archive_axes(db, project_id)
+    # A2/C-下一步：取档案轴号 + 构件类型标签文字 + 每图坐标变换。
+    archive_axes_by_drawing, archive_text_by_drawing, transforms = \
+        await _load_archive_axes(db, project_id)
     yolo_total = await _attach_floor_elements(
         floors, drawings, floor_of, progress_cb,
-        archive_axes_by_drawing, transforms,
+        archive_axes_by_drawing, transforms, archive_text_by_drawing,
     )
     _clip_elements_to_envelope(floors)  # 裁掉离群构件(机电比例错误致管线冲到数千米)
     # B-07：剖面/详图截面回填构件（实测覆盖硬编码默认；无标注时全默认→无副作用）。

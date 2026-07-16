@@ -194,3 +194,23 @@ async def fetch_project_category(db: Any, project_id: str, category: str) -> lis
         _FETCH_PROJECT_CATEGORY_SQL, {"project_id": project_id, "category": category}
     )]
     return effective_values(rows)
+
+
+_FETCH_PROJECT_CATEGORIES_SQL = """
+SELECT dei.id, dei.drawing_id, dei.category, dei.content, dei.value_json,
+       dei.location_json, dei.extractor, dei.confidence,
+       dei.source_kind, dei.is_active, dei.supersedes_key
+FROM drawing_extracted_info dei
+WHERE dei.project_id = :project_id AND dei.category = ANY(:categories)
+"""
+
+
+async def fetch_project_categories(
+    db: Any, project_id: str, categories: list[str],
+) -> list[dict]:
+    """全项目多类别生效值(建模消费:构件类型标签取 room_name/other 等)。"""
+    rows = [_coerce_row(r) for r in await db.fetch_all(
+        _FETCH_PROJECT_CATEGORIES_SQL,
+        {"project_id": project_id, "categories": categories},
+    )]
+    return effective_values(rows)

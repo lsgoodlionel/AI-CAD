@@ -36,13 +36,21 @@ export interface SceneFloor {
 export type ElementPoint = number[]
 
 /** 柱：真实轮廓挤出 */
-export interface ElementColumn {
+/** 构件类型标签(C-下一步:档案 OCR 文字反哺,如 steel/curtain_wall/pile) */
+export interface ComponentTypeLabel {
+  /** steel | curtain_wall | pile | diaphragm_wall | retaining_wall | exterior_wall */
+  type_label?: string
+  /** 原始 OCR 文本(如"钢立柱"/"幕墙") */
+  type_text?: string
+}
+
+export interface ElementColumn extends ComponentTypeLabel {
   outline: ElementPoint[]
   src: string
 }
 
 /** 墙：中线 path + 墙厚 */
-export interface ElementWall {
+export interface ElementWall extends ComponentTypeLabel {
   path: ElementPoint[]
   width: number
   src: string

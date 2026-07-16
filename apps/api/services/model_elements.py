@@ -447,6 +447,7 @@ def _merge_elements(target: dict[str, list], parts: dict | None, kinds: tuple[st
 async def build_floor_elements(
     executor, floor_drawings: list[dict], file_getter: Callable[[str], bytes],
     archive_axes_by_drawing: dict | None = None, transforms: dict | None = None,
+    archive_text_by_drawing: dict | None = None,
 ) -> tuple[dict[str, list], int, dict]:
     """构建单楼层 elements（识别 → 轴号配准 → 合并 + YOLO 补充）。
 
@@ -492,6 +493,12 @@ async def build_floor_elements(
             if arch_items:
                 arch = archive_axes_to_scene(arch_items, transforms[did])
                 axes = _merge_axes(dict(axes), arch)
+        # C-下一步：按位置给本图构件附类型标签(钢构/幕墙/围护桩;OCR 短标签
+        # 经该图变换转米就近关联,与构件同坐标系;配准前处理,标签随构件平移)
+        if archive_text_by_drawing and transforms and did in transforms:
+            text_items = archive_text_by_drawing.get(did) or []
+            if text_items:
+                part = _attach_component_type_labels(part, text_items, transforms[did])
         # 轴号配准：以本层首张带轴号的图为参考系，其余图按共有轴号平移对齐
         if _has_labeled_axes(axes):
             if ref_axes is None:
@@ -544,6 +551,21 @@ def _merge_axes(agg: dict | None, new: dict) -> dict:
             elif not str(hit[0]).strip() and str(label).strip():
                 hit[0] = label  # 无标签轴线 → 升级为带标签
     return agg
+
+
+def _attach_component_type_labels(part: dict, text_items: list[dict], transform) -> dict:
+    """C-下一步:档案短标签 → 构件类型,就近关联到本图构件(失败返回原 part)。"""
+    try:
+        from core.model3d.component_labels import (
+            attach_type_labels,
+            classify_component_labels,
+        )
+        labels = classify_component_labels(text_items, transform)
+        if not labels:
+            return part
+        return attach_type_labels(part, labels)
+    except Exception:  # noqa: BLE001 — 类型标签失败不影响几何构件
+        return part
 
 
 def archive_axes_to_scene(archive_items: list[dict], transform) -> dict:
