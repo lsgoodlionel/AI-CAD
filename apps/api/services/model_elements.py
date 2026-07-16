@@ -115,7 +115,48 @@ def _recognize_sync(
         elements["columns"] = _augment_circle_columns(
             data, geom, elements.get("columns") or [], drawing_id
         )
+        # E3-4:桩增强后若无板,用桩包络补底板(基坑楼层得到板参与体量/算量)
+        elements["slabs"] = ensure_slab_from_columns(
+            elements.get("columns") or [], elements.get("slabs") or []
+        )
     return {"elements": elements, "axes": result.axes}
+
+
+# 桩包络补板参数(米):足量柱/桩才补,外扩边距,最小面积
+_SLAB_FROM_PILES_MIN = 8
+_SLAB_ENVELOPE_MARGIN_M = 1.0
+_SLAB_MIN_AREA_M2 = 10.0
+_PILE_SLAB_THICKNESS_M = 0.5   # 基坑底板偏厚
+
+
+def ensure_slab_from_columns(
+    columns: list[dict], existing_slabs: list[dict],
+) -> list[dict]:
+    """E3-4:该图有大量柱/桩却无板时,用柱/桩包络补一块底板(基坑楼层)。
+
+    已有板则原样返回(不覆盖识别结果)。纯函数,离线可测。
+    """
+    if existing_slabs:
+        return existing_slabs
+    pts: list[tuple[float, float]] = []
+    for col in columns:
+        for p in col.get("outline") or []:
+            if len(p) >= 2:
+                pts.append((float(p[0]), float(p[1])))
+    if len(columns) < _SLAB_FROM_PILES_MIN or len(pts) < 3:
+        return existing_slabs
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    m = _SLAB_ENVELOPE_MARGIN_M
+    x0, x1, y0, y1 = min(xs) - m, max(xs) + m, min(ys) - m, max(ys) + m
+    if (x1 - x0) * (y1 - y0) < _SLAB_MIN_AREA_M2:
+        return existing_slabs
+    return [{
+        "outline": [[round(x0, 3), round(y0, 3)], [round(x1, 3), round(y0, 3)],
+                    [round(x1, 3), round(y1, 3)], [round(x0, 3), round(y1, 3)]],
+        "thickness": _PILE_SLAB_THICKNESS_M,
+        "src": "piles-envelope",
+    }]
 
 
 def _augment_circle_columns(
