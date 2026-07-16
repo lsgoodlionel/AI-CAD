@@ -175,9 +175,17 @@ def extract_drawing_info(
     return build_info_items(geom=geom, ocr=ocr_result, filename=filename)
 
 
-# ── 持久化仓储(先删后插幂等) ─────────────────────────────────────
+# ── 持久化仓储(重抽只覆盖 auto 行,保留人审 verified) ───────────────
+#
+# 关键:重抽绝不能冲掉人工 verified 修正(档案层单一真相源正确性地基,
+# 见蓝图 §0.5 决策②)。故只删本图 source_kind='auto' 的行,verified 保留;
+# 且删除的是 active auto——被 verified 经 supersedes 置为 is_active=false 的
+# auto 也一并清掉(它们已被人审推翻,重抽的新 auto 会重新落 active)。
 
-_DELETE_SQL = "DELETE FROM drawing_extracted_info WHERE drawing_id = :drawing_id"
+_DELETE_SQL = (
+    "DELETE FROM drawing_extracted_info "
+    "WHERE drawing_id = :drawing_id AND source_kind = 'auto'"
+)
 
 _INSERT_SQL = """
 INSERT INTO drawing_extracted_info (

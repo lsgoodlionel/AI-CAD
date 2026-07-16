@@ -27,16 +27,33 @@ def _row(**kw):
 # ── 生效值规则 ───────────────────────────────────────────────────
 
 def test_verified_wins_over_auto():
-    # 人工把 auto 'a'(-2.35)修正为 -2.40:verified 经 supersedes 抑制被改的 auto
+    # 人工把 auto 'a'(-2.35)修正为 -2.40:verified 带被改值的 supersedes_key 抑制 auto
     rows = [
         _row(id="a", value_json={"elevation_m": -2.35}, confidence=0.99, source_kind="auto"),
         _row(id="v", value_json={"elevation_m": -2.40}, source_kind="verified",
-             confidence=None, supersedes="a"),
+             confidence=None, supersedes="a",
+             supersedes_key=normalized_key("elevation", "-2.350", {"elevation_m": -2.35})),
     ]
     eff = effective_values(rows)
     assert len(eff) == 1
     assert eff[0]["id"] == "v"
     assert eff[0]["value_json"]["elevation_m"] == -2.40
+
+
+def test_verified_suppresses_regenerated_auto_by_key():
+    # 重抽后场景:人工把 -2.35 改成 -2.40(verified 带 supersedes_key),
+    # 重抽又生成新 auto(-2.35, 新 id)。verified 应按 key 抑制复活的 -2.35。
+    verified_key = normalized_key("elevation", "-2.350", {"elevation_m": -2.35})
+    rows = [
+        _row(id="new_auto", value_json={"elevation_m": -2.35}, confidence=0.99,
+             source_kind="auto"),  # 重抽复活的
+        {"id": "v", "drawing_id": "d1", "category": "elevation", "content": "-2.400",
+         "value_json": {"elevation_m": -2.40}, "extractor": "manual", "confidence": None,
+         "source_kind": "verified", "is_active": True, "supersedes_key": verified_key},
+    ]
+    eff = effective_values(rows)
+    assert len(eff) == 1
+    assert eff[0]["id"] == "v"
 
 
 def test_verified_same_value_dedups_with_auto():

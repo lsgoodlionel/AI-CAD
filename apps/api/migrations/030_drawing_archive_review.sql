@@ -18,11 +18,12 @@
 
 -- ① drawing_extracted_info 增人审列（向后兼容：既有行全为 auto/active）
 ALTER TABLE drawing_extracted_info
-    ADD COLUMN IF NOT EXISTS source_kind VARCHAR(10) NOT NULL DEFAULT 'auto',   -- auto | verified
-    ADD COLUMN IF NOT EXISTS is_active   BOOLEAN     NOT NULL DEFAULT true,      -- 被 verified 推翻的 auto 行置 false
-    ADD COLUMN IF NOT EXISTS reviewed_by UUID,                                   -- 人审操作人
-    ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ,                            -- 人审时间
-    ADD COLUMN IF NOT EXISTS supersedes  UUID;                                   -- verified 行 → 它修正的 auto 行 id
+    ADD COLUMN IF NOT EXISTS source_kind    VARCHAR(10) NOT NULL DEFAULT 'auto', -- auto | verified
+    ADD COLUMN IF NOT EXISTS is_active      BOOLEAN     NOT NULL DEFAULT true,    -- 被 verified 推翻的 auto 行置 false
+    ADD COLUMN IF NOT EXISTS reviewed_by    UUID,                                -- 人审操作人
+    ADD COLUMN IF NOT EXISTS reviewed_at    TIMESTAMPTZ,                          -- 人审时间
+    ADD COLUMN IF NOT EXISTS supersedes     UUID,                                -- verified 行 → 它修正的 auto 行 id(留痕)
+    ADD COLUMN IF NOT EXISTS supersedes_key VARCHAR(200);                        -- 被修正值的归一化 key(跨重抽稳定,抑制复活)
 
 -- 生效值查询主路径：项目 + 类别 + 仅生效行
 CREATE INDEX IF NOT EXISTS idx_dei_active

@@ -43,18 +43,23 @@ def effective_values(rows: list[dict]) -> list[dict]:
     - verified 优先,其次 confidence 最高的 active auto。
     输入顺序不敏感;输出保持每组首次出现顺序。
     """
-    # verified 行经 supersedes 抑制它修正的 auto 行（即便该 auto 的 is_active
-    # 因故未置假,也不让脏值参与择优——人审意图以 supersedes 链接为准）
-    superseded = {
-        row.get("supersedes") for row in rows
-        if row.get("source_kind") == "verified" and row.get("supersedes")
-    }
+    # verified 抑制它修正的 auto:按「被修正值的归一化 key」抑制(supersedes_key),
+    # 而非按 auto 行 id——id 在重抽时会变(删旧 auto 插新 auto),key 跨重抽稳定,
+    # 从而人审「把 -2.35 改成 -2.40」在重抽后仍抑制复活的 -2.35(蓝图 §0.5 决策②)。
+    suppressed_keys: set[tuple[str, str]] = set()
+    for row in rows:
+        if row.get("source_kind") == "verified" and row.get("supersedes_key"):
+            suppressed_keys.add((row["category"], row["supersedes_key"]))
     best: dict[tuple[str, str], dict] = {}
     order: list[tuple[str, str]] = []
     for row in rows:
         if not row.get("is_active", True):
             continue
-        if row.get("id") in superseded:
+        row_key = normalized_key(
+            row["category"], row.get("content", ""), row.get("value_json")
+        )
+        # auto 行若其 key 被某个 verified 标记为「已修正掉」,则抑制(防复活)
+        if row.get("source_kind") == "auto" and (row["category"], row_key) in suppressed_keys:
             continue
         key = (row["category"], normalized_key(
             row["category"], row.get("content", ""), row.get("value_json")
@@ -74,8 +79,19 @@ def build_verify_params(
     content: str, value_json: dict | None,
     supersedes_id: str | None, reviewer_id: str,
     location_json: dict | None = None,
+    superseded_content: str | None = None,
+    superseded_value_json: dict | None = None,
 ) -> dict:
-    """构造人审修正的落库参数:一条 verified 插入 + 可选置原 auto 行失活。"""
+    """构造人审修正的落库参数:一条 verified 插入 + 可选置原 auto 行失活。
+
+    superseded_content/value_json:被修正的原 auto 行的原值,用于算出稳定的
+    supersedes_key(跨重抽抑制复活)。仅「确认」(无原值/同值)时可省。
+    """
+    supersedes_key = None
+    if supersedes_id and superseded_content is not None:
+        supersedes_key = normalized_key(
+            category, superseded_content, superseded_value_json
+        )
     return {
         "insert": {
             "project_id": project_id,
@@ -91,6 +107,7 @@ def build_verify_params(
             "source_kind": "verified",
             "is_active": True,
             "supersedes": supersedes_id,
+            "supersedes_key": supersedes_key,
             "reviewed_by": reviewer_id,
         },
         "deactivate_id": supersedes_id,
@@ -107,12 +124,13 @@ _INSERT_VERIFIED_SQL = """
 INSERT INTO drawing_extracted_info (
     project_id, drawing_id, category, content,
     value_json, location_json, extractor, confidence,
-    source_kind, is_active, supersedes, reviewed_by, reviewed_at, extraction_version
+    source_kind, is_active, supersedes, supersedes_key,
+    reviewed_by, reviewed_at, extraction_version
 )
 VALUES (
     :project_id, :drawing_id, :category, :content,
     CAST(:value_json AS jsonb), CAST(:location_json AS jsonb), :extractor, :confidence,
-    :source_kind, :is_active, :supersedes, :reviewed_by, now(), 1
+    :source_kind, :is_active, :supersedes, :supersedes_key, :reviewed_by, now(), 1
 )
 """
 
@@ -128,7 +146,7 @@ async def persist_verify(db: Any, params: dict) -> None:
 
 _FETCH_DRAWING_ROWS_SQL = """
 SELECT id, drawing_id, category, content, value_json, location_json,
-       extractor, confidence, source_kind, is_active
+       extractor, confidence, source_kind, is_active, supersedes_key
 FROM drawing_extracted_info
 WHERE drawing_id = :drawing_id
 """
@@ -136,7 +154,7 @@ WHERE drawing_id = :drawing_id
 _FETCH_PROJECT_CATEGORY_SQL = """
 SELECT dei.id, dei.drawing_id, dei.category, dei.content, dei.value_json,
        dei.location_json, dei.extractor, dei.confidence,
-       dei.source_kind, dei.is_active,
+       dei.source_kind, dei.is_active, dei.supersedes_key,
        d.drawing_no, d.title AS drawing_title, d.discipline
 FROM drawing_extracted_info dei
 JOIN drawings d ON d.id = dei.drawing_id
