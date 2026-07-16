@@ -10,6 +10,7 @@ import {
 import { listDrawings, createReviewBatch } from '@/services/drawings'
 import type { CreateReviewBatchResult } from '@/services/drawings'
 import { listProjects } from '@/services/projects'
+import DrawingPreviewModal from '@/components/DrawingPreviewModal'
 import UploadWizard, { DISCIPLINE_OPTIONS, DISCIPLINE_LABEL, extractErrorMessage } from './UploadWizard'
 
 const STATUS_MAP: Record<string, { color: string; text: string }> = {
@@ -62,6 +63,7 @@ export default function DrawingList() {
   const [uploadOpen, setUploadOpen] = useState(false)
   const [selectedRows, setSelectedRows] = useState<DrawingRow[]>([])
   const [projects, setProjects] = useState<ProjectOption[]>([])
+  const [preview, setPreview] = useState<{ id: string; title: string } | null>(null)
 
   useEffect(() => {
     listProjects({ limit: 200 }).then((res: { items?: ProjectOption[] }) =>
@@ -154,16 +156,28 @@ export default function DrawingList() {
     },
     {
       title: '操作',
-      width: 80,
+      width: 140,
       search: false,
       render: (_, row) => (
-        <Button
-          type="link"
-          icon={<EyeOutlined />}
-          onClick={() => navigate(`/drawings/${row.id}`)}
-        >
-          查看
-        </Button>
+        <>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() =>
+              setPreview({ id: row.id, title: `${row.drawing_no} ${row.title}` })
+            }
+          >
+            预览
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => navigate(`/drawings/${row.id}`)}
+          >
+            详情
+          </Button>
+        </>
       ),
     },
   ]
@@ -285,6 +299,12 @@ export default function DrawingList() {
         projectSelectOptions={projectSelectOptions}
         onClose={() => setUploadOpen(false)}
         onUploaded={() => actionRef.current?.reload()}
+      />
+
+      <DrawingPreviewModal
+        drawingId={preview?.id ?? null}
+        title={preview?.title}
+        onClose={() => setPreview(null)}
       />
     </div>
   )
