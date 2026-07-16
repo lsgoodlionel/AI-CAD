@@ -10,10 +10,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { history, useParams } from '@umijs/max'
 import {
-  Alert, Button, Card, Col, Empty, Input, Menu, Progress, Row, Select,
-  Space, Spin, Table, Tag, Tooltip, Typography, message,
+  Alert, Button, Card, Col, Empty, Input, InputNumber, Menu, Modal, Progress, Row,
+  Select, Space, Spin, Table, Tag, Tooltip, Typography, message,
 } from 'antd'
-import { EyeOutlined, SyncOutlined } from '@ant-design/icons'
+import { CheckOutlined, EditOutlined, EyeOutlined, SyncOutlined } from '@ant-design/icons'
 import { listProjects } from '@/services/projects'
 import {
   INFO_CATEGORY_LABEL,
@@ -21,6 +21,7 @@ import {
   getInfoSummary,
   listInfoItems,
   triggerInfoExtract,
+  verifyArchiveItem,
 } from '@/services/projectInfo'
 import type { InfoItem, InfoSummary } from '@/services/projectInfo'
 import DrawingPreviewModal from '@/components/DrawingPreviewModal'
@@ -98,6 +99,10 @@ function InfoWorkspace({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(false)
   const [extracting, setExtracting] = useState(false)
   const [preview, setPreview] = useState<{ id: string; title: string } | null>(null)
+  const [editing, setEditing] = useState<InfoItem | null>(null)
+  const [editContent, setEditContent] = useState('')
+  const [editValue, setEditValue] = useState<number | null>(null)
+  const [saving, setSaving] = useState(false)
 
   const loadSummary = useCallback(() => {
     getInfoSummary(projectId)
@@ -134,6 +139,39 @@ function InfoWorkspace({ projectId }: { projectId: string }) {
       message.error('触发重抽失败')
     } finally {
       setExtracting(false)
+    }
+  }
+
+  // ── 人审:确认(不改值)/修正(改值)→ 写 verified,触发建模增量重建 ──
+  const isNumericCategory = (cat: string) => cat === 'elevation' || cat === 'dimension'
+  const valueKey = (cat: string) => (cat === 'elevation' ? 'elevation_m' : 'dim_mm')
+
+  const openEdit = (item: InfoItem) => {
+    setEditing(item)
+    setEditContent(item.content)
+    const vj = item.value_json as Record<string, number> | null
+    setEditValue(vj ? (vj[valueKey(item.category)] ?? null) : null)
+  }
+
+  const submitVerify = async (item: InfoItem, content: string, value: number | null) => {
+    setSaving(true)
+    try {
+      const value_json = isNumericCategory(item.category) && value != null
+        ? { [valueKey(item.category)]: value }
+        : item.value_json
+      await verifyArchiveItem(item.drawing_id, {
+        category: item.category,
+        content,
+        value_json,
+        supersedes_id: item.id,
+      })
+      message.success('已记录人工核对,建模/审图将采用修正值')
+      setEditing(null)
+      loadItems()
+    } catch {
+      message.error('提交修正失败')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -184,11 +222,17 @@ function InfoWorkspace({ projectId }: { projectId: string }) {
     {
       title: '来源',
       dataIndex: 'extractor',
-      width: 110,
+      width: 120,
       render: (v: string, row: InfoItem) => (
         <Space direction="vertical" size={0}>
-          <Text style={{ fontSize: 12 }}>{INFO_EXTRACTOR_LABEL[v] ?? v}</Text>
-          {row.confidence != null ? (
+          {row.source_kind === 'verified' ? (
+            <Tag color="green" icon={<CheckOutlined />} style={{ marginInlineEnd: 0 }}>
+              已人工核对
+            </Tag>
+          ) : (
+            <Text style={{ fontSize: 12 }}>{INFO_EXTRACTOR_LABEL[v] ?? v}</Text>
+          )}
+          {row.source_kind !== 'verified' && row.confidence != null ? (
             <Text type="secondary" style={{ fontSize: 12 }}>
               置信 {(row.confidence * 100).toFixed(0)}%
             </Text>
@@ -199,7 +243,7 @@ function InfoWorkspace({ projectId }: { projectId: string }) {
     {
       title: '来源图纸',
       dataIndex: 'drawing_no',
-      width: 220,
+      width: 200,
       render: (_: unknown, row: InfoItem) => (
         <Button
           type="link"
@@ -212,6 +256,33 @@ function InfoWorkspace({ projectId }: { projectId: string }) {
         >
           {row.drawing_no} {row.drawing_title}
         </Button>
+      ),
+    },
+    {
+      title: '核对',
+      width: 130,
+      render: (_: unknown, row: InfoItem) => (
+        <Space size={4}>
+          <Tooltip title="确认该信息正确(标记已人工核对)">
+            <Button
+              type="text"
+              size="small"
+              icon={<CheckOutlined />}
+              disabled={row.source_kind === 'verified'}
+              onClick={() => {
+                const vj = row.value_json as Record<string, number> | null
+                submitVerify(
+                  row,
+                  row.content,
+                  vj ? (vj[valueKey(row.category)] ?? null) : null,
+                )
+              }}
+            />
+          </Tooltip>
+          <Tooltip title="修正该信息(改值)">
+            <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(row)} />
+          </Tooltip>
+        </Space>
       ),
     },
   ]
@@ -315,6 +386,47 @@ function InfoWorkspace({ projectId }: { projectId: string }) {
         title={preview?.title}
         onClose={() => setPreview(null)}
       />
+
+      <Modal
+        open={!!editing}
+        title="修正图纸信息"
+        onCancel={() => setEditing(null)}
+        confirmLoading={saving}
+        onOk={() => editing && submitVerify(editing, editContent, editValue)}
+        okText="保存修正"
+        destroyOnClose
+      >
+        {editing ? (
+          <Space direction="vertical" style={{ width: '100%' }} size={12}>
+            <Text type="secondary">
+              来源:{editing.drawing_no} {editing.drawing_title} ·{' '}
+              {INFO_CATEGORY_LABEL[editing.category] ?? editing.category}
+            </Text>
+            <div>
+              <Text>原文</Text>
+              <Input
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+              />
+            </div>
+            {isNumericCategory(editing.category) ? (
+              <div>
+                <Text>解析值（{editing.category === 'elevation' ? '标高 米' : '尺寸 mm'}）</Text>
+                <InputNumber
+                  style={{ width: '100%' }}
+                  value={editValue ?? undefined}
+                  onChange={(v) => setEditValue(v as number | null)}
+                />
+              </div>
+            ) : null}
+            <Alert
+              type="info"
+              showIcon
+              message="保存后记为人工核对值，建模标高/审图/算量将采用该值，并触发模型增量重建。"
+            />
+          </Space>
+        ) : null}
+      </Modal>
     </div>
   )
 }

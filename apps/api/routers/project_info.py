@@ -43,11 +43,11 @@ WHERE dei.project_id = :project_id {where}
 _ITEMS_SQL = """
 SELECT dei.id, dei.drawing_id, dei.category, dei.content,
        dei.value_json, dei.location_json, dei.extractor,
-       dei.confidence, dei.extraction_version,
+       dei.confidence, dei.extraction_version, dei.source_kind,
        d.drawing_no, d.title AS drawing_title, d.discipline
 FROM drawing_extracted_info dei
 JOIN drawings d ON d.id = dei.drawing_id
-WHERE dei.project_id = :project_id {where}
+WHERE dei.project_id = :project_id AND dei.is_active = true {where}
 ORDER BY dei.category, d.drawing_no, dei.id
 LIMIT :limit OFFSET :offset
 """
@@ -134,7 +134,7 @@ async def info_items(
     where = " ".join(clauses)
 
     total = await db.fetch_val(
-        _ITEMS_COUNT_SQL.format(where=where), params
+        _ITEMS_COUNT_SQL.format(where=where + " AND dei.is_active = true"), params
     )
     rows = await db.fetch_all(
         _ITEMS_SQL.format(where=where),

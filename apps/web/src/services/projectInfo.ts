@@ -55,9 +55,18 @@ export interface InfoItem {
   extractor: string
   confidence: number | null
   extraction_version: number
+  source_kind?: 'auto' | 'verified'
   drawing_no: string
   drawing_title: string
   discipline: string
+}
+
+/** 人审修正入参:content 必填;标高/尺寸类附解析值 */
+export interface VerifyPayload {
+  category: string
+  content: string
+  value_json?: Record<string, unknown> | null
+  supersedes_id?: string | null
 }
 
 export interface InfoSummary {
@@ -106,3 +115,13 @@ export const triggerInfoExtract = (
 /** 统一预览:PDF/图片原文件,DXF/DWG 走服务端渲染 PNG;422 = 暂不支持 */
 export const getDrawingPreview = (drawingId: string): Promise<DrawingPreview> =>
   request(`/api/v1/drawings/${drawingId}/preview`, { skipErrorHandler: true })
+
+/** 人审修正:写 verified 行(生效值),触发建模增量重建 */
+export const verifyArchiveItem = (
+  drawingId: string,
+  payload: VerifyPayload,
+): Promise<{ ok: boolean }> =>
+  request(`/api/v1/drawings/${drawingId}/archive/verify`, {
+    method: 'POST',
+    data: payload,
+  })
