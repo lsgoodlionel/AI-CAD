@@ -13,6 +13,7 @@ from dataclasses import replace
 from functools import lru_cache
 from typing import Any, Callable
 
+from services.drawing_view_classifier import classify_view_type
 from services.model_story import detect_building_unit
 
 logger = logging.getLogger(__name__)
@@ -90,7 +91,9 @@ def pick_element_drawings(floor_drawings: list[dict]) -> dict[str, list[dict]]:
     }
 
 
-def _recognize_sync(data: bytes, ext: str, discipline: str, drawing_id: str) -> dict | None:
+def _recognize_sync(
+    data: bytes, ext: str, discipline: str, drawing_id: str, allow_circles: bool = False,
+) -> dict | None:
     """线程池内执行：几何提取 + 构件识别 + spotting 融合回灌 → {elements, axes}；失败返回 None。"""
     from core.model3d import extract_dxf_geometry, extract_pdf_geometry, recognize
 
@@ -104,7 +107,31 @@ def _recognize_sync(data: bytes, ext: str, discipline: str, drawing_id: str) -> 
         return None
     result = recognize(geom, discipline, drawing_id)
     elements = _reinject_fusion(result.as_dict(), geom, drawing_id)
+    # E3/路径B：PDF 圆形桩/圆柱补识别——几何识别器只抓闭合近方多段线,抓不到
+    # 圆(桩/钢立柱多画成圆)。栅格 HoughCircles 检圆 → 米坐标八边形柱,去重后并入。
+    # 双闸防误检:①仅平面图(allow_circles,剖面/详图里的钢筋圆不算桩)
+    #            ②仅结构/通用专业(机电图圆多是设备/管件)。
+    if allow_circles and ext == "pdf" and discipline in ("structure", "general"):
+        elements["columns"] = _augment_circle_columns(
+            data, geom, elements.get("columns") or [], drawing_id
+        )
     return {"elements": elements, "axes": result.axes}
+
+
+def _augment_circle_columns(
+    data: bytes, geom, existing_columns: list[dict], drawing_id: str,
+) -> list[dict]:
+    """圆检测补柱并去重（失败返回原柱,绝不阻断）。"""
+    try:
+        from core.model3d.circle_detector import dedupe_against, detect_pile_columns
+        circles = detect_pile_columns(data, geom, src=drawing_id)
+        if not circles:
+            return existing_columns
+        fresh = dedupe_against(circles, existing_columns)
+        return existing_columns + fresh
+    except Exception as exc:  # noqa: BLE001 — 圆柱补充失败不影响既有识别
+        logger.warning("[ModelElements] 圆柱补充跳过 %s: %s", drawing_id, exc)
+        return existing_columns
 
 
 # ── D-09：符号 spotting 融合回灌（fusion 引擎补规则漏召回，强规则不被覆盖）──
@@ -396,9 +423,12 @@ async def _recognize_one(
         return None
     try:
         data = await loop.run_in_executor(executor, file_getter, file_key)
+        # 圆检测仅对平面图开启(剖面/立面/详图里的圆多是钢筋/符号,非平面桩)
+        allow_circles = classify_view_type(drawing).view_type in ("plan", "unknown")
         return await asyncio.wait_for(
             loop.run_in_executor(
-                executor, _recognize_sync, data, ext, discipline, str(drawing["id"])
+                executor, _recognize_sync, data, ext, discipline,
+                str(drawing["id"]), allow_circles,
             ),
             timeout=_RECOGNIZE_TIMEOUT_SEC,
         )
