@@ -146,11 +146,13 @@ def build_info_items(
 
 def extract_drawing_info(
     file_bytes: bytes, file_ext: str, *, filename: str | None = None,
-    run_ocr_pass: bool = True,
-) -> list[dict]:
+    run_ocr_pass: bool = True, with_transform: bool = False,
+):
     """从文件字节抽取信息条目(几何 + 可选 OCR + 文件名)。
 
     抽取器缺失/失败一律优雅降级为跳过该来源(不抛),与建模管线纪律一致。
+    with_transform=True 时返回 (items, transform)：transform 为每图 pt→米
+    坐标变换(A1,供档案 pt 坐标进 3D);算不出为 None。
     """
     geom: DrawingGeometry | None = None
     ext = (file_ext or "").lower().lstrip(".")
@@ -172,7 +174,14 @@ def extract_drawing_info(
         except Exception as exc:  # noqa: BLE001
             logger.warning("[drawing_info] OCR 失败: %s", exc)
 
-    return build_info_items(geom=geom, ocr=ocr_result, filename=filename)
+    items = build_info_items(geom=geom, ocr=ocr_result, filename=filename)
+    if with_transform:
+        transform = None
+        if geom is not None:
+            from services.drawing_transform import transform_from_geometry
+            transform = transform_from_geometry(geom)
+        return items, transform
+    return items
 
 
 # ── 持久化仓储(重抽只覆盖 auto 行,保留人审 verified) ───────────────

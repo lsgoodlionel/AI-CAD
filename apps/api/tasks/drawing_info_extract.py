@@ -93,7 +93,9 @@ async def _extract_one(db, row: dict, version: int) -> int:
 
     file_bytes = get_file_bytes(row["file_key"])
     ext = _file_ext(row["file_key"], row.get("title"))
-    items = extract_drawing_info(file_bytes, ext, filename=row.get("title"))
+    items, transform = extract_drawing_info(
+        file_bytes, ext, filename=row.get("title"), with_transform=True
+    )
     written = await persist_drawing_info(
         db,
         project_id=project_id,
@@ -101,6 +103,15 @@ async def _extract_one(db, row: dict, version: int) -> int:
         items=items,
         version=version,
     )
+    # A1：落库每图坐标变换(pt→米),供档案轴号/文字进 3D(失败不阻断)
+    if transform is not None:
+        try:
+            from services.drawing_transform import persist_transform
+            await persist_transform(
+                db, project_id=project_id, drawing_id=drawing_id, transform=transform
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[drawing_info] 变换落库跳过 %s: %s", drawing_id, exc)
     await _set_status(db, drawing_id, project_id, "ready", version, written)
     return written
 
