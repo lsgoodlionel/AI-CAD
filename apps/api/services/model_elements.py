@@ -446,12 +446,17 @@ def _merge_elements(target: dict[str, list], parts: dict | None, kinds: tuple[st
 
 async def build_floor_elements(
     executor, floor_drawings: list[dict], file_getter: Callable[[str], bytes],
+    archive_axes_by_drawing: dict | None = None, transforms: dict | None = None,
 ) -> tuple[dict[str, list], int, dict]:
     """构建单楼层 elements（识别 → 轴号配准 → 合并 + YOLO 补充）。
 
     返回 (elements, yolo_count, floor_meta)；floor_meta 含
-    ``{"elevations": [标高候选], "registered": 配准图数}``。
+    ``{"elevations": [标高候选], "registered": 配准图数, "axes": ...}``。
     core.model3d 缺失时返回 (全空, 0, {})。
+
+    A2:传入 archive_axes_by_drawing/transforms 时,每图的档案轴号(好标签)经
+    该图坐标变换转米(同图同变换,与识别路径同坐标系),并入聚合——升级识别路径
+    的 "X" 噪声标签、补识别未命中的轴线。
     """
     empty = {key: [] for key in EMPTY_ELEMENTS}
     try:
@@ -480,6 +485,13 @@ async def build_floor_elements(
         axes = result.get("axes") or {}
         elevations.extend(axes.get("elevations") or [])
         part = result["elements"]
+        # A2：并入本图档案轴号(好标签,经该图变换转米,与识别轴号同坐标系)
+        did = str(drawing.get("id") or "")
+        if archive_axes_by_drawing and transforms and did in transforms:
+            arch_items = archive_axes_by_drawing.get(did) or []
+            if arch_items:
+                arch = archive_axes_to_scene(arch_items, transforms[did])
+                axes = _merge_axes(dict(axes), arch)
         # 轴号配准：以本层首张带轴号的图为参考系，其余图按共有轴号平移对齐
         if _has_labeled_axes(axes):
             if ref_axes is None:
@@ -532,6 +544,33 @@ def _merge_axes(agg: dict | None, new: dict) -> dict:
             elif not str(hit[0]).strip() and str(label).strip():
                 hit[0] = label  # 无标签轴线 → 升级为带标签
     return agg
+
+
+def archive_axes_to_scene(archive_items: list[dict], transform) -> dict:
+    """档案 axis 项(label + pt 位置)→ scene 轴网格式 {"x":[[label,pos_m]], "y":[...]}。
+
+    A2:档案 OCR/矢量抽出的轴号质量高(真实 1/2/3/A/B),但坐标是页面点;
+    经每图坐标变换(A1)转米,与识别路径 _merge_axes 合并(升级 "X" 标签 + 补覆盖)。
+    方向按轴号惯例:纯数字→x(竖轴),字母→y(横轴)。
+    """
+    from services.drawing_transform import pt_to_meter
+
+    x_axes: list[list] = []
+    y_axes: list[list] = []
+    for item in archive_items:
+        label = str(item.get("content") or "").strip()
+        if not _is_grid_label(label):
+            continue
+        loc = item.get("location_json") or {}
+        x_pt, y_pt = loc.get("x"), loc.get("y")
+        if x_pt is None or y_pt is None:
+            continue
+        x_m, y_m = pt_to_meter(float(x_pt), float(y_pt), transform)
+        if label.isdigit():
+            x_axes.append([label, x_m])       # 数字轴号 → 竖轴(x 位置)
+        else:
+            y_axes.append([label, y_m])       # 字母轴号 → 横轴(y 位置)
+    return {"x": x_axes, "y": y_axes}
 
 
 def _is_grid_label(label: str) -> bool:
