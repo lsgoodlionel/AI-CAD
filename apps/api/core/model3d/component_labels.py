@@ -89,11 +89,19 @@ def _element_centroid(el: dict) -> tuple[float, float] | None:
     return (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts))
 
 
+# O(元素×标签) 上限:超过则跳过(防桩密集层病态卡顿,建模鲁棒性优先)
+_MAX_ATTACH_OPS = 2_000_000
+
+
 def attach_type_labels(
     elements: dict[str, list], labels: list[dict], tol_m: float = DEFAULT_ATTACH_TOL_M,
 ) -> dict[str, list]:
     """为每个几何构件附最近的类型标签(容差内);返回新 elements(不改原对象)。"""
     if not labels:
+        return elements
+    # 防护:元素×标签 过大时跳过(如桩密集层 5000 柱 × 500 标签),避免拖垮 build
+    total_elements = sum(len(v) for v in elements.values())
+    if total_elements * len(labels) > _MAX_ATTACH_OPS:
         return elements
     out: dict[str, list] = {}
     for kind, items in elements.items():

@@ -24,6 +24,7 @@ DEFAULT_DPI = 150
 DEFAULT_SIZE_RANGE_M = (0.5, 1.4)
 DEFAULT_PARAM2 = 32          # HoughGradient 累加阈值:越小越敏感(误检多)
 _MAX_CIRCLES = 1500          # 单图圆柱上限(防噪声图刷爆)
+_MAX_RENDER_PX = 3000        # 圆检测栅格最长边上限(大图降 DPI,防 HoughCircles 卡死)
 
 # 八边形单位方向(近似圆,渲染/算量足够)
 _OCT_DIRS = [
@@ -100,7 +101,16 @@ def detect_pile_columns(
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         try:
             page = doc[0]
-            pix = page.get_pixmap(matrix=fitz.Matrix(dpi / 72.0, dpi / 72.0), alpha=False)
+            # 大图自适应降 DPI:HoughCircles 在 7000×5000 图上极慢甚至卡死执行器
+            # (C 调用不受 asyncio 超时约束)。限最长边 ≤ _MAX_RENDER_PX,按需降 dpi。
+            eff_dpi = dpi
+            longest_pt = max(page.rect.width, page.rect.height)
+            longest_px = longest_pt * dpi / 72.0
+            if longest_px > _MAX_RENDER_PX:
+                eff_dpi = dpi * _MAX_RENDER_PX / longest_px
+            pix = page.get_pixmap(
+                matrix=fitz.Matrix(eff_dpi / 72.0, eff_dpi / 72.0), alpha=False
+            )
             arr = np.frombuffer(pix.samples, dtype=np.uint8).reshape(
                 pix.height, pix.width, 3
             )
@@ -108,6 +118,7 @@ def detect_pile_columns(
         finally:
             doc.close()
 
+        dpi = eff_dpi  # 后续半径像素换算用实际渲染 dpi
         m_per_px = scale * 72.0 / dpi
         if m_per_px <= 0:
             return []
