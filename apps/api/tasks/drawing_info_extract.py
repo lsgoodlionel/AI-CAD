@@ -67,16 +67,21 @@ async def _extract_one(db, row: dict, version: int) -> int:
 
 @celery_app.task(bind=True, max_retries=1, default_retry_delay=60)
 def extract_project_drawing_info(self, project_id: str) -> dict:
-    """全项目工程信息抽取入口。"""
-    logger.info("[drawing_info] 项目级抽取启动: project_id=%s", project_id)
+    """全项目工程信息抽取入口(扇出模式)。
+
+    大项目(数千图 × OCR 数十秒/图)串行必撞 celery 1800s 硬超时,
+    故本任务只做「查清单 + 定版本 + 逐图派发单图任务」,秒级完成;
+    真正抽取由 extract_single_drawing_info 逐图独立执行(可重试、互不拖累)。
+    """
+    logger.info("[drawing_info] 项目级抽取启动(扇出): project_id=%s", project_id)
     try:
-        return asyncio.run(_do_extract_project(project_id))
+        return asyncio.run(_fanout_project(project_id))
     except Exception as exc:
-        logger.error("[drawing_info] 项目级抽取失败: %s", exc)
+        logger.error("[drawing_info] 项目级扇出失败: %s", exc)
         raise self.retry(exc=exc)
 
 
-async def _do_extract_project(project_id: str) -> dict:
+async def _fanout_project(project_id: str) -> dict:
     db = databases.Database(settings.database_url)
     await db.connect()
     try:
@@ -85,44 +90,32 @@ async def _do_extract_project(project_id: str) -> dict:
         )]
         version_row = await db.fetch_one(_SELECT_NEXT_VERSION, {"project_id": project_id})
         version = int(version_row["v"]) if version_row else 1
-
-        total_items = 0
-        failed = 0
-        for i, row in enumerate(rows, 1):
-            try:
-                total_items += await _extract_one(db, row, version)
-            except Exception as exc:  # noqa: BLE001 — 单图失败不拖垮批量
-                failed += 1
-                logger.warning(
-                    "[drawing_info] 单图抽取失败跳过 drawing_id=%s: %s", row["id"], exc
-                )
-            if i % 100 == 0:
-                logger.info("[drawing_info] 进度 %d/%d,累计条目 %d", i, len(rows), total_items)
-
-        result = {
-            "project_id": project_id,
-            "drawings": len(rows),
-            "failed": failed,
-            "items": total_items,
-            "version": version,
-        }
-        logger.info("[drawing_info] 项目级抽取完成: %s", result)
-        return result
     finally:
         await db.disconnect()
 
+    for row in rows:
+        extract_single_drawing_info.delay(str(row["id"]), version)
+
+    result = {"project_id": project_id, "enqueued": len(rows), "version": version}
+    logger.info("[drawing_info] 项目级扇出完成: %s", result)
+    return result
+
 
 @celery_app.task(bind=True, max_retries=1, default_retry_delay=30)
-def extract_single_drawing_info(self, drawing_id: str) -> dict:
-    """单图工程信息重抽入口。"""
+def extract_single_drawing_info(self, drawing_id: str, version: int | None = None) -> dict:
+    """单图工程信息抽取/重抽入口。
+
+    version 由项目级扇出统一下发保证同代次;单图独立触发时为 None,
+    按项目当前 max+1 自算。
+    """
     try:
-        return asyncio.run(_do_extract_single(drawing_id))
+        return asyncio.run(_do_extract_single(drawing_id, version))
     except Exception as exc:
         logger.error("[drawing_info] 单图抽取失败: drawing_id=%s %s", drawing_id, exc)
         raise self.retry(exc=exc)
 
 
-async def _do_extract_single(drawing_id: str) -> dict:
+async def _do_extract_single(drawing_id: str, version: int | None = None) -> dict:
     db = databases.Database(settings.database_url)
     await db.connect()
     try:
@@ -130,10 +123,11 @@ async def _do_extract_single(drawing_id: str) -> dict:
         if row is None:
             return {"drawing_id": drawing_id, "items": 0, "skipped": "not_found"}
         row = dict(row)
-        version_row = await db.fetch_one(
-            _SELECT_NEXT_VERSION, {"project_id": str(row["project_id"])}
-        )
-        version = int(version_row["v"]) if version_row else 1
+        if version is None:
+            version_row = await db.fetch_one(
+                _SELECT_NEXT_VERSION, {"project_id": str(row["project_id"])}
+            )
+            version = int(version_row["v"]) if version_row else 1
         items = await _extract_one(db, row, version)
         return {"drawing_id": drawing_id, "items": items, "version": version}
     finally:
