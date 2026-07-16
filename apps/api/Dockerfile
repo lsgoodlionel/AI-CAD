@@ -69,6 +69,16 @@ COPY api/requirements.txt .
 RUN pip install --upgrade pip \
     && pip install -r requirements.txt
 
+# 图纸全文 OCR 后端（core/model3d/ocr，独立 extra：requirements-ocr.txt）。
+# OCR_EXTRA=rapid（默认，aarch64 稳定的 RapidOCR）| full（paddle+rapid，x86_64 生产）| none（跳过，链路降级 backend=none）
+ARG OCR_EXTRA=rapid
+COPY api/requirements-ocr.txt .
+RUN if [ "$OCR_EXTRA" = "rapid" ]; then \
+      pip install rapidocr-onnxruntime==1.4.4 ; \
+    elif [ "$OCR_EXTRA" = "full" ]; then \
+      pip install -r requirements-ocr.txt ; \
+    fi
+
 COPY api/ .
 
 EXPOSE 8000
