@@ -16,6 +16,7 @@ celery_app = Celery(
         "tasks.model_build",
         "tasks.pipeline",
         "tasks.partition_maintenance",
+        "tasks.drawing_info_extract",
     ],
 )
 
@@ -45,6 +46,8 @@ celery_app.conf.update(
         # 不与 ai_review/regulation_import 等重负载队列争抢。
         "tasks.pipeline.*": {"queue": "default"},
         "tasks.partition_maintenance.*": {"queue": "default"},
+        # 工程信息抽取:逐图 OCR 较重但可断点重来,走 default 不抢 ai_review
+        "tasks.drawing_info_extract.*": {"queue": "default"},
     },
     # Celery beat 定时任务
     beat_schedule={

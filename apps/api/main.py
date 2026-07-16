@@ -14,6 +14,7 @@ from routers.admin.engine_params import router as engine_params_router
 from routers.admin.call_logs import router as call_logs_router
 from routers.admin.users import router as admin_users_router
 from routers.projects import router as projects_router
+from routers.project_info import router as project_info_router
 from routers.project_models import router as project_models_router
 from routers.model_spotting import router as model_spotting_router
 from routers.model_annotations import router as model_annotations_router
@@ -64,6 +65,7 @@ app.include_router(engine_params_router,  prefix=API_V1)
 app.include_router(call_logs_router,      prefix=API_V1)
 app.include_router(admin_users_router,    prefix=API_V1)
 app.include_router(projects_router,       prefix=API_V1)
+app.include_router(project_info_router,   prefix=API_V1)
 app.include_router(project_models_router, prefix=API_V1)
 app.include_router(model_spotting_router, prefix=API_V1)
 app.include_router(model_annotations_router, prefix=API_V1)
