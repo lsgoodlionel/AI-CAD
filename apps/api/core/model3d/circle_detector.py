@@ -24,7 +24,7 @@ DEFAULT_DPI = 150
 DEFAULT_SIZE_RANGE_M = (0.5, 1.4)
 DEFAULT_PARAM2 = 32          # HoughGradient 累加阈值:越小越敏感(误检多)
 _MAX_CIRCLES = 1500          # 单图圆柱上限(防噪声图刷爆)
-_MAX_RENDER_PX = 3000        # 圆检测栅格最长边上限(大图降 DPI,防 HoughCircles 卡死)
+_MAX_RENDER_PX = 8000        # 仅超巨图降 dpi 兜底(150dpi 全分辨率保桩检出;+2705 实测在此成功)
 
 # 八边形单位方向(近似圆,渲染/算量足够)
 _OCT_DIRS = [
@@ -101,11 +101,10 @@ def detect_pile_columns(
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         try:
             page = doc[0]
-            # 大图自适应降 DPI:HoughCircles 在 7000×5000 图上极慢甚至卡死执行器
-            # (C 调用不受 asyncio 超时约束)。限最长边 ≤ _MAX_RENDER_PX,按需降 dpi。
+            # 150dpi 全分辨率(实测 +2705 桩的整机重建在此分辨率成功;桩多在大图上,
+            # 降采样会严重削弱检出)。仅当超巨图(>_MAX_RENDER_PX)才降 dpi 兜底防卡。
             eff_dpi = dpi
-            longest_pt = max(page.rect.width, page.rect.height)
-            longest_px = longest_pt * dpi / 72.0
+            longest_px = max(page.rect.width, page.rect.height) * dpi / 72.0
             if longest_px > _MAX_RENDER_PX:
                 eff_dpi = dpi * _MAX_RENDER_PX / longest_px
             pix = page.get_pixmap(
