@@ -969,11 +969,50 @@ def _section_levels_ocr_fallback(data: bytes, geom, vector_levels):
         return vector_levels
 
 
+def _section_levels_from_archive(elevation_items: list[dict]):
+    """档案标高项(生效值)→ SectionLevels(E2-consume:替代自跑 OCR)。
+
+    档案由抽取管线(矢量文字/OCR/VLM/人审)统一产出,建模直接消费其标高值,
+    不再在 build 里对每张剖面图重跑 OCR。人审 verified 值置满置信。
+    只用 elevation_m(与 VLM 路径同构,recover_section_z 主要按值排序对齐)。
+    """
+    from core.model3d.section_level_extractor import LevelMark, SectionLevels
+
+    seen: set[float] = set()
+    marks: list = []
+    for item in elevation_items:
+        value_json = item.get("value_json") or {}
+        raw = value_json.get("elevation_m")
+        if raw is None:
+            continue
+        value = round(float(raw), 3)
+        if value in seen:
+            continue
+        seen.add(value)
+        is_verified = item.get("source_kind") == "verified"
+        conf = 1.0 if is_verified else (
+            1.0 if item.get("confidence") is None else float(item["confidence"])
+        )
+        marks.append(LevelMark(
+            elevation_m=value,
+            label=item.get("content") or f"{value:+.3f}",
+            confidence=round(conf, 4),
+            source_ref={"archive": True, "verified": is_verified},
+        ))
+    return SectionLevels(marks=tuple(marks), reason=None, fit={"archive": True})
+
+
 async def _recover_section_z(
     drawings: list[dict],
     normalization: model_story.StoryNormalizationResult,
+    db=None,
+    project_id: str | None = None,
 ) -> section_z_recovery.SectionZRecovery:
-    """识别剖面图 → 抽标高 → 对齐平面楼层序（B-05）。无剖面时 no-op。"""
+    """识别剖面图 → 取标高 → 对齐平面楼层序（B-05）。无剖面时 no-op。
+
+    E2-consume:标高优先从「图纸信息档案」读(不再自跑 OCR);仅当项目未建档
+    (档案无标高)时回退旧的逐图 OCR 路径,保证未迁移项目向后兼容。
+    """
     section_drawings = [
         drawing for drawing in drawings
         if classify_view_type(drawing).view_type == "section"
@@ -981,24 +1020,52 @@ async def _recover_section_z(
     if not section_drawings:
         return section_z_recovery.SectionZRecovery()
 
-    loop = asyncio.get_event_loop()
+    section_ids = {str(d["id"]) for d in section_drawings}
     levels_by_drawing: dict[str, Any] = {}
-    for drawing in section_drawings:
-        file_key = drawing.get("file_key") or ""
-        ext = file_key.rsplit(".", 1)[-1].lower() if "." in file_key else ""
-        if not file_key or ext not in ("pdf", "dxf", "dwg"):
-            continue
+
+    # ── 优先:从档案读标高(单次查询,按 drawing 分组)──
+    archive_used = False
+    if db is not None and project_id is not None:
         try:
-            data = await loop.run_in_executor(_executor, get_file_bytes, file_key)
-            levels = await asyncio.wait_for(
-                loop.run_in_executor(_executor, _section_levels_sync, data, ext),
-                timeout=_SECTION_TIMEOUT_SEC,
-            )
-        except Exception as exc:  # noqa: BLE001 — 单图失败不阻断整链
-            logger.warning("[ModelBuilder] 剖面 z 恢复跳过 %s: %s", drawing.get("id"), exc)
-            continue
-        if levels is not None and getattr(levels, "marks", ()):
-            levels_by_drawing[str(drawing["id"])] = levels
+            from services.drawing_archive import fetch_project_category
+            elevations = await fetch_project_category(db, project_id, "elevation")
+            by_drawing: dict[str, list[dict]] = {}
+            for item in elevations:
+                did = str(item.get("drawing_id"))
+                if did in section_ids:
+                    by_drawing.setdefault(did, []).append(item)
+            if by_drawing:
+                archive_used = True
+                for did, items in by_drawing.items():
+                    levels = _section_levels_from_archive(items)
+                    if levels.marks:
+                        levels_by_drawing[did] = levels
+                logger.info(
+                    "[ModelBuilder] section-z 从档案读标高: %d/%d 剖面图命中",
+                    len(levels_by_drawing), len(section_drawings),
+                )
+        except Exception as exc:  # noqa: BLE001 — 档案不可用则回退 OCR 路径
+            logger.warning("[ModelBuilder] 档案标高读取失败,回退 OCR: %s", exc)
+
+    # ── 回退:未建档项目走旧的逐图 OCR(向后兼容)──
+    if not archive_used:
+        loop = asyncio.get_event_loop()
+        for drawing in section_drawings:
+            file_key = drawing.get("file_key") or ""
+            ext = file_key.rsplit(".", 1)[-1].lower() if "." in file_key else ""
+            if not file_key or ext not in ("pdf", "dxf", "dwg"):
+                continue
+            try:
+                data = await loop.run_in_executor(_executor, get_file_bytes, file_key)
+                levels = await asyncio.wait_for(
+                    loop.run_in_executor(_executor, _section_levels_sync, data, ext),
+                    timeout=_SECTION_TIMEOUT_SEC,
+                )
+            except Exception as exc:  # noqa: BLE001 — 单图失败不阻断整链
+                logger.warning("[ModelBuilder] 剖面 z 恢复跳过 %s: %s", drawing.get("id"), exc)
+                continue
+            if levels is not None and getattr(levels, "marks", ()):
+                levels_by_drawing[str(drawing["id"])] = levels
 
     vlm_elevations_by_drawing: dict[str, Any] = {}
     if _vlm_section_z_enabled():
@@ -1293,7 +1360,7 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     annotation_overrides = await _load_annotation_overrides(db, project_id)
     normalization = model_story.normalize_story_table(drawings, annotation_overrides)
     # B-05：跨视图 z 恢复（仅剖面标高）——有剖面则以实测层高重归一化并点亮 gate；无剖面 no-op。
-    section_z = await _recover_section_z(drawings, normalization)
+    section_z = await _recover_section_z(drawings, normalization, db=db, project_id=project_id)
     # Task 3：人工录入层高作为最高优先级 override（覆盖剖面/估算），消除均匀默认层高。
     manual_overrides = await model_story_manual.fetch_manual_overrides(db, project_id)
     combined_overrides = {**(section_z.z_overrides or {}), **manual_overrides}

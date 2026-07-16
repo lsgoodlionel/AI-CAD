@@ -55,6 +55,30 @@ def _file_ext(file_key: str, title: str | None) -> str:
     return os.path.splitext(title or "")[1].lstrip(".").lower()
 
 
+_UPSERT_STATUS_SQL = """
+INSERT INTO drawing_archive_status
+    (drawing_id, project_id, status, extraction_version, item_count, updated_at)
+VALUES (:drawing_id, :project_id, :status, :version, :item_count, now())
+ON CONFLICT (drawing_id) DO UPDATE
+SET status = EXCLUDED.status,
+    extraction_version = EXCLUDED.extraction_version,
+    item_count = EXCLUDED.item_count,
+    updated_at = now()
+"""
+
+
+async def _set_status(db, drawing_id: str, project_id: str, status: str,
+                      version: int = 0, item_count: int = 0) -> None:
+    """更新单图档案状态机(失败不阻断抽取)。"""
+    try:
+        await db.execute(_UPSERT_STATUS_SQL, {
+            "drawing_id": drawing_id, "project_id": project_id,
+            "status": status, "version": version, "item_count": item_count,
+        })
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[drawing_info] 状态更新跳过 %s: %s", drawing_id, exc)
+
+
 async def _extract_one(db, row: dict, version: int) -> int:
     """抽取并落库单图,返回写入条数;失败抛出由调用方决定吞或抛。"""
     from core.storage import get_file_bytes
@@ -63,16 +87,22 @@ async def _extract_one(db, row: dict, version: int) -> int:
         persist_drawing_info,
     )
 
+    drawing_id = str(row["id"])
+    project_id = str(row["project_id"])
+    await _set_status(db, drawing_id, project_id, "extracting", version)
+
     file_bytes = get_file_bytes(row["file_key"])
     ext = _file_ext(row["file_key"], row.get("title"))
     items = extract_drawing_info(file_bytes, ext, filename=row.get("title"))
-    return await persist_drawing_info(
+    written = await persist_drawing_info(
         db,
-        project_id=str(row["project_id"]),
-        drawing_id=str(row["id"]),
+        project_id=project_id,
+        drawing_id=drawing_id,
         items=items,
         version=version,
     )
+    await _set_status(db, drawing_id, project_id, "ready", version, written)
+    return written
 
 
 @celery_app.task(bind=True, max_retries=1, default_retry_delay=60)

@@ -141,6 +141,22 @@ async def _create_drawing_record(
     if auto_review:
         run_ai_review.delay(drawing_id)
 
+    # E1.5-2：导入即建档案——置 pending + 触发抽取(OCR/矢量/VLM 落档案层)。
+    # 档案是全平台单一真相源(建模/工程信息/审图/算量都读它),故导入即抽取一次。
+    try:
+        await db.execute(
+            """
+            INSERT INTO drawing_archive_status (drawing_id, project_id, status)
+            VALUES ($1, $2, 'pending')
+            ON CONFLICT (drawing_id) DO UPDATE SET status='pending', updated_at=now()
+            """,
+            drawing_id, project_id,
+        )
+        from tasks.drawing_info_extract import extract_single_drawing_info
+        extract_single_drawing_info.delay(drawing_id)
+    except Exception as exc:  # noqa: BLE001 — 建档失败不阻断上传
+        logger.warning("[drawings] 档案抽取触发失败 %s: %s", drawing_id, exc)
+
     # 重大变更预警（≥ 50 万，后续升级审批路径）
     if estimated_impact and estimated_impact >= ESCALATION_IMPACT_THRESHOLD:
         await db.execute(
