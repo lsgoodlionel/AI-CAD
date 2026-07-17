@@ -77,7 +77,7 @@ def _fake_render(project_id, drawing_id, file_key, file_ext) -> dict:
 
 def _columns_elements():
     """注入确定性柱构件（带闭合方形轮廓，供程序化 IFC 拉伸）。"""
-    async def _build(executor, floor_drawings, file_getter):
+    async def _build(executor, floor_drawings, file_getter, *args, **kwargs):
         return (
             {
                 "columns": [
@@ -96,7 +96,7 @@ def _columns_elements():
     return _build
 
 
-async def _empty_elements(executor, floor_drawings, file_getter):
+async def _empty_elements(executor, floor_drawings, file_getter, *args, **kwargs):
     """无构件（纯贴图路径）。"""
     return {k: [] for k in model_elements.EMPTY_ELEMENTS}, 0, {}
 

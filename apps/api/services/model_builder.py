@@ -697,9 +697,44 @@ async def _fetch_inputs(db, project_id: str) -> tuple[dict, list[dict], dict, di
     return dict(project), drawings, issues_by_drawing, cross
 
 
+async def _load_archive_axes(db, project_id: str) -> tuple[dict, dict, dict]:
+    """取档案轴号 + 构件类型标签文字(按 drawing 分组)+ 每图坐标变换。
+
+    返回 (axes_by_drawing, text_by_drawing, transforms);任一缺失返回 ({},{},{})降级。
+    - axes_by_drawing：category='axis'(A2 轴号升级)
+    - text_by_drawing：category∈room_name/other/level_name(C-下一步 构件类型标签)
+    """
+    try:
+        from services.drawing_archive import (
+            fetch_project_categories,
+            fetch_project_category,
+        )
+        from services.drawing_transform import fetch_project_transforms
+
+        axis_items = await fetch_project_category(db, project_id, "axis")
+        axes_by_drawing: dict[str, list] = {}
+        for item in axis_items:
+            axes_by_drawing.setdefault(str(item.get("drawing_id")), []).append(item)
+
+        text_items = await fetch_project_categories(
+            db, project_id, ["room_name", "other", "level_name"]
+        )
+        text_by_drawing: dict[str, list] = {}
+        for item in text_items:
+            text_by_drawing.setdefault(str(item.get("drawing_id")), []).append(item)
+
+        transforms = await fetch_project_transforms(db, project_id)
+        return axes_by_drawing, text_by_drawing, transforms
+    except Exception as exc:  # noqa: BLE001 — 档案/变换不可用则不增强,识别路径照旧
+        logger.info("[ModelBuilder] 档案数据加载跳过(降级识别路径): %s", exc)
+        return {}, {}, {}
+
+
 async def _attach_floor_elements(
     floors: list[dict], drawings: list[dict], floor_of: dict[str, str],
     progress_cb=None,
+    archive_axes_by_drawing: dict | None = None, transforms: dict | None = None,
+    archive_text_by_drawing: dict | None = None,
 ) -> int:
     """为每楼层识别构件（V2）：floor 增 elements/element_stats；返回 YOLO 设备数。"""
     drawings_by_floor: dict[str, list[dict]] = {}
@@ -726,7 +761,8 @@ async def _attach_floor_elements(
         floor_drawings = drawings_by_floor.get(floor["key"], [])
         try:
             elements, yolo_count, meta = await model_elements.build_floor_elements(
-                _executor, floor_drawings, get_file_bytes
+                _executor, floor_drawings, get_file_bytes,
+                archive_axes_by_drawing, transforms, archive_text_by_drawing,
             )
         except Exception as exc:  # noqa: BLE001 — 构件层失败回退贴图
             logger.warning("[ModelBuilder] 楼层构件识别失败 %s: %s", floor["key"], exc)
@@ -735,6 +771,8 @@ async def _attach_floor_elements(
             )
         floor["elements"] = elements
         floor["element_stats"] = model_elements.element_stats(elements)
+        # E2 轴网层：楼层配准参考轴网入 scene（前端「轴网」构件图层数据源）
+        floor["axes"] = meta.get("axes") or None
         floor["_elevation_candidates"] = meta.get("elevations") or []
         floor["_lod_registered_drawings"] = int(meta.get("registered") or 0)
         floor["_lod_evidence"] = (
@@ -967,11 +1005,50 @@ def _section_levels_ocr_fallback(data: bytes, geom, vector_levels):
         return vector_levels
 
 
+def _section_levels_from_archive(elevation_items: list[dict]):
+    """档案标高项(生效值)→ SectionLevels(E2-consume:替代自跑 OCR)。
+
+    档案由抽取管线(矢量文字/OCR/VLM/人审)统一产出,建模直接消费其标高值,
+    不再在 build 里对每张剖面图重跑 OCR。人审 verified 值置满置信。
+    只用 elevation_m(与 VLM 路径同构,recover_section_z 主要按值排序对齐)。
+    """
+    from core.model3d.section_level_extractor import LevelMark, SectionLevels
+
+    seen: set[float] = set()
+    marks: list = []
+    for item in elevation_items:
+        value_json = item.get("value_json") or {}
+        raw = value_json.get("elevation_m")
+        if raw is None:
+            continue
+        value = round(float(raw), 3)
+        if value in seen:
+            continue
+        seen.add(value)
+        is_verified = item.get("source_kind") == "verified"
+        conf = 1.0 if is_verified else (
+            1.0 if item.get("confidence") is None else float(item["confidence"])
+        )
+        marks.append(LevelMark(
+            elevation_m=value,
+            label=item.get("content") or f"{value:+.3f}",
+            confidence=round(conf, 4),
+            source_ref={"archive": True, "verified": is_verified},
+        ))
+    return SectionLevels(marks=tuple(marks), reason=None, fit={"archive": True})
+
+
 async def _recover_section_z(
     drawings: list[dict],
     normalization: model_story.StoryNormalizationResult,
+    db=None,
+    project_id: str | None = None,
 ) -> section_z_recovery.SectionZRecovery:
-    """识别剖面图 → 抽标高 → 对齐平面楼层序（B-05）。无剖面时 no-op。"""
+    """识别剖面图 → 取标高 → 对齐平面楼层序（B-05）。无剖面时 no-op。
+
+    E2-consume:标高优先从「图纸信息档案」读(不再自跑 OCR);仅当项目未建档
+    (档案无标高)时回退旧的逐图 OCR 路径,保证未迁移项目向后兼容。
+    """
     section_drawings = [
         drawing for drawing in drawings
         if classify_view_type(drawing).view_type == "section"
@@ -979,24 +1056,52 @@ async def _recover_section_z(
     if not section_drawings:
         return section_z_recovery.SectionZRecovery()
 
-    loop = asyncio.get_event_loop()
+    section_ids = {str(d["id"]) for d in section_drawings}
     levels_by_drawing: dict[str, Any] = {}
-    for drawing in section_drawings:
-        file_key = drawing.get("file_key") or ""
-        ext = file_key.rsplit(".", 1)[-1].lower() if "." in file_key else ""
-        if not file_key or ext not in ("pdf", "dxf", "dwg"):
-            continue
+
+    # ── 优先:从档案读标高(单次查询,按 drawing 分组)──
+    archive_used = False
+    if db is not None and project_id is not None:
         try:
-            data = await loop.run_in_executor(_executor, get_file_bytes, file_key)
-            levels = await asyncio.wait_for(
-                loop.run_in_executor(_executor, _section_levels_sync, data, ext),
-                timeout=_SECTION_TIMEOUT_SEC,
-            )
-        except Exception as exc:  # noqa: BLE001 — 单图失败不阻断整链
-            logger.warning("[ModelBuilder] 剖面 z 恢复跳过 %s: %s", drawing.get("id"), exc)
-            continue
-        if levels is not None and getattr(levels, "marks", ()):
-            levels_by_drawing[str(drawing["id"])] = levels
+            from services.drawing_archive import fetch_project_category
+            elevations = await fetch_project_category(db, project_id, "elevation")
+            by_drawing: dict[str, list[dict]] = {}
+            for item in elevations:
+                did = str(item.get("drawing_id"))
+                if did in section_ids:
+                    by_drawing.setdefault(did, []).append(item)
+            if by_drawing:
+                archive_used = True
+                for did, items in by_drawing.items():
+                    levels = _section_levels_from_archive(items)
+                    if levels.marks:
+                        levels_by_drawing[did] = levels
+                logger.info(
+                    "[ModelBuilder] section-z 从档案读标高: %d/%d 剖面图命中",
+                    len(levels_by_drawing), len(section_drawings),
+                )
+        except Exception as exc:  # noqa: BLE001 — 档案不可用则回退 OCR 路径
+            logger.warning("[ModelBuilder] 档案标高读取失败,回退 OCR: %s", exc)
+
+    # ── 回退:未建档项目走旧的逐图 OCR(向后兼容)──
+    if not archive_used:
+        loop = asyncio.get_event_loop()
+        for drawing in section_drawings:
+            file_key = drawing.get("file_key") or ""
+            ext = file_key.rsplit(".", 1)[-1].lower() if "." in file_key else ""
+            if not file_key or ext not in ("pdf", "dxf", "dwg"):
+                continue
+            try:
+                data = await loop.run_in_executor(_executor, get_file_bytes, file_key)
+                levels = await asyncio.wait_for(
+                    loop.run_in_executor(_executor, _section_levels_sync, data, ext),
+                    timeout=_SECTION_TIMEOUT_SEC,
+                )
+            except Exception as exc:  # noqa: BLE001 — 单图失败不阻断整链
+                logger.warning("[ModelBuilder] 剖面 z 恢复跳过 %s: %s", drawing.get("id"), exc)
+                continue
+            if levels is not None and getattr(levels, "marks", ()):
+                levels_by_drawing[str(drawing["id"])] = levels
 
     vlm_elevations_by_drawing: dict[str, Any] = {}
     if _vlm_section_z_enabled():
@@ -1291,7 +1396,7 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     annotation_overrides = await _load_annotation_overrides(db, project_id)
     normalization = model_story.normalize_story_table(drawings, annotation_overrides)
     # B-05：跨视图 z 恢复（仅剖面标高）——有剖面则以实测层高重归一化并点亮 gate；无剖面 no-op。
-    section_z = await _recover_section_z(drawings, normalization)
+    section_z = await _recover_section_z(drawings, normalization, db=db, project_id=project_id)
     # Task 3：人工录入层高作为最高优先级 override（覆盖剖面/估算），消除均匀默认层高。
     manual_overrides = await model_story_manual.fetch_manual_overrides(db, project_id)
     combined_overrides = {**(section_z.z_overrides or {}), **manual_overrides}
@@ -1306,7 +1411,13 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     )
     assets, ifc_models, ifc_skipped = await _build_assets(project_id, drawings, progress_cb)
     floors, floor_of = _build_floors(drawings, issues_by_drawing, assets, normalization)
-    yolo_total = await _attach_floor_elements(floors, drawings, floor_of, progress_cb)
+    # A2/C-下一步：取档案轴号 + 构件类型标签文字 + 每图坐标变换。
+    archive_axes_by_drawing, archive_text_by_drawing, transforms = \
+        await _load_archive_axes(db, project_id)
+    yolo_total = await _attach_floor_elements(
+        floors, drawings, floor_of, progress_cb,
+        archive_axes_by_drawing, transforms, archive_text_by_drawing,
+    )
     _clip_elements_to_envelope(floors)  # 裁掉离群构件(机电比例错误致管线冲到数千米)
     # B-07：剖面/详图截面回填构件（实测覆盖硬编码默认；无标注时全默认→无副作用）。
     component_sections = await _recover_component_sections(drawings)

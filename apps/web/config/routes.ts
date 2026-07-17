@@ -82,6 +82,20 @@ const routes: IRoute[] = [
     ],
   },
 
+  // ── 工程信息（Phase E1：图纸抽取信息聚合，每条信息溯源到源图纸）─────
+  {
+    name: '工程信息',
+    path: '/project-info',
+    icon: 'ProfileOutlined',
+    component: './project/Info',
+  },
+  {
+    path: '/project-info/:projectId',
+    component: './project/Info',
+    hideInMenu: true,
+    name: '工程信息详情',
+  },
+
   // ── 审查中心（Phase D D-06：合并单图 AI 审图/会审审查/套图审查三处入口）─────
   {
     name: '审查中心',

@@ -5,6 +5,7 @@
  * 状态/数据获取逻辑见 useModelWorkspaceState.ts；面板内容按模式分派到
  * modes/BrowseModePanels · modes/ReviewModePanels · modes/QuantityModePanels。
  */
+import { useState } from 'react'
 import { Alert, Button, Col, Descriptions, Drawer, Empty, Row, Space, Spin, Tag, Typography } from 'antd'
 import { history } from '@umijs/max'
 import ModelHeaderBar from './ModelHeaderBar'
@@ -15,8 +16,23 @@ import QuantityModePanels from './modes/QuantityModePanels'
 import { useModelWorkspaceState } from './useModelWorkspaceState'
 import { DISCIPLINE_LABEL, SEVERITY_META, MARKER_TYPE_LABEL } from './modelWorkspaceConstants'
 import { ELEMENT_TYPE_LABEL } from './modes/elementFilterOptions'
+import DrawingTraceDrawer from '@/components/DrawingTraceDrawer'
 
 const { Text } = Typography
+
+/** 识别途径中文 */
+const SOURCE_PATH_LABEL: Record<string, string> = {
+  rule: '几何规则',
+  circle: '圆检测(桩/圆柱)',
+  model: '学习模型',
+  fused: '融合',
+  human: '人工',
+  'columns-envelope': '柱包络',
+  'piles-envelope': '桩包络',
+}
+
+/** 来源图纸按钮短标签(id 末 6 位,区分多张;详情看追溯抽屉) */
+const sourceDrawingLabel = (id: string) => `…${id.slice(-6)}`
 
 interface ModelWorkspaceProps {
   projectId: string
@@ -25,6 +41,7 @@ interface ModelWorkspaceProps {
 
 export default function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
   const state = useModelWorkspaceState(projectId, focusDrawingId)
+  const [traceDrawing, setTraceDrawing] = useState<string | null>(null)
 
   if (state.isNotBuilt) {
     return (
@@ -248,26 +265,49 @@ export default function ModelWorkspace({ projectId, focusDrawingId }: ModelWorks
                 {selection.element.count}
                 {selection.element.count > 1 ? '（同类合批渲染）' : ''}
               </Descriptions.Item>
-              {selection.element.label ? <Descriptions.Item label="标注">{selection.element.label}</Descriptions.Item> : null}
+              {selection.element.typeLabels?.length ? (
+                <Descriptions.Item label="类型标签">
+                  {selection.element.typeLabels.map((t) => <Tag key={t} color="purple">{t}</Tag>)}
+                </Descriptions.Item>
+              ) : null}
+              {selection.element.sourcePaths?.length ? (
+                <Descriptions.Item label="识别途径">
+                  {selection.element.sourcePaths.map((p) => (
+                    <Tag key={p}>{SOURCE_PATH_LABEL[p] ?? p}</Tag>
+                  ))}
+                </Descriptions.Item>
+              ) : null}
+              <Descriptions.Item label="来源图纸">
+                {selection.element.sourceDrawings?.length ?? 0} 张
+              </Descriptions.Item>
             </Descriptions>
             <Alert
               style={{ marginTop: 12 }}
               type="info"
               showIcon
-              message="构件级重建（矢量图纸提取）"
-              description="几何由结构/机电平面图矢量线条确定性识别生成，构件可追溯来源图纸。"
+              message="有信息的模型 · 可反向追溯"
+              description="该构件由下列来源图纸经识别途径生成,点「追溯来源图纸」查看每张图识别了什么、用在哪。"
             />
-            {selection.element.src ? (
-              <Button
-                type="primary" block style={{ marginTop: 16 }}
-                onClick={() => history.push(`/drawings/${selection.element.src}`)}
-              >
-                查看来源图纸
-              </Button>
-            ) : null}
+            <Space direction="vertical" style={{ width: '100%', marginTop: 12 }} size={8}>
+              {(selection.element.sourceDrawings ?? []).slice(0, 20).map((did) => (
+                <Button key={did} block onClick={() => setTraceDrawing(did)}>
+                  追溯来源图纸 {sourceDrawingLabel(did)}
+                </Button>
+              ))}
+              {!selection.element.sourceDrawings?.length && selection.element.src ? (
+                <Button block onClick={() => setTraceDrawing(selection.element.src!)}>
+                  追溯来源图纸
+                </Button>
+              ) : null}
+            </Space>
           </>
         ) : null}
       </Drawer>
+
+      <DrawingTraceDrawer
+        drawingId={traceDrawing}
+        onClose={() => setTraceDrawing(null)}
+      />
     </div>
   )
 }

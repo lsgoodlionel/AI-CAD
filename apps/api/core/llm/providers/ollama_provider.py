@@ -1,8 +1,17 @@
-"""本地 Ollama 提供商：qwen2.5:72b / llama3.3 / deepseek-r1:14b 等"""
+"""本地/远程 Ollama 提供商：qwen2.5:72b / llama3.3 / deepseek-r1:14b / qwen3.5 等"""
 import time
 import httpx
 from .base import LLMProvider, LLMResponse, ModelParams
 from . import vision
+
+# 远程 Ollama 网关常经 Cloudflare 前置,拦无浏览器 UA 的 POST(默认 python-httpx
+# 会 403)。带常规 UA 作为合法 API 客户端标识,本地直连也无副作用。
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36"
+    ),
+}
 
 
 class OllamaProvider(LLMProvider):
@@ -14,7 +23,7 @@ class OllamaProvider(LLMProvider):
         if vision.messages_have_images(messages):
             messages = vision.to_ollama_messages(messages)
         start = time.monotonic()
-        async with httpx.AsyncClient(timeout=params.timeout_sec) as client:
+        async with httpx.AsyncClient(timeout=params.timeout_sec, headers=_HEADERS) as client:
             response = await client.post(
                 f"{self.base_url}/api/chat",
                 json={
@@ -42,14 +51,14 @@ class OllamaProvider(LLMProvider):
 
     async def health_check(self) -> bool:
         try:
-            async with httpx.AsyncClient(timeout=5) as client:
+            async with httpx.AsyncClient(timeout=5, headers=_HEADERS) as client:
                 r = await client.get(f"{self.base_url}/api/tags")
                 return r.status_code == 200
         except Exception:
             return False
 
     async def list_models(self) -> list[dict]:
-        async with httpx.AsyncClient(timeout=5) as client:
+        async with httpx.AsyncClient(timeout=5, headers=_HEADERS) as client:
             response = await client.get(f"{self.base_url}/api/tags")
             response.raise_for_status()
             data = response.json()

@@ -27,6 +27,8 @@ _POINTS_PER_INCH = 72.0
 _TILE_THRESHOLD_PX = 2000
 _TILE_SIZE_PX = 1600
 _TILE_OVERLAP_PX = 200
+# E-末 提速:渲染最长边上限(大图自适应降 dpi,限分块数;≈120dpi 等效仍够标签级文字)
+_MAX_RENDER_PX = 6000
 _DEDUP_IOU = 0.5
 
 
@@ -101,7 +103,12 @@ def _render_first_page(file_bytes: bytes, file_ext: str, warnings: list[str], dp
                 return None, (0.0, 0.0)
             page = doc[0]
             page_size = (float(page.rect.width), float(page.rect.height))
-            pix = page.get_pixmap(dpi=dpi)
+            # 自适应降 DPI(E-末 提速):A0/A1 图 200dpi 近万像素 → 35 块 × ~8s ≈ 280s。
+            # 限渲染最长边 ≤ _MAX_RENDER_PX,大图按需降 dpi,块数减 ~3x,标签级文字
+            # (标高/轴号/房间)在等效 ~120dpi 仍清晰(实测标高 97% 高置信不受损)。
+            longest_px = max(page.rect.width, page.rect.height) * dpi / 72.0
+            eff_dpi = dpi if longest_px <= _MAX_RENDER_PX else dpi * _MAX_RENDER_PX / longest_px
+            pix = page.get_pixmap(dpi=int(eff_dpi))
             from PIL import Image
 
             image = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)

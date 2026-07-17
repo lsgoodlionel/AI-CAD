@@ -9,6 +9,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type {
   ElementEquipment,
+  SceneFloorAxes,
   SceneFloorElements,
 } from '@/services/projectModel'
 import { FLOOR_DEPTH, FLOOR_HEIGHT, FLOOR_WIDTH } from './sceneBuilder'
@@ -56,8 +57,33 @@ export interface ElementUserData {
   count: number
   label?: string
   src?: string
+  /** 反向追溯(G3):该合并网格构件的来源图纸 id 集合 */
+  sourceDrawings?: string[]
+  /** 识别途径集合(rule/circle/model/fused/human 等) */
+  sourcePaths?: string[]
+  /** 档案 OCR 反哺的类型标签(钢立柱/幕墙/围护桩…) */
+  typeLabels?: string[]
   /** 仅设备合批网格：逐设备拾取区间（按 faceEnd 升序），供 raycast faceIndex 反查 */
   equipmentPicks?: EquipmentPick[]
+}
+
+/** 从构件集合聚合来源(反向追溯):distinct 来源图纸/识别途径/类型标签 */
+export function collectSourceInfo(
+  items: { src?: string; source?: string; type_label?: string; type_text?: string }[],
+): Pick<ElementUserData, 'sourceDrawings' | 'sourcePaths' | 'typeLabels'> {
+  const drawings = new Set<string>()
+  const paths = new Set<string>()
+  const types = new Set<string>()
+  for (const it of items) {
+    if (it.src) drawings.add(it.src)
+    if (it.source) paths.add(it.source)
+    if (it.type_label) types.add(it.type_text || it.type_label)
+  }
+  return {
+    sourceDrawings: Array.from(drawings).slice(0, 50),
+    sourcePaths: Array.from(paths),
+    typeLabels: Array.from(types).slice(0, 10),
+  }
 }
 
 /** 由命中的 faceIndex 反查是哪台设备（区间按 faceEnd 升序，取首个 faceIndex < faceEnd） */
@@ -253,8 +279,12 @@ export function buildFloorElementMeshes(
   const baseY = floorY
   const storyH = real?.storyHeight ?? ELEMENT_STORY_HEIGHT
   const meshes: THREE.Mesh[] = []
-  const meta = (elementType: string, count: number): ElementUserData => ({
-    kind: 'element', elementType, floorKey, buildingKey, count,
+  const meta = (
+    elementType: string,
+    items: { src?: string; source?: string; type_label?: string; type_text?: string }[],
+  ): ElementUserData => ({
+    kind: 'element', elementType, floorKey, buildingKey, count: items.length,
+    ...collectSourceInfo(items),
   })
 
   const columnGeoms: THREE.BufferGeometry[] = []
@@ -262,7 +292,7 @@ export function buildFloorElementMeshes(
     const shape = outlineShape(column.outline, t)
     if (shape) columnGeoms.push(extrudeUp(shape, storyH, baseY))
   }
-  const columns = mergedMesh(columnGeoms, ELEMENT_COLORS.columns, meta('columns', elements.columns.length))
+  const columns = mergedMesh(columnGeoms, ELEMENT_COLORS.columns, meta('columns', elements.columns))
   if (columns) meshes.push(columns)
 
   const wallGeoms: THREE.BufferGeometry[] = []
@@ -272,7 +302,7 @@ export function buildFloorElementMeshes(
       if (box) wallGeoms.push(box)
     }
   }
-  const walls = mergedMesh(wallGeoms, ELEMENT_COLORS.walls, meta('walls', elements.walls.length))
+  const walls = mergedMesh(wallGeoms, ELEMENT_COLORS.walls, meta('walls', elements.walls))
   if (walls) meshes.push(walls)
 
   const beamGeoms: THREE.BufferGeometry[] = []
@@ -286,7 +316,7 @@ export function buildFloorElementMeshes(
       if (box) beamGeoms.push(box)
     }
   }
-  const beams = mergedMesh(beamGeoms, ELEMENT_COLORS.beams, meta('beams', elements.beams.length))
+  const beams = mergedMesh(beamGeoms, ELEMENT_COLORS.beams, meta('beams', elements.beams))
   if (beams) meshes.push(beams)
 
   const slabGeoms: THREE.BufferGeometry[] = []
@@ -294,7 +324,7 @@ export function buildFloorElementMeshes(
     const shape = outlineShape(slab.outline, t)
     if (shape) slabGeoms.push(extrudeUp(shape, SLAB_RENDER_THICKNESS, baseY - SLAB_RENDER_THICKNESS))
   }
-  const slabs = mergedMesh(slabGeoms, ELEMENT_COLORS.slabs, meta('slabs', elements.slabs.length), 0.5)
+  const slabs = mergedMesh(slabGeoms, ELEMENT_COLORS.slabs, meta('slabs', elements.slabs), 0.5)
   if (slabs) meshes.push(slabs)
 
   meshes.push(...buildPipeMeshes(elements, t, baseY, floorKey, buildingKey))
@@ -386,4 +416,104 @@ function buildPipeMeshes(
     if (mesh) meshes.push(mesh)
   })
   return meshes
+}
+
+// ── E2 轴网层 ────────────────────────────────────────────────────
+
+const AXIS_LINE_COLOR = 0x8c8c8c
+const AXIS_LABEL_SIZE_M = 2.4        // 轴号标签牌尺寸（米）
+const AXIS_EXTEND_M = 3              // 轴线越出构件包络的出头长度（米）
+const AXIS_LABEL_CANVAS_PX = 64
+
+/** 轴号 → CanvasTexture 缓存：轴号跨楼层大量重复（"1"/"A"…），共享纹理防内存膨胀 */
+const axisLabelTextureCache = new Map<string, THREE.CanvasTexture>()
+
+function axisLabelTexture(label: string): THREE.CanvasTexture | null {
+  const cached = axisLabelTextureCache.get(label)
+  if (cached) return cached
+  const canvas = document.createElement('canvas')
+  canvas.width = AXIS_LABEL_CANVAS_PX
+  canvas.height = AXIS_LABEL_CANVAS_PX
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  const center = AXIS_LABEL_CANVAS_PX / 2
+  ctx.fillStyle = '#ffffff'
+  ctx.strokeStyle = '#595959'
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.arc(center, center, center - 4, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.stroke()
+  ctx.fillStyle = '#262626'
+  ctx.font = `bold ${label.length > 2 ? 22 : 30}px sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(label, center, center + 1)
+  const texture = new THREE.CanvasTexture(canvas)
+  axisLabelTextureCache.set(label, texture)
+  return texture
+}
+
+function axisLabelSprite(label: string, position: THREE.Vector3): THREE.Sprite | null {
+  const texture = axisLabelTexture(label)
+  if (!texture) return null
+  const material = new THREE.SpriteMaterial({ map: texture, depthTest: false })
+  const sprite = new THREE.Sprite(material)
+  sprite.position.copy(position)
+  sprite.scale.set(AXIS_LABEL_SIZE_M, AXIS_LABEL_SIZE_M, 1)
+  return sprite
+}
+
+/**
+ * 楼层轴网（E2）：识别出的轴线 + 轴号标签，整层一个 Group
+ * （elementType='axes'，与其他构件图层共用 elementFilter 显隐机制；
+ * raycast 非递归遍历不命中 Group——轴网不可拾取，纯参照显示）。
+ *
+ * 仅真实坐标模式渲染（axes 坐标与构件同为米坐标系）。
+ */
+export function buildFloorAxes(
+  axes: SceneFloorAxes,
+  floorY: number,
+  floorKey: string,
+  buildingKey: string,
+  real: RealPlanOptions,
+  extent: { minX: number; maxX: number; minY: number; maxY: number },
+): THREE.Group | null {
+  if (!axes.x.length && !axes.y.length) return null
+  const t = realTransform(real.center)
+  const y = floorY + 0.05 // 略抬避免与楼板 z-fighting
+  const positions: number[] = []
+  const group = new THREE.Group()
+
+  const zMin = t.toZ(extent.minY) - AXIS_EXTEND_M
+  const zMax = t.toZ(extent.maxY) + AXIS_EXTEND_M
+  for (const axis of axes.x) {
+    const x = t.toX(axis.coord)
+    positions.push(x, y, zMin, x, y, zMax)
+    const sprite = axisLabelSprite(axis.label, new THREE.Vector3(x, y, zMin - 1))
+    if (sprite) group.add(sprite)
+  }
+  const xMin = t.toX(extent.minX) - AXIS_EXTEND_M
+  const xMax = t.toX(extent.maxX) + AXIS_EXTEND_M
+  for (const axis of axes.y) {
+    const z = t.toZ(axis.coord)
+    positions.push(xMin, y, z, xMax, y, z)
+    const sprite = axisLabelSprite(axis.label, new THREE.Vector3(xMin - 1, y, z))
+    if (sprite) group.add(sprite)
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  const lines = new THREE.LineSegments(
+    geometry,
+    new THREE.LineBasicMaterial({ color: AXIS_LINE_COLOR, transparent: true, opacity: 0.65 }),
+  )
+  group.add(lines)
+
+  const data: ElementUserData = {
+    kind: 'element', elementType: 'axes', floorKey, buildingKey,
+    count: axes.x.length + axes.y.length,
+  }
+  group.userData = data
+  return group
 }

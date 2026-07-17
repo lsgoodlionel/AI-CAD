@@ -5,6 +5,7 @@ import {
 } from 'antd'
 import type { TableProps } from 'antd'
 import { ArrowLeftOutlined, BuildOutlined, EyeOutlined } from '@ant-design/icons'
+import DrawingPreviewModal from '@/components/DrawingPreviewModal'
 import {
   getReviewBatch,
   coerceJson,
@@ -178,6 +179,7 @@ export default function ReviewBatchDetailPage() {
   const navigate = useNavigate()
   const [detail, setDetail] = useState<ReviewBatchDetail | null>(null)
   const [loading, setLoading] = useState(true)
+  const [preview, setPreview] = useState<{ id: string; title: string } | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout>>()
 
   useEffect(() => {
@@ -296,16 +298,27 @@ export default function ReviewBatchDetailPage() {
     },
     {
       title: '操作',
-      width: 80,
+      width: 140,
       render: (_, row) => (
-        <Button
-          type="link"
-          size="small"
-          icon={<EyeOutlined />}
-          onClick={() => navigate(`/drawings/${row.drawing_id}`)}
-        >
-          查看
-        </Button>
+        <>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() =>
+              setPreview({ id: row.drawing_id, title: `${row.drawing_no} ${row.title}` })
+            }
+          >
+            预览
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => navigate(`/drawings/${row.drawing_id}`)}
+          >
+            详情
+          </Button>
+        </>
       ),
     },
   ]
@@ -393,6 +406,12 @@ export default function ReviewBatchDetailPage() {
           )}
         </Card>
       </Space>
+
+      <DrawingPreviewModal
+        drawingId={preview?.id ?? null}
+        title={preview?.title}
+        onClose={() => setPreview(null)}
+      />
     </div>
   )
 }

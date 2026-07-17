@@ -65,7 +65,7 @@ async def daily_cost(
                ROUND(SUM(cl.cost_usd)::numeric, 4) AS cost_usd,
                COUNT(*) AS calls
         FROM llm_call_logs cl
-        WHERE cl.created_at >= now() - ($1 || ' days')::interval {where}
+        WHERE cl.created_at >= now() - make_interval(days => $1) {where}
         GROUP BY DATE(cl.created_at), cl.engine_name
         ORDER BY day, cl.engine_name
         """,
@@ -99,15 +99,20 @@ async def error_list(
 
 @router.get("/circuit-breakers")
 async def cb_status(db=Depends(get_db), _=Depends(require_admin)):
-    """所有断路器当前状态（从 Redis 读取）"""
+    """所有断路器当前状态（从 Redis 读取）
+
+    兼容 decode_responses 两种配置:True 时 keys() 已是 str,False 时为 bytes。
+    """
+    import json
+
     from dependencies import get_redis
-    from core.llm.circuit_breaker import CircuitBreaker
+
     redis = await get_redis()
     keys = await redis.keys("cb:*")
     result = []
     for key in keys:
-        import json
         raw = await redis.get(key)
         data = json.loads(raw) if raw else {}
-        result.append({"key": key.decode(), **data})
+        key_str = key if isinstance(key, str) else key.decode()
+        result.append({"key": key_str, **data})
     return result

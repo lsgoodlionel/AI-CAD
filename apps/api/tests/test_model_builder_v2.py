@@ -110,7 +110,7 @@ def _fake_elements() -> dict:
     }
 
 
-async def _fake_build_floor_elements(executor, floor_drawings, file_getter):
+async def _fake_build_floor_elements(executor, floor_drawings, file_getter, *args, **kwargs):
     return _fake_elements(), 0, {"elevations": [0.0, 4.5], "registered": 0}
 
 

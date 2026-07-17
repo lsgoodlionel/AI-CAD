@@ -144,7 +144,7 @@ def _skip_element_recognition(monkeypatch):
     """本文件专注 V1 契约：跳过 V2 构件识别（V2 路径见 test_model_builder_v2.py）。"""
     import services.model_elements as model_elements
 
-    async def _empty(executor, floor_drawings, file_getter):
+    async def _empty(executor, floor_drawings, file_getter, *args, **kwargs):
         return {k: [] for k in model_elements.EMPTY_ELEMENTS}, 0
 
     monkeypatch.setattr(model_elements, "build_floor_elements", _empty)
@@ -265,7 +265,7 @@ async def test_build_scene_lod300_requires_explicit_scope_evidence(fake_db, monk
         }
     ]
 
-    async def _elements_with_lod_evidence(executor, floor_drawings, file_getter):
+    async def _elements_with_lod_evidence(executor, floor_drawings, file_getter, *args, **kwargs):
         return (
             {
                 "columns": [
@@ -308,7 +308,7 @@ async def test_build_scene_lod300_requires_explicit_scope_evidence(fake_db, monk
 async def test_build_scene_does_not_infer_lod300_from_geometry_or_elevation(fake_db, monkeypatch):
     monkeypatch.setattr(model_builder, "_render_and_upload_sync", _fake_render)
 
-    async def _elements_without_lod_evidence(executor, floor_drawings, file_getter):
+    async def _elements_without_lod_evidence(executor, floor_drawings, file_getter, *args, **kwargs):
         return (
             {
                 "columns": [

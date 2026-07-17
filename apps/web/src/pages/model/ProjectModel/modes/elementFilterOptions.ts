@@ -14,8 +14,10 @@ export const ELEMENT_TYPE_LABEL: Record<string, string> = {
 
 export function elementFilterOptions(scene: ModelScene): { label: string; value: string }[] {
   const systems = new Set<string>()
+  let hasAxes = false
   for (const floor of scene.floors as SceneFloorV2[]) {
     for (const pipe of floor.elements?.pipes ?? []) systems.add(pipe.system)
+    if (floor.axes && (floor.axes.x?.length || floor.axes.y?.length)) hasAxes = true
   }
   return [
     ...['columns', 'walls', 'beams', 'slabs'].map((kind) => ({
@@ -26,5 +28,7 @@ export function elementFilterOptions(scene: ModelScene): { label: string; value:
     })),
     { label: ELEMENT_TYPE_LABEL.equipment, value: 'equipment' },
     { label: '外观壳体', value: 'shell' },
+    // E2 轴网层：scene 携带轴网数据时才出现（识别出的轴线位置+轴号）
+    ...(hasAxes ? [{ label: '轴网', value: 'axes' }] : []),
   ]
 }

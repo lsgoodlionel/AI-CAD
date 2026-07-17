@@ -117,9 +117,18 @@ async def call_vlm_chat(
         "model": model,
         "messages": [{"role": "user", "content": prompt, "images": [image_b64]}],
         "stream": False,
-        "options": {"temperature": 0.1},
+        # 思考型模型(qwen3.5)默认 num_predict=128 太小,思考未完就截断致 content 空;
+        # 给足预算让其产出结论。
+        "options": {"temperature": 0.1, "num_predict": 800},
     }
-    async with httpx.AsyncClient(timeout=timeout) as client:
+    # 远程网关常经 Cloudflare 前置,拦无浏览器 UA 的 POST(默认 httpx UA 会 403)。
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36"
+        ),
+    }
+    async with httpx.AsyncClient(timeout=timeout, headers=headers) as client:
         response = await client.post(f"{base_url.rstrip('/')}/api/chat", json=payload)
         response.raise_for_status()
         data = response.json()

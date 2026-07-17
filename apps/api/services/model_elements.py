@@ -13,6 +13,7 @@ from dataclasses import replace
 from functools import lru_cache
 from typing import Any, Callable
 
+from services.drawing_view_classifier import classify_view_type
 from services.model_story import detect_building_unit
 
 logger = logging.getLogger(__name__)
@@ -90,7 +91,9 @@ def pick_element_drawings(floor_drawings: list[dict]) -> dict[str, list[dict]]:
     }
 
 
-def _recognize_sync(data: bytes, ext: str, discipline: str, drawing_id: str) -> dict | None:
+def _recognize_sync(
+    data: bytes, ext: str, discipline: str, drawing_id: str, allow_circles: bool = False,
+) -> dict | None:
     """线程池内执行：几何提取 + 构件识别 + spotting 融合回灌 → {elements, axes}；失败返回 None。"""
     from core.model3d import extract_dxf_geometry, extract_pdf_geometry, recognize
 
@@ -104,7 +107,72 @@ def _recognize_sync(data: bytes, ext: str, discipline: str, drawing_id: str) -> 
         return None
     result = recognize(geom, discipline, drawing_id)
     elements = _reinject_fusion(result.as_dict(), geom, drawing_id)
+    # E3/路径B：PDF 圆形桩/圆柱补识别——几何识别器只抓闭合近方多段线,抓不到
+    # 圆(桩/钢立柱多画成圆)。栅格 HoughCircles 检圆 → 米坐标八边形柱,去重后并入。
+    # 双闸防误检:①仅平面图(allow_circles,剖面/详图里的钢筋圆不算桩)
+    #            ②仅结构/通用专业(机电图圆多是设备/管件)。
+    if allow_circles and ext == "pdf" and discipline in ("structure", "general"):
+        elements["columns"] = _augment_circle_columns(
+            data, geom, elements.get("columns") or [], drawing_id
+        )
+        # E3-4:桩增强后若无板,用桩包络补底板(基坑楼层得到板参与体量/算量)
+        elements["slabs"] = ensure_slab_from_columns(
+            elements.get("columns") or [], elements.get("slabs") or []
+        )
     return {"elements": elements, "axes": result.axes}
+
+
+# 桩包络补板参数(米):足量柱/桩才补,外扩边距,最小面积
+_SLAB_FROM_PILES_MIN = 8
+_SLAB_ENVELOPE_MARGIN_M = 1.0
+_SLAB_MIN_AREA_M2 = 10.0
+_PILE_SLAB_THICKNESS_M = 0.5   # 基坑底板偏厚
+
+
+def ensure_slab_from_columns(
+    columns: list[dict], existing_slabs: list[dict],
+) -> list[dict]:
+    """E3-4:该图有大量柱/桩却无板时,用柱/桩包络补一块底板(基坑楼层)。
+
+    已有板则原样返回(不覆盖识别结果)。纯函数,离线可测。
+    """
+    if existing_slabs:
+        return existing_slabs
+    pts: list[tuple[float, float]] = []
+    for col in columns:
+        for p in col.get("outline") or []:
+            if len(p) >= 2:
+                pts.append((float(p[0]), float(p[1])))
+    if len(columns) < _SLAB_FROM_PILES_MIN or len(pts) < 3:
+        return existing_slabs
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    m = _SLAB_ENVELOPE_MARGIN_M
+    x0, x1, y0, y1 = min(xs) - m, max(xs) + m, min(ys) - m, max(ys) + m
+    if (x1 - x0) * (y1 - y0) < _SLAB_MIN_AREA_M2:
+        return existing_slabs
+    return [{
+        "outline": [[round(x0, 3), round(y0, 3)], [round(x1, 3), round(y0, 3)],
+                    [round(x1, 3), round(y1, 3)], [round(x0, 3), round(y1, 3)]],
+        "thickness": _PILE_SLAB_THICKNESS_M,
+        "src": "piles-envelope",
+    }]
+
+
+def _augment_circle_columns(
+    data: bytes, geom, existing_columns: list[dict], drawing_id: str,
+) -> list[dict]:
+    """圆检测补柱并去重（失败返回原柱,绝不阻断）。"""
+    try:
+        from core.model3d.circle_detector import dedupe_against, detect_pile_columns
+        circles = detect_pile_columns(data, geom, src=drawing_id)
+        if not circles:
+            return existing_columns
+        fresh = dedupe_against(circles, existing_columns)
+        return existing_columns + fresh
+    except Exception as exc:  # noqa: BLE001 — 圆柱补充失败不影响既有识别
+        logger.warning("[ModelElements] 圆柱补充跳过 %s: %s", drawing_id, exc)
+        return existing_columns
 
 
 # ── D-09：符号 spotting 融合回灌（fusion 引擎补规则漏召回，强规则不被覆盖）──
@@ -396,9 +464,12 @@ async def _recognize_one(
         return None
     try:
         data = await loop.run_in_executor(executor, file_getter, file_key)
+        # 圆检测仅对平面图开启(剖面/立面/详图里的圆多是钢筋/符号,非平面桩)
+        allow_circles = classify_view_type(drawing).view_type in ("plan", "unknown")
         return await asyncio.wait_for(
             loop.run_in_executor(
-                executor, _recognize_sync, data, ext, discipline, str(drawing["id"])
+                executor, _recognize_sync, data, ext, discipline,
+                str(drawing["id"]), allow_circles,
             ),
             timeout=_RECOGNIZE_TIMEOUT_SEC,
         )
@@ -416,12 +487,18 @@ def _merge_elements(target: dict[str, list], parts: dict | None, kinds: tuple[st
 
 async def build_floor_elements(
     executor, floor_drawings: list[dict], file_getter: Callable[[str], bytes],
+    archive_axes_by_drawing: dict | None = None, transforms: dict | None = None,
+    archive_text_by_drawing: dict | None = None,
 ) -> tuple[dict[str, list], int, dict]:
     """构建单楼层 elements（识别 → 轴号配准 → 合并 + YOLO 补充）。
 
     返回 (elements, yolo_count, floor_meta)；floor_meta 含
-    ``{"elevations": [标高候选], "registered": 配准图数}``。
+    ``{"elevations": [标高候选], "registered": 配准图数, "axes": ...}``。
     core.model3d 缺失时返回 (全空, 0, {})。
+
+    A2:传入 archive_axes_by_drawing/transforms 时,每图的档案轴号(好标签)经
+    该图坐标变换转米(同图同变换,与识别路径同坐标系),并入聚合——升级识别路径
+    的 "X" 噪声标签、补识别未命中的轴线。
     """
     empty = {key: [] for key in EMPTY_ELEMENTS}
     try:
@@ -440,6 +517,8 @@ async def build_floor_elements(
     elements: dict[str, list] = empty
     elevations: list[float] = []
     ref_axes: dict | None = None
+    ref_axes_drawing_id: str | None = None
+    aggregated_axes: dict | None = None  # 跨该层所有图配准对齐后聚合的轴网
     registered = 0
     for drawing, discipline, kinds in tasks:
         result = await _recognize_one(loop, executor, drawing, discipline, file_getter)
@@ -448,19 +527,154 @@ async def build_floor_elements(
         axes = result.get("axes") or {}
         elevations.extend(axes.get("elevations") or [])
         part = result["elements"]
+        # A2：并入本图档案轴号(好标签,经该图变换转米,与识别轴号同坐标系)
+        did = str(drawing.get("id") or "")
+        if archive_axes_by_drawing and transforms and did in transforms:
+            arch_items = archive_axes_by_drawing.get(did) or []
+            if arch_items:
+                arch = archive_axes_to_scene(arch_items, transforms[did])
+                axes = _merge_axes(dict(axes), arch)
+        # C-下一步：按位置给本图构件附类型标签(钢构/幕墙/围护桩;OCR 短标签
+        # 经该图变换转米就近关联,与构件同坐标系;配准前处理,标签随构件平移)
+        if archive_text_by_drawing and transforms and did in transforms:
+            text_items = archive_text_by_drawing.get(did) or []
+            if text_items:
+                part = _attach_component_type_labels(part, text_items, transforms[did])
         # 轴号配准：以本层首张带轴号的图为参考系，其余图按共有轴号平移对齐
         if _has_labeled_axes(axes):
             if ref_axes is None:
                 ref_axes = axes
+                ref_axes_drawing_id = str(drawing.get("id") or "")
+                aligned_axes = axes
             else:
                 dx, dy = register_offset(ref_axes, axes)
                 part = _shift_elements(part, dx, dy)
+                aligned_axes = _shift_axes(axes, dx, dy)
                 registered += 1
+            # E2 覆盖提升：聚合本层所有已识别图的轴网（对齐到同一坐标系），
+            # 不再只取首张——多张结构/梁图各识别到部分轴线，并集才完整。
+            aggregated_axes = _merge_axes(aggregated_axes, aligned_axes)
         _merge_elements(elements, part, kinds)
 
     yolo_count = await _yolo_supplement(loop, executor, picked["mep"], elements, file_getter)
-    meta = {"elevations": sorted(set(elevations)), "registered": registered}
+    meta = {
+        "elevations": sorted(set(elevations)),
+        "registered": registered,
+        "axes": _axes_scene_payload(aggregated_axes, ref_axes_drawing_id),
+    }
     return elements, yolo_count, meta
+
+
+_AXIS_MERGE_TOL_M = 0.3  # 同轴线去重容差（米）
+
+
+def _shift_axes(axes: dict, dx: float, dy: float) -> dict:
+    """按配准偏移平移轴网坐标（x 位置移 dx、y 位置移 dy），对齐到参考坐标系。"""
+    return {
+        "x": [[label, float(pos) + dx] for label, pos in (axes.get("x") or [])],
+        "y": [[label, float(pos) + dy] for label, pos in (axes.get("y") or [])],
+    }
+
+
+def _merge_axes(agg: dict | None, new: dict) -> dict:
+    """并入一张图的轴网：按坐标去重（容差内视为同轴），无标签者被有标签者升级。"""
+    if agg is None:
+        agg = {"x": [], "y": []}
+    for direction in ("x", "y"):
+        existing = agg[direction]
+        for label, pos in (new.get(direction) or []):
+            pos = float(pos)
+            hit = next(
+                (e for e in existing if abs(e[1] - pos) < _AXIS_MERGE_TOL_M), None
+            )
+            if hit is None:
+                existing.append([label, pos])
+            elif not str(hit[0]).strip() and str(label).strip():
+                hit[0] = label  # 无标签轴线 → 升级为带标签
+    return agg
+
+
+def _attach_component_type_labels(part: dict, text_items: list[dict], transform) -> dict:
+    """C-下一步:档案短标签 → 构件类型,就近关联到本图构件(失败返回原 part)。"""
+    try:
+        from core.model3d.component_labels import (
+            attach_type_labels,
+            classify_component_labels,
+        )
+        labels = classify_component_labels(text_items, transform)
+        if not labels:
+            return part
+        return attach_type_labels(part, labels)
+    except Exception:  # noqa: BLE001 — 类型标签失败不影响几何构件
+        return part
+
+
+def archive_axes_to_scene(archive_items: list[dict], transform) -> dict:
+    """档案 axis 项(label + pt 位置)→ scene 轴网格式 {"x":[[label,pos_m]], "y":[...]}。
+
+    A2:档案 OCR/矢量抽出的轴号质量高(真实 1/2/3/A/B),但坐标是页面点;
+    经每图坐标变换(A1)转米,与识别路径 _merge_axes 合并(升级 "X" 标签 + 补覆盖)。
+    方向按轴号惯例:纯数字→x(竖轴),字母→y(横轴)。
+    """
+    from services.drawing_transform import pt_to_meter
+
+    x_axes: list[list] = []
+    y_axes: list[list] = []
+    for item in archive_items:
+        label = str(item.get("content") or "").strip()
+        if not _is_grid_label(label):
+            continue
+        loc = item.get("location_json") or {}
+        x_pt, y_pt = loc.get("x"), loc.get("y")
+        if x_pt is None or y_pt is None:
+            continue
+        x_m, y_m = pt_to_meter(float(x_pt), float(y_pt), transform)
+        if label.isdigit():
+            x_axes.append([label, x_m])       # 数字轴号 → 竖轴(x 位置)
+        else:
+            y_axes.append([label, y_m])       # 字母轴号 → 横轴(y 位置)
+    return {"x": x_axes, "y": y_axes}
+
+
+def _is_grid_label(label: str) -> bool:
+    """真实轴号判定：纯数字(1,2,3…)、1–2 位字母(A,B,AA)、或分区号(1/A)。
+
+    去噪：滤掉说明文字/超长串等误分类为轴号的噪声（>3 字符且非上述形态）。
+    """
+    s = (label or "").strip()
+    if not s or len(s) > 3:
+        return False
+    if s.isdigit():
+        return True
+    if "/" in s and len(s) <= 3:
+        return True
+    if s.isalpha() and len(s) <= 2:
+        return True
+    return False
+
+
+def _axes_scene_payload(axes: dict | None, source_drawing_id: str | None) -> dict | None:
+    """聚合轴网 → scene floor.axes 载荷；无带标签轴网返回 None。
+
+    输出：{"x": [{"label","coord"}...], "y": [...], "source_drawing_id"}，
+    坐标为米（与构件同坐标系），仅收带标签且通过去噪的轴线，按坐标排序。
+    """
+    if not axes:
+        return None
+
+    def _entries(direction: str) -> list[dict]:
+        out = [
+            {"label": str(label).strip(), "coord": round(float(pos), 3)}
+            for label, pos in (axes.get(direction) or [])
+            if _is_grid_label(str(label or ""))
+        ]
+        return sorted(out, key=lambda e: e["coord"])
+
+    x_entries = _entries("x")
+    y_entries = _entries("y")
+    if not x_entries and not y_entries:
+        return None
+    return {"x": x_entries, "y": y_entries, "source_drawing_id": source_drawing_id or ""}
 
 
 async def _yolo_supplement(

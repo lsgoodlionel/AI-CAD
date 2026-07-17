@@ -92,3 +92,13 @@ def get_file_bytes(object_key: str, bucket: str | None = None) -> bytes:
 def delete_object(object_key: str, bucket: str | None = None) -> None:
     bucket = bucket or settings.minio_bucket_drawings
     get_minio().remove_object(bucket, object_key)
+
+
+def object_exists(object_key: str, bucket: str | None = None) -> bool:
+    """对象是否存在（stat 探测；网络/权限异常一律视为不存在,由调用方降级）。"""
+    bucket = bucket or settings.minio_bucket_drawings
+    try:
+        get_minio().stat_object(bucket, object_key)
+        return True
+    except Exception:  # noqa: BLE001 — S3Error/网络错误统一按 miss 处理
+        return False

@@ -36,13 +36,25 @@ export interface SceneFloor {
 export type ElementPoint = number[]
 
 /** 柱：真实轮廓挤出 */
-export interface ElementColumn {
+/** 构件类型标签(C-下一步:档案 OCR 文字反哺,如 steel/curtain_wall/pile) */
+export interface ComponentTypeLabel {
+  /** steel | curtain_wall | pile | diaphragm_wall | retaining_wall | exterior_wall */
+  type_label?: string
+  /** 原始 OCR 文本(如"钢立柱"/"幕墙") */
+  type_text?: string
+}
+
+export interface ElementColumn extends ComponentTypeLabel {
   outline: ElementPoint[]
   src: string
+  /** 识别途径:rule(几何规则)/circle(圆检测)/model/fused/human */
+  source?: string
+  /** 圆检测桩为 'circle' */
+  shape?: string
 }
 
 /** 墙：中线 path + 墙厚 */
-export interface ElementWall {
+export interface ElementWall extends ComponentTypeLabel {
   path: ElementPoint[]
   width: number
   src: string
@@ -99,12 +111,21 @@ export interface SceneElementStats {
   equipment: number
 }
 
+/** 楼层轴网（E2：配准参考轴网入 scene，坐标为米、与构件同坐标系） */
+export interface SceneFloorAxes {
+  x: { label: string; coord: number }[]
+  y: { label: string; coord: number }[]
+  source_drawing_id: string
+}
+
 /** V2 楼层：V1 字段全保留，追加 elements / element_stats / 真实标高 */
 export interface SceneFloorV2 extends SceneFloor {
   /** 图纸标高文本推导的真实标高（米）；无法确定时为 null */
   elevation_m?: number | null
   elements?: SceneFloorElements
   element_stats?: SceneElementStats
+  /** 楼层轴网（无带轴号图时为 null/缺省，前端判空不渲染） */
+  axes?: SceneFloorAxes | null
 }
 
 /** 单体（南区/北区/main…）；origin 后端恒 [0,0]，布局由前端计算 */

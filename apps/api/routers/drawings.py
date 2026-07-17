@@ -18,7 +18,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from core.config import settings
-from core.storage import upload_file, presigned_get_url, get_file_bytes
+from core.storage import upload_file, presigned_get_url, get_file_bytes, object_exists
 from core.workflow.drawing_state_machine import assert_valid_transition
 from dependencies import get_db, get_current_user
 from services.audit import write_audit
@@ -140,6 +140,22 @@ async def _create_drawing_record(
     )
     if auto_review:
         run_ai_review.delay(drawing_id)
+
+    # E1.5-2：导入即建档案——置 pending + 触发抽取(OCR/矢量/VLM 落档案层)。
+    # 档案是全平台单一真相源(建模/工程信息/审图/算量都读它),故导入即抽取一次。
+    try:
+        await db.execute(
+            """
+            INSERT INTO drawing_archive_status (drawing_id, project_id, status)
+            VALUES ($1, $2, 'pending')
+            ON CONFLICT (drawing_id) DO UPDATE SET status='pending', updated_at=now()
+            """,
+            drawing_id, project_id,
+        )
+        from tasks.drawing_info_extract import extract_single_drawing_info
+        extract_single_drawing_info.delay(drawing_id)
+    except Exception as exc:  # noqa: BLE001 — 建档失败不阻断上传
+        logger.warning("[drawings] 档案抽取触发失败 %s: %s", drawing_id, exc)
 
     # 重大变更预警（≥ 50 万，后续升级审批路径）
     if estimated_impact and estimated_impact >= ESCALATION_IMPACT_THRESHOLD:
@@ -594,6 +610,81 @@ async def get_download_url(
         raise HTTPException(404)
     url = presigned_get_url(row["file_key"], expires_seconds=300)
     return {"url": url, "expires_in": 300}
+
+
+# ── 统一预览（Phase E1-4）─────────────────────────────────────
+
+_PREVIEW_IMAGE_EXTS = {"png", "jpg", "jpeg", "webp"}
+_PREVIEW_CAD_EXTS = {"dxf", "dwg"}
+
+
+async def _render_preview_asset(
+    project_id: str, drawing_id: str, file_key: str, file_ext: str
+) -> None:
+    """按需渲染 CAD 预览图并写回 model_assets key（与建模贴图互为缓存）。"""
+    import asyncio
+
+    from services.model_builder import _render_and_upload_sync
+
+    await asyncio.to_thread(
+        _render_and_upload_sync, project_id, drawing_id, file_key, file_ext
+    )
+
+
+@router.get("/{drawing_id}/preview")
+async def get_preview(
+    drawing_id: str,
+    db=Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """统一预览入口：返回 {kind: pdf|image, url}。
+
+    - PDF → 原文件 presigned（前端 iframe 内嵌）
+    - 图片 → 原文件 presigned
+    - DXF/DWG → 模型贴图资产 PNG（miss 时按需渲染，写回同 key 供建模复用）
+    - 其余格式 → 422 PREVIEW_UNAVAILABLE（前端降级为下载）
+    """
+    row = await db.fetch_one(
+        "SELECT id, project_id, file_key FROM drawings WHERE id=$1", drawing_id
+    )
+    if not row or not row["file_key"]:
+        raise HTTPException(404)
+
+    file_key = row["file_key"]
+    project_id = str(row["project_id"])
+    ext = file_key.rsplit(".", 1)[-1].lower() if "." in file_key else ""
+
+    if ext == "pdf":
+        return {"kind": "pdf", "url": presigned_get_url(file_key, expires_seconds=300)}
+    if ext in _PREVIEW_IMAGE_EXTS:
+        return {"kind": "image", "url": presigned_get_url(file_key, expires_seconds=300)}
+    if ext in _PREVIEW_CAD_EXTS:
+        asset_key = f"projects/{project_id}/model_assets/{drawing_id}.png"
+        if not object_exists(asset_key):
+            try:
+                await _render_preview_asset(project_id, drawing_id, file_key, ext)
+            except Exception as exc:  # noqa: BLE001 — 渲染失败对外统一 422
+                logger.warning("[preview] CAD 渲染失败 drawing_id=%s: %s", drawing_id, exc)
+                raise HTTPException(422, "PREVIEW_UNAVAILABLE") from exc
+        return {"kind": "image", "url": presigned_get_url(asset_key, expires_seconds=300)}
+
+    raise HTTPException(422, "PREVIEW_UNAVAILABLE")
+
+
+# ── 图纸追溯(Phase G:识别了什么 + 用在哪)─────────────────────
+
+@router.get("/{drawing_id}/trace")
+async def get_drawing_trace(
+    drawing_id: str,
+    db=Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """正向追溯:这张图识别出的信息(按类别/抽取器)+ 模型用途(生成的构件/楼层)。"""
+    from services.drawing_trace import build_drawing_trace
+    trace = await build_drawing_trace(db, drawing_id)
+    if trace is None:
+        raise HTTPException(404, "DRAWING_NOT_FOUND")
+    return trace
 
 
 # ── AI 审查报告 ────────────────────────────────────────────────
