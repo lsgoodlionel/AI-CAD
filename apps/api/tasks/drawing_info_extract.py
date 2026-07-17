@@ -92,8 +92,28 @@ async def _set_status(db, drawing_id: str, project_id: str, status: str,
         logger.debug("[drawing_info] 状态更新跳过 %s: %s", drawing_id, exc)
 
 
-async def _run_vlm(file_bytes: bytes, ext: str) -> tuple[list, str]:
-    """渲染位图 → 远程 VLM 读图 → (档案条目, backend);失败降级 ([], 'none')。"""
+_VLM_PROVIDER_SQL = (
+    "SELECT base_url FROM llm_providers WHERE name = :name AND is_active = true LIMIT 1"
+)
+
+
+async def _resolve_vlm_base_url(db) -> str | None:
+    """用任务自己的 db 连接查远程 VLM 端点(celery worker 无 app 共享连接)。"""
+    try:
+        row = await db.fetch_one(_VLM_PROVIDER_SQL, {"name": "Ollama 远程"})
+        return (row["base_url"] if row else None) or None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+async def _run_vlm(file_bytes: bytes, ext: str, base_url: str | None) -> tuple[list, str]:
+    """渲染位图 → 远程 VLM 读图 → (档案条目, backend);失败降级 ([], 'none')。
+
+    base_url 由调用方用任务 db 查出显式传入(worker 无 app 共享 DB 连接,
+    read_drawing_vlm 内部的 DB 端点解析在 worker 里会失败)。
+    """
+    if not base_url:
+        return [], "none"
     try:
         from services.drawing_info_extractor import items_from_vlm
 
@@ -108,7 +128,7 @@ async def _run_vlm(file_bytes: bytes, ext: str) -> tuple[list, str]:
             finally:
                 doc.close()
         from core.model3d.vlm_read import read_drawing_vlm
-        result = await read_drawing_vlm(img_bytes)
+        result = await read_drawing_vlm(img_bytes, base_url=base_url)
         return items_from_vlm(result), getattr(result, "backend", "none")
     except Exception as exc:  # noqa: BLE001 — VLM 失败不阻断扫描
         logger.warning("[drawing_info] VLM 读图跳过: %s", exc)
@@ -138,7 +158,8 @@ async def _extract_one(db, row: dict, version: int, with_vlm: bool = False) -> i
     # F1：VLM 读图(判专业/标高/构件候选)——全量扫描时启用,慢但独立降级
     vlm_backend = "skipped"
     if with_vlm and ext in ("pdf", "png", "jpg", "jpeg"):
-        vlm_items, vlm_backend = await _run_vlm(file_bytes, ext)
+        vlm_base_url = await _resolve_vlm_base_url(db)
+        vlm_items, vlm_backend = await _run_vlm(file_bytes, ext, vlm_base_url)
         items = items + vlm_items
         if vlm_backend not in ("none", "skipped"):
             extractors.append("vlm")
