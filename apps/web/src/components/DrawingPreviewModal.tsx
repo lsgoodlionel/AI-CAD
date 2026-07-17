@@ -11,10 +11,11 @@
  */
 import { useEffect, useState } from 'react'
 import { Alert, Button, Modal, Spin } from 'antd'
-import { DownloadOutlined } from '@ant-design/icons'
+import { DownloadOutlined, NodeIndexOutlined } from '@ant-design/icons'
 import { getDownloadUrl } from '@/services/drawings'
 import { getDrawingPreview } from '@/services/projectInfo'
 import type { DrawingPreview } from '@/services/projectInfo'
+import DrawingTraceDrawer from './DrawingTraceDrawer'
 
 interface DrawingPreviewModalProps {
   drawingId: string | null
@@ -32,6 +33,7 @@ export default function DrawingPreviewModal({
   const [loading, setLoading] = useState(false)
   const [preview, setPreview] = useState<DrawingPreview | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [traceOpen, setTraceOpen] = useState(false)
 
   useEffect(() => {
     if (!drawingId) return
@@ -61,6 +63,13 @@ export default function DrawingPreviewModal({
       onCancel={onClose}
       width="80%"
       footer={[
+        <Button
+          key="trace"
+          icon={<NodeIndexOutlined />}
+          onClick={() => setTraceOpen(true)}
+        >
+          识别信息 / 用途追溯
+        </Button>,
         <Button key="download" icon={<DownloadOutlined />} onClick={handleDownload}>
           下载原图
         </Button>,
@@ -91,6 +100,11 @@ export default function DrawingPreviewModal({
           />
         </div>
       ) : null}
+
+      <DrawingTraceDrawer
+        drawingId={traceOpen ? drawingId : null}
+        onClose={() => setTraceOpen(false)}
+      />
     </Modal>
   )
 }

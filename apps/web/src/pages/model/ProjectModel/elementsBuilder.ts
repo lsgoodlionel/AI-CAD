@@ -57,8 +57,33 @@ export interface ElementUserData {
   count: number
   label?: string
   src?: string
+  /** 反向追溯(G3):该合并网格构件的来源图纸 id 集合 */
+  sourceDrawings?: string[]
+  /** 识别途径集合(rule/circle/model/fused/human 等) */
+  sourcePaths?: string[]
+  /** 档案 OCR 反哺的类型标签(钢立柱/幕墙/围护桩…) */
+  typeLabels?: string[]
   /** 仅设备合批网格：逐设备拾取区间（按 faceEnd 升序），供 raycast faceIndex 反查 */
   equipmentPicks?: EquipmentPick[]
+}
+
+/** 从构件集合聚合来源(反向追溯):distinct 来源图纸/识别途径/类型标签 */
+export function collectSourceInfo(
+  items: { src?: string; source?: string; type_label?: string; type_text?: string }[],
+): Pick<ElementUserData, 'sourceDrawings' | 'sourcePaths' | 'typeLabels'> {
+  const drawings = new Set<string>()
+  const paths = new Set<string>()
+  const types = new Set<string>()
+  for (const it of items) {
+    if (it.src) drawings.add(it.src)
+    if (it.source) paths.add(it.source)
+    if (it.type_label) types.add(it.type_text || it.type_label)
+  }
+  return {
+    sourceDrawings: Array.from(drawings).slice(0, 50),
+    sourcePaths: Array.from(paths),
+    typeLabels: Array.from(types).slice(0, 10),
+  }
 }
 
 /** 由命中的 faceIndex 反查是哪台设备（区间按 faceEnd 升序，取首个 faceIndex < faceEnd） */
@@ -254,8 +279,12 @@ export function buildFloorElementMeshes(
   const baseY = floorY
   const storyH = real?.storyHeight ?? ELEMENT_STORY_HEIGHT
   const meshes: THREE.Mesh[] = []
-  const meta = (elementType: string, count: number): ElementUserData => ({
-    kind: 'element', elementType, floorKey, buildingKey, count,
+  const meta = (
+    elementType: string,
+    items: { src?: string; source?: string; type_label?: string; type_text?: string }[],
+  ): ElementUserData => ({
+    kind: 'element', elementType, floorKey, buildingKey, count: items.length,
+    ...collectSourceInfo(items),
   })
 
   const columnGeoms: THREE.BufferGeometry[] = []
@@ -263,7 +292,7 @@ export function buildFloorElementMeshes(
     const shape = outlineShape(column.outline, t)
     if (shape) columnGeoms.push(extrudeUp(shape, storyH, baseY))
   }
-  const columns = mergedMesh(columnGeoms, ELEMENT_COLORS.columns, meta('columns', elements.columns.length))
+  const columns = mergedMesh(columnGeoms, ELEMENT_COLORS.columns, meta('columns', elements.columns))
   if (columns) meshes.push(columns)
 
   const wallGeoms: THREE.BufferGeometry[] = []
@@ -273,7 +302,7 @@ export function buildFloorElementMeshes(
       if (box) wallGeoms.push(box)
     }
   }
-  const walls = mergedMesh(wallGeoms, ELEMENT_COLORS.walls, meta('walls', elements.walls.length))
+  const walls = mergedMesh(wallGeoms, ELEMENT_COLORS.walls, meta('walls', elements.walls))
   if (walls) meshes.push(walls)
 
   const beamGeoms: THREE.BufferGeometry[] = []
@@ -287,7 +316,7 @@ export function buildFloorElementMeshes(
       if (box) beamGeoms.push(box)
     }
   }
-  const beams = mergedMesh(beamGeoms, ELEMENT_COLORS.beams, meta('beams', elements.beams.length))
+  const beams = mergedMesh(beamGeoms, ELEMENT_COLORS.beams, meta('beams', elements.beams))
   if (beams) meshes.push(beams)
 
   const slabGeoms: THREE.BufferGeometry[] = []
@@ -295,7 +324,7 @@ export function buildFloorElementMeshes(
     const shape = outlineShape(slab.outline, t)
     if (shape) slabGeoms.push(extrudeUp(shape, SLAB_RENDER_THICKNESS, baseY - SLAB_RENDER_THICKNESS))
   }
-  const slabs = mergedMesh(slabGeoms, ELEMENT_COLORS.slabs, meta('slabs', elements.slabs.length), 0.5)
+  const slabs = mergedMesh(slabGeoms, ELEMENT_COLORS.slabs, meta('slabs', elements.slabs), 0.5)
   if (slabs) meshes.push(slabs)
 
   meshes.push(...buildPipeMeshes(elements, t, baseY, floorKey, buildingKey))

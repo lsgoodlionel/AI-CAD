@@ -154,6 +154,35 @@ export const getScanProgress = (
 export const getDrawingPreview = (drawingId: string): Promise<DrawingPreview> =>
   request(`/api/v1/drawings/${drawingId}/preview`, { skipErrorHandler: true })
 
+// ── 图纸追溯(Phase G:识别了什么 + 用在哪)────────────────────
+
+export interface DrawingTrace {
+  drawing: { id: string; drawing_no: string; title: string; discipline: string }
+  info: {
+    total: number
+    by_category: Record<string, number>
+    by_extractor: Record<string, number>
+  }
+  model_usage: {
+    used: boolean
+    total_elements: number
+    model_version?: number | null
+    floors: { key: string; label: string; by_kind: Record<string, number>; count: number }[]
+  }
+}
+
+export const getDrawingTrace = (drawingId: string): Promise<DrawingTrace> =>
+  request(`/api/v1/drawings/${drawingId}/trace`)
+
+export const ELEMENT_KIND_LABEL: Record<string, string> = {
+  columns: '柱/桩',
+  walls: '墙',
+  beams: '梁',
+  slabs: '板',
+  pipes: '管线',
+  equipment: '设备',
+}
+
 /** 人审修正:写 verified 行(生效值),触发建模增量重建 */
 export const verifyArchiveItem = (
   drawingId: string,

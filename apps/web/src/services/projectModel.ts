@@ -47,6 +47,10 @@ export interface ComponentTypeLabel {
 export interface ElementColumn extends ComponentTypeLabel {
   outline: ElementPoint[]
   src: string
+  /** 识别途径:rule(几何规则)/circle(圆检测)/model/fused/human */
+  source?: string
+  /** 圆检测桩为 'circle' */
+  shape?: string
 }
 
 /** 墙：中线 path + 墙厚 */
