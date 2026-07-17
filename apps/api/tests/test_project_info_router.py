@@ -124,7 +124,7 @@ async def test_extract_enqueues_celery_task(client, fake_db):
         resp = await client.post(f"{API}/extract")
 
     assert resp.status_code == 202
-    task.delay.assert_called_once_with("p-0001")
+    task.delay.assert_called_once_with("p-0001", False)
 
 
 @pytest.mark.asyncio

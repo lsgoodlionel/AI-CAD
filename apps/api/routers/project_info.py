@@ -162,12 +162,71 @@ async def info_axes(
 @router.post("/{project_id}/info/extract", status_code=202)
 async def trigger_extract(
     project_id: str,
+    with_vlm: bool = Query(default=False, description="是否含 VLM 读图(慢,~40s/图)"),
     db=Depends(get_db),
     _user=Depends(get_current_user),
 ):
-    """触发全项目工程信息重抽(异步,Celery default 队列)。"""
+    """触发全项目工程信息重抽(异步,Celery default 队列)。with_vlm=True 含 VLM 读图。"""
     exists = await db.fetch_one(_PROJECT_EXISTS_SQL, {"project_id": project_id})
     if exists is None:
         raise HTTPException(status_code=404, detail="PROJECT_NOT_FOUND")
-    async_result = extract_project_drawing_info.delay(project_id)
-    return {"task_id": str(async_result.id), "project_id": project_id}
+    async_result = extract_project_drawing_info.delay(project_id, with_vlm)
+    return {"task_id": str(async_result.id), "project_id": project_id, "with_vlm": with_vlm}
+
+
+_SCAN_OVERALL_SQL = """
+SELECT
+    (SELECT COUNT(*) FROM drawings WHERE project_id = :project_id) AS total,
+    COUNT(*) FILTER (WHERE status = 'ready')      AS ready,
+    COUNT(*) FILTER (WHERE status = 'extracting') AS extracting,
+    COUNT(*) FILTER (WHERE status = 'pending')    AS pending
+FROM drawing_archive_status WHERE project_id = :project_id
+"""
+
+_SCAN_ROWS_SQL = """
+SELECT s.drawing_id, d.drawing_no, d.title, d.discipline,
+       s.status, s.item_count, s.extractors_done, s.summary, s.updated_at
+FROM drawing_archive_status s
+JOIN drawings d ON d.id = s.drawing_id
+WHERE s.project_id = :project_id {where}
+ORDER BY s.updated_at DESC
+LIMIT :limit OFFSET :offset
+"""
+
+
+@router.get("/{project_id}/info/scan-progress")
+async def scan_progress(
+    project_id: str,
+    status: str | None = Query(default=None, description="按状态过滤 pending/extracting/ready"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=200),
+    db=Depends(get_db),
+    _user=Depends(get_current_user),
+):
+    """扫描进度:总进度 + 每图状态/已完成抽取器/各类计数/内容摘要(进度页轮询)。"""
+    overall_row = await db.fetch_one(_SCAN_OVERALL_SQL, {"project_id": project_id})
+    overall = dict(overall_row) if overall_row else {
+        "total": 0, "ready": 0, "extracting": 0, "pending": 0,
+    }
+    for k in ("total", "ready", "extracting", "pending"):
+        overall[k] = int(overall.get(k) or 0)
+    overall["percent"] = (
+        round(overall["ready"] * 100 / overall["total"]) if overall["total"] else 0
+    )
+
+    where = ""
+    params: dict[str, Any] = {"project_id": project_id}
+    if status:
+        where = "AND s.status = :status"
+        params["status"] = status
+    rows = await db.fetch_all(
+        _SCAN_ROWS_SQL.format(where=where),
+        {**params, "limit": page_size, "offset": (page - 1) * page_size},
+    )
+    drawings = []
+    for r in rows:
+        d = dict(r)
+        d["extractors_done"] = _parse_jsonb(d.get("extractors_done")) or []
+        d["summary"] = _parse_jsonb(d.get("summary")) or {}
+        drawings.append(d)
+    return {"overall": overall, "page": page, "drawings": drawings}
