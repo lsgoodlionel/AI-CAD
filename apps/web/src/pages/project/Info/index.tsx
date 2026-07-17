@@ -25,6 +25,7 @@ import {
 } from '@/services/projectInfo'
 import type { InfoItem, InfoSummary } from '@/services/projectInfo'
 import DrawingPreviewModal from '@/components/DrawingPreviewModal'
+import ScanProgressPanel from './ScanProgressPanel'
 
 const { Text, Title } = Typography
 
@@ -289,6 +290,9 @@ function InfoWorkspace({ projectId }: { projectId: string }) {
 
   return (
     <div style={{ padding: 16 }}>
+      <div style={{ marginBottom: 12 }}>
+        <ScanProgressPanel projectId={projectId} />
+      </div>
       <Card size="small" style={{ marginBottom: 12 }}>
         <Space wrap size="large">
           <Title level={5} style={{ margin: 0 }}>工程信息</Title>

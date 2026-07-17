@@ -109,8 +109,46 @@ export const getInfoAxes = (projectId: string): Promise<{ axes: InfoItem[] }> =>
 
 export const triggerInfoExtract = (
   projectId: string,
-): Promise<{ task_id: string; project_id: string }> =>
-  request(`${BASE}/${projectId}/info/extract`, { method: 'POST' })
+  withVlm = false,
+): Promise<{ task_id: string; project_id: string; with_vlm: boolean }> =>
+  request(`${BASE}/${projectId}/info/extract`, {
+    method: 'POST',
+    params: { with_vlm: withVlm },
+  })
+
+// ── 扫描进度(Phase F)──────────────────────────────────────────
+
+export interface ScanSummary {
+  total?: number
+  by_category?: Record<string, number>
+  by_extractor?: Record<string, number>
+  samples?: { category: string; text: string; extractor: string }[]
+  vlm_backend?: string
+}
+
+export interface ScanDrawing {
+  drawing_id: string
+  drawing_no: string
+  title: string
+  discipline: string
+  status: 'pending' | 'extracting' | 'ready'
+  item_count: number
+  extractors_done: string[]
+  summary: ScanSummary
+  updated_at: string
+}
+
+export interface ScanProgress {
+  overall: { total: number; ready: number; extracting: number; pending: number; percent: number }
+  page: number
+  drawings: ScanDrawing[]
+}
+
+export const getScanProgress = (
+  projectId: string,
+  params: { status?: string; page?: number; page_size?: number } = {},
+): Promise<ScanProgress> =>
+  request(`${BASE}/${projectId}/info/scan-progress`, { params })
 
 /** 统一预览:PDF/图片原文件,DXF/DWG 走服务端渲染 PNG;422 = 暂不支持 */
 export const getDrawingPreview = (drawingId: string): Promise<DrawingPreview> =>
