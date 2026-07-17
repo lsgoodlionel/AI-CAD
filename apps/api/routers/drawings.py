@@ -671,6 +671,22 @@ async def get_preview(
     raise HTTPException(422, "PREVIEW_UNAVAILABLE")
 
 
+# ── 图纸追溯(Phase G:识别了什么 + 用在哪)─────────────────────
+
+@router.get("/{drawing_id}/trace")
+async def get_drawing_trace(
+    drawing_id: str,
+    db=Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """正向追溯:这张图识别出的信息(按类别/抽取器)+ 模型用途(生成的构件/楼层)。"""
+    from services.drawing_trace import build_drawing_trace
+    trace = await build_drawing_trace(db, drawing_id)
+    if trace is None:
+        raise HTTPException(404, "DRAWING_NOT_FOUND")
+    return trace
+
+
 # ── AI 审查报告 ────────────────────────────────────────────────
 
 async def _get_ai_report_or_404(drawing_id: str, db) -> dict:
