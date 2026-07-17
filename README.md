@@ -4,7 +4,39 @@
 
 ---
 
-## 当前版本：v0.7.0-dev（Phase D — 全模块串联 · 操作简化 · 前沿升级）
+## 当前版本：v0.8.0-dev（Phase E/F/G — 图纸信息档案层 · 全量扫描 · 有信息的模型）
+
+Phase E 确立**「图纸信息档案层」为全平台数据主线**（抽取一次 · 单一真相源 · 人审在环 · 分层消费），并在其上叠加 Phase F（全量 OCR/VLM 扫描 + 进度可视）与 Phase G（双向可追溯的「有信息的模型」）。蓝图见 [docs/PHASE_E_BLUEPRINT.md](docs/PHASE_E_BLUEPRINT.md)、[docs/PHASE_G_BLUEPRINT.md](docs/PHASE_G_BLUEPRINT.md)。分支 `feat/phase-e`，约 **110 新单测全绿**。
+
+### Phase E — 图纸信息档案层(全平台数据主线)
+
+| 泳道 | 交付 |
+|------|------|
+| **E0** 缺陷+OCR | 健康看板 500 修复（daily 费用 SQL / 断路器 redis key）；OCR 后端随镜像交付（RapidOCR，Dockerfile `OCR_EXTRA` 层）|
+| **E1** 工程信息模块 | 图纸信息档案存储底座（migration 029）+ 抽取编排 + 聚合 API + 前端页 `/project-info` + **全站图纸预览**（PDF/DXF 服务端渲染）|
+| **E1.5** 档案层升级 | **人审 verified 层**（migration 030,auto/verified 分离,`supersedes_key` 跨重抽抑制复活）+ 导入即建档 + 档案读取契约 API + 工程信息页人审修正 UI |
+| **E2** 轴网 + 建模读档案 | 工程模型「**轴网**」显示层（scene 携带 axes + three.js 渲染 + 显隐）；建模 section-z **改读档案标高**（去重复 OCR,建模不再自跑 OCR）|
+| **E3** 建模覆盖增强 | E3-0 审计（证明歌剧院 2309 图 **100% PDF、无图层、矢量文字取不到、识别器无欠费**）；**E3-B 围护桩圆检测**（栅格 HoughCircles,双闸防误检,整机 **columns 3089→5704**）；桩包络补底板 |
+| **路径C** 档案进 3D | A1 每图坐标变换持久化（migration 031,pt→米）+ A2 档案轴号→3D + 档案 OCR 文字→**构件类型标签**（钢构/幕墙/围护桩）|
+| **E4** 评测 | OCR 评测（标高 **97% 高置信**）；**VLM 判专业实测**（远程 qwen3.5,清晰三专业 ~80%,修 Cloudflare UA 拦截）|
+| **E-末** OCR 提速 | 自适应降 DPI **~4.8x**（289s→60s/图）|
+
+### Phase F — 全量扫描 + 进度可视
+
+- **VLM 接入抽取管线**（migration 032）:每图 OCR + 矢量 + **VLM 读图**(判专业/标高/构件候选,backend=qwen3.5-vision) + 文件名,统一落档案。
+- **扫描进度页**:工程信息页顶部「扫描进度」面板,**精确到每张图的各类信息读取进度 + 内容摘要**,4s 实时轮询;总进度条 + 每图状态/抽取器/各类计数/内容样例。
+
+### Phase G — 有信息的模型(双向可追溯)
+
+- **反向**(3D 构件→来源):点击构件 → 面板显示类型标签/识别途径/来源图纸 → 「追溯来源图纸」查看该图识别了什么、用在哪。
+- **正向**(图纸→用途):`GET /drawings/{id}/trace` + 追溯抽屉,任一图纸一键查看**识别出什么信息 + 生成了哪些模型构件**(实测:一张图识别 470 条 → 生成 525 构件)。
+
+> **能力边界(如实)**:纯 PDF 项目(如歌剧院)无图层、矢量文字取不到,构件识别限于几何 + OCR/VLM 反哺;A2/C 的整机显效随 OCR 全量回填铺开逐步显现。详见 `docs/PHASE_E_E3_AUDIT.md` / `docs/PHASE_E_OCR_EVAL.md` / `docs/PHASE_E_VLM_EVAL.md`。
+
+---
+
+<details>
+<summary>历史版本:v0.7.0-dev（Phase D — 全模块串联）</summary>
 
 Phase D 把 Phase A/B/C 逐块建成的能力**串成产品**：打通模块间断点、合并同类入口、给专业流程配引导，并吸收 2025-2026 前沿升级。蓝图见 [docs/PHASE_D_BLUEPRINT.md](docs/PHASE_D_BLUEPRINT.md)，6 泳道 24 工作块。**泳道 1-4 已合并 main**（PR [#12](https://github.com/lsgoodlionel/AI-CAD/pull/12)、[#15](https://github.com/lsgoodlionel/AI-CAD/pull/15)，CI 全绿）；**泳道 5 前沿升级 + 后续工程**在 `feat/phase-d`（待 PR）。后端全量 **1443 测试**、前端 tsc 零新错 / vitest 72。
 
