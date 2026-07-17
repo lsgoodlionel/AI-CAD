@@ -94,6 +94,65 @@ def _item_from_filename(filename: str) -> dict | None:
     }
 
 
+def items_from_vlm(vlm_result) -> list[dict]:
+    """VlmReadResult → 档案条目(extractor='vlm')。
+
+    VLM 铁律:只产语义候选 + 置信,不出坐标/计数/尺寸 → location_json=None。
+    - discipline → category='discipline'(专业提示)
+    - elevations → category='elevation'(value_json.elevation_m)
+    - components → category='note'(构件类型提示)
+    """
+    if getattr(vlm_result, "backend", "none") in ("none", ""):
+        return []
+    items: list[dict] = []
+    disc = getattr(vlm_result, "discipline", None)
+    if disc is not None:
+        items.append({
+            "category": "discipline", "content": str(disc.value),
+            "value_json": {"discipline": disc.value},
+            "location_json": None, "extractor": "vlm",
+            "confidence": round(float(disc.confidence), 4),
+        })
+    for elev in getattr(vlm_result, "elevations", ()) or ():
+        items.append({
+            "category": "elevation", "content": f"{elev.value_m:+.3f}",
+            "value_json": {"elevation_m": round(float(elev.value_m), 3)},
+            "location_json": None, "extractor": "vlm",
+            "confidence": round(float(elev.confidence), 4),
+        })
+    for comp in getattr(vlm_result, "components", ()) or ():
+        items.append({
+            "category": "note", "content": str(comp.label),
+            "value_json": None, "location_json": None, "extractor": "vlm",
+            "confidence": round(float(comp.confidence), 4),
+        })
+    return items
+
+
+def build_scan_summary(items: list[dict], *, vlm_backend: str = "none") -> dict:
+    """每图扫描摘要:按类别/抽取器计数 + 短内容样例(供进度页逐图展示)。"""
+    by_category: dict[str, int] = {}
+    by_extractor: dict[str, int] = {}
+    seen: set[str] = set()
+    samples: list[dict] = []
+    for it in items:
+        cat = it.get("category", "other")
+        ext = it.get("extractor", "?")
+        by_category[cat] = by_category.get(cat, 0) + 1
+        by_extractor[ext] = by_extractor.get(ext, 0) + 1
+        content = (it.get("content") or "").strip()
+        if content and len(content) <= 20 and content not in seen and len(samples) < 8:
+            seen.add(content)
+            samples.append({"category": cat, "text": content, "extractor": ext})
+    return {
+        "total": len(items),
+        "by_category": by_category,
+        "by_extractor": by_extractor,
+        "samples": samples,
+        "vlm_backend": vlm_backend,
+    }
+
+
 def _dedup(items: list[dict]) -> list[dict]:
     """同 (category, content) 只留最高置信;确定性来源(confidence=None)视为 1.0。"""
     def _conf(it: dict) -> float:
