@@ -47,3 +47,28 @@ def test_usage_empty_scene():
     usage = model_usage_from_scene({}, "dA")
     assert usage["used"] is False
     assert usage["total_elements"] == 0
+
+
+# ── G5 正向追溯:识别内容样例 ──────────────────────────────────────
+from services.drawing_trace import summarize_samples  # noqa: E402
+
+
+def test_samples_group_by_category_dedup_and_limit():
+    items = (
+        [{"category": "elevation", "content": f"{i}.000"} for i in range(12)]
+        + [{"category": "axis", "content": "1"}, {"category": "axis", "content": "1"}]
+    )
+    out = summarize_samples(items)
+    assert len(out["elevation"]) == 8  # _SAMPLE_LIMIT 截断
+    assert out["axis"] == ["1"]        # 去重
+
+
+def test_samples_skip_empty_and_missing_category():
+    items = [
+        {"category": "note", "content": ""},
+        {"category": None, "content": "x"},
+        {"category": "spec", "content": "C30"},
+    ]
+    out = summarize_samples(items)
+    assert "note" not in out and None not in out
+    assert out["spec"] == ["C30"]

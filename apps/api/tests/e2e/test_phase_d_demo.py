@@ -28,6 +28,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+
+from tests.repo_paths import require_docs
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -43,7 +45,8 @@ from services import finding_service
 
 _API_ROOT = Path(__file__).resolve().parents[2]
 _REPO_ROOT = _API_ROOT.parent.parent
-_DOCS = _REPO_ROOT / "docs"
+# docs/ 改为按标记上溯定位;容器只挂载 apps/api 时明确 skip
+# (原先按固定层数推导,在容器里算出 /docs,造成稳定的**假失败**)
 
 PROJECT_ID = "22222222-2222-2222-2222-222222222222"
 
@@ -367,4 +370,4 @@ def test_standard_contract_files_present():
     # tests/test_findings.py 单测覆盖，此处仅核实契约常量未漂移）。
     assert finding_service.VALID_SOURCES == frozenset({"engine", "review", "cross", "semantic", "symbol"})
 
-    assert (_DOCS / "PHASE_D_DEMO.md").exists()
+    assert (require_docs() / "PHASE_D_DEMO.md").exists()

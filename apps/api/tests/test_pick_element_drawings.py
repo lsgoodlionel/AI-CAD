@@ -1,0 +1,121 @@
+"""每层取哪几张图出构件 —— 这决定了模型位置对不对。
+
+**这是用户报告「模型轴线和结构位置不对」的第二个根因。**
+
+实测:每层 1248 张图进了楼层，却**只有 2 张出构件**（`_MAX_STRUCTURE_PLANS = 2`），
+而且取的是**前 2 张、顺序任意**。后果:
+
+| 层 | 来源图数 | 两图构件中心散布 |
+|---|---:|---:|
+| F2 | 2 | **103 米** |
+| F3 | 2 | **83 米** |
+| F5 | 2 | 38 米 |
+
+三个问题:
+
+1. **顺序任意** —— 按 DB 返回顺序取前 N 张;
+2. **不看变换质量** —— 有标准比例变换的图可能排在后面被丢掉，
+   取到的却是无变换、位置靠估的那张;
+3. **不按单体分组** —— 南区与北区的图各有各的坐标系原点，
+   取一张南区一张北区拼在一起，**必然差几十米**。
+
+第 3 条正是 F2/F3 错位 83~103 米的直接原因。
+"""
+from __future__ import annotations
+
+import pytest
+
+from services.model_elements import pick_element_drawings
+
+
+def _d(did: str, title: str, discipline: str = "structure") -> dict:
+    return {"id": did, "drawing_no": did, "title": title,
+            "discipline": discipline}
+
+
+class _T:
+    """`DrawingTransform` 的最小替身。"""
+
+    def __init__(self, scale_m_pt: float) -> None:
+        self.scale_m_pt = scale_m_pt
+        self.origin_x = 0.0
+        self.origin_y = 0.0
+        self.page_h = 2384.0
+        self.confidence = 1.0
+
+
+_STANDARD = _T(150 * 25.4 / 72 / 1000)      # 1:150
+_ODD = _T(137 * 25.4 / 72 / 1000)           # 非标准分母
+
+
+@pytest.mark.unit
+def test_drawings_with_a_standard_scale_transform_come_first():
+    """**有标准比例变换的图优先** —— 它们的位置才靠得住。"""
+    drawings = [_d("no-tf", "一层结构平面图A"),
+                _d("odd", "一层结构平面图B"),
+                _d("std", "一层结构平面图C")]
+    picked = pick_element_drawings(
+        drawings, transforms={"std": _STANDARD, "odd": _ODD})
+    assert picked["structure"][0]["id"] == "std"
+
+
+@pytest.mark.unit
+def test_drawings_without_a_transform_come_last():
+    """无变换的图位置只能靠估,排最后。"""
+    drawings = [_d("no-tf", "一层结构平面图A"), _d("odd", "一层结构平面图B")]
+    picked = pick_element_drawings(drawings, transforms={"odd": _ODD})
+    assert [d["id"] for d in picked["structure"]] == ["odd", "no-tf"]
+
+
+@pytest.mark.unit
+def test_picks_stay_within_one_building_unit():
+    """**核心用例**:南区与北区的图不能混着取。
+
+    两区坐标系原点不同,拼在一起会差几十米 —— 实测 F2 差 103 米。
+    """
+    drawings = [
+        _d("s1", "南区（大歌剧厅）一层结构平面图"),
+        _d("s2", "南区（大歌剧厅）一层墙柱平面图"),
+        _d("n1", "北区（小歌剧厅）一层结构平面图"),
+        _d("n2", "北区（小歌剧厅）一层墙柱平面图"),
+    ]
+    picked = pick_element_drawings(drawings, transforms={
+        "s1": _STANDARD, "s2": _STANDARD, "n1": _STANDARD, "n2": _STANDARD})
+    units = {d["id"][0] for d in picked["structure"]}
+    assert len(units) == 1, f"取到了多个单体的图:{picked['structure']}"
+
+
+@pytest.mark.unit
+def test_the_richest_unit_wins():
+    """取图纸最多的那个单体 —— 它最可能是本层主体。"""
+    drawings = [
+        _d("n1", "北区一层结构平面图"),
+        _d("s1", "南区一层结构平面图"),
+        _d("s2", "南区一层墙柱平面图"),
+        _d("s3", "南区一层模板平面图"),
+    ]
+    picked = pick_element_drawings(drawings, transforms={})
+    assert all(d["id"].startswith("s") for d in picked["structure"])
+
+
+@pytest.mark.unit
+def test_backward_compatible_without_transforms():
+    """不传 transforms 时行为不崩 —— 老调用方照常工作。"""
+    drawings = [_d("a", "一层结构平面图"), _d("b", "一层墙柱平面图")]
+    picked = pick_element_drawings(drawings)
+    assert len(picked["structure"]) == 2
+
+
+@pytest.mark.unit
+def test_mep_and_beam_buckets_still_work():
+    drawings = [_d("m", "一层给排水平面图", "mep"),
+                _d("bm", "一层主梁配筋图")]
+    picked = pick_element_drawings(drawings, transforms={})
+    assert [d["id"] for d in picked["mep"]] == ["m"]
+    assert [d["id"] for d in picked["beam"]] == ["bm"]
+
+
+@pytest.mark.unit
+def test_empty_input_is_safe():
+    picked = pick_element_drawings([], transforms={})
+    assert picked == {"structure": [], "beam": [], "mep": []}
