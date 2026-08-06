@@ -16,6 +16,13 @@ from collections import Counter
 
 UNZONED_FLOOR: tuple[str, str, int] = ("UNZONED", "未分层", 0)
 ROOF_FLOOR: tuple[str, str, int] = ("RF", "屋面", 99)
+#: 高位屋面（台塔/塔楼/舞台塔）——主体屋面之上的独立体量。
+#:
+#: **实测必要性**：`A-10-10.1C 台塔屋顶平面图` 与 `A-10-10.2B 屋顶平面图`
+#: 此前同归 `RF`、标高同为 33.9，而两者的实测标高是:
+#: 台塔 23.400~**43.000**、主体 2.500~**28.180** —— 差约 **15 米**。
+#: 并层会让台塔整体塌下来 15 米。
+HIGH_ROOF_FLOOR: tuple[str, str, int] = ("RF_HIGH", "台塔屋面", 100)
 FOUNDATION_FLOOR: tuple[str, str, int] = ("FD", "基础层", -98)
 
 _CN_DIGITS = {
@@ -25,6 +32,9 @@ _CN_DIGITS = {
 _CN_UNITS = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九"]
 
 _RE_ROOF = re.compile(r"屋面|屋顶")
+#: 高位体量的部位词。**必须与屋面/屋顶同时出现**才判为高位屋面——
+#: 实测有 `台塔给排水及消防平面图`、`地下室台仓…`，那是台塔的其他楼层。
+_RE_HIGH_ROOF_PART = re.compile(r"台塔|塔楼|塔台|舞台塔")
 _RE_FOUNDATION = re.compile(r"基础|承台|桩基")
 _RE_BASEMENT = re.compile(
     r"B(\d{1,2})(?!\d)|地下([0-9一二两三四五六七八九十]{1,3})层?|负([0-9一二两三四五六七八九十]{1,3})层",
@@ -95,6 +105,11 @@ def parse_floor(text: str) -> tuple[str, str, int] | None:
     if not text:
         return None
     if _RE_ROOF.search(text):
+        # 台塔/塔楼屋面是**主体屋面之上的独立标高面**（实测差约 15 米），
+        # 并层会让台塔整体塌下来。部位词必须与屋面/屋顶同时出现，
+        # 否则 `台塔给排水平面图` 这类台塔的其他楼层会被误判成屋面。
+        if _RE_HIGH_ROOF_PART.search(text):
+            return HIGH_ROOF_FLOOR
         return ROOF_FLOOR
     if _RE_FOUNDATION.search(text):
         return FOUNDATION_FLOOR

@@ -29,7 +29,12 @@ logger = logging.getLogger(__name__)
 # - 本地/CI 源码树：apps/api/services/fragments_convert.py -> 仓库根 -> apps/model-convert
 # - 容器内：apps/api 内容被拍平到 /app，源码树相对路径不再成立，故允许
 #   ``MODEL_CONVERT_DIR`` 环境变量覆盖（镜像里指向 /opt/model-convert）。
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+_RESOLVED = Path(__file__).resolve()
+# 源码树 apps/api/services/fragments_convert.py → 仓库根须上溯 3 层;容器内 apps/api
+# 被拍平到 /app,层级不足会导致 parents[3] 抛 IndexError（模块导入即崩)。安全兜底:
+# 层级不足时退回文件父目录(仅作默认,实际由 MODEL_CONVERT_DIR 覆盖,镜像指向
+# /opt/model-convert),使导入永不崩溃。
+_REPO_ROOT = _RESOLVED.parents[3] if len(_RESOLVED.parents) > 3 else _RESOLVED.parent
 _DEFAULT_CONVERT_DIR = _REPO_ROOT / "apps" / "model-convert"
 
 

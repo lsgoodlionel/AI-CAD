@@ -70,12 +70,74 @@ def building_of(drawing: dict, normalized_assignment: dict[str, Any] | None = No
     return "main", detected.display_name
 
 
-def pick_element_drawings(floor_drawings: list[dict]) -> dict[str, list[dict]]:
-    """楼层图纸 → 各构件类的「最适图纸」清单（蓝图 4 节规则）。"""
+def _transform_rank(drawing: dict, transforms: dict | None) -> int:
+    """图纸的定位可靠度排序键（越小越优先）。
+
+    0 = 有**标准比例**变换（§6.0.4）；1 = 有变换但比例非标准；2 = 无变换。
+
+    **为什么必须排序**：原实现按 DB 返回顺序取前 N 张，
+    有好变换的图可能排在后面被丢掉，取到的却是位置只能靠估的那张。
+    """
+    if not transforms:
+        return 2
+    transform = transforms.get(str(drawing.get("id") or ""))
+    if transform is None:
+        return 2
+    try:
+        from services.drawing_transform import is_standard_scale
+
+        return 0 if is_standard_scale(float(transform.scale_m_pt)) else 1
+    except Exception:  # noqa: BLE001 — 判不了就当非标准，不阻断
+        return 1
+
+
+def _dominant_unit(drawings: list[dict]) -> str | None:
+    """本层图纸最多的那个单体 —— 最可能是本层主体。"""
+    counts: dict[str, int] = {}
+    for drawing in drawings:
+        for pattern, key in _BUILDING_PATTERNS:
+            if pattern.search(f"{drawing.get('title') or ''} "
+                              f"{drawing.get('drawing_no') or ''}"):
+                counts[key] = counts.get(key, 0) + 1
+                break
+    if not counts:
+        return None
+    return max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
+
+
+def _same_unit(drawing: dict, unit: str | None) -> bool:
+    if unit is None:
+        return True
+    text = f"{drawing.get('title') or ''} {drawing.get('drawing_no') or ''}"
+    for pattern, key in _BUILDING_PATTERNS:
+        if pattern.search(text):
+            return key == unit
+    return True          # 没写单体的图不排除——它可能就是本层通用图
+
+
+def pick_element_drawings(
+    floor_drawings: list[dict], transforms: dict | None = None,
+) -> dict[str, list[dict]]:
+    """楼层图纸 → 各构件类的「最适图纸」清单（蓝图 4 节规则）。
+
+    选图规则（**顺序即优先级**，实测教训见下）：
+
+    1. **只取同一个单体的图** —— 南区与北区各有各的坐标系原点，
+       混着取会差几十米。实测 F2 两图构件中心散布 **103 米**、F3 **83 米**，
+       正是南北区混取造成的。
+    2. **有标准比例变换的优先** —— 位置才靠得住（见 `_transform_rank`）。
+    3. 每类仍有张数上限，控制构建时长。
+
+    `transforms` 形如 ``{drawing_id: DrawingTransform}``；不传时退回
+    「按原顺序取前 N 张」的旧行为，老调用方不受影响。
+    """
+    unit = _dominant_unit(floor_drawings)
     structure: list[dict] = []
     beams: list[dict] = []
     mep: list[dict] = []
     for drawing in floor_drawings:
+        if not _same_unit(drawing, unit):
+            continue                  # 跨单体不混取——这是错位几十米的根因
         title = str(drawing.get("title") or "")
         discipline = str(drawing.get("discipline") or "")
         if discipline == "mep":
@@ -84,11 +146,156 @@ def pick_element_drawings(floor_drawings: list[dict]) -> dict[str, list[dict]]:
             beams.append(drawing)
         elif _STRUCTURE_TITLE_RE.search(title) or discipline == "structure":
             structure.append(drawing)
+
+    def by_quality(items: list[dict]) -> list[dict]:
+        # stable sort:同等可靠度时保持原顺序，结果可复现
+        return sorted(items, key=lambda d: _transform_rank(d, transforms))
+
     return {
-        "structure": structure[:_MAX_STRUCTURE_PLANS],
-        "beam": beams[:_MAX_BEAM_PLANS],
-        "mep": mep[:_MAX_MEP_PLANS],
+        "structure": by_quality(structure)[:_MAX_STRUCTURE_PLANS],
+        "beam": by_quality(beams)[:_MAX_BEAM_PLANS],
+        "mep": by_quality(mep)[:_MAX_MEP_PLANS],
     }
+
+
+#: 参与**轴网聚合**的图纸上限。与构件选图上限(2)分开——
+#: 构件识别每图要 10~40 秒(几何提取 + 识别 + YOLO)，而轴网只是
+#: 「坐标 + 标签」的纯计算，几乎不花时间。
+#:
+#: **实测缺口**:v33 有六个楼层 scene 里无轴网，而 F1 有 **139 张**
+#: 「有轴号且有变换」的图可用 —— 它们全被构件选图的上限挡在外面了。
+#:
+#: 仍然限量，但限的理由不同:图越多、变换不一致的风险越大。
+#: 按定位可靠度排序后取前若干张，再由 `dedupe_axis_labels` 与
+#: 序列校验(§8.0.3)兜底。
+MAX_AXIS_SOURCE_PLANS = 12
+
+#: 新图并入前的一致性门禁:与已聚合轴网**同名**的轴号里，位置对不上的比例。
+#:
+#: **实测教训**:把聚合上限从 2 提到 12 后，轴网覆盖**从 6 层跌到 2 层**——
+#: 新引入的图变换与主组不一致，同名轴号落在不同位置，冲突暴增
+#: (B3 一层 **74 条**)，去重后保留的反而更少。
+#:
+#: **更多来源 ≠ 更好的结果**。逐张检验:对不上的比例超过此值就跳过该图，
+#: 让聚合自动收敛到「变换一致的那一组」。
+MAX_AXIS_DISAGREEMENT_RATIO = 0.3
+
+
+def collect_floor_axes(
+    floor_drawings: list[dict], *, transforms: dict | None,
+    recognized: dict | None, max_drawings: int = MAX_AXIS_SOURCE_PLANS,
+) -> dict:
+    """从本层**所有**有轴号且有变换的图聚合轴网(不受构件选图上限约束)。
+
+    没有变换的图**跳过** —— 没有米坐标就没法把轴线放到正确位置，
+    硬放只会制造错位。
+
+    按定位可靠度排序:同名冲突时先到的胜出(见 `dedupe_axis_labels`)，
+    所以最可靠的那张要排在前面。
+    """
+    if not transforms or not recognized:
+        return {"x": [], "y": []}
+
+    from services.axis_recognition import axes_to_scene
+
+    usable = [d for d in floor_drawings
+              if str(d.get("id") or "") in transforms
+              and recognized.get(str(d.get("id") or ""))]
+    # **排序键必须完全确定**:`_transform_rank` 只有 0/1/2 三档，
+    # stable sort 在同档内保持**输入顺序**。而 builder 拿到的是 DB 返回顺序、
+    # 诊断脚本拿到的是 scene 顺序 —— 两者的「前 N 张」不是同一批，
+    # 于是同一层算出的轴网不同、诊断结论无法预期 builder 的行为。
+    # 同档时按 drawing_id 定序，让结果可复现。
+    usable.sort(key=lambda d: (_transform_rank(d, transforms),
+                               str(d.get("id") or "")))
+
+    candidates: list[tuple[str, dict]] = []
+    for drawing in usable[:max_drawings]:
+        did = str(drawing.get("id") or "")
+        try:
+            candidates.append((did, axes_to_scene(recognized[did], transforms[did])))
+        except Exception as exc:  # noqa: BLE001 — 单图失败不拖垮整层
+            logger.info("[ModelElements] 轴网聚合跳过 %s: %s", did, exc)
+    if not candidates:
+        return {"x": [], "y": []}
+
+    group = _largest_consistent_group(candidates)
+    aggregated: dict | None = None
+    for _did, scene_axes in group:
+        aggregated = _merge_axes(aggregated, scene_axes, authoritative=True)
+    if len(group) < len(candidates):
+        logger.info("[ModelElements] 轴网聚合采纳 %d/%d 张（其余变换与主组不一致）",
+                    len(group), len(candidates))
+    return aggregated or {"x": [], "y": []}
+
+
+def _largest_consistent_group(
+    candidates: list[tuple[str, dict]],
+) -> list[tuple[str, dict]]:
+    """找出**彼此一致的最大那组**图纸。
+
+    **为什么不能只与第一张比**:排序取到的第一张若恰好是离群值，
+    后面**正确的会被全部挡掉**。实测 v35 里 F1（195 张图）、F2、F3、B1
+    在只与第一张比时全部失去轴网，而它们在 v33 是有的 ——
+    基准选错的代价是整层归零。
+
+    做法:以每张图为基准各试一遍，取能吸纳最多图的那一组。
+    候选最多 `MAX_AXIS_SOURCE_PLANS` 张，O(n²) 完全可接受。
+    平局时取靠前的（已按定位可靠度排序）。
+    """
+    best: list[tuple[str, dict]] = []
+    for base_index, (_bid, base_axes) in enumerate(candidates):
+        group = [candidates[base_index]]
+        merged = dict(base_axes)
+        for index, (did, axes) in enumerate(candidates):
+            if index == base_index:
+                continue
+            if _axes_disagree(merged, axes):
+                continue
+            group.append((did, axes))
+            merged = _merge_axes(dict(merged), axes, authoritative=True)
+        if len(group) > len(best):
+            best = group
+    return best
+
+
+def _axes_disagree(
+    aggregated: dict, candidate: dict,
+    max_ratio: float = MAX_AXIS_DISAGREEMENT_RATIO,
+) -> bool:
+    """候选轴网与已聚合的主组是否**位置对不上**。
+
+    只比**同名**轴号 —— 没有同名的说明两者覆盖不同区域，那不是矛盾，
+    是互补，应当并入。
+    """
+    compared = mismatched = 0
+    for direction in ("x", "y"):
+        known = {}
+        for label, pos in aggregated.get(direction) or ():
+            text = str(label or "").strip()
+            if text:
+                known.setdefault(text, float(pos))
+        for label, pos in candidate.get(direction) or ():
+            text = str(label or "").strip()
+            if text and text in known:
+                compared += 1
+                if abs(float(pos) - known[text]) > _AXIS_MERGE_TOL_M:
+                    mismatched += 1
+    if compared == 0:
+        return False          # 无同名可比 —— 是互补不是矛盾
+    return mismatched / compared > max_ratio
+
+
+def _prefer_collected_axes(collected: dict | None, fallback: dict | None) -> dict | None:
+    """优先用独立聚合的轴网，聚不出才退回构件循环里攒的那份。
+
+    **不能写成 `collected or fallback`**：`{"x": [], "y": []}` 是**非空 dict、
+    truthy**，`or` 永远不会回落 —— 没有识别轴号或没有变换的场景会整个丢掉轴网。
+    要看的是**里面有没有内容**，不是 dict 本身真假。
+    """
+    if collected and (collected.get("x") or collected.get("y")):
+        return collected
+    return fallback
 
 
 def _recognize_sync(
@@ -151,10 +358,14 @@ def ensure_slab_from_columns(
     x0, x1, y0, y1 = min(xs) - m, max(xs) + m, min(ys) - m, max(ys) + m
     if (x1 - x0) * (y1 - y0) < _SLAB_MIN_AREA_M2:
         return existing_slabs
+    from core.model3d.element_recognizer import SLAB_BASIS_COLUMN_ENVELOPE
+
     return [{
         "outline": [[round(x0, 3), round(y0, 3)], [round(x1, 3), round(y0, 3)],
                     [round(x1, 3), round(y1, 3)], [round(x0, 3), round(y1, 3)]],
         "thickness": _PILE_SLAB_THICKNESS_M,
+        # 兜底,不是识别结果 —— 与 element_recognizer 的三条兜底同口径
+        "basis": SLAB_BASIS_COLUMN_ENVELOPE,
         "src": "piles-envelope",
     }]
 
@@ -489,6 +700,8 @@ async def build_floor_elements(
     executor, floor_drawings: list[dict], file_getter: Callable[[str], bytes],
     archive_axes_by_drawing: dict | None = None, transforms: dict | None = None,
     archive_text_by_drawing: dict | None = None,
+    recognized_axes_by_drawing: dict | None = None,
+    placements: dict | None = None,
 ) -> tuple[dict[str, list], int, dict]:
     """构建单楼层 elements（识别 → 轴号配准 → 合并 + YOLO 补充）。
 
@@ -499,6 +712,10 @@ async def build_floor_elements(
     A2:传入 archive_axes_by_drawing/transforms 时,每图的档案轴号(好标签)经
     该图坐标变换转米(同图同变换,与识别路径同坐标系),并入聚合——升级识别路径
     的 "X" 噪声标签、补识别未命中的轴线。
+
+    H23:传入 placements 时,**有工程坐标锚点的图按绝对坐标摆放**,并跳过相对
+    轴号配准——绝对定位优先于相对对齐。没有锚点的图保持原有相对配准行为
+    (诚实降级:不给它编一个世界坐标)。`floor_meta["placed"]` 报出绝对定位的图数。
     """
     empty = {key: [] for key in EMPTY_ELEMENTS}
     try:
@@ -507,7 +724,9 @@ async def build_floor_elements(
         return empty, 0, {}
 
     loop = asyncio.get_event_loop()
-    picked = pick_element_drawings(floor_drawings)
+    # 传入 transforms:选图要按**定位可靠度**排序、且**不跨单体混取**
+    # ——这是同层两图构件中心差 83~103 米的根因(见 pick_element_drawings)
+    picked = pick_element_drawings(floor_drawings, transforms)
     tasks: list[tuple[dict, str, tuple[str, ...]]] = [
         *[(d, "structure", ("columns", "walls", "slabs")) for d in picked["structure"]],
         *[(d, "structure", ("beams",)) for d in picked["beam"]],
@@ -520,6 +739,7 @@ async def build_floor_elements(
     ref_axes_drawing_id: str | None = None
     aggregated_axes: dict | None = None  # 跨该层所有图配准对齐后聚合的轴网
     registered = 0
+    placed = 0                           # 按工程坐标绝对定位的图数(H23)
     for drawing, discipline, kinds in tasks:
         result = await _recognize_one(loop, executor, drawing, discipline, file_getter)
         if not result:
@@ -534,17 +754,39 @@ async def build_floor_elements(
             if arch_items:
                 arch = archive_axes_to_scene(arch_items, transforms[did])
                 axes = _merge_axes(dict(axes), arch)
+        # Phase I:并入**轴网识别**产出的轴号。多分区图带分区前缀
+        # (§8.0.5「分区号-轴线号」),且全部经国标校验(全项目 0 违规)。
+        # **authoritative=True**:识别标签覆盖档案标签。档案是未经校验的
+        # OCR 原文(实测噪声 `IX`/`80`/`BY`),只按「空才升级」会让噪声恒定胜出。
+        if recognized_axes_by_drawing and transforms and did in transforms:
+            from services.axis_recognition import axes_to_scene
+
+            recognized = recognized_axes_by_drawing.get(did) or []
+            if recognized:
+                axes = _merge_axes(
+                    dict(axes), axes_to_scene(recognized, transforms[did]),
+                    authoritative=True)
         # C-下一步：按位置给本图构件附类型标签(钢构/幕墙/围护桩;OCR 短标签
         # 经该图变换转米就近关联,与构件同坐标系;配准前处理,标签随构件平移)
         if archive_text_by_drawing and transforms and did in transforms:
             text_items = archive_text_by_drawing.get(did) or []
             if text_items:
                 part = _attach_component_type_labels(part, text_items, transforms[did])
+        # H23：有工程坐标锚点的图,按绝对坐标摆到工程坐标系(优先于相对配准)
+        placement = (placements or {}).get(did)
+        if placement:
+            from services.model_world_placement import place_elements
+            part = place_elements(part, placement)
+            placed += 1
+
         # 轴号配准：以本层首张带轴号的图为参考系，其余图按共有轴号平移对齐
+        # 已绝对定位的图不再相对平移——否则会被拉离它的真实工程坐标
         if _has_labeled_axes(axes):
             if ref_axes is None:
                 ref_axes = axes
                 ref_axes_drawing_id = str(drawing.get("id") or "")
+                aligned_axes = axes
+            elif placement:
                 aligned_axes = axes
             else:
                 dx, dy = register_offset(ref_axes, axes)
@@ -560,7 +802,19 @@ async def build_floor_elements(
     meta = {
         "elevations": sorted(set(elevations)),
         "registered": registered,
-        "axes": _axes_scene_payload(aggregated_axes, ref_axes_drawing_id),
+        # placed = 按工程坐标绝对定位的图数;与 registered(相对配准)并列报出,
+        # 这一层到底有多少图是真定位、多少是相对贴合,一眼可见
+        "placed": placed,
+        # 轴网**不受构件选图上限约束**:构件识别每图 10~40 秒所以限 2 张，
+        # 而轴网只是坐标 + 标签的纯计算。实测 v33 有六层 scene 无轴网，
+        # 而 F1 有 139 张「有轴号且有变换」的图被白白挡在外面。
+        # 先用本层可用图聚合，聚不出再退回构件循环里攒的那份。
+        "axes": _axes_scene_payload(
+            _prefer_collected_axes(
+                collect_floor_axes(floor_drawings, transforms=transforms,
+                                   recognized=recognized_axes_by_drawing),
+                aggregated_axes),
+            ref_axes_drawing_id),
     }
     return elements, yolo_count, meta
 
@@ -576,8 +830,62 @@ def _shift_axes(axes: dict, dx: float, dy: float) -> dict:
     }
 
 
-def _merge_axes(agg: dict | None, new: dict) -> dict:
-    """并入一张图的轴网：按坐标去重（容差内视为同轴），无标签者被有标签者升级。"""
+def dedupe_axis_labels(axes: dict | None) -> tuple[dict, int]:
+    """同一方向上**一个轴号只保留一条轴线**，并按坐标排序。
+
+    **国标依据**：GB/T 50001 §8.0.3「依次注写」+ §8.0.5 分区编号 ⇒
+    同一分区、同一方向上一个轴号只对应一条轴线。
+
+    **实测必要性**：模型 v31 的 F5 层出现
+
+    ```
+    {"coord":  8.394, "label": "2"}
+    {"coord": 16.290, "label": "2"}   ← 同名 `2` 在两个位置
+    ```
+
+    因为 `_merge_axes` **只按坐标去重（容差 0.3 米），不看标签**，
+    同一条 `2` 轴在两张图上因变换差异落到相距 **7.9 米** 的两处，
+    超出容差就变成了两条同名轴线。
+
+    **同名冲突的真正含义不是标签写错，而是这些图的坐标变换不一致**——
+    整套轴网都偏了。留哪条都不对，所以:保留**先到的那条**
+    （选图已按定位可靠度排序，第一张最可靠），并把冲突数报出来。
+
+    返回 ``(去重后的轴网, 冲突条数)``。
+    """
+    if not axes:
+        return {"x": [], "y": []}, 0
+    out: dict[str, list] = {"x": [], "y": []}
+    conflicts = 0
+    for direction in ("x", "y"):
+        seen: set[str] = set()
+        for entry in axes.get(direction) or []:
+            label = str(entry[0] or "").strip()
+            if label:
+                if label in seen:
+                    conflicts += 1        # 变换不一致的信号，不是标签错
+                    continue
+                seen.add(label)
+            out[direction].append([entry[0], float(entry[1])])
+        out[direction].sort(key=lambda e: e[1])   # §8.0.3 依次注写
+    return out, conflicts
+
+
+def _merge_axes(agg: dict | None, new: dict, *,
+                authoritative: bool = False) -> dict:
+    """并入一张图的轴网：按坐标去重（容差内视为同轴）。
+
+    标签冲突规则：
+    * 默认（``authoritative=False``）：只有**无标签**的轴线会被升级，
+      已有标签保持不动。
+    * ``authoritative=True``：新标签**覆盖**已有标签——留给识别路径用。
+
+    **为什么需要这个区分**：档案的 axis 条目是未经校验的 OCR 原文，
+    实测样本 ``IX / 80 / 3 / 0 / BY / M / E / P / S`` —— `IX` 含国标禁用字母 I
+    （§8.0.4）、数字是尺寸碎片、字母是图框专业代号，43643 条覆盖全部 2309 张图。
+    识别路径的轴号由几何推导 + 国标校验（全项目 0 违规）得来。
+    档案先合、识别后合，若只按「空才升级」，噪声会恒定压过真轴号。
+    """
     if agg is None:
         agg = {"x": [], "y": []}
     for direction in ("x", "y"):
@@ -589,8 +897,11 @@ def _merge_axes(agg: dict | None, new: dict) -> dict:
             )
             if hit is None:
                 existing.append([label, pos])
-            elif not str(hit[0]).strip() and str(label).strip():
-                hit[0] = label  # 无标签轴线 → 升级为带标签
+                continue
+            if not str(label).strip():
+                continue                      # 空标签永不覆盖已有标签
+            if authoritative or not str(hit[0]).strip():
+                hit[0] = label
     return agg
 
 
@@ -609,6 +920,25 @@ def _attach_component_type_labels(part: dict, text_items: list[dict], transform)
         return part
 
 
+def _axis_point_of(loc: dict) -> tuple[float | None, float | None]:
+    """档案位置 → 页面点 (x_pt, y_pt);缺 x/y 时**从 bbox 中心兜底**。
+
+    实测:全项目 43612 条轴号中 **17023 条(39%)只有 bbox 没有 x/y**,
+    原实现直接跳过 → 轴网覆盖凭空少四成。bbox 为 [x0,y0,x1,y1],取中心即可。
+    """
+    x_pt, y_pt = loc.get("x"), loc.get("y")
+    if x_pt is not None and y_pt is not None:
+        return float(x_pt), float(y_pt)
+    bbox = loc.get("bbox")
+    if isinstance(bbox, (list, tuple)) and len(bbox) >= 4:
+        try:
+            x0, y0, x1, y1 = (float(v) for v in bbox[:4])
+        except (TypeError, ValueError):
+            return None, None
+        return (x0 + x1) / 2, (y0 + y1) / 2
+    return None, None
+
+
 def archive_axes_to_scene(archive_items: list[dict], transform) -> dict:
     """档案 axis 项(label + pt 位置)→ scene 轴网格式 {"x":[[label,pos_m]], "y":[...]}。
 
@@ -625,7 +955,7 @@ def archive_axes_to_scene(archive_items: list[dict], transform) -> dict:
         if not _is_grid_label(label):
             continue
         loc = item.get("location_json") or {}
-        x_pt, y_pt = loc.get("x"), loc.get("y")
+        x_pt, y_pt = _axis_point_of(loc)
         if x_pt is None or y_pt is None:
             continue
         x_m, y_m = pt_to_meter(float(x_pt), float(y_pt), transform)
@@ -637,20 +967,120 @@ def archive_axes_to_scene(archive_items: list[dict], transform) -> dict:
 
 
 def _is_grid_label(label: str) -> bool:
-    """真实轴号判定：纯数字(1,2,3…)、1–2 位字母(A,B,AA)、或分区号(1/A)。
+    """真实轴号判定（GB/T 50001 第 8 章）。
 
-    去噪：滤掉说明文字/超长串等误分类为轴号的噪声（>3 字符且非上述形态）。
+    合法形式:
+
+    * 数字轴号 `1`/`24`（§8.0.3 横向从左至右）
+    * 单字母 `A`~`Y`，**跳过 I、O、Z**（§8.0.4）
+    * 双字母 `AA`/`BB` —— §8.0.4「不够用时可用**双字母**」，指重复同一字母
+    * 字母加数字注脚 `A1`/`B2` —— §8.0.4 的另一种形式
+    * 分区编号 `1-1`/`2-A`（§8.0.5）
+    * 附加轴线分数式 `1/A`（§8.0.6）
+
+    **两个不同字母的组合（`BY`/`AC`/`PS`）不是国标形式**——
+    实测它们是图框专业代号(Phase I 已查明 OCR 在图框读出
+    `A/BY/E/M/P/S`)，混进来后出现在 F2/F4 的轴号序列开头。
     """
-    s = (label or "").strip()
-    if not s or len(s) > 3:
+    from core.model3d.drawing_conventions import FORBIDDEN_AXIS_LETTERS
+
+    raw = (label or "").strip()
+    if not raw or len(raw) > 4:
         return False
-    if s.isdigit():
+    # §8.0.5 分区编号:去掉「分区号-」前缀后按轴线号判
+    if "-" in raw:
+        head, _, tail = raw.partition("-")
+        return bool(head) and _is_grid_label(tail)
+    if raw.isdigit():
         return True
-    if "/" in s and len(s) <= 3:
+    # §8.0.6 附加轴线分数式
+    if "/" in raw and len(raw) <= 4:
         return True
-    if s.isalpha() and len(s) <= 2:
-        return True
+    upper = raw.upper()
+    if upper.isalpha():
+        if len(upper) == 1:
+            return upper not in FORBIDDEN_AXIS_LETTERS
+        if len(upper) == 2:
+            # §8.0.4「双字母」= 重复同一字母;两个不同字母是图框代号
+            return upper[0] == upper[1] and upper[0] not in FORBIDDEN_AXIS_LETTERS
+        return False
+    # §8.0.4「字母加数字注脚」
+    if len(upper) >= 2 and upper[0].isalpha() and upper[1:].isdigit():
+        return upper[0] not in FORBIDDEN_AXIS_LETTERS
     return False
+
+
+#: **离群轴号**占比上限（不在最长递增子序列上的那些）。超过就不输出该方向。
+#:
+#: **实测违规**（v32/v33 的 F5 层 x 向）:`1 2 3 4 5 10 12 14 6 15 7 8`
+#: —— `1~8` 是连续的 8 个、`10 12 14 15` 是另外 4 个,**两套轴网交织**,
+#: 正是坐标变换不一致的表现。§8.0.3 规定轴号随坐标单调递增。
+#:
+#: **不能用「相邻逆序次数」度量**:该序列只有 **2 次**相邻逆序(17%),
+#: 低于阈值而漏掉;而按「不在最长递增子序列上」算是 **3 条(25%)**,
+#: 才反映出真实的错乱程度。
+#:
+#: 取 0.2:附加轴线(§8.0.6)、局部补号会造成个别离群,
+#: 但两套轴网交织必然产生大量离群。
+MAX_SEQUENCE_OUTLIER_RATIO = 0.2
+
+
+def _sequence_rank(label: str) -> tuple[str, int] | None:
+    """轴号 → (分区, 序号)。认不出返回 None（不参与序列校验）。
+
+    §8.0.5 的分区前缀要剥掉后再比——不同分区各自从 1 开始，跨区比较会误报。
+    §8.0.4 的字母跳过 I/O/Z，所以字母序号按 `AXIS_LETTERS` 的位置算，
+    这样 `H` 之后是 `J` 不算逆序。
+    """
+    from core.model3d.drawing_conventions import AXIS_LETTERS
+
+    raw = str(label or "").strip()
+    if not raw:
+        return None
+    zone = ""
+    if "-" in raw:
+        zone, _, raw = raw.partition("-")
+    if raw.isdigit():
+        return (f"{zone}#num", int(raw))
+    upper = raw.upper()
+    if len(upper) == 1 and upper in AXIS_LETTERS:
+        return (f"{zone}#alpha", AXIS_LETTERS.index(upper))
+    return None
+
+
+def axis_sequence_outliers(entries: list[dict]) -> int:
+    """按坐标排序后，**不在最长递增子序列上**的轴号数（§8.0.3 依次注写）。
+
+    **为什么不用「相邻逆序次数」**:实测 F5 的
+    `1 2 3 4 5 10 12 14 6 15 7 8` 只有 **2 次**相邻逆序（17%），
+    低于阈值而漏掉;但它其实是**两套轴网交织**
+    （`1~8` 一套、`10 12 14 15` 一套）。按最长递增子序列算，
+    离群 **3 条（25%）**，才反映出真实错乱程度。
+
+    数字与字母各自成序——混在一起比较没有意义。
+    """
+    import bisect
+
+    groups: dict[str, list[tuple[float, int]]] = {}
+    for entry in entries or ():
+        rank = _sequence_rank(entry.get("label", ""))
+        if rank is None:
+            continue
+        groups.setdefault(rank[0], []).append(
+            (float(entry.get("coord", 0.0)), rank[1]))
+    outliers = 0
+    for items in groups.values():
+        items.sort(key=lambda t: t[0])
+        seq = [n for _c, n in items]
+        tails: list[int] = []          # 最长**严格**递增子序列
+        for value in seq:
+            index = bisect.bisect_left(tails, value)
+            if index == len(tails):
+                tails.append(value)
+            else:
+                tails[index] = value
+        outliers += len(seq) - len(tails)
+    return outliers
 
 
 def _axes_scene_payload(axes: dict | None, source_drawing_id: str | None) -> dict | None:
@@ -662,6 +1092,15 @@ def _axes_scene_payload(axes: dict | None, source_drawing_id: str | None) -> dic
     if not axes:
         return None
 
+    # **同名轴号只留一条**（§8.0.3/§8.0.5）。实测 v31 的 F5 层出现两条
+    # 都叫 `2` 的轴线（8.394 与 16.290，相距 7.9 米）——那是两张图的坐标
+    # 变换不一致，不是标签写错。冲突数一并报出，供诊断变换质量。
+    axes, label_conflicts = dedupe_axis_labels(axes)
+    if label_conflicts:
+        logger.warning(
+            "[ModelElements] 轴号同名冲突 %d 条（图纸变换不一致，已保留先到者）",
+            label_conflicts)
+
     def _entries(direction: str) -> list[dict]:
         out = [
             {"label": str(label).strip(), "coord": round(float(pos), 3)}
@@ -672,9 +1111,28 @@ def _axes_scene_payload(axes: dict | None, source_drawing_id: str | None) -> dic
 
     x_entries = _entries("x")
     y_entries = _entries("y")
+
+    # §8.0.3 依次注写:轴号必须随坐标单调递增。大面积逆序说明这些轴线
+    # 来自变换不一致的多张图 —— **宁可不给,也不给一套顺序错乱的轴网**。
+    inversions = 0
+    for direction, entries in (("x", x_entries), ("y", y_entries)):
+        bad = axis_sequence_outliers(entries)
+        inversions += bad
+        if entries and bad / len(entries) >= MAX_SEQUENCE_OUTLIER_RATIO:
+            logger.warning(
+                "[ModelElements] %s 向轴号离群 %d/%d（≥%.0f%%）—— 疑为两套轴网"
+                "交织，不输出该方向", direction, bad, len(entries),
+                MAX_SEQUENCE_OUTLIER_RATIO * 100)
+            entries.clear()
+
     if not x_entries and not y_entries:
         return None
-    return {"x": x_entries, "y": y_entries, "source_drawing_id": source_drawing_id or ""}
+    return {"x": x_entries, "y": y_entries,
+            "source_drawing_id": source_drawing_id or "",
+            # >0 说明本层各图的坐标变换不一致，轴网位置不可尽信
+            "label_conflicts": label_conflicts,
+            # §8.0.3 离群轴号数;大面积离群的方向已被剔除
+            "sequence_outliers": inversions}
 
 
 async def _yolo_supplement(
@@ -752,8 +1210,22 @@ def yolo_equipment(
     return equipment
 
 
+#: 板的统计里额外报一个「真识别出来的板数」。
+#: 板有四种来源(见 `element_recognizer.SLAB_BASIS_*`),只有图层/块名命中那种
+#: 算识别结果,其余三种是兜底。混在一个 `slabs` 数字里,
+#: 「0 块真板」会显示成「N 块板」—— 实测大歌剧院 v30 正是如此。
+#: 缺 `basis` 的旧数据按**兜底**处理,绝不默认算成成果。
+SLABS_RECOGNISED_KEY = "slabs_recognised"
+
+
 def element_stats(elements: dict[str, list]) -> dict[str, int]:
-    return {key: len(elements.get(key) or []) for key in EMPTY_ELEMENTS}
+    from core.model3d.element_recognizer import SLAB_BASIS_RECOGNISED
+
+    stats = {key: len(elements.get(key) or []) for key in EMPTY_ELEMENTS}
+    stats[SLABS_RECOGNISED_KEY] = sum(
+        1 for slab in (elements.get("slabs") or [])
+        if (slab or {}).get("basis") == SLAB_BASIS_RECOGNISED)
+    return stats
 
 
 def reconstruction_mode(floors: list[dict]) -> str:
@@ -772,6 +1244,7 @@ def reconstruction_mode(floors: list[dict]) -> str:
 def totals(floors: list[dict]) -> dict[str, int]:
     """全场景构件总量汇总。"""
     result: dict[str, int] = {key: 0 for key in EMPTY_ELEMENTS}
+    result[SLABS_RECOGNISED_KEY] = 0
     for floor in floors:
         for key, count in (floor.get("element_stats") or {}).items():
             if key in result:
