@@ -81,6 +81,13 @@ services:
       # 上下文为 apps/：镜像需同时打包 api 与 sibling 的 model-convert（IFC→Fragments）
       context: ../apps
       dockerfile: api/Dockerfile
+      # 镜像源：实测本地到 pypi.org 只有 24KB/s，下 221MB 的 CUDA wheel 必然超时
+      # （整个 4GB 镜像构建因此全废两次）；清华源实测 1.7MB/s，快 70 倍。
+      # 可用环境变量覆盖：PIP_INDEX_URL=https://pypi.org/simple 走官方源。
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+        GNU_MIRROR: ${GNU_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/gnu}
+        NODE_MIRROR: ${NODE_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/nodejs-release}
     image: cad-api:local
     container_name: cad_api
     profiles: ["app"]
@@ -141,8 +148,15 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # 建模/抽取是重内存任务(实测容器 OOMKilled,建模在构件识别阶段被杀,
+    # 表现为「进度卡住、worker 活跃任务为空」)。故:
+    #   --concurrency=2          限同时执行的任务数,避免多重任务叠加爆内存
+    #   --max-memory-per-child   子进程内存超限后**优雅重启**(而非被 OS OOM 杀掉),
+    #                            单位 KB,1.8GB;任务会被重新派发而不是静默丢失
     command: >
-      celery -A core.celery_app worker --loglevel=info -Q default,ai_review,regulation_import
+      celery -A core.celery_app worker --loglevel=info
+      -Q default,ai_review,regulation_import
+      --concurrency=2 --max-memory-per-child=1800000
 
   celery-beat:
     image: cad-api:local

@@ -95,3 +95,6 @@ celerybeat.pid
 # 本地 pip 缓存(3.2GB)与工具目录,不入库
 .pip-cache/
 .superpowers/
+
+# 编辑器工作区文件
+*.code-workspace
