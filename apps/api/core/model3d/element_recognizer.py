@@ -38,6 +38,18 @@ _PAIR_MIN_OVERLAP_M = 1.0
 _PIPE_MIN_LEN_M = 3.0
 _EQUIPMENT_SIZE = (0.5, 5.0)
 _SLAB_MIN_AREA_M2 = 10.0
+
+# 板的来源依据。**只有 SLAB_BASIS_RECOGNISED 是真识别出来的**，其余三种是兜底
+# ——把它们混进同一个 slabs 计数，会让「板」这项能力看起来远比实际强：
+# 上海大歌剧院模型 v30 报 21 块板，13 层里 10 层恒为 2 块，全部来自兜底，
+# 靠图层判出来的是 0 块（该项目 2309 张图全是无图层 PDF，图层分支永不命中）。
+SLAB_BASIS_RECOGNISED = "layer"           # 图层/块名判定 —— 唯一的真识别
+SLAB_BASIS_LARGEST_POLYGON = "largest_polygon"   # 兜底：最大闭合多边形当整层单板
+SLAB_BASIS_AXIS_ENVELOPE = "axis_envelope"       # 兜底：轴网包络
+SLAB_BASIS_COLUMN_ENVELOPE = "column_envelope"   # 兜底：柱/桩包络
+SLAB_FALLBACK_BASES = (SLAB_BASIS_LARGEST_POLYGON, SLAB_BASIS_AXIS_ENVELOPE,
+                       SLAB_BASIS_COLUMN_ENVELOPE)
+
 _SLAB_THICKNESS_M = 0.12              # 普通楼板默认厚（无实测标注时）
 _RAFT_THICKNESS_M = 0.5              # 基础底板/筏板/承台默认厚（远厚于楼板）
 # 筏板/底板/承台判定（在已归类为 slab 的多边形上再细分，给更厚默认值）
@@ -436,23 +448,27 @@ def _find_slabs(
             "outline": [ctx.to_m(x, y) for x, y in poly],
             "thickness": _RAFT_THICKNESS_M if is_raft else _SLAB_THICKNESS_M,
             "kind": "raft" if is_raft else "slab",
+            "basis": SLAB_BASIS_RECOGNISED,
             "src": ctx.src,
         })
         if len(layered) >= _CAPS["slabs"]:
             break
     if layered:
         return layered
-    # 2) 无图层命中 → 沿用「最大闭合多边形」作为整层单板
+    # 2) 无图层命中 → 兜底。**以下三条都不是识别结果**，各自标明依据，
+    #    让统计能把它们与图层命中的板分开数（否则 0 块真板会显示成 N 块）。
     if best is not None and best_area >= _SLAB_MIN_AREA_M2:
         return [{"outline": [ctx.to_m(x, y) for x, y in best],
-                 "thickness": _SLAB_THICKNESS_M, "src": ctx.src}]
+                 "thickness": _SLAB_THICKNESS_M,
+                 "basis": SLAB_BASIS_LARGEST_POLYGON, "src": ctx.src}]
     if len(axis_x) >= 2 and len(axis_y) >= 2:
         xs = [pos for _label, pos in axis_x]
         ys = [pos for _label, pos in axis_y]
         x0, x1 = min(xs), max(xs)
         y0, y1 = min(ys), max(ys)
         outline = [ctx.to_m(x0, y0), ctx.to_m(x1, y0), ctx.to_m(x1, y1), ctx.to_m(x0, y1)]
-        return [{"outline": outline, "thickness": _SLAB_THICKNESS_M, "src": ctx.src}]
+        return [{"outline": outline, "thickness": _SLAB_THICKNESS_M,
+                 "basis": SLAB_BASIS_AXIS_ENVELOPE, "src": ctx.src}]
     # 兜底:无大多边形、无 2×2 轴网,但已识别出柱 → 用柱包络(米)生成楼板,
     # 让缺清晰轴网的楼层也有楼板参与体量/算量(否则该层无板)。
     slab = _slab_from_columns(columns)
@@ -482,6 +498,7 @@ def _slab_from_columns(columns: list[dict]) -> dict | None:
     return {
         "outline": [[x0, y0], [x1, y0], [x1, y1], [x0, y1]],
         "thickness": _SLAB_THICKNESS_M,
+        "basis": SLAB_BASIS_COLUMN_ENVELOPE,
         "src": "columns-envelope",
     }
 
