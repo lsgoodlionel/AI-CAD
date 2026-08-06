@@ -22,7 +22,10 @@ WORKDIR /app
 # libgl1/libglib2.0-0：ultralytics(opencv) 运行时依赖
 RUN apt-get update \
     && apt-get install -y --no-install-recommends gcc g++ libgl1 libglib2.0-0 \
+       fonts-dejavu-core fonts-wqy-zenhei \
     && rm -rf /var/lib/apt/lists/*
+# 注：CAD(ezdxf/matplotlib)渲染必须有系统字体，否则报
+# "no fonts available, not even fallback fonts"；wqy-zenhei 提供中文字形
 
 # GNU LibreDWG（dwg2dxf）：DWG→DXF 自动转换（自由软件，无 ODA 登录墙；
 # Debian 仓库无此包，从 GNU ftp 源码编译，独立缓存层）
@@ -66,8 +69,24 @@ RUN cd ${MODEL_CONVERT_DIR} && npm ci --omit=dev
 COPY model-convert/ ${MODEL_CONVERT_DIR}/
 
 COPY api/requirements.txt .
-RUN pip install --upgrade pip \
-    && pip install -r requirements.txt
+# 弱网下装 4GB 依赖的三件套(实测缺一不可,连废四次才凑齐):
+#   1. --mount=type=cache  已下好的 wheel **跨构建保留**,失败重来不用从零下;
+#   2. 循环重试            pip 遇 IncompleteRead 会整体放弃,不会自己续;每轮
+#                          靠缓存往前推进(实测 361s → 867s 逐轮变远);
+#   3. 镜像源              见 compose 的 PIP_INDEX_URL(pypi.org 实测仅 24KB/s)。
+# 循环末尾 `exit 1` 保证全部失败时构建**真的失败**,不会产出缺依赖的坏镜像。
+# --find-links=/wheels:**离线预下载通道**。宿主 `apps/wheelhouse/` 里有什么就用
+# 什么,缺的才联网补——网络太差时可先在宿主把 wheel 下全(见 infra/DEV.md),
+# 构建即可几乎全离线完成。目录为空时行为与纯联网一致,不影响正常构建。
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=bind,source=wheelhouse,target=/wheels,ro \
+    pip install --upgrade pip \
+    && ( for i in $(seq 1 10); do \
+           echo "[pip] 第 $i 轮(本地 wheelhouse + 缓存,进度不丢)"; \
+           pip install --find-links=/wheels --retries 10 --timeout 120 \
+               -r requirements.txt && exit 0; \
+           sleep 5; \
+         done; echo "[pip] 10 轮仍未装齐,判定失败"; exit 1 )
 
 # 图纸全文 OCR 后端（core/model3d/ocr，独立 extra：requirements-ocr.txt）。
 # OCR_EXTRA=rapid（默认，aarch64 稳定的 RapidOCR）| full（paddle+rapid，x86_64 生产）| none（跳过，链路降级 backend=none）

@@ -413,6 +413,7 @@ async def import_drawings_zip(
 async def list_drawings(
     project_id: str | None = None,
     discipline: str | None = None,
+    discipline_label: str | None = None,
     status: str | None = None,
     limit: int = 50,
     offset: int = 0,
@@ -431,6 +432,11 @@ async def list_drawings(
         conditions.append(f"d.discipline=${idx}")
         args.append(discipline)
         idx += 1
+    if discipline_label:
+        # 图框实读专业(给排水/基坑围护…);未读到的图纸回落粗粒度枚举
+        conditions.append(f"COALESCE(d.discipline_label, d.discipline)=${idx}")
+        args.append(discipline_label)
+        idx += 1
     if status:
         conditions.append(f"d.status=${idx}")
         args.append(status)
@@ -439,7 +445,8 @@ async def list_drawings(
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     rows = await db.fetch_all(
         f"""
-        SELECT d.id, d.drawing_no, d.title, d.discipline, d.version, d.status,
+        SELECT d.id, d.drawing_no, d.title, d.discipline, d.discipline_label,
+               d.version, d.status,
                d.current_stage, d.estimated_impact, d.created_at, d.updated_at,
                u.display_name AS creator_name,
                p.id AS project_id,
@@ -448,7 +455,8 @@ async def list_drawings(
         JOIN users u ON d.created_by = u.id
         JOIN projects p ON d.project_id = p.id
         {where}
-        ORDER BY d.updated_at DESC
+        ORDER BY d.sort_rank, d.directory_seq NULLS LAST, d.sort_key,
+                 d.updated_at DESC
         LIMIT ${idx} OFFSET ${idx+1}
         """,
         *args, limit, offset,
@@ -457,6 +465,79 @@ async def list_drawings(
         f"SELECT COUNT(*) FROM drawings d {where}", *args
     )
     return {"items": [dict(r) for r in rows], "total": total, "limit": limit, "offset": offset}
+
+
+@router.get("/directory-tree")
+async def drawing_directory_tree(
+    project_id: str,
+    db=Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """图纸目录树:每张目录图 → 它列出的图纸(按目录顺序),供侧栏展开跳转。
+
+    注:须声明在 `/{drawing_id}` **之前**,否则会被路径参数路由吞掉。
+    """
+    sheets = await db.fetch_all(
+        "SELECT id, drawing_no, title, discipline_label, discipline FROM drawings "
+        "WHERE project_id=$1 AND sort_rank=0 ORDER BY sort_key",
+        project_id,
+    )
+    children = await db.fetch_all(
+        "SELECT id, drawing_no, title, directory_sheet_id, directory_seq "
+        "FROM drawings WHERE project_id=$1 AND directory_sheet_id IS NOT NULL "
+        "ORDER BY directory_seq",
+        project_id,
+    )
+    by_sheet: dict[str, list] = {}
+    for c in children:
+        by_sheet.setdefault(str(c["directory_sheet_id"]), []).append({
+            "id": str(c["id"]), "drawing_no": c["drawing_no"], "title": c["title"],
+        })
+    unlisted = await db.fetch_val(
+        "SELECT COUNT(*) FROM drawings WHERE project_id=$1 AND sort_rank=2", project_id)
+    return {
+        "sheets": [{
+            "id": str(s["id"]), "drawing_no": s["drawing_no"], "title": s["title"],
+            "discipline": s["discipline_label"] or s["discipline"],
+            "children": by_sheet.get(str(s["id"]), []),
+        } for s in sheets],
+        "unlisted_count": int(unlisted or 0),
+    }
+
+
+@router.get("/discipline-summary")
+async def drawings_discipline_summary(
+    project_id: str | None = None,
+    status: str | None = None,
+    db=Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """各专业图纸张数(图纸列表页专业筛选栏的计数)。
+
+    注:须声明在 `/{drawing_id}` **之前**,否则会被路径参数路由吞掉。
+    """
+    conditions = []
+    args: list = []
+    idx = 1
+    if project_id:
+        conditions.append(f"project_id=${idx}")
+        args.append(project_id)
+        idx += 1
+    if status:
+        conditions.append(f"status=${idx}")
+        args.append(status)
+        idx += 1
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    rows = await db.fetch_all(
+        f"SELECT COALESCE(discipline_label, discipline) AS key, "
+        f"       bool_or(discipline_label IS NOT NULL) AS is_detail, "
+        f"       COUNT(*) AS cnt FROM drawings {where} "
+        "GROUP BY 1 ORDER BY cnt DESC",
+        *args,
+    )
+    items = [{"key": r["key"], "count": int(r["cnt"]),
+              "is_detail": bool(r["is_detail"])} for r in rows]
+    return {"items": items, "total": sum(i["count"] for i in items)}
 
 
 # ── 图纸详情 ──────────────────────────────────────────────────
@@ -634,6 +715,7 @@ async def _render_preview_asset(
 @router.get("/{drawing_id}/preview")
 async def get_preview(
     drawing_id: str,
+    raster: bool = Query(False, description="标注模式:PDF 也渲成 PNG,三种格式统一走位图"),
     db=Depends(get_db),
     _=Depends(get_current_user),
 ):
@@ -643,6 +725,9 @@ async def get_preview(
     - 图片 → 原文件 presigned
     - DXF/DWG → 模型贴图资产 PNG（miss 时按需渲染，写回同 key 供建模复用）
     - 其余格式 → 422 PREVIEW_UNAVAILABLE（前端降级为下载）
+
+    `raster=true`(轴线标定 / 图框框选用)：PDF 也渲成 PNG。渲染**等比**，
+    故前端「同除显示高度」得到的归一化坐标与后端 `page_h` 口径一致，可直接落库。
     """
     row = await db.fetch_one(
         "SELECT id, project_id, file_key FROM drawings WHERE id=$1", drawing_id
@@ -655,10 +740,30 @@ async def get_preview(
     ext = file_key.rsplit(".", 1)[-1].lower() if "." in file_key else ""
 
     if ext == "pdf":
+        if raster:
+            import asyncio
+
+            from services.drawing_raster import ensure_pdf_raster
+            key = await asyncio.to_thread(
+                ensure_pdf_raster, project_id, drawing_id, file_key)
+            if key:
+                return {"kind": "image",
+                        "url": presigned_get_url(key, expires_seconds=300)}
+            # 渲不出来就退回原 PDF,至少还能看(标注端会提示不支持)
         return {"kind": "pdf", "url": presigned_get_url(file_key, expires_seconds=300)}
     if ext in _PREVIEW_IMAGE_EXTS:
         return {"kind": "image", "url": presigned_get_url(file_key, expires_seconds=300)}
     if ext in _PREVIEW_CAD_EXTS:
+        if raster:
+            # 标注专用:建模贴图那张是固定画布(会拉伸),坐标对不上,须按范围等比重渲
+            import asyncio
+
+            from services.drawing_raster import ensure_cad_raster
+            key = await asyncio.to_thread(
+                ensure_cad_raster, project_id, drawing_id, file_key)
+            if key:
+                return {"kind": "image",
+                        "url": presigned_get_url(key, expires_seconds=300)}
         asset_key = f"projects/{project_id}/model_assets/{drawing_id}.png"
         if not object_exists(asset_key):
             try:

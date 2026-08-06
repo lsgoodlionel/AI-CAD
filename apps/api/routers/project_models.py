@@ -162,7 +162,7 @@ async def get_project_model(
 ):
     row = await db.fetch_one(
         """
-        SELECT status, version, built_at, error, scene, progress
+        SELECT status, version, built_at, error, scene, progress, updated_at
         FROM project_models WHERE project_id=$1
         """,
         project_id,
@@ -171,7 +171,13 @@ async def get_project_model(
         raise HTTPException(404, "MODEL_NOT_BUILT")
     record = dict(row)
     scene = _parse_jsonb(record["scene"], None)
+    progress = _parse_jsonb(record.get("progress"), None)
+    # 僵尸构建检测:任务已死(worker 重启/OOM)但状态仍 building,前端会永远转圈。
+    # 实测:进度停在 2308/2309 达 25 分钟而 worker 活跃任务为空。
+    from services.build_health import build_health
+    health = build_health(record["status"], record.get("updated_at"), progress)
     return {
+        "build_health": health,
         "status": record["status"],
         "version": record["version"],
         "built_at": record["built_at"],
@@ -183,6 +189,204 @@ async def get_project_model(
         # 构建实时进度（migration 014；building 状态时前端展示）
         "progress": _parse_jsonb(record.get("progress"), None),
     }
+
+
+@router.get("/{project_id}/model/components")
+async def get_model_components(
+    project_id: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """H4:装配 ComponentInstance 汇总(有信息的模型)——总数 + 类型分布 +
+    Z/轴网覆盖 + 审核态(auto/待人审 conflict/已确认)。取最新模型版本。"""
+    row = await db.fetch_one(
+        "SELECT version FROM project_models WHERE project_id=$1", project_id
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="MODEL_NOT_FOUND")
+    version = row["version"]
+    from services.component_repository import fetch_instances_summary
+    summary = await fetch_instances_summary(db, project_id, version)
+    return {"project_id": project_id, "model_version": version, **summary}
+
+
+class ComponentReviewBody(BaseModel):
+    action: str                       # confirm | reject | reclass
+    new_type: str | None = None       # reclass 时的新类型
+    note: str | None = None
+
+
+@router.get("/{project_id}/model/components/review-queue")
+async def get_component_review_queue(
+    project_id: str,
+    limit: int = Query(default=50, ge=1, le=200),
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """H4+:低置信(conflict)构件人审队列——带来源图纸/识别途径,按置信升序。"""
+    row = await db.fetch_one(
+        "SELECT version FROM project_models WHERE project_id=$1", project_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="MODEL_NOT_FOUND")
+    from services.component_repository import fetch_review_queue
+    queue = await fetch_review_queue(db, project_id, row["version"], limit)
+    return {"project_id": project_id, "model_version": row["version"], "queue": queue}
+
+
+@router.get("/{project_id}/model/components/metrics")
+async def get_component_metrics(
+    project_id: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """H7 验收指标:竖向真实率/轴网定位率(位置代理)/审核收敛/人审工作量。
+
+    位置误差需人审金标签作真值,当前不可测,用轴网定位率代理(如实标注)。
+    数量准确率见 `POST /model/components/reconcile`(需设计 BOM)。
+    """
+    row = await db.fetch_one(
+        "SELECT version FROM project_models WHERE project_id=$1", project_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="MODEL_NOT_FOUND")
+    from services.component_repository import (
+        fetch_instances_summary, fetch_review_action_counts)
+    from services.component_metrics import compute_metrics
+    summary = await fetch_instances_summary(db, project_id, row["version"])
+    actions = await fetch_review_action_counts(db, project_id)
+    metrics = compute_metrics(summary, actions)
+    return {"project_id": project_id, "model_version": row["version"], **metrics}
+
+
+class ComponentReconcileBody(BaseModel):
+    bom: dict[str, int]                # 设计构件表数量 {type: count}
+
+
+@router.post("/{project_id}/model/components/reconcile")
+async def reconcile_components(
+    project_id: str,
+    body: ComponentReconcileBody,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """H5 职责A:装配实体数量 vs 设计构件表 BOM,报每型 缺/多(数量对齐,驱动补漏/查重)。"""
+    row = await db.fetch_one(
+        "SELECT version FROM project_models WHERE project_id=$1", project_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="MODEL_NOT_FOUND")
+    from services.component_repository import fetch_instances_summary
+    from services.component_bom import reconcile_from_counts
+    summary = await fetch_instances_summary(db, project_id, row["version"])
+    report = reconcile_from_counts(summary.get("by_type") or {}, body.bom)
+    return {"project_id": project_id, "model_version": row["version"], "report": report}
+
+
+@router.get("/{project_id}/model/components/overlay")
+async def get_components_overlay(
+    project_id: str,
+    drawing_id: str = Query(..., description="图纸 id"),
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """H4+ 回投:某图纸构件的归一化页面标记,供前端叠加到图纸预览让人在图上核对。"""
+    row = await db.fetch_one(
+        "SELECT version FROM project_models WHERE project_id=$1", project_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="MODEL_NOT_FOUND")
+    from services.component_repository import fetch_overlay
+    return await fetch_overlay(db, project_id, row["version"], drawing_id)
+
+
+@router.get("/{project_id}/model/components/by-source")
+async def get_components_by_source(
+    project_id: str,
+    drawing_id: str = Query(..., description="来源图纸 id"),
+    comp_type: str = Query(..., description="构件类型 column/wall/pipe…"),
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """H6:3D 点击单构件 → 该图该类构件在装配层的证据(数量 + 审核态 + 竖向覆盖)。"""
+    row = await db.fetch_one(
+        "SELECT version FROM project_models WHERE project_id=$1", project_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="MODEL_NOT_FOUND")
+    from services.component_repository import fetch_instances_by_source
+    data = await fetch_instances_by_source(
+        db, project_id, row["version"], drawing_id, comp_type)
+    return {"project_id": project_id, "model_version": row["version"], **data}
+
+
+_COMPONENT_REVIEW_ACTIONS = {"confirm", "reject", "reclass"}
+_INSERT_COMPONENT_ACTION_SQL = """
+INSERT INTO model_review_actions
+    (project_id, drawing_id, target_kind, target_id, action_type,
+     new_category, reviewer_id, note)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+"""
+
+
+@router.post("/{project_id}/model/components/{instance_id}/llm-review")
+async def llm_review_component(
+    project_id: str,
+    instance_id: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """H5:大模型复核单个低置信构件,返回 确认/否定/改类 建议(不自动应用,供人审参考)。
+
+    LLM 不可用/失败时优雅降级(available=False),端点仍 200。
+    """
+    from services.component_repository import fetch_instance_for_review
+    inst = await fetch_instance_for_review(db, project_id, instance_id)
+    if inst is None:
+        raise HTTPException(status_code=404, detail="COMPONENT_NOT_FOUND")
+    router_llm = None
+    try:
+        from redis.asyncio import Redis
+        from core.llm.router import ModelRouter
+        from core.config import settings as _settings
+        router_llm = ModelRouter(
+            db=db, redis=Redis.from_url(_settings.redis_url, decode_responses=True))
+    except Exception:  # noqa: BLE001 — 无 Redis/依赖 → 降级
+        router_llm = None
+    from services.component_llm_review import review_component
+    recommendation = await review_component(inst, router_llm)
+    return {"instance_id": instance_id, "component": inst, "recommendation": recommendation}
+
+
+@router.post("/{project_id}/model/components/{instance_id}/review", status_code=201)
+async def submit_component_review(
+    project_id: str,
+    instance_id: str,
+    body: ComponentReviewBody,
+    request: Request,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """H4+:构件人审 confirm/reject/reclass → 翻转 review_state + 埋点 + 审计(收敛飞轮)。"""
+    if body.action not in _COMPONENT_REVIEW_ACTIONS:
+        raise HTTPException(status_code=400, detail="INVALID_REVIEW_ACTION")
+    if body.action == "reclass" and not (body.new_type or "").strip():
+        raise HTTPException(status_code=400, detail="REVIEW_NEW_TYPE_REQUIRED")
+    reviewer_id = current_user["id"]
+    from services.component_repository import apply_component_review
+    updated = await apply_component_review(
+        db, project_id, instance_id, body.action, reviewer_id, body.new_type)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="COMPONENT_NOT_FOUND")
+    updated["id"] = str(updated["id"])
+    await db.execute(
+        _INSERT_COMPONENT_ACTION_SQL,
+        project_id, None, "element", instance_id, body.action,
+        body.new_type, str(reviewer_id), body.note,
+    )
+    await write_audit(
+        db, user_id=reviewer_id, action="model.component.review",
+        resource="component_instance", resource_id=instance_id,
+        new_state={"action": body.action, "new_type": body.new_type,
+                   "review_state": updated["review_state"]},
+        ip_address=request.client.host if request.client else None,
+    )
+    return {"success": True, "data": updated, "error": None}
 
 
 @router.get("/{project_id}/model/quantities")
@@ -469,7 +673,155 @@ async def get_model_story_heights(
             ),
             "note": (manual.get("note") if manual else None),
         })
-    return {"data": items, "meta": {"count": len(items)}}
+    # 方向1:平面图标注恢复的**标高候选**(须人审,不自动采用)。
+    # 实测大歌剧院仅 24 张剖面(north 单体 0 张)→ 层高全为默认套;而 989 张平面图带
+    # 28265 条标高标注,经区分度加权投票 + 单调性约束可恢复 9/12 层候选。
+    # 诚实边界:IDF 会误压制"恰好正确的普遍值"(实测 F1 恢复 0.92m 而应为 ±0.000),
+    # 故仅作建议值展示,由人确认后写入人工录入通道。
+    try:
+        suggestions = await _plan_elevation_suggestions(db, project_id, scene)
+        for item in items:
+            sug = suggestions.get(str(item.get("story_key")))
+            if sug:
+                item["suggested_elevation_m"] = sug["elevation_m"]
+                item["suggestion_support"] = sug["support"]
+                item["suggestion_confidence"] = sug.get("confidence")
+                item["suggestion_source"] = "plan_annotation"
+    except Exception:  # noqa: BLE001 — 建议值失败不影响主功能
+        pass
+    # 层高↔标高计算关系(工程约束):标高差分即层高,不自洽处即数据错误所在。
+    # 领域依据:标高多在剖面/立面表格,层高在平面以标高符号标注,二者须互洽。
+    meta: dict[str, Any] = {"count": len(items)}
+    try:
+        from services.story_elevation_calculus import (
+            cross_validate, heights_from_elevations, unreasonable_heights)
+        levels = [
+            {"story_key": i.get("story_key"), "order": i.get("story_order") or 0,
+             "elevation_m": (i.get("manual_elevation_m")
+                             if i.get("manual_elevation_m") is not None
+                             else i.get("auto_elevation_m"))}
+            for i in items
+        ]
+        derived = {d["story_key"]: d for d in heights_from_elevations(levels)}
+        for item in items:
+            d = derived.get(item.get("story_key"))
+            if d:
+                item["derived_height_m"] = d["height_m"]         # 由上下层标高差算出
+                item["height_reasonable"] = d["reasonable"]      # 2.5~9m 合理区间
+        given = [
+            {"story_key": i.get("story_key"),
+             "height_m": (i.get("manual_height_m") if i.get("manual_height_m") is not None
+                          else i.get("auto_height_m"))}
+            for i in items
+        ]
+        meta["height_consistency"] = cross_validate(levels, given)
+        meta["unreasonable_heights"] = unreasonable_heights(levels)
+    except Exception:  # noqa: BLE001 — 校验失败不影响主功能
+        pass
+    return {"data": items, "meta": meta}
+
+
+async def _plan_elevation_suggestions(db, project_id: str, scene: dict | None) -> dict:
+    """从平面图标注恢复各层标高候选(带质量分)。失败/无数据 → 空 dict。"""
+    if not scene:
+        return {}
+    from services.plan_elevation_recovery import grade_candidates, recover_plan_elevations
+
+    rows = await db.fetch_all(
+        """SELECT drawing_id, value_json FROM drawing_extracted_info
+           WHERE project_id = :p AND category = 'elevation' AND is_active""",
+        {"p": project_id})
+    by_drawing: dict[str, list[float]] = {}
+    for r in rows:
+        value = _parse_jsonb(r["value_json"], None) or {}
+        elevation = value.get("elevation_m")
+        if elevation is not None:
+            by_drawing.setdefault(str(r["drawing_id"]), []).append(float(elevation))
+    per_floor: dict[str, dict] = {}
+    baseline: dict[str, float] = {}
+    orders: dict[str, int] = {}
+    for floor in scene.get("floors") or []:
+        key = str(floor.get("key") or "")
+        if not key or key == "UNZONED":
+            continue
+        drawings = {
+            str(d.get("drawing_id")): by_drawing[str(d.get("drawing_id"))]
+            for d in (floor.get("drawings") or [])
+            if str(d.get("drawing_id")) in by_drawing
+        }
+        if not drawings:
+            continue
+        orders[key] = int(floor.get("order") or 0)
+        per_floor[key] = {"order": orders[key], "drawings": drawings}
+        if floor.get("elevation_m") is not None:
+            baseline[key] = float(floor["elevation_m"])
+    if not per_floor:
+        return {}
+    plan = grade_candidates(recover_plan_elevations(per_floor), baseline, orders)
+    # **剖面/立面优先**:标高本就标注在剖面/立面(常为表格),且其竖向按比例绘制
+    # → 标高与图上 y 严格线性,可自校验(实测 19/31 张 R²≥0.98,最佳 R²=1.0)。
+    # 质量高于平面图投票,故覆盖同层的平面建议。
+    section = await _section_elevation_suggestions(db, project_id, scene, baseline, orders)
+    plan.update(section)
+    return plan
+
+
+async def _section_elevation_suggestions(
+    db, project_id: str, scene: dict, baseline: dict, orders: dict,
+) -> dict:
+    """从剖面/立面图恢复标高(线性自校验 + 主楼面序列 + 楼层匹配)。"""
+    from services.drawing_view_classifier import classify_view_type
+    from services.section_elevation_fit import (
+        fit_elevation_axis, main_story_elevations, match_to_floors)
+
+    drawings = [dict(r) for r in await db.fetch_all(
+        "SELECT id, drawing_no, title, file_key, discipline FROM drawings "
+        "WHERE project_id = :p", {"p": project_id})]
+    section_ids = [str(d["id"]) for d in drawings
+                   if classify_view_type(d).view_type in ("section", "elevation")]
+    if not section_ids:
+        return {}
+    rows = await db.fetch_all(
+        """SELECT drawing_id, value_json, location_json FROM drawing_extracted_info
+           WHERE project_id = :p AND category = 'elevation' AND is_active
+             AND drawing_id::text = ANY(:ids)""",
+        {"p": project_id, "ids": section_ids})
+    by_drawing: dict[str, list] = {}
+    for r in rows:
+        value = _parse_jsonb(r["value_json"], None) or {}
+        loc = _parse_jsonb(r["location_json"], None) or {}
+        y = loc.get("y")
+        if y is None:
+            bbox = loc.get("bbox")
+            if isinstance(bbox, (list, tuple)) and len(bbox) >= 4:
+                y = (bbox[1] + bbox[3]) / 2
+        elevation = value.get("elevation_m")
+        if elevation is not None and y is not None:
+            by_drawing.setdefault(str(r["drawing_id"]), []).append(
+                (float(y), float(elevation)))
+    floors = [{"story_key": k, "order": orders.get(k, 0), "elevation_m": v}
+              for k, v in baseline.items()]
+    out: dict[str, dict] = {}
+    for points in by_drawing.values():
+        fit = fit_elevation_axis(points)
+        if not fit["ok"]:
+            continue          # 线性不成立 → 该图标高不可信,不采用
+        sequence = main_story_elevations([e for _, e in points])
+        for key, hit in match_to_floors(sequence, floors).items():
+            prev = out.get(key)
+            # 同层多图命中时取拟合优度更高者
+            if prev is None or fit["r_squared"] > prev.get("r_squared", 0):
+                out[key] = {
+                    "elevation_m": hit["elevation_m"],
+                    "support": fit["inliers"],
+                    "confidence": round(min(fit["r_squared"], 1.0), 3),
+                    "deviation_m": hit["delta_m"],
+                    "story_height_ok": None,
+                    "needs_review": True,
+                    "z_source": "section_fit",
+                    "r_squared": fit["r_squared"],
+                }
+    return out
 
 
 class _StoryHeightItem(BaseModel):

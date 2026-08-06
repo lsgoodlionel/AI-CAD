@@ -9,6 +9,8 @@ build_project_model(project_id)：
 蓝图：docs/MODEL_BASE_BLUEPRINT.md 第 7 节。
 """
 import asyncio
+
+from celery.exceptions import SoftTimeLimitExceeded
 import json
 import logging
 
@@ -39,12 +41,32 @@ def _resolve_build_mode(scene: dict) -> str | None:
     return str(default_mode) if default_mode else None
 
 
-@celery_app.task(bind=True, max_retries=2, default_retry_delay=30)
+#: 建模的**独立**超时。全局 `task_soft_time_limit=1500`（25 分钟）
+#: 是给秒级任务定的，而全项目建模（2309 张图 / 14 层）实测:
+#: 楼层定位 1.5 分钟 + **构件识别 23.5 分钟**，刚好被 1500s 杀掉后重试，
+#: 重试再超时——白烧 50 分钟仍然失败。
+BUILD_SOFT_TIME_LIMIT_SEC = 5400      # 90 分钟
+BUILD_HARD_TIME_LIMIT_SEC = 6000      # 留 10 分钟给软超时的清理逻辑
+
+
+@celery_app.task(
+    bind=True, max_retries=2, default_retry_delay=30,
+    soft_time_limit=BUILD_SOFT_TIME_LIMIT_SEC,
+    time_limit=BUILD_HARD_TIME_LIMIT_SEC,
+)
 def build_project_model(self, project_id: str) -> dict:
     """模型基座构建任务入口。"""
     logger.info("模型基座构建任务启动: project_id=%s", project_id)
     try:
         return asyncio.run(_do_build(project_id))
+    except SoftTimeLimitExceeded as exc:
+        # **超时不重试**:同样的输入、同样的耗时，重试必然再超时。
+        # 如实失败，让人知道该加时还是该减量——而不是白烧两轮。
+        logger.error("模型基座构建超时(%ds): project_id=%s —— 不重试",
+                     BUILD_SOFT_TIME_LIMIT_SEC, project_id)
+        asyncio.run(_mark_failed(
+            project_id, f"构建超时（超过 {BUILD_SOFT_TIME_LIMIT_SEC // 60} 分钟）"))
+        raise exc
     except Exception as exc:
         logger.error("模型基座构建失败: project_id=%s error=%s", project_id, exc)
         asyncio.run(_mark_failed(project_id, str(exc)))
@@ -102,6 +124,21 @@ async def _do_build(project_id: str) -> dict:
         )
         version = row["version"] if row is not None else None
         logger.info("模型基座构建完成: project_id=%s version=%s", project_id, version)
+
+        # ── H4:实体中心装配 —— scene 构件 → ComponentInstance 入库(可追溯) ──
+        # try/except 包裹:装配是增强能力,失败绝不能影响建模主流程。
+        try:
+            from services.component_pipeline import assemble_scene_instances
+            from services.component_repository import replace_instances
+            if version is not None:
+                assembled = assemble_scene_instances(scene)
+                written = await replace_instances(
+                    db, project_id, version, assembled["instances"])
+                logger.info(
+                    "H4 装配实体入库: project_id=%s version=%s 实体=%s 跨层缺口=%s",
+                    project_id, version, written, len(assembled["continuity_gaps"]))
+        except Exception as exc:  # noqa: BLE001 — 装配失败仅告警,不影响建模
+            logger.warning("H4 实体装配/入库失败: %s", exc)
 
         # ── 发射 model.built 管线事件（D-08） ──────────────────────
         # try/except 包裹：事件编排层是自动化增强，发射失败绝不能影响建模主流程。
