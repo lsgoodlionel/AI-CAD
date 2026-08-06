@@ -37,6 +37,7 @@ export interface ModelQualitySummary {
   unassignedStoryCount: number
   floorConflictCount: number
   floorConflicts: FloorConflictSummary[]
+  unregisteredFloorCount: number
   lowConfidenceUnits: LowConfidenceBuildingUnit[]
   pendingManualCount: number
   pendingCandidateCount: number

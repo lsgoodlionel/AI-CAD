@@ -48,6 +48,20 @@ export interface EquipmentPick {
   src?: string
 }
 
+/**
+ * 逐构件拾取索引（G-精确）：合并网格里每个构件的三角形结束区间（faceEnd,exclusive）
+ * + 该构件的来源图纸/识别途径/类型,支撑点击 faceIndex 反查**单个构件**由哪张图建立。
+ * 是 EquipmentPick 的泛化(通用于柱/墙/梁/板/设备)。
+ */
+export interface ElementItemPick {
+  faceEnd: number
+  label?: string
+  src?: string
+  source?: string
+  typeLabel?: string
+  typeText?: string
+}
+
 export interface ElementUserData {
   kind: 'element'
   /** columns | walls | beams | slabs | equipment | pipes:<system> */
@@ -65,6 +79,8 @@ export interface ElementUserData {
   typeLabels?: string[]
   /** 仅设备合批网格：逐设备拾取区间（按 faceEnd 升序），供 raycast faceIndex 反查 */
   equipmentPicks?: EquipmentPick[]
+  /** 逐构件拾取区间（G-精确,通用于柱/墙/梁/板/设备）,供 raycast faceIndex 反查单构件 */
+  itemPicks?: ElementItemPick[]
 }
 
 /** 从构件集合聚合来源(反向追溯):distinct 来源图纸/识别途径/类型标签 */
@@ -86,11 +102,40 @@ export function collectSourceInfo(
   }
 }
 
+/** 单构件 → 逐构件拾取信息(faceEnd 由 mergedMeshWithPicks 累加填入)。
+ *  构件字段为 snake_case,映射为 pick 的 camelCase(供 ModelViewer 消费)。 */
+function itemPickOf(item: {
+  label?: string
+  src?: string
+  source?: string
+  type_label?: string
+  type_text?: string
+}): Omit<ElementItemPick, 'faceEnd'> {
+  return {
+    label: item.label,
+    src: item.src,
+    source: item.source,
+    typeLabel: item.type_label,
+    typeText: item.type_text,
+  }
+}
+
 /** 由命中的 faceIndex 反查是哪台设备（区间按 faceEnd 升序，取首个 faceIndex < faceEnd） */
 export function resolveEquipmentPick(
   picks: EquipmentPick[],
   faceIndex: number,
 ): EquipmentPick | null {
+  for (const pick of picks) {
+    if (faceIndex < pick.faceEnd) return pick
+  }
+  return picks.length ? picks[picks.length - 1] : null
+}
+
+/** 由命中的 faceIndex 反查是哪个构件（通用版：区间按 faceEnd 升序,取首个 faceIndex < faceEnd） */
+export function resolveItemPick(
+  picks: ElementItemPick[],
+  faceIndex: number,
+): ElementItemPick | null {
   for (const pick of picks) {
     if (faceIndex < pick.faceEnd) return pick
   }
@@ -217,40 +262,62 @@ function mergedMesh(
 }
 
 /**
+ * 逐构件可拾取的合批网格（G4）：同类构件几何按构件顺序合并为一个 Mesh（性能不变），
+ * 同时记录每个构件的三角形区间（faceEnd）+ 来源图纸/识别途径/类型，支撑点击
+ * faceIndex 反查**单个构件**由哪张图的什么内容建立。一个构件可含多段几何
+ * （墙/梁多段），faceEnd 记在该构件末尾。
+ */
+function mergedMeshWithPicks(
+  itemGroups: { geoms: THREE.BufferGeometry[]; pick: Omit<ElementItemPick, 'faceEnd'> }[],
+  color: string,
+  baseData: ElementUserData,
+  opacity = 1,
+): THREE.Mesh | null {
+  const allGeoms: THREE.BufferGeometry[] = []
+  const picks: ElementItemPick[] = []
+  let faceAcc = 0
+  for (const group of itemGroups) {
+    let hasGeom = false
+    for (const geometry of group.geoms) {
+      const position = geometry.getAttribute('position')
+      faceAcc += position ? position.count / 3 : 0
+      allGeoms.push(geometry)
+      hasGeom = true
+    }
+    if (hasGeom) picks.push({ faceEnd: faceAcc, ...group.pick })
+  }
+  if (!allGeoms.length) return null
+  const merged = allGeoms.length === 1 ? allGeoms[0] : mergeGeometries(allGeoms)
+  if (!merged) return null
+  if (allGeoms.length > 1) allGeoms.forEach((g) => g.dispose())
+  const material = new THREE.MeshLambertMaterial({
+    color, transparent: opacity < 1, opacity,
+  })
+  const mesh = new THREE.Mesh(merged, material)
+  mesh.userData = { ...baseData, count: picks.length, itemPicks: picks }
+  return mesh
+}
+
+/**
  * 设备合批网格：整层设备挤出几何合并为一个 Mesh（1799→1 draw call/geometry），
- * 同时记录逐设备三角形区间以支持点击 faceIndex 反查该设备的 label/来源图纸。
+ * 逐设备拾取区间（itemPicks）支持点击 faceIndex 反查该设备的 label/来源图纸/类型。
  */
 function buildEquipmentMergedMesh(
   items: ElementEquipment[], t: PlanTransform, floorY: number,
   floorKey: string, buildingKey: string,
 ): THREE.Mesh | null {
-  const geometries: THREE.BufferGeometry[] = []
-  const picks: EquipmentPick[] = []
-  let faceAcc = 0
+  const groups: { geoms: THREE.BufferGeometry[]; pick: Omit<ElementItemPick, 'faceEnd'> }[] = []
   for (const item of items) {
     const shape = outlineShape(item.outline, t)
     if (!shape) continue
     const height = Math.max(item.height * t.scale, 0.4)
-    const geometry = extrudeUp(shape, height, floorY)
-    const position = geometry.getAttribute('position')
-    faceAcc += position ? position.count / 3 : 0
-    picks.push({ faceEnd: faceAcc, label: item.label, src: item.src })
-    geometries.push(geometry)
+    groups.push({ geoms: [extrudeUp(shape, height, floorY)], pick: itemPickOf(item) })
   }
-  if (!geometries.length) return null
-  const merged = geometries.length === 1 ? geometries[0] : mergeGeometries(geometries)
-  if (!merged) return null
-  if (geometries.length > 1) geometries.forEach((g) => g.dispose())
-  const mesh = new THREE.Mesh(
-    merged,
-    new THREE.MeshLambertMaterial({ color: ELEMENT_COLORS.equipment }),
-  )
-  const data: ElementUserData = {
+  const base: ElementUserData = {
     kind: 'element', elementType: 'equipment', floorKey, buildingKey,
-    count: picks.length, equipmentPicks: picks,
+    count: groups.length, ...collectSourceInfo(items),
   }
-  mesh.userData = data
-  return mesh
+  return mergedMeshWithPicks(groups, ELEMENT_COLORS.equipment, base)
 }
 
 /** 估算三角形数（粗略：几何 position 顶点数/3 累加） */
@@ -279,7 +346,7 @@ export function buildFloorElementMeshes(
   const baseY = floorY
   const storyH = real?.storyHeight ?? ELEMENT_STORY_HEIGHT
   const meshes: THREE.Mesh[] = []
-  const meta = (
+  const base = (
     elementType: string,
     items: { src?: string; source?: string; type_label?: string; type_text?: string }[],
   ): ElementUserData => ({
@@ -287,44 +354,50 @@ export function buildFloorElementMeshes(
     ...collectSourceInfo(items),
   })
 
-  const columnGeoms: THREE.BufferGeometry[] = []
+  type Group = { geoms: THREE.BufferGeometry[]; pick: Omit<ElementItemPick, 'faceEnd'> }
+
+  const columnGroups: Group[] = []
   for (const column of elements.columns) {
     const shape = outlineShape(column.outline, t)
-    if (shape) columnGeoms.push(extrudeUp(shape, storyH, baseY))
+    if (shape) columnGroups.push({ geoms: [extrudeUp(shape, storyH, baseY)], pick: itemPickOf(column) })
   }
-  const columns = mergedMesh(columnGeoms, ELEMENT_COLORS.columns, meta('columns', elements.columns))
+  const columns = mergedMeshWithPicks(columnGroups, ELEMENT_COLORS.columns, base('columns', elements.columns))
   if (columns) meshes.push(columns)
 
-  const wallGeoms: THREE.BufferGeometry[] = []
+  const wallGroups: Group[] = []
   for (const wall of elements.walls) {
+    const geoms: THREE.BufferGeometry[] = []
     for (let i = 0; i < wall.path.length - 1; i += 1) {
       const box = segmentBox(wall.path[i], wall.path[i + 1], t, wall.width, storyH, baseY + storyH / 2)
-      if (box) wallGeoms.push(box)
+      if (box) geoms.push(box)
     }
+    if (geoms.length) wallGroups.push({ geoms, pick: itemPickOf(wall) })
   }
-  const walls = mergedMesh(wallGeoms, ELEMENT_COLORS.walls, meta('walls', elements.walls))
+  const walls = mergedMeshWithPicks(wallGroups, ELEMENT_COLORS.walls, base('walls', elements.walls))
   if (walls) meshes.push(walls)
 
-  const beamGeoms: THREE.BufferGeometry[] = []
+  const beamGroups: Group[] = []
   for (const beam of elements.beams) {
+    const geoms: THREE.BufferGeometry[] = []
     for (let i = 0; i < beam.path.length - 1; i += 1) {
       const depth = Math.max(beam.depth * t.scale, 0.15)
       const box = segmentBox(
         beam.path[i], beam.path[i + 1], t, beam.width,
         depth, baseY + storyH - BEAM_TOP_OFFSET - depth / 2,
       )
-      if (box) beamGeoms.push(box)
+      if (box) geoms.push(box)
     }
+    if (geoms.length) beamGroups.push({ geoms, pick: itemPickOf(beam) })
   }
-  const beams = mergedMesh(beamGeoms, ELEMENT_COLORS.beams, meta('beams', elements.beams))
+  const beams = mergedMeshWithPicks(beamGroups, ELEMENT_COLORS.beams, base('beams', elements.beams))
   if (beams) meshes.push(beams)
 
-  const slabGeoms: THREE.BufferGeometry[] = []
+  const slabGroups: Group[] = []
   for (const slab of elements.slabs) {
     const shape = outlineShape(slab.outline, t)
-    if (shape) slabGeoms.push(extrudeUp(shape, SLAB_RENDER_THICKNESS, baseY - SLAB_RENDER_THICKNESS))
+    if (shape) slabGroups.push({ geoms: [extrudeUp(shape, SLAB_RENDER_THICKNESS, baseY - SLAB_RENDER_THICKNESS)], pick: itemPickOf(slab) })
   }
-  const slabs = mergedMesh(slabGeoms, ELEMENT_COLORS.slabs, meta('slabs', elements.slabs), 0.5)
+  const slabs = mergedMeshWithPicks(slabGroups, ELEMENT_COLORS.slabs, base('slabs', elements.slabs), 0.5)
   if (slabs) meshes.push(slabs)
 
   meshes.push(...buildPipeMeshes(elements, t, baseY, floorKey, buildingKey))

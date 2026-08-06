@@ -131,6 +131,26 @@ export default function StoryHeightPanel({ projectId, onSaved }: StoryHeightPane
       width: 84,
       render: (v: number | null) => (v == null ? '—' : v.toFixed(2)),
     },
+    {
+      // 方向1:从平面图标注恢复的标高建议。实测大歌剧院层高几乎全是默认套(4.2/4.5),
+      // 而 989 张平面图带 28265 条标高标注可投票恢复。置信低者(支持少/层高不合理)慎用。
+      title: '图纸建议标高',
+      dataIndex: 'suggested_elevation_m',
+      width: 150,
+      render: (v: number | null, row: StoryHeightRow) => {
+        if (v == null) return <span style={{ color: '#bfbfbf' }}>—</span>
+        const conf = row.suggestion_confidence ?? 0
+        const color = conf >= 0.8 ? 'green' : conf >= 0.4 ? 'orange' : 'red'
+        return (
+          <Space size={4}>
+            <Tag color={color} style={{ marginInlineEnd: 0 }}>{v.toFixed(2)}</Tag>
+            <span style={{ fontSize: 11, color: '#8c8c8c' }}>
+              {row.suggestion_support ?? 0}张图
+            </span>
+          </Space>
+        )
+      },
+    },
   ]
 
   if (!loading && rows.length === 0) {
@@ -142,6 +162,7 @@ export default function StoryHeightPanel({ projectId, onSaved }: StoryHeightPane
       <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 8 }}>
         自动识别层高为参考值(灰色)。按剖面/设计说明在「人工层高」录入真实值校正，
         留空则沿用自动值。保存后<b>重建模型</b>生效。
+        「图纸建议标高」由平面图标注投票恢复(绿=高置信/橙=中/红=低,仅供参考,请核对图纸后录入)。
       </div>
       <Table
         size="small"

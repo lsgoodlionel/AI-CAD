@@ -7,7 +7,9 @@ import { Card, Checkbox, List, Space, Tabs, Tag, Typography } from 'antd'
 import type { ModelScene, SceneFloor } from '@/services/projectModel'
 import SemanticTreePanel from '../SemanticTreePanel'
 import ModelQualityPanel from '../ModelQualityPanel'
+import ComponentSummaryCard from '../ComponentSummaryCard'
 import CollapsiblePanel from '../CollapsiblePanel'
+import SetCapabilityPanel from '../SetCapabilityPanel'
 import HelpTip from '@/components/HelpTip'
 import type {
   BuildingUnitOption, ModelQualitySummary, SemanticScopeLodView,
@@ -19,6 +21,7 @@ import { elementFilterOptions } from './elementFilterOptions'
 const { Text } = Typography
 
 interface BrowseModePanelsProps {
+  projectId: string
   semanticTreeGroups: SemanticTreeGroup[]
   selectedSemanticNode: SemanticTreeNodeView | null
   onSelectSemanticNode: (node: SemanticTreeNodeView | null) => void
@@ -48,6 +51,7 @@ const ALL_MARKER_TYPES = ['issue', 'cross']
 const MARKER_TYPE_LABEL: Record<string, string> = { issue: '图内问题', cross: '跨图发现' }
 
 export default function BrowseModePanels({
+  projectId,
   semanticTreeGroups,
   selectedSemanticNode,
   onSelectSemanticNode,
@@ -128,9 +132,19 @@ export default function BrowseModePanels({
                   background: isActive ? '#e6f4ff' : undefined, borderRadius: 6,
                 }}
               >
-                <Space>
+                <Space wrap>
                   <Text strong={isActive}>{floor.label}</Text>
                   <Text type="secondary">{floor.drawings.length} 张</Text>
+                  {/*
+                    楼层级门禁:标高是图纸读的还是默认值推的。
+                    实测 v31 有 10/13 层是 4.5m 默认值硬推,最大偏差 11.9m,
+                    而界面上与图纸值长得一模一样 —— 必须在这里区分开。
+                  */}
+                  {(floor as { elevation_estimated?: boolean }).elevation_estimated
+                    ? <Tag color="orange">标高为默认值</Tag>
+                    : (floor as { elevation_source?: string }).elevation_source
+                      ? <Tag color="green">标高来自图纸</Tag>
+                      : null}
                 </Space>
               </List.Item>
             )
@@ -204,11 +218,25 @@ export default function BrowseModePanels({
         </Card>
       ) : null}
 
+      {/*
+        建模能力与降级说明。**默认展开、排在模型质量之前**——
+        降级如果被折叠起来，用户就会把默认层高当成图纸实测值
+        （实测：13 层里 10 层是 4.5m 默认值推的，界面上看不出来）。
+      */}
+      <CollapsiblePanel
+        title={<>建模能力与降级<HelpTip content="这批图纸能建到什么程度：有无坐标基准图（决定世界坐标）、有无完整平面图（决定楼层）、有无立面/剖面图（决定层高是实测还是默认值）。降级项会逐条列出。" anchor="12-0-建模能力" /></>}
+        defaultOpen
+        maxBodyHeight={460}
+      >
+        <SetCapabilityPanel payload={viewScene?.set_capability} />
+      </CollapsiblePanel>
+
       <CollapsiblePanel
         title={<>模型质量<HelpTip content="汇总楼层未分配、楼层冲突、低置信构件、待人工确认等模型健康指标，用于判断当前模型是否可放心用于审图/算量。" anchor="12-1-模型质量" /></>}
         defaultOpen={false}
         maxBodyHeight={420}
       >
+        <ComponentSummaryCard projectId={projectId} />
         <ModelQualityPanel quality={quality} buildingUnits={buildingUnits} selectedScopeQuality={selectedScopeQuality} />
       </CollapsiblePanel>
     </>

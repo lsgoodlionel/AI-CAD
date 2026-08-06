@@ -12,6 +12,8 @@ import type { CreateReviewBatchResult } from '@/services/drawings'
 import { listProjects } from '@/services/projects'
 import DrawingPreviewModal from '@/components/DrawingPreviewModal'
 import UploadWizard, { DISCIPLINE_OPTIONS, DISCIPLINE_LABEL, extractErrorMessage } from './UploadWizard'
+import DisciplineFilter from './DisciplineFilter'
+import DirectoryDrawer from './DirectoryDrawer'
 
 const STATUS_MAP: Record<string, { color: string; text: string }> = {
   draft:              { color: 'default',    text: '草稿' },
@@ -41,6 +43,8 @@ interface DrawingRow {
   drawing_no: string
   title: string
   discipline: string
+  /** 图框「专业」栏实读值(给排水/基坑围护…);null = 未读到,回落 discipline */
+  discipline_label?: string | null
   version: string
   status: string
   estimated_impact?: number
@@ -63,7 +67,11 @@ export default function DrawingList() {
   const [uploadOpen, setUploadOpen] = useState(false)
   const [selectedRows, setSelectedRows] = useState<DrawingRow[]>([])
   const [projects, setProjects] = useState<ProjectOption[]>([])
-  const [preview, setPreview] = useState<{ id: string; title: string } | null>(null)
+  const [preview, setPreview] =
+    useState<{ id: string; title: string; projectId: string } | null>(null)
+  // 专业快捷筛选(常驻一行,不必展开搜索表单)
+  const [discipline, setDiscipline] = useState('')
+  const [projectFilterId, setProjectFilterId] = useState<string | undefined>()
 
   useEffect(() => {
     listProjects({ limit: 200 }).then((res: { items?: ProjectOption[] }) =>
@@ -103,8 +111,10 @@ export default function DrawingList() {
     {
       title: '专业',
       dataIndex: 'discipline',
-      width: 80,
-      render: (_, row) => DISCIPLINE_LABEL[row.discipline] ?? row.discipline,
+      width: 100,
+      // 图框实读专业优先(给排水/基坑围护…),读不到才回落粗粒度枚举
+      render: (_, row) =>
+        row.discipline_label ?? DISCIPLINE_LABEL[row.discipline] ?? row.discipline,
       valueEnum: Object.fromEntries(DISCIPLINE_OPTIONS.map(({ value, label }) => [value, { text: label }])),
     },
     {
@@ -165,7 +175,8 @@ export default function DrawingList() {
             size="small"
             icon={<EyeOutlined />}
             onClick={() =>
-              setPreview({ id: row.id, title: `${row.drawing_no} ${row.title}` })
+              setPreview({ id: row.id, title: `${row.drawing_no} ${row.title}`,
+                projectId: row.project_id })
             }
           >
             预览
@@ -238,8 +249,16 @@ export default function DrawingList() {
     navigate(`/model/${projectFilter}`)
   }
 
+  // 专业切换即刷新列表(ProTable 的 request 闭包读最新 discipline)
+  useEffect(() => { actionRef.current?.reload() }, [discipline])
+
   return (
     <div style={{ padding: 24 }}>
+      <DisciplineFilter
+        value={discipline}
+        onChange={setDiscipline}
+        projectId={projectFilterId}
+      />
       <ProTable<DrawingRow>
         actionRef={actionRef}
         formRef={formRef}
@@ -252,8 +271,12 @@ export default function DrawingList() {
         }}
         request={async (params) => {
           const { current, pageSize, ...rest } = params
+          // 选了项目则专业计数随之收敛(只在变化时置状态,避免重复渲染)
+          const pid = (rest as { project_id?: string }).project_id
+          setProjectFilterId((prev) => (prev === pid ? prev : pid))
           const res = await listDrawings({
             ...rest,
+            discipline_label: discipline || undefined,
             limit: pageSize,
             offset: ((current ?? 1) - 1) * (pageSize ?? 20),
           })
@@ -261,6 +284,7 @@ export default function DrawingList() {
         }}
         pagination={{ pageSize: 20 }}
         toolBarRender={() => [
+          <DirectoryDrawer key="directory" projectId={projectFilterId} />,
           <Button
             key="batch-review"
             icon={<RobotOutlined />}
@@ -304,6 +328,7 @@ export default function DrawingList() {
       <DrawingPreviewModal
         drawingId={preview?.id ?? null}
         title={preview?.title}
+        projectId={preview?.projectId}
         onClose={() => setPreview(null)}
       />
     </div>

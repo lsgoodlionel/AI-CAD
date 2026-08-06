@@ -9,6 +9,8 @@ import StoryHeightPanel from '../StoryHeightPanel'
 import UnifiedReviewInbox from '../review/UnifiedReviewInbox'
 import SemanticCandidateQueue from '../review/SemanticCandidateQueue'
 import FloorAssignmentQueue from '../review/FloorAssignmentQueue'
+import ComponentReviewQueue from '../ComponentReviewQueue'
+import ReviewHub from '@/components/ReviewHub'
 import type { SymbolDrawingOption } from '../review/reviewInbox'
 import type {
   AnnotationQueueItem, AnnotationSaveDraft, BuildingUnitOption,
@@ -53,6 +55,14 @@ export default function ReviewModePanels({
 }: ReviewModePanelsProps) {
   return (
     <>
+      <ReviewHub projectId={projectId} compact />
+      <CollapsiblePanel
+        title={<>构件核对<HelpTip content="实体中心装配(Phase H)产出的低置信构件按置信升序排队,显示来源图纸/识别途径,人工确认/否定/改类。人审动作翻转 review_state 并写埋点,驱动模型收敛(auto→confirmed 单调上升)。" anchor="H-构件核对" /></>}
+        defaultOpen
+        maxBodyHeight={520}
+      >
+        <ComponentReviewQueue projectId={projectId} />
+      </CollapsiblePanel>
       <CollapsiblePanel
         title={<>审校收件箱<HelpTip content="合并符号级候选（置信度+候选框）与成果审校（拓扑闭合/构件命名/规范符合性），按冲突优先、低置信优先排序；支持键盘快捷键流水作业。" anchor="10-审校收件箱" /></>}
         defaultOpen

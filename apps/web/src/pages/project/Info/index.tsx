@@ -26,6 +26,11 @@ import {
 import type { InfoItem, InfoSummary } from '@/services/projectInfo'
 import DrawingPreviewModal from '@/components/DrawingPreviewModal'
 import ScanProgressPanel from './ScanProgressPanel'
+import ScaleConfirmPanel from './ScaleConfirmPanel'
+import AxisCalibrationPanel from './AxisCalibrationPanel'
+import AxisRecognitionPanel from './AxisRecognitionPanel'
+import OptimizationPanel from './OptimizationPanel'
+import ReviewHub from '@/components/ReviewHub'
 
 const { Text, Title } = Typography
 
@@ -38,6 +43,18 @@ const DISCIPLINE_LABEL: Record<string, string> = {
 }
 
 const PAGE_SIZE = 50
+
+/** value_json → 可读文本:标高/尺寸/轴号等结构化值人性化展示,避免原始 JSON */
+function formatValueJson(vj: Record<string, unknown> | null): string {
+  if (!vj) return ''
+  if (typeof vj.elevation_m === 'number') return `标高 ${vj.elevation_m}m`
+  if (typeof vj.dim_mm === 'number') return `尺寸 ${vj.dim_mm}mm`
+  if (typeof vj.label === 'string' && vj.label) return `轴号 ${vj.label}`
+  const parts = Object.entries(vj)
+    .filter(([, v]) => v != null && v !== '')
+    .map(([k, v]) => `${k}:${v}`)
+  return parts.join(' · ')
+}
 
 interface ProjectOption {
   id: string
@@ -202,7 +219,7 @@ function InfoWorkspace({ projectId }: { projectId: string }) {
           <Text>{v}</Text>
           {row.value_json ? (
             <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
-              {JSON.stringify(row.value_json)}
+              {formatValueJson(row.value_json)}
             </Text>
           ) : null}
         </Tooltip>
@@ -293,6 +310,11 @@ function InfoWorkspace({ projectId }: { projectId: string }) {
       <div style={{ marginBottom: 12 }}>
         <ScanProgressPanel projectId={projectId} />
       </div>
+      <ReviewHub projectId={projectId} />
+      <OptimizationPanel projectId={projectId} />
+      <AxisRecognitionPanel projectId={projectId} />
+      <AxisCalibrationPanel projectId={projectId} />
+      <ScaleConfirmPanel projectId={projectId} />
       <Card size="small" style={{ marginBottom: 12 }}>
         <Space wrap size="large">
           <Title level={5} style={{ margin: 0 }}>工程信息</Title>
@@ -388,6 +410,7 @@ function InfoWorkspace({ projectId }: { projectId: string }) {
       <DrawingPreviewModal
         drawingId={preview?.id ?? null}
         title={preview?.title}
+        projectId={projectId}
         onClose={() => setPreview(null)}
       />
 
