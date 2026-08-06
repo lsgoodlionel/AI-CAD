@@ -60,18 +60,56 @@ ORDER BY r.updated_at DESC
 
 _CONFIRM_SQL = """
 INSERT INTO axis_zone_confirmation
-    (project_id, drawing_id, zone_index, zone_label, confirmed_by)
+    (project_id, drawing_id, zone_index, zone_label, confirmed_by, source)
 VALUES (CAST(:project_id AS uuid), CAST(:drawing_id AS uuid),
-        :zone_index, :zone_label, CAST(:confirmed_by AS uuid))
+        :zone_index, :zone_label, CAST(:confirmed_by AS uuid), 'manual')
 ON CONFLICT (drawing_id, zone_index) DO UPDATE SET
     zone_label = EXCLUDED.zone_label,
     confirmed_by = EXCLUDED.confirmed_by,
+    -- 人工确认可以**覆盖**先前的自动传播结果（人的判断优先），
+    -- 并把来源改回 manual，使该分区重新具备作传播锚的资格。
+    source = 'manual',
+    anchor_drawing_id = NULL,
+    anchor_zone_index = NULL,
+    scale_ratio = NULL,
     confirmed_at = now()
+"""
+
+#: 传播落库。**绝不覆盖人工确认** —— `WHERE` 限定只更新已有的传播行。
+_PROPAGATE_SQL = """
+INSERT INTO axis_zone_confirmation
+    (project_id, drawing_id, zone_index, zone_label, source,
+     anchor_drawing_id, anchor_zone_index, scale_ratio, needs_review)
+VALUES (CAST(:project_id AS uuid), CAST(:drawing_id AS uuid),
+        :zone_index, :zone_label, 'propagated',
+        CAST(:anchor_drawing_id AS uuid), :anchor_zone_index, :scale_ratio,
+        :needs_review)
+ON CONFLICT (drawing_id, zone_index) DO UPDATE SET
+    zone_label = EXCLUDED.zone_label,
+    anchor_drawing_id = EXCLUDED.anchor_drawing_id,
+    anchor_zone_index = EXCLUDED.anchor_zone_index,
+    scale_ratio = EXCLUDED.scale_ratio,
+    needs_review = EXCLUDED.needs_review,
+    confirmed_at = now()
+WHERE axis_zone_confirmation.source = 'propagated'
 """
 
 _FETCH_CONFIRMATIONS_SQL = """
 SELECT zone_index, zone_label FROM axis_zone_confirmation
 WHERE drawing_id = CAST(:drawing_id AS uuid)
+"""
+
+#: 只有**人工确认**的分区可作传播锚：用传播结果当锚会让一次误传播沿链
+#: 扩散，且 `anchor_drawing_id` 无法回溯到真正的源头。
+_FETCH_MANUAL_ZONES_SQL = """
+SELECT drawing_id, zone_index, zone_label FROM axis_zone_confirmation
+WHERE project_id = CAST(:project_id AS uuid) AND source = 'manual'
+ORDER BY drawing_id, zone_index
+"""
+
+_FETCH_ALL_ZONES_SQL = """
+SELECT drawing_id, zone_index, source FROM axis_zone_confirmation
+WHERE project_id = CAST(:project_id AS uuid)
 """
 
 _JSON_FIELDS = ("zones", "axes", "anchors", "outliers", "violations",
@@ -154,3 +192,40 @@ async def fetch_zone_labels(db: Any, drawing_id: str) -> dict[int, str]:
     rows = await db.fetch_all(_FETCH_CONFIRMATIONS_SQL,
                               {"drawing_id": drawing_id})
     return {int(r["zone_index"]): r["zone_label"] for r in rows}
+
+
+async def fetch_manual_zones(db: Any, project_id: str) -> list[dict]:
+    """项目内**人工确认**的分区（传播锚的唯一来源）。"""
+    rows = await db.fetch_all(_FETCH_MANUAL_ZONES_SQL, {"project_id": project_id})
+    return [{"drawing_id": str(r["drawing_id"]),
+             "zone_index": int(r["zone_index"]),
+             "zone_label": r["zone_label"]} for r in rows]
+
+
+async def fetch_confirmed_keys(db: Any, project_id: str) -> set[tuple[str, int]]:
+    """项目内**人工确认**过的 (drawing_id, zone_index)，传播时须跳过。
+
+    只跳 manual：先前的传播结果应当被新一轮覆盖（锚变多后结论可能更准），
+    而人工确认不该被自动结论推翻。
+    """
+    rows = await db.fetch_all(_FETCH_ALL_ZONES_SQL, {"project_id": project_id})
+    return {(str(r["drawing_id"]), int(r["zone_index"]))
+            for r in rows if r["source"] == "manual"}
+
+
+async def save_propagations(db: Any, *, project_id: str, items: Any) -> int:
+    """落库传播结果；返回写入条数。人工确认的行不会被触碰（见 SQL 的 WHERE）。"""
+    written = 0
+    for item in items or []:
+        await db.execute(_PROPAGATE_SQL, {
+            "project_id": project_id,
+            "drawing_id": item.drawing_id,
+            "zone_index": int(item.zone_index),
+            "zone_label": item.zone_label,
+            "anchor_drawing_id": item.anchor_drawing_id,
+            "anchor_zone_index": int(item.anchor_zone_index),
+            "scale_ratio": float(item.scale_ratio),
+            "needs_review": bool(item.needs_review),
+        })
+        written += 1
+    return written
