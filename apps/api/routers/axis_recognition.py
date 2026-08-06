@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from dependencies import get_current_user, get_db
 from services import axis_recognition_repo as repo
+from services.axis_zone_propagate_job import run_zone_propagation
 from services.audit import write_audit
 from tasks.axis_recognition import recognize_drawing_axes, recognize_project_axes
 
@@ -113,3 +114,23 @@ async def confirm_zone_label(drawing_id: str, zone_index: int,
     return {"success": True, "data": {"zone_index": zone_index,
                                       "zone_label": payload.zone_label,
                                       "rerun": True}}
+
+
+@router.post("/projects/{project_id}/axis-recognition/propagate-zones")
+async def propagate_zones(project_id: str, db=Depends(get_db),
+                          user=Depends(get_current_user)) -> dict:
+    """把**人工确认**的分区号经轴距序列匹配传播到其他图（J1-3）。
+
+    §8.0.5 的分区编号几何推不出，逐张确认 1052 张不现实。实测未匹配原因中
+    「对不上任何锚」占 91%、歧义仅 1% ⇒ 瓶颈是锚覆盖不足而非算法，
+    所以确认少数覆盖广的锚图、其余自动继承才是有杠杆的做法。
+
+    **幂等**：每多确认一张锚图就再跑一次，匹配面扩一片。
+    人工确认的行不会被覆盖。
+    """
+    stats = await run_zone_propagation(db, project_id)
+    await write_audit(db, user_id=user["id"],
+                      action="axis_recognition.propagate_zones",
+                      resource="project", resource_id=project_id,
+                      new_state=stats)
+    return {"success": True, "data": stats}
