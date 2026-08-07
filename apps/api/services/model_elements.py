@@ -1274,13 +1274,24 @@ def group_buildings(
     project_name: str,
     normalized_assignments: dict[str, dict[str, Any]] | None = None,
     building_units: list[dict[str, Any]] | None = None,
+    stories_by_building: dict[str, list] | None = None,
 ) -> list[dict]:
     """按单体分组楼层（同楼层图纸可能分属多单体 → 楼层按单体拆分）。
 
     输入 floors 为拍平楼层（V1 结构 + elements）；输出蓝图 buildings 数组。
     楼层构件按 src 来源图纸切分到所属单体（不重复归组）。
+
+    ``stories_by_building``：各单体自己的楼层表。**必须传** —— 否则各单体
+    共用汇总层的标高，实测值到不了 3D。实测 north 的 RF 图纸值 25.00
+    与 main 的 33.90 差 **8.9 米**，共用一个数就是把两个单体摞错位置。
     """
     normalized_assignments = normalized_assignments or {}
+    # (单体, 楼层) → 该单体自己的标高与 provenance
+    level_of: dict[tuple[str, str], Any] = {
+        (str(unit_key), str(level.story_key)): level
+        for unit_key, levels in (stories_by_building or {}).items()
+        for level in levels
+    }
     building_unit_map = {
         str(item.get("unit_key")): dict(item) for item in (building_units or []) if item.get("unit_key")
     }
@@ -1312,13 +1323,23 @@ def group_buildings(
             elements = _split_elements_by_srcs(
                 floor.get("elements") or {}, src_ids
             )
-            building["floors"].append({
+            # 优先用该单体自己的标高；查不到才退回汇总值，
+            # 且**不谎报 provenance** —— 退回来的值不属于这个单体。
+            level = level_of.get((key, str(floor.get("key") or "")))
+            unit_floor = {
                 **{k: floor[k] for k in ("key", "label", "elevation", "order")},
-                "elevation_m": floor.get("elevation_m"),
+                "elevation_m": (float(level.elevation_m) if level is not None
+                                else floor.get("elevation_m")),
                 "drawings": entries,
                 "elements": elements,
                 "element_stats": element_stats(elements),
-            })
+            }
+            if level is not None:
+                unit_floor["elevation_source"] = str(
+                    getattr(level, "elevation_source", "") or "")
+                unit_floor["elevation_estimated"] = bool(
+                    getattr(level, "elevation_estimated", True))
+            building["floors"].append(unit_floor)
     for building in buildings.values():
         building["floors"].sort(key=lambda f: f["order"])
     return sorted(buildings.values(), key=lambda b: b["key"])

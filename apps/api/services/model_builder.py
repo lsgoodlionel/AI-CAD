@@ -1720,6 +1720,9 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
         project_name,
         normalized_assignments=normalization.drawing_assignments,
         building_units=normalization.building_units,
+        # 各单体用**自己**的标高：实测 north 的 RF 图纸值 25.00 与 main 的
+        # 33.90 差 8.9 米，共用汇总层的一个数就是把两个单体摞错位置。
+        stories_by_building=normalization.stories_by_building,
     )
     stats["buildings"] = len(buildings)
     model_scopes = _build_model_scopes(buildings, floors, ifc_models, section_z.matched_units)
