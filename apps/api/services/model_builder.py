@@ -1084,29 +1084,42 @@ def _accumulate_manual_elevations(normalization, overrides: dict) -> dict:
         ordered = sorted(levels, key=lambda lv: lv.story_order)
         if not ordered:
             continue
-        elevations = [0.0] * len(ordered)
-        # 该层标高是否由估算层高累加而来。**一处估算,沿累加方向全估** ——
-        # 误差是加进去的,不会自己消失。锚点层(±0.000)例外:
-        # 它是 §11.8.5 定义的基准,不由累加得来。
-        estimated = [False] * len(ordered)
+        # **实测标高是锚,不是待覆盖的初值**。
+        # 旧实现一路从 ±0.000 按层高累加，把 pairing 读出的图纸标高全冲掉：
+        # 实测 north RF 图纸 25.00 → 被写成 22.50（差 2.5 米），
+        # 而 `source` 仍是 `level_elevation_pairing` —— 标签说图纸读的、
+        # 值却是 4.5 默认层高推的。这比 provenance 标错严重得多。
+        elevations: list[float | None] = [None] * len(ordered)
+        estimated = [True] * len(ordered)
+        for i, level in enumerate(ordered):
+            measured = (overrides.get((unit_key, level.story_key)) or {}).get(
+                "elevation_bottom_m")
+            if measured is not None:
+                elevations[i] = round(float(measured), 3)
+                estimated[i] = False
+        # ±0.000 锚点层（§11.8.5 的基准）在没有实测值时兜底为 0，且不算估算。
         anchor = next((i for i, lv in enumerate(ordered) if lv.story_order == 1), None)
-        if anchor is None:
-            elevations[0] = float(getattr(ordered[0], "elevation_m", None) or 0.0)
-            for i in range(1, len(ordered)):
-                height, is_est = height_of(unit_key, ordered[i - 1])
-                elevations[i] = round(elevations[i - 1] + height, 3)
-                estimated[i] = estimated[i - 1] or is_est
-        else:
+        if anchor is not None and elevations[anchor] is None:
             elevations[anchor] = 0.0
-            for i in range(anchor + 1, len(ordered)):
+            estimated[anchor] = False
+        if all(value is None for value in elevations):
+            elevations[0] = float(getattr(ordered[0], "elevation_m", None) or 0.0)
+
+        # 未知层从**最近的已知层**累加（而不是一路从 order=1 推）。
+        for i in range(1, len(ordered)):
+            if elevations[i] is None and elevations[i - 1] is not None:
                 height, is_est = height_of(unit_key, ordered[i - 1])
                 elevations[i] = round(elevations[i - 1] + height, 3)
                 estimated[i] = estimated[i - 1] or is_est
-            for i in range(anchor - 1, -1, -1):
+        for i in range(len(ordered) - 2, -1, -1):
+            if elevations[i] is None and elevations[i + 1] is not None:
                 height, is_est = height_of(unit_key, ordered[i])
                 elevations[i] = round(elevations[i + 1] - height, 3)
                 estimated[i] = estimated[i + 1] or is_est
+
         for level, elevation, is_est in zip(ordered, elevations, estimated):
+            if elevation is None:
+                continue                     # 上下都无锚可依，不编一个值
             existing = result.get((unit_key, level.story_key), {})
             height, _ = height_of(unit_key, level)
             result[(unit_key, level.story_key)] = {
