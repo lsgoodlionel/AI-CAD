@@ -95,8 +95,11 @@ def test_all_units_measured_stays_unestimated():
     attach_floor_elevation_source(floors, norm)
 
     assert floors[0]["elevation_estimated"] is False
-    assert floors[0]["elevation_source"] in (
-        ELEVATION_SOURCE_DRAWING, "level_elevation_pairing")
+    # 两个单体的来源不同 ⇒ 报 `mixed` + 明细（见下方多单体用例）。
+    # 关键是**都不是估算**，所以不该出现「标高为默认值」的标签。
+    assert floors[0]["elevation_source"] == "mixed"
+    assert floors[0]["elevation_sources"] == [
+        ELEVATION_SOURCE_DRAWING, "level_elevation_pairing"]
 
 
 @pytest.mark.unit
@@ -136,3 +139,51 @@ def test_field_names_match_the_frontend_contract():
     attach_floor_elevation_source(
         floors, _Norm({"u": [_level("F1", ELEVATION_SOURCE_DRAWING, False)]}))
     assert set(floors[0]) >= {"elevation_source", "elevation_estimated"}
+
+
+# ── 多单体时的来源表达 ────────────────────────────────────────
+
+@pytest.mark.unit
+def test_mixed_sources_are_reported_as_mixed():
+    """**一层多单体、来源不同时不能只报第一个**。
+
+    实测 v39:F1 报 `level_elevation_pairing`(来自 north),
+    其余层报 `manual`(来自 main)—— 看不出这一层的**哪个单体**是图纸读的。
+    只报第一个会让人以为整层都是那个来源。
+    """
+    floors = [{"key": "F1", "building_units": ["north", "south"]}]
+    norm = _Norm({
+        "north": [_level("F1", "level_elevation_pairing", False)],
+        "south": [_level("F1", ELEVATION_SOURCE_DRAWING, False)],
+    })
+    attach_floor_elevation_source(floors, norm)
+    assert floors[0]["elevation_source"] == "mixed"
+    assert floors[0]["elevation_sources"] == [
+        ELEVATION_SOURCE_DRAWING, "level_elevation_pairing"]
+
+
+@pytest.mark.unit
+def test_single_source_is_reported_directly():
+    """来源一致时照常报该来源,不必让界面处理 `mixed`。"""
+    floors = [{"key": "F1", "building_units": ["north", "south"]}]
+    norm = _Norm({
+        "north": [_level("F1", "level_elevation_pairing", False)],
+        "south": [_level("F1", "level_elevation_pairing", False)],
+    })
+    attach_floor_elevation_source(floors, norm)
+    assert floors[0]["elevation_source"] == "level_elevation_pairing"
+    assert floors[0]["elevation_sources"] == ["level_elevation_pairing"]
+
+
+@pytest.mark.unit
+def test_sources_list_is_sorted_for_determinism():
+    """列表必须定序 —— 集合迭代顺序会让同样的数据产出不同的 scene。"""
+    floors_a = [{"key": "F1", "building_units": ["a", "b", "c"]}]
+    floors_b = [{"key": "F1", "building_units": ["c", "b", "a"]}]
+    norm = _Norm({
+        "a": [_level("F1", "s3", False)], "b": [_level("F1", "s1", False)],
+        "c": [_level("F1", "s2", False)],
+    })
+    attach_floor_elevation_source(floors_a, norm)
+    attach_floor_elevation_source(floors_b, norm)
+    assert floors_a[0]["elevation_sources"] == floors_b[0]["elevation_sources"]

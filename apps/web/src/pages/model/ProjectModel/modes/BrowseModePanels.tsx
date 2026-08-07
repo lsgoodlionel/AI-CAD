@@ -3,7 +3,7 @@
  * + 构件图层 + 模型质量。从原 index.tsx 左栏 Card 列表迁出并按「≤4 常驻面板」合并整理。
  */
 import type { ReactNode } from 'react'
-import { Card, Checkbox, List, Space, Tabs, Tag, Typography } from 'antd'
+import { Card, Checkbox, List, Space, Tabs, Tag, Tooltip, Typography } from 'antd'
 import type { ModelScene, SceneFloor } from '@/services/projectModel'
 import SemanticTreePanel from '../SemanticTreePanel'
 import ModelQualityPanel from '../ModelQualityPanel'
@@ -140,11 +140,34 @@ export default function BrowseModePanels({
                     实测 v31 有 10/13 层是 4.5m 默认值硬推,最大偏差 11.9m,
                     而界面上与图纸值长得一模一样 —— 必须在这里区分开。
                   */}
-                  {(floor as { elevation_estimated?: boolean }).elevation_estimated
-                    ? <Tag color="orange">标高为默认值</Tag>
-                    : (floor as { elevation_source?: string }).elevation_source
-                      ? <Tag color="green">标高来自图纸</Tag>
-                      : null}
+                  {(() => {
+                    const meta = floor as {
+                      elevation_estimated?: boolean
+                      elevation_source?: string
+                      elevation_sources?: string[]
+                    }
+                    if (meta.elevation_estimated) {
+                      return (
+                        <Tooltip title="标高由默认层高推出（或累加链上用过默认层高），不是图纸实测值">
+                          <Tag color="orange">标高为默认值</Tag>
+                        </Tooltip>
+                      )
+                    }
+                    if (!meta.elevation_source) return null
+                    // 一层可由多个单体贡献，来源可能不同（如 north 读自图纸配对、
+                    // main 是人工录入）。此时后端报 `mixed` + 明细，
+                    // 只显示其中一个会让人以为整层都是那个来源。
+                    const sources = meta.elevation_sources ?? [meta.elevation_source]
+                    return (
+                      <Tooltip title={`标高来源：${sources.join('、')}`}>
+                        <Tag color="green">
+                          {meta.elevation_source === 'mixed'
+                            ? `标高来自图纸（${sources.length} 种来源）`
+                            : '标高来自图纸'}
+                        </Tag>
+                      </Tooltip>
+                    )
+                  })()}
                 </Space>
               </List.Item>
             )

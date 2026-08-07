@@ -221,9 +221,18 @@ export type ElevationSource = 'drawing' | 'override' | 'default' | string
 export interface SceneFloorV2 extends SceneFloor {
   /** 图纸标高文本推导的真实标高（米）；无法确定时为 null */
   elevation_m?: number | null
-  /** 这一层标高的来源；旧模型无此字段 */
-  elevation_source?: ElevationSource
-  /** true = 该层标高是**估算/默认值**，不是图纸实测 */
+  /**
+   * 这一层标高的来源；旧模型无此字段。
+   * 一层可由多个单体贡献、来源不同，此时为 `mixed`，明细见 `elevation_sources`。
+   */
+  elevation_source?: ElevationSource | 'mixed'
+  /** 各贡献单体的来源明细（去重且定序）；来源一致时只有一项 */
+  elevation_sources?: ElevationSource[]
+  /**
+   * true = 该层标高是**估算/默认值**，不是图纸实测。
+   * 包含「累加链上用过默认层高」的情形 —— 实测 F2 标高 4.50 完全由
+   * 「F1 的默认层高 4.5」推出，此前被当作实测值显示。
+   */
   elevation_estimated?: boolean
   elements?: SceneFloorElements
   element_stats?: SceneElementStats

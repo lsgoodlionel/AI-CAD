@@ -532,7 +532,12 @@ def normalize_story_table(
                 # override 没写 source 时退到通用 override，**不能算默认值**
                 elev_source = str(override.get("source")
                                   or ELEVATION_SOURCE_OVERRIDE)
-                elev_estimated = False
+                # **不能无条件判非估算**：override 的标高可能是由默认层高
+                # 累加出来的（`_accumulate_manual_elevations`）。实测 F2 标高
+                # 4.50 完全由「F1 的默认层高 4.5」推出，却与实测标高一样
+                # 显示为可信 —— 正是本门禁要防的事。
+                # 没带该字段的 override（如直接给实测标高的 pairing）保持非估算。
+                elev_estimated = bool(override.get("elevation_estimated", False))
             else:
                 explicit = sorted(set(round(value, 3) for value in entry["elevations"]))
                 if explicit:

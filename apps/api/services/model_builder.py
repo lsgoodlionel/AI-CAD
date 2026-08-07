@@ -635,8 +635,12 @@ def attach_floor_elevation_source(floors: list[dict], normalization) -> None:
             continue
         floor["elevation_estimated"] = any(
             bool(level.elevation_estimated) for level in matched)
-        # 展示用途取一个代表值；`elevation_estimated` 才是门禁判据。
-        floor["elevation_source"] = matched[0].elevation_source
+        # 一层可由多个单体贡献，来源可能不同（实测 F1 的 north 读自图纸配对、
+        # main 是人工录入）。只报第一个会让人以为整层都是那个来源，
+        # 所以来源不一致时报 `mixed`，并给出明细 —— 排序保证结果与输入顺序无关。
+        sources = sorted({str(level.elevation_source) for level in matched})
+        floor["elevation_sources"] = sources
+        floor["elevation_source"] = sources[0] if len(sources) == 1 else "mixed"
 
 
 def _serialize_story_level(level: model_story.StoryLevel) -> dict[str, Any]:
@@ -1058,11 +1062,21 @@ def _accumulate_manual_elevations(normalization, overrides: dict) -> dict:
     result = dict(overrides)
     affected_units = {unit for (unit, _story) in overrides}
 
-    def height_of(unit_key: str, level) -> float:
+    def height_of(unit_key: str, level) -> tuple[float, bool]:
+        """→ (层高, 该层高是否为估算值)。
+
+        **来源必须跟着走**:标高是层高累加出来的,链上用过默认层高，
+        算出的标高就是估算值。此前只返回数值，于是 `_serialize_story_level`
+        看到 override 有标高就无条件判非估算 —— 实测 F2 标高 4.50
+        完全由「F1 的默认层高 4.5」推出，却与实测标高一样显示为可信。
+        """
         override = overrides.get((unit_key, level.story_key))
         if override and override.get("height_m"):
-            return float(override["height_m"])
-        return float(getattr(level, "height_m", None) or default_h)
+            return float(override["height_m"]), False   # 人工录入,不是估
+        height = getattr(level, "height_m", None)
+        if height:
+            return float(height), bool(getattr(level, "height_estimated", True))
+        return default_h, True
 
     for unit_key, levels in normalization.stories_by_building.items():
         if unit_key not in affected_units:
@@ -1071,24 +1085,38 @@ def _accumulate_manual_elevations(normalization, overrides: dict) -> dict:
         if not ordered:
             continue
         elevations = [0.0] * len(ordered)
+        # 该层标高是否由估算层高累加而来。**一处估算,沿累加方向全估** ——
+        # 误差是加进去的,不会自己消失。锚点层(±0.000)例外:
+        # 它是 §11.8.5 定义的基准,不由累加得来。
+        estimated = [False] * len(ordered)
         anchor = next((i for i, lv in enumerate(ordered) if lv.story_order == 1), None)
         if anchor is None:
             elevations[0] = float(getattr(ordered[0], "elevation_m", None) or 0.0)
             for i in range(1, len(ordered)):
-                elevations[i] = round(elevations[i - 1] + height_of(unit_key, ordered[i - 1]), 3)
+                height, is_est = height_of(unit_key, ordered[i - 1])
+                elevations[i] = round(elevations[i - 1] + height, 3)
+                estimated[i] = estimated[i - 1] or is_est
         else:
             elevations[anchor] = 0.0
             for i in range(anchor + 1, len(ordered)):
-                elevations[i] = round(elevations[i - 1] + height_of(unit_key, ordered[i - 1]), 3)
+                height, is_est = height_of(unit_key, ordered[i - 1])
+                elevations[i] = round(elevations[i - 1] + height, 3)
+                estimated[i] = estimated[i - 1] or is_est
             for i in range(anchor - 1, -1, -1):
-                elevations[i] = round(elevations[i + 1] - height_of(unit_key, ordered[i]), 3)
-        for level, elevation in zip(ordered, elevations):
+                height, is_est = height_of(unit_key, ordered[i])
+                elevations[i] = round(elevations[i + 1] - height, 3)
+                estimated[i] = estimated[i + 1] or is_est
+        for level, elevation, is_est in zip(ordered, elevations, estimated):
             existing = result.get((unit_key, level.story_key), {})
+            height, _ = height_of(unit_key, level)
             result[(unit_key, level.story_key)] = {
-                "height_m": height_of(unit_key, level),
+                "height_m": height,
                 "elevation_bottom_m": elevation,
                 "source": existing.get("source", "manual"),
                 "confidence": existing.get("confidence", 1.0),
+                # 累加链的 provenance —— 消费方(model_story)据此判定
+                # `elevation_estimated`,不再无条件当作实测值。
+                "elevation_estimated": is_est,
             }
     return result
 
