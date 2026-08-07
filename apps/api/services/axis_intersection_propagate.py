@@ -209,3 +209,52 @@ async def run_intersection_propagation(
     logger.info("[IntersectionPropagation] 锚点 %d 条 → %d 张图 / %d 个交点",
                 stats["anchor_points"], stats["drawings"], stats["points"])
     return stats
+
+
+_FETCH_REAL_ANCHORS_SQL = """
+SELECT drawing_id, x_norm, y_norm, world_x, world_y, world_z
+FROM axis_intersections
+WHERE project_id = CAST(:project_id AS uuid)
+  AND world_x IS NOT NULL AND world_y IS NOT NULL
+  AND note LIKE 'auto:coord_annotation%'
+ORDER BY drawing_id
+"""
+
+
+async def fetch_anchor_candidates(db: Any, project_id: str) -> list[dict]:
+    """有**真**世界锚点（坐标标注读出）的图及其变换残差。
+
+    只认 `auto:coord_annotation` —— 传播来的 `auto:sequence_match` 不能当锚，
+    否则一次误传播会沿链扩散且无法回溯源头（与分区号传播同一条规则）。
+    """
+    grouped: dict[str, list[dict]] = {}
+    for row in await db.fetch_all(_FETCH_REAL_ANCHORS_SQL, {"project_id": project_id}):
+        grouped.setdefault(str(row["drawing_id"]), []).append(dict(row))
+
+    out: list[dict] = []
+    for drawing_id, points in grouped.items():
+        transform = solve_world_transform(points)
+        out.append({
+            "drawing_id": drawing_id,
+            "anchor_points": len(points),
+            # 解不出变换时 rmse_m 为 None —— `pick_anchor_drawing` 会据此排除，
+            # 不会拿一张解不出变换的图去传播。
+            "rmse_m": None if transform is None else float(transform["rmse_m"]),
+            "suspect": bool(transform.get("suspect")) if transform else True,
+        })
+    return out
+
+
+async def run_auto_intersection_propagation(db: Any, project_id: str) -> dict:
+    """自动选锚 → 传播。**锚图由内容判据选出，不硬编码图号**。"""
+    from services.anchor_candidates import pick_anchor_drawing
+
+    candidates = await fetch_anchor_candidates(db, project_id)
+    anchor_id = pick_anchor_drawing(
+        [c for c in candidates if not c.get("suspect")])
+    if anchor_id is None:
+        return {"drawings": 0, "points": 0,
+                "note": "项目内没有可作锚的图（需 ≥2 个坐标标注锚点且变换可解）"}
+    stats = await run_intersection_propagation(db, project_id, anchor_id)
+    stats["anchor_drawing_id"] = anchor_id
+    return stats

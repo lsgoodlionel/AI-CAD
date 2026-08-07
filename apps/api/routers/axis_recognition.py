@@ -134,3 +134,22 @@ async def propagate_zones(project_id: str, db=Depends(get_db),
                       resource="project", resource_id=project_id,
                       new_state=stats)
     return {"success": True, "data": stats}
+
+
+@router.get("/projects/{project_id}/axis-recognition/anchor-suggestions")
+async def anchor_suggestions(project_id: str, limit: int = 10,
+                             db=Depends(get_db),
+                             user=Depends(get_current_user)) -> dict:
+    """荐锚 —— 「该确认哪几张图最划算」（J1-3）。
+
+    实测未匹配原因中「对不上任何锚」占 **91%**、歧义仅 1% ⇒ 瓶颈是锚覆盖，
+    而人工确认一次的成本固定，所以该优先确认覆盖最广的图，
+    而不是照单逐张确认 1052 张。
+
+    每项带 `reason`，可疑者（轴线数远超常见轴网，多半是圆形构件被当成
+    轴号圈）会在理由里标出 —— 让人能判断值不值得花这一次确认。
+    """
+    from services.axis_zone_propagate_job import suggest_anchor_drawings
+
+    items = await suggest_anchor_drawings(db, project_id, limit=limit)
+    return {"success": True, "data": {"items": items, "total": len(items)}}

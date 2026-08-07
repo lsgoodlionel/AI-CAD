@@ -100,3 +100,39 @@ async def run_zone_propagation(db: Any, project_id: str) -> dict:
                 stats["anchor_zones"], stats["anchor_drawings"],
                 stats["propagated"], stats["drawings_covered"])
     return stats
+
+
+async def suggest_anchor_drawings(db: Any, project_id: str,
+                                  limit: int = 10) -> list[dict]:
+    """荐锚 —— 「该确认哪几张图最划算」（J1-3）。
+
+    实测未匹配原因中「对不上任何锚」占 **91%**、歧义仅 1%
+    ⇒ 瓶颈是锚覆盖不足；而人工确认一次的成本固定，
+    所以该优先确认**覆盖最广**的图，而不是照单逐张确认 1052 张。
+    """
+    from services.anchor_candidates import rank_anchor_candidates
+
+    rows = await db.fetch_all(_FETCH_AXES_SQL, {"project_id": project_id})
+    by_drawing = _rows_to_sequences(rows)
+    confirmed = {did for did, _zone in await repo.fetch_confirmed_keys(db, project_id)}
+    titles = {
+        str(r["id"]): (r["drawing_no"], r["title"])
+        for r in await db.fetch_all(
+            "SELECT id, drawing_no, title FROM drawings "
+            "WHERE project_id = CAST(:pid AS uuid)", {"pid": project_id})
+    }
+    candidates = []
+    for did, groups in by_drawing.items():
+        drawing_no, title = titles.get(did, ("", ""))
+        candidates.append({
+            "drawing_id": did, "drawing_no": drawing_no, "title": title,
+            "total_gaps": sum(len(seq) for seq in groups.values()),
+            # **最长的一组**才是覆盖力 —— 匹配按组做，各组总和会把
+            # 「11 个分区各 4 段」这种符号场误检抬成榜首（实测发生过）
+            "max_gaps": max((len(seq) for seq in groups.values()), default=0),
+            # 方向数决定能否构成交点 —— 单向图确认了也拿不到世界坐标
+            "directions": len({key[1] for key in groups}),
+            "zones": len({key[0] for key in groups}),
+            "zone_confirmed": did in confirmed,
+        })
+    return rank_anchor_candidates(candidates, limit=limit)

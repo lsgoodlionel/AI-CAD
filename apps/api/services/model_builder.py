@@ -1666,6 +1666,20 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     # 只对锚点齐全且残差合格的图求解;其余图无变换,建模时保持相对配准(诚实降级)。
     placements: dict = {}
     try:
+        # J1：先把锚图的世界坐标经轴距序列匹配传播成其他图的交点，
+        # 再解摆放 —— 否则只有锚图自己有世界坐标（实测 placements 恒为 1 张）。
+        # 锚图由内容判据自动选出（残差最小者），**不硬编码图号**。
+        from services.axis_intersection_propagate import (
+            run_auto_intersection_propagation,
+        )
+        propagation = await run_auto_intersection_propagation(db, project_id)
+        if propagation.get("points"):
+            logger.info("[ModelBuilder] 交点传播:%d 张图 / %d 个交点(锚图 %s)",
+                        propagation.get("drawings") or 0, propagation["points"],
+                        str(propagation.get("anchor_drawing_id") or "")[:8])
+    except Exception as exc:  # noqa: BLE001 — 传播失败不阻断建模，退回原有锚点
+        logger.warning("[ModelBuilder] 交点传播跳过: %s", exc)
+    try:
         from services.model_world_placement import placements_for_project
         placements = await placements_for_project(db, project_id, transforms)
         if placements:
