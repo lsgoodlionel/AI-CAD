@@ -70,14 +70,32 @@ def building_of(drawing: dict, normalized_assignment: dict[str, Any] | None = No
     return "main", detected.display_name
 
 
-def _transform_rank(drawing: dict, transforms: dict | None) -> int:
+def _placement_suspect(placement: Any) -> bool:
+    """摆放是否存疑（dict 与对象两种形态都要吃得下）。"""
+    if isinstance(placement, dict):
+        return bool(placement.get("suspect"))
+    return bool(getattr(placement, "suspect", False))
+
+
+def _transform_rank(drawing: dict, transforms: dict | None,
+                    placements: dict | None = None) -> int:
     """图纸的定位可靠度排序键（越小越优先）。
 
-    0 = 有**标准比例**变换（§6.0.4）；1 = 有变换但比例非标准；2 = 无变换。
+    **-1 = 有世界摆放**（锚点求解，绝对坐标）；0 = 有标准比例变换（§6.0.4）；
+    1 = 有变换但比例非标准；2 = 无变换。
 
-    **为什么必须排序**：原实现按 DB 返回顺序取前 N 张，
-    有好变换的图可能排在后面被丢掉，取到的却是位置只能靠估的那张。
+    **为什么世界摆放排在最前**：它是**绝对**位置（残差毫米级），
+    而标准比例变换只保证图内比例对、不保证摆在哪。
+    实测交点传播算出 12 张图的世界坐标后 `placed_drawings` 仍是 0 ——
+    因为选图不看 placement，那 12 张一张也没被选中出构件，
+    **算出来的世界坐标进不了模型**。
+
+    残差过大（`suspect`）的摆放不算数：宁可用相对配准，不用错的绝对坐标。
     """
+    did = str(drawing.get("id") or "")
+    placement = (placements or {}).get(did)
+    if placement is not None and not _placement_suspect(placement):
+        return -1
     if not transforms:
         return 2
     transform = transforms.get(str(drawing.get("id") or ""))
@@ -117,6 +135,7 @@ def _same_unit(drawing: dict, unit: str | None) -> bool:
 
 def pick_element_drawings(
     floor_drawings: list[dict], transforms: dict | None = None,
+    placements: dict | None = None,
 ) -> dict[str, list[dict]]:
     """楼层图纸 → 各构件类的「最适图纸」清单（蓝图 4 节规则）。
 
@@ -148,8 +167,10 @@ def pick_element_drawings(
             structure.append(drawing)
 
     def by_quality(items: list[dict]) -> list[dict]:
-        # stable sort:同等可靠度时保持原顺序，结果可复现
-        return sorted(items, key=lambda d: _transform_rank(d, transforms))
+        # 同等可靠度时按 drawing_id 定序 —— stable sort 保留的是**输入顺序**，
+        # 而 builder 与诊断脚本拿到的顺序不同，会算出不同结果（曾为此排查三轮）。
+        return sorted(items, key=lambda d: (
+            _transform_rank(d, transforms, placements), str(d.get("id") or "")))
 
     return {
         "structure": by_quality(structure)[:_MAX_STRUCTURE_PLANS],
@@ -726,7 +747,7 @@ async def build_floor_elements(
     loop = asyncio.get_event_loop()
     # 传入 transforms:选图要按**定位可靠度**排序、且**不跨单体混取**
     # ——这是同层两图构件中心差 83~103 米的根因(见 pick_element_drawings)
-    picked = pick_element_drawings(floor_drawings, transforms)
+    picked = pick_element_drawings(floor_drawings, transforms, placements)
     tasks: list[tuple[dict, str, tuple[str, ...]]] = [
         *[(d, "structure", ("columns", "walls", "slabs")) for d in picked["structure"]],
         *[(d, "structure", ("beams",)) for d in picked["beam"]],

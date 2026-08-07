@@ -119,3 +119,54 @@ def test_mep_and_beam_buckets_still_work():
 def test_empty_input_is_safe():
     picked = pick_element_drawings([], transforms={})
     assert picked == {"structure": [], "beam": [], "mep": []}
+
+
+# ── 有世界坐标的图必须优先（v44 实测断点）────────────────────
+
+@pytest.mark.unit
+def test_drawings_with_a_world_placement_come_first():
+    """**实测断点**:交点传播算出 12 张图的世界坐标,`placed_drawings` 仍是 0。
+
+    日志确认「12 张图按工程坐标绝对定位」,但 `placed` 只在**被选中出构件的图**
+    上计数 —— 而每层只取 2 张结构图,选图逻辑不看有没有 placement,
+    那 12 张一张也没被选中。**算出来的世界坐标进不了模型。**
+
+    有 placement 的图位置是**绝对**可信的(锚点求解、残差毫米级),
+    优先级应高于「有标准比例变换」——后者只保证图内比例对,不保证摆在哪。
+    """
+    drawings = [_d("std", "一层结构平面图A"), _d("placed", "一层结构平面图B")]
+    picked = pick_element_drawings(
+        drawings, transforms={"std": _STANDARD, "placed": _STANDARD},
+        placements={"placed": {"rmse_m": 0.006}})
+    assert picked["structure"][0]["id"] == "placed"
+
+
+@pytest.mark.unit
+def test_placement_beats_standard_scale_even_without_transform():
+    """有世界坐标但无标准变换,仍优于只有标准变换的图。"""
+    drawings = [_d("std", "一层结构平面图A"), _d("placed", "一层结构平面图B")]
+    picked = pick_element_drawings(
+        drawings, transforms={"std": _STANDARD},
+        placements={"placed": {"rmse_m": 0.01}})
+    assert picked["structure"][0]["id"] == "placed"
+
+
+@pytest.mark.unit
+def test_suspect_placement_does_not_get_priority():
+    """残差过大的摆放**不算数** —— 宁可用相对配准,不用错的绝对坐标。
+
+    `bad` **没有变换**(本该排最后)。若 suspect 的摆放仍被当作绝对定位,
+    它会被提到第一 —— 那正是本用例要挡住的。
+    """
+    drawings = [_d("std", "一层结构平面图A"), _d("bad", "一层结构平面图B")]
+    picked = pick_element_drawings(
+        drawings, transforms={"std": _STANDARD},
+        placements={"bad": {"rmse_m": 5.0, "suspect": True}})
+    assert picked["structure"][0]["id"] == "std"
+
+
+@pytest.mark.unit
+def test_backward_compatible_without_placements():
+    drawings = [_d("a", "一层结构平面图"), _d("b", "一层墙柱平面图")]
+    picked = pick_element_drawings(drawings, transforms={})
+    assert len(picked["structure"]) == 2
