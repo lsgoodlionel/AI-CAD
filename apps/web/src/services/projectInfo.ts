@@ -750,3 +750,32 @@ export const confirmAxisZoneLabel = (
   request(`/api/v1/drawings/${drawingId}/axis-recognition/zones/${zoneIndex}`, {
     method: 'POST', data: { zone_label: zoneLabel },
   })
+
+/** 分区号传播的统计（J1-3）。 */
+export interface ZonePropagationStats {
+  /** 去重后的**真实**锚序列组数 —— 同一分区的两个方向各算一组 */
+  anchor_zones: number
+  anchor_drawings?: number
+  candidates?: number
+  /** 写入的传播条数 */
+  propagated: number
+  /** 覆盖到的图纸数 */
+  drawings_covered?: number
+  /** 无锚可用等情形的说明 */
+  note?: string
+}
+
+/**
+ * 把**人工确认**的分区号经轴距序列匹配传播到其他图（J1-3）。
+ *
+ * §8.0.5 的分区编号几何推不出，逐张确认 1052 张不现实。实测未匹配原因中
+ * 「对不上任何锚」占 91%、歧义仅 1% ⇒ 瓶颈是锚覆盖不足而非算法，
+ * 所以确认少数覆盖广的锚图、其余自动继承才是有杠杆的做法。
+ *
+ * **幂等**：每多确认一张锚图就再跑一次，匹配面扩一片。人工确认不会被覆盖。
+ */
+export const propagateAxisZones = (projectId: string) =>
+  request<{ success: boolean; data: ZonePropagationStats }>(
+    `/api/v1/projects/${projectId}/axis-recognition/propagate-zones`,
+    { method: 'POST' },
+  )

@@ -18,9 +18,9 @@ import {
 } from 'antd'
 import {
   AxisRecognitionOutlier, AxisRecognitionResult, AxisRecognitionSummaryRow,
-  AxisRecognitionZone, confirmAxisZoneLabel,
-  getDrawingAxisRecognition, listAxisRecognition, startDrawingAxisRecognition,
-  startProjectAxisRecognition,
+  AxisRecognitionZone, ZonePropagationStats, confirmAxisZoneLabel,
+  getDrawingAxisRecognition, listAxisRecognition, propagateAxisZones,
+  startDrawingAxisRecognition, startProjectAxisRecognition,
 } from '@/services/projectInfo'
 
 const { Text } = Typography
@@ -38,6 +38,8 @@ export default function AxisRecognitionPanel({ projectId }: AxisRecognitionPanel
   const [loading, setLoading] = useState(false)
   const [detail, setDetail] = useState<AxisRecognitionResult | null>(null)
   const [zoneInput, setZoneInput] = useState<Record<number, string>>({})
+  const [propagating, setPropagating] = useState(false)
+  const [propagation, setPropagation] = useState<ZonePropagationStats | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -51,6 +53,31 @@ export default function AxisRecognitionPanel({ projectId }: AxisRecognitionPanel
       setLoading(false)
     }
   }, [projectId])
+
+  /**
+   * 把人工确认的分区号传播到其他图。
+   *
+   * §8.0.5 的分区编号几何推不出，逐张确认不现实。实测「对不上任何锚」占 91%、
+   * 歧义仅 1% ⇒ 瓶颈是锚覆盖，所以**确认少数覆盖广的锚图**最划算。
+   */
+  const runPropagation = async () => {
+    setPropagating(true)
+    try {
+      const res = await propagateAxisZones(projectId)
+      setPropagation(res.data)
+      message.success(
+        res.data.note
+          ? res.data.note
+          : `传播 ${res.data.propagated} 条，覆盖 ${res.data.drawings_covered ?? 0} 张图`,
+      )
+      await load()
+    } catch (err) {
+      message.error('分区号传播失败')
+      throw err
+    } finally {
+      setPropagating(false)
+    }
+  }
 
   useEffect(() => { load() }, [load])
 
@@ -129,6 +156,14 @@ export default function AxisRecognitionPanel({ projectId }: AxisRecognitionPanel
       extra={
         <Space>
           <Button onClick={load}>刷新</Button>
+          {/*
+            分区号传播:确认少数覆盖广的锚图，其余按轴距序列自动继承。
+            实测未匹配原因中「对不上任何锚」占 91%、歧义仅 1% ⇒
+            瓶颈是锚覆盖不足，多确认一张覆盖广的图就扩一片匹配面。
+          */}
+          <Button loading={propagating} onClick={runPropagation}>
+            传播分区号
+          </Button>
           <Button type="primary" onClick={async () => {
             await startProjectAxisRecognition(projectId)
             message.success('全项目识别已启动,逐图独立执行')
@@ -145,9 +180,34 @@ export default function AxisRecognitionPanel({ projectId }: AxisRecognitionPanel
             <b>未确认的分区不产出锚点</b>——锚点身份是轴号对,缺分区号会串图。
             {(pending.outliers > 0 || pending.violations > 0) &&
               ` 另有粗错 ${pending.outliers} 处、国标违规 ${pending.violations} 条待核对。`}
+            <br />
+            确认后可点「<b>传播分区号</b>」，把已确认的分区经轴距序列匹配扩散到其他图
+            ——实测确认 <b>1 张</b>覆盖广的轴网定位图即可覆盖 <b>143 张</b>。
           </>
         }
       />
+      {propagation && (
+        <Alert
+          type={propagation.propagated > 0 ? 'success' : 'warning'}
+          showIcon style={{ marginBottom: 12 }}
+          message={
+            propagation.note
+              ? propagation.note
+              : `分区号传播:${propagation.propagated} 条,覆盖 ${propagation.drawings_covered ?? 0} 张图`
+          }
+          description={
+            propagation.note ? null : (
+              <>
+                锚 <b>{propagation.anchor_zones}</b> 组序列（来自 {propagation.anchor_drawings ?? 0} 张
+                <b>人工确认</b>的图），候选 {propagation.candidates ?? 0} 组。
+                <br />
+                传播结果标为<b>自动推导</b>，与人工确认分开存放，
+                <b>不会覆盖人工确认</b>；每多确认一张覆盖广的图再跑一次，匹配面就扩一片。
+              </>
+            )
+          }
+        />
+      )}
 
       <Spin spinning={loading}>
         <Table
