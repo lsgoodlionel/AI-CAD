@@ -170,3 +170,41 @@ def test_backward_compatible_without_placements():
     drawings = [_d("a", "一层结构平面图"), _d("b", "一层墙柱平面图")]
     picked = pick_element_drawings(drawings, transforms={})
     assert len(picked["structure"]) == 2
+
+
+@pytest.mark.unit
+def test_placed_drawings_do_not_consume_the_regular_quota():
+    """**世界坐标是稀缺资源,不该被选图上限浪费掉**。
+
+    实测 F2 层有 **8 张**图带世界坐标,却只摆放了 **3** 张 ——
+    `_MAX_STRUCTURE_PLANS = 2` 把其余挡在外面。
+    全项目 2309 张里只有 19 张有世界坐标,把它们全用上的成本可控
+    (每图识别 10~40 秒),而它们的位置是**绝对**可信的。
+
+    规则:有摆放的图**全部纳入**,常规配额只用来填充其余。
+    """
+    placed_ids = {f"p{i}": {"rmse_m": 0.01} for i in range(5)}
+    drawings = ([_d(f"p{i}", f"一层结构平面图P{i}") for i in range(5)]
+                + [_d(f"n{i}", f"一层结构平面图N{i}") for i in range(3)])
+    picked = pick_element_drawings(drawings, transforms={},
+                                   placements=placed_ids)
+    ids = [d["id"] for d in picked["structure"]]
+    assert set(ids) >= set(placed_ids), f"有世界坐标的图必须全进:{ids}"
+
+
+@pytest.mark.unit
+def test_regular_quota_still_caps_unplaced_drawings():
+    """没有摆放的图仍受上限约束 —— 构建时长要可控。"""
+    drawings = [_d(f"n{i}", f"一层结构平面图N{i}") for i in range(6)]
+    picked = pick_element_drawings(drawings, transforms={}, placements={})
+    assert len(picked["structure"]) == 2
+
+
+@pytest.mark.unit
+def test_suspect_placements_do_not_get_extra_quota():
+    """存疑的摆放不享受额外配额 —— 它的绝对坐标本就不可信。"""
+    drawings = [_d(f"b{i}", f"一层结构平面图B{i}") for i in range(5)]
+    picked = pick_element_drawings(
+        drawings, transforms={},
+        placements={f"b{i}": {"suspect": True} for i in range(5)})
+    assert len(picked["structure"]) == 2

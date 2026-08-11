@@ -172,10 +172,24 @@ def pick_element_drawings(
         return sorted(items, key=lambda d: (
             _transform_rank(d, transforms, placements), str(d.get("id") or "")))
 
+    def take(items: list[dict], limit: int) -> list[dict]:
+        """有世界摆放的**全取**，常规配额只填充其余。
+
+        实测 F2 层有 8 张图带世界坐标却只摆放了 3 张 —— 被 `limit` 挡掉了。
+        全项目 2309 张里只有 19 张有世界坐标，把它们全用上成本可控，
+        而它们的位置是**绝对**可信的（残差毫米级），不该被上限浪费。
+        存疑的摆放不享受此待遇。
+        """
+        ordered = by_quality(items)
+        has_world = [d for d in ordered
+                     if _transform_rank(d, transforms, placements) < 0]
+        rest = [d for d in ordered if d not in has_world]
+        return has_world + rest[:limit]
+
     return {
-        "structure": by_quality(structure)[:_MAX_STRUCTURE_PLANS],
-        "beam": by_quality(beams)[:_MAX_BEAM_PLANS],
-        "mep": by_quality(mep)[:_MAX_MEP_PLANS],
+        "structure": take(structure, _MAX_STRUCTURE_PLANS),
+        "beam": take(beams, _MAX_BEAM_PLANS),
+        "mep": take(mep, _MAX_MEP_PLANS),
     }
 
 
