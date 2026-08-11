@@ -49,6 +49,19 @@ MAX_DIAMETER_PT = 60.0
 #: 单一来源在 `drawing_conventions` —— 同一条国标不在两处各写一遍
 STANDARD_DIAMETER_MM = LABEL_CIRCLE_DIAMETER_MM
 
+#: 轴号圈到**轴线端点**的最大距离，按半径的比例。
+#:
+#: GB/T 50001 §8.0.2:「编号注写在轴线端部的圆内…**圆心应在定位轴线的
+#: 延长线上**」⇒ 轴线画到圈心附近；而桩、钢立柱是孤立的圆，圆内没有线。
+#:
+#: **实测依据**(三张真值图 + 两张误检图，见 `tests/test_axis_circle_axis_proximity.py`):
+#: 真值图在 0.30r 处**全部跳到 100%**(0.20r 时只有 56~76%)，
+#: 而基坑图 29.7%、围护体图 46.0% —— 分界尖锐，不是凑出来的阈值。
+#:
+#: 没有这条判据时，「58 基础底板换撑平面布置图」报出 **862 个圈**，
+#: 而真正的轴网定位图只有 108 个。
+AXIS_PROXIMITY_MAX_RATIO = 0.30
+
 #: 圈心到轴线的最大法向距离(pt)。实测最小轴距 4500mm ≈ 26pt(1:350),
 #: 容差必须远小于它,否则会把圈串到相邻轴线上
 CIRCLE_TO_AXIS_TOLERANCE_PT = 3.0
@@ -122,6 +135,10 @@ def find_circles(paths: list[dict],
     只保留众数直径的圈,离群计入 `dropped`。
     """
     cands = circle_candidates(paths)
+    # **必须在选主导直径之前过滤**：桩多时桩径会成为众数，
+    # 把整张图的检测带偏（实测基坑图 862 个圈全是桩）。
+    endpoints = [pt for p in paths for pt in (p.get("line_points") or ())]
+    cands = filter_circles_near_axes(cands, endpoints)
     dom = dominant_diameter(cands, tol)
     kept = [c for c in cands if abs(c["diameter_pt"] - dom) <= tol]
     return {
@@ -194,8 +211,13 @@ def paths_from_pdf(pdf_bytes: bytes) -> tuple[list[dict], float, float]:
     paths = []
     for p in page.get_drawings():
         r = p["rect"]
+        # 线段端点供 §8.0.2 邻近判据用（`filter_circles_near_axes`）。
+        # 放在 path 记录里而不是改签名，老调用方不受影响。
+        points = [(pt.x, pt.y) for it in p["items"] if it[0] == "l"
+                  for pt in (it[1], it[2])]
         paths.append({"rect": (r.x0, r.y0, r.x1, r.y1),
-                      "kinds": [it[0] for it in p["items"]]})
+                      "kinds": [it[0] for it in p["items"]],
+                      "line_points": points})
     return paths, page.rect.width, page.rect.height
 
 
@@ -207,3 +229,52 @@ def circles_from_pdf(pdf_bytes: bytes) -> dict:
                 "standard": False, "diameter_mm": 0.0,
                 "page_w": page_w, "page_h": page_h}
     return {**find_circles(paths), "page_w": page_w, "page_h": page_h}
+
+
+def filter_circles_near_axes(
+    circles: list[dict] | None, line_endpoints: list[tuple[float, float]] | None,
+    *, max_ratio: float = AXIS_PROXIMITY_MAX_RATIO,
+) -> list[dict]:
+    """只留**贴着轴线**的圈（§8.0.2 圆心在定位轴线的延长线上）。
+
+    判据是「圈心到最近线段端点的距离 ≤ 半径 × max_ratio」——
+    按半径的**比例**而非绝对值，才能同时适配实测的 16.0pt 与 28.0pt 圈径。
+
+    **取不到线段端点时原样返回**：判不出就不判，不能把整张图清空。
+    """
+    if not circles:
+        return [] if circles is None else circles
+    if not line_endpoints:
+        return circles
+
+    # 空间哈希：862 圈 × 96 万端点直接两两算不现实。
+    cell = max(1.0, max(float(c.get("diameter_pt") or 0) for c in circles))
+    grid: dict[tuple[int, int], list[tuple[float, float]]] = {}
+    for x, y in line_endpoints:
+        grid.setdefault((int(x // cell), int(y // cell)), []).append((x, y))
+
+    kept: list[dict] = []
+    for circle in circles:
+        cx = float(circle.get("cx") or 0.0)
+        cy = float(circle.get("cy") or 0.0)
+        radius = float(circle.get("diameter_pt") or 0.0) / 2
+        if radius <= 0:
+            continue                       # 退化圈不参与
+        # 加浮点容差:实测三张真值图**恰在 0.30r 处**跳到 100%，
+        # 边界必须含在内，不能被 1e-15 的误差挤出去。
+        limit = radius * max_ratio + 1e-9
+        gx, gy = int(cx // cell), int(cy // cell)
+        found = False
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for px, py in grid.get((gx + dx, gy + dy), ()):
+                    if math.hypot(px - cx, py - cy) <= limit:
+                        found = True
+                        break
+                if found:
+                    break
+            if found:
+                break
+        if found:
+            kept.append(circle)
+    return kept
