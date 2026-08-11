@@ -165,6 +165,14 @@ def pick_element_drawings(
             beams.append(drawing)
         elif _STRUCTURE_TITLE_RE.search(title) or discipline == "structure":
             structure.append(drawing)
+        elif _transform_rank(drawing, transforms, placements) < 0:
+            # **有世界坐标却进不了任何桶** —— 实测 19 张里有 3 张这样
+            # （屋顶花园排水组织图、隔声隔振平面图、夹层平面图，
+            # 都是 architecture 且标题无结构词）。它们的位置是**绝对可信**的
+            # （锚点求解、残差毫米级），整张丢弃太可惜；建筑平面图上
+            # 本就有墙、柱、门窗。**只对有世界坐标的图开这个口子** ——
+            # 位置不可信的图进来只会添噪声。
+            structure.append(drawing)
 
     def by_quality(items: list[dict]) -> list[dict]:
         # 同等可靠度时按 drawing_id 定序 —— stable sort 保留的是**输入顺序**，

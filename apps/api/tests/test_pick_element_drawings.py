@@ -208,3 +208,54 @@ def test_suspect_placements_do_not_get_extra_quota():
         drawings, transforms={},
         placements={f"b{i}": {"suspect": True} for i in range(5)})
     assert len(picked["structure"]) == 2
+
+
+# ── 有世界坐标却进不了任何桶（J1 任务 2,v49 实测）──────────────
+
+@pytest.mark.unit
+def test_located_drawing_outside_the_three_buckets_is_still_used():
+    """**实测**:19 张有世界坐标的图里,3 张进不了任何桶。
+
+    | 图 | 专业 | 为什么落空 |
+    |---|---|---|
+    | 屋顶花园排水组织图 | architecture | 标题无结构/梁词,专业非 mep/structure |
+    | 二层隔声隔振平面图 | architecture | 同上 |
+    | 四层夹层平面图 | architecture | 同上 |
+
+    分桶逻辑是 `mep → beam → structure`，三者都不匹配就**整张丢弃**。
+    可这些图的位置是**绝对可信**的（锚点求解、残差毫米级），
+    白白浪费掉太可惜 —— 建筑平面图上本就有墙、柱、门窗。
+
+    **只对有世界坐标的图开这个口子**：位置不可信的图进来只会添噪声。
+    """
+    drawings = [_d("plain", "屋顶花园排水组织图", "architecture")]
+    picked = pick_element_drawings(
+        drawings, transforms={}, placements={"plain": {"rmse_m": 0.01}})
+    assert [d["id"] for d in picked["structure"]] == ["plain"]
+
+
+@pytest.mark.unit
+def test_unlocated_drawing_outside_the_buckets_is_still_dropped():
+    """没有世界坐标的图照旧丢弃 —— 不能借这个口子把噪声放进来。"""
+    drawings = [_d("plain", "屋顶花园排水组织图", "architecture")]
+    picked = pick_element_drawings(drawings, transforms={}, placements={})
+    assert picked["structure"] == []
+
+
+@pytest.mark.unit
+def test_suspect_placement_does_not_open_the_door():
+    """存疑的摆放不享受此待遇 —— 它的位置本就不可信。"""
+    drawings = [_d("plain", "屋顶花园排水组织图", "architecture")]
+    picked = pick_element_drawings(
+        drawings, transforms={}, placements={"plain": {"suspect": True}})
+    assert picked["structure"] == []
+
+
+@pytest.mark.unit
+def test_mep_located_drawings_still_go_to_mep():
+    """已有归属的不改桶 —— 只兜底真正无处可去的。"""
+    drawings = [_d("m", "二层火灾自动报警平面图", "mep")]
+    picked = pick_element_drawings(
+        drawings, transforms={}, placements={"m": {"rmse_m": 0.01}})
+    assert [d["id"] for d in picked["mep"]] == ["m"]
+    assert picked["structure"] == []

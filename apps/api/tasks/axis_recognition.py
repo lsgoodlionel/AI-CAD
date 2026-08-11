@@ -28,7 +28,7 @@ ORDER BY created_at
 """
 
 _SELECT_ONE = """
-SELECT id, project_id, file_key, drawing_no, title, filename FROM drawings
+SELECT id, project_id, file_key, drawing_no, title FROM drawings
 WHERE id = CAST(:drawing_id AS uuid)
 """
 
