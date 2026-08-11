@@ -16,6 +16,8 @@
 """
 from __future__ import annotations
 
+from typing import Any
+
 import logging
 
 from core.model3d.axis_label_band import bands_to_axes, detect_bands
@@ -65,6 +67,36 @@ DEFAULT_DIRECTIONS = (0.0, 42.0, 90.0, 132.0)
 #: **不能改用直径判**:轴号圈实测 5.65~9.88mm、喷头 2.50~2.60mm 看似可分,
 #: 但抽样 40 张后发现 A-01-04A 恰好落在 5.65mm —— 阈值定高杀真图、定低放噪声。
 SYMBOL_FIELD_BAND_HINT = 60
+
+
+#: 非几何图被拦下时写进 `warnings` 的说明。
+#: **降级必须可见**：置零而不跳过，界面上才能与「还没跑」分开。
+NON_GEOMETRIC_WARNING = (
+    "本图为**系统图/原理图/接线图**一类的示意图，**不表达平面位置**，"
+    "因此不产出定位轴线 —— 定位轴线用于平面定位（GB/T 50001 §8）。"
+    "实测「消火栓系统原理图」曾被识别出 385 条轴线、21 个分区"
+    "（那些「圈」是管道节点符号，分区数也远超工程常识）。"
+)
+
+
+def should_skip_axes(drawing: Any) -> bool:
+    """这张图是否**本就不该有轴网**（非几何示意图）。
+
+    判据复用 `drawing_role` 的 `ROLE_NON_GEOMETRIC`（国标术语，
+    不绑任何院的编号体系）—— 判据早就有，识别层此前没去读它。
+
+    **只拦非几何图**：立面/剖面有单向轴线（Phase I 靠它们做 z 恢复）、
+    详图也可能带轴号（§9.4.4），都要放行。判不出就放行 ——
+    宁可多识别，不可漏掉真轴网图。
+    """
+    if not drawing:
+        return False
+    try:
+        from services.drawing_role import ROLE_NON_GEOMETRIC, classify_role
+
+        return classify_role(drawing).role == ROLE_NON_GEOMETRIC
+    except Exception:  # noqa: BLE001 — 判不了就放行，不阻断识别
+        return False
 
 
 def is_suspect_symbol_field(band_count: int) -> bool:

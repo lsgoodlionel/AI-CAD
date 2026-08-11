@@ -28,7 +28,7 @@ ORDER BY created_at
 """
 
 _SELECT_ONE = """
-SELECT id, project_id, file_key FROM drawings
+SELECT id, project_id, file_key, drawing_no, title, filename FROM drawings
 WHERE id = CAST(:drawing_id AS uuid)
 """
 
@@ -99,12 +99,26 @@ async def _mark_failed(drawing_id: str, message: str) -> None:
         await db.disconnect()
 
 
+def _empty_result(row) -> dict:
+    """非几何图的空结果 —— 带上原因，不做静默空返回。"""
+    from services.axis_recognition import NON_GEOMETRIC_WARNING
+
+    return {"page_w": 0.0, "page_h": 0.0, "circle_count": 0,
+            "additional_count": 0, "axis_count": 0, "leader_count": 0,
+            "zones": [], "axes": [], "anchors": [], "outliers": [],
+            "violations": [], "transform": None, "is_split_view": False,
+            "split_view_numbering": None, "suspect_symbol_field": False,
+            "warnings": [NON_GEOMETRIC_WARNING]}
+
+
 async def _recognize_one(drawing_id: str) -> dict:
     from core.model3d.axis_label_circle import circles_from_pdf
     from core.model3d.axis_label_glyph import strokes_from_pdf
     from core.model3d.vector_axis_extractor import segments_from_pdf
     from core.storage import get_file_bytes
-    from services.axis_recognition import recognize, summarize
+    from services.axis_recognition import (
+        NON_GEOMETRIC_WARNING, recognize, should_skip_axes, summarize,
+    )
     from services.axis_recognition_repo import (
         fetch_zone_labels, save_result,
     )
@@ -118,6 +132,18 @@ async def _recognize_one(drawing_id: str) -> dict:
         if row is None:
             return {"drawing_id": drawing_id, "skipped": "not_found"}
         project_id = str(row["project_id"])
+        # **非几何图不产出轴网**（系统图/原理图/接线图不表达平面位置）。
+        # 判据早就在 `drawing_role` 里，识别层此前没读它 —— 实测
+        # 「消火栓系统原理图」被识别出 385 条轴线、21 个分区。
+        # **置零而不跳过**：界面上才能与「还没跑」分开（降级必须可见）。
+        if should_skip_axes(dict(row)):
+            empty = _empty_result(row)
+            await save_result(db, project_id=project_id, drawing_id=drawing_id,
+                              result=empty)
+            logger.info("[axis_recognition] 非几何图不产出轴网: %s",
+                        row["drawing_no"] or drawing_id)
+            return {"drawing_id": drawing_id, "axis_count": 0,
+                    "skipped": "non_geometric"}
         pdf = get_file_bytes(row["file_key"])
 
         circles = circles_from_pdf(pdf)
