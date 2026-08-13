@@ -85,7 +85,8 @@ MIN_COMPONENTS_FOR_SKELETON = 200
 # 顺序即优先级：先匹配到的胜出。**非几何**放最前，因为
 # 「XX平面图说明」这类既含「平面图」又含「说明」的，本质是说明。
 _TERM_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"目录|设计说明|施工说明|统一说明|修改通知|变更单"), ROLE_NON_GEOMETRIC),
+    (re.compile(r"目录|设计说明|施工说明|总说明|统一说明|修改通知|变更单"),
+     ROLE_NON_GEOMETRIC),
     (re.compile(r"系统图|流程图|原理图|配电箱|接线图"), ROLE_NON_GEOMETRIC),
     (re.compile(r"(?:材料|做法|门窗|构件|设备)\s*表$|一览表|明细表"), ROLE_NON_GEOMETRIC),
     (re.compile(r"图例"), ROLE_NON_GEOMETRIC),

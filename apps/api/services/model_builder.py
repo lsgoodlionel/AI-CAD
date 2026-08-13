@@ -666,6 +666,24 @@ def _serialize_story_level(level: model_story.StoryLevel) -> dict[str, Any]:
     }
 
 
+def _with_unzoned_reasons(items: list[dict] | None) -> list[dict]:
+    """给未分层清单补上**判不出的原因**与建议动作。
+
+    原先每条的 `reason` 都是同一个占位值 `story_unclassified` ——
+    人打开队列看到 1061 张，不知道每张为什么判不出、该补什么。
+    分成三类后人的动作才明确：跨层图无需指定楼层、
+    非标准名只需告知对应层、毫无线索的才要翻图。
+    """
+    from services.unzoned_reason import classify_unzoned
+
+    out = []
+    for item in items or []:
+        entry = dict(item)
+        entry.update(classify_unzoned(entry).as_dict())
+        out.append(entry)
+    return out
+
+
 def _serialize_quality_issue(issue: model_story.ModelQualityIssue) -> dict[str, Any]:
     return {
         "issue_type": issue.issue_type,
@@ -705,7 +723,8 @@ def _quality_payload(
             key: [_serialize_story_level(level) for level in levels]
             for key, levels in normalization.stories_by_building.items()
         },
-        "unclassified_drawings": normalization.unclassified_drawings,
+        "unclassified_drawings": _with_unzoned_reasons(
+            normalization.unclassified_drawings),
         "unassigned_story_count": len(normalization.unclassified_drawings),
         "pending_manual_count": len(normalization.unclassified_drawings),
         "story_conflict_count": len(story_conflicts),
