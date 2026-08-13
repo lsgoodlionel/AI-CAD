@@ -17,10 +17,11 @@ import {
   Typography, message,
 } from 'antd'
 import {
-  AxisRecognitionOutlier, AxisRecognitionResult, AxisRecognitionSummaryRow,
-  AxisRecognitionZone, ZonePropagationStats, confirmAxisZoneLabel,
-  getDrawingAxisRecognition, listAxisRecognition, propagateAxisZones,
-  startDrawingAxisRecognition, startProjectAxisRecognition,
+  AnchorSuggestion, AxisRecognitionOutlier, AxisRecognitionResult,
+  AxisRecognitionSummaryRow, AxisRecognitionZone, ZonePropagationStats,
+  confirmAxisZoneLabel, getAnchorSuggestions, getDrawingAxisRecognition,
+  listAxisRecognition, propagateAxisZones, startDrawingAxisRecognition,
+  startProjectAxisRecognition,
 } from '@/services/projectInfo'
 
 const { Text } = Typography
@@ -40,6 +41,7 @@ export default function AxisRecognitionPanel({ projectId }: AxisRecognitionPanel
   const [zoneInput, setZoneInput] = useState<Record<number, string>>({})
   const [propagating, setPropagating] = useState(false)
   const [propagation, setPropagation] = useState<ZonePropagationStats | null>(null)
+  const [suggestions, setSuggestions] = useState<AnchorSuggestion[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -51,6 +53,13 @@ export default function AxisRecognitionPanel({ projectId }: AxisRecognitionPanel
       message.error('轴网识别结果加载失败')
     } finally {
       setLoading(false)
+    }
+    // 荐锚是**辅助信息**，拉不到不该拖垮整个面板 —— 单独 try
+    try {
+      const res = await getAnchorSuggestions(projectId, 5)
+      setSuggestions(res.data?.items || [])
+    } catch {
+      setSuggestions([])
     }
   }, [projectId])
 
@@ -207,6 +216,54 @@ export default function AxisRecognitionPanel({ projectId }: AxisRecognitionPanel
             )
           }
         />
+      )}
+
+      {suggestions.length > 0 && (
+        <Card
+          size="small" style={{ marginBottom: 12 }}
+          title="该确认哪几张最划算"
+          extra={
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              确认一次的成本是固定的，先确认覆盖最广的
+            </Text>
+          }
+        >
+          <Table
+            rowKey="drawing_id" size="small" pagination={false}
+            dataSource={suggestions}
+            columns={[
+              { title: '图号', dataIndex: 'drawing_no', width: 130 },
+              { title: '图名', dataIndex: 'title', ellipsis: true },
+              {
+                // **最长的一组**才是覆盖力：匹配按组做，各组总和会把
+                // 「11 个分区各 4 段」这种符号场误检抬成榜首（实测发生过）
+                title: '最长序列', dataIndex: 'max_gaps', width: 90,
+                render: (n: number) => <Tag color="blue">{n} 段</Tag>,
+              },
+              {
+                title: '方向', dataIndex: 'directions', width: 80,
+                // 双向才能构成交点 —— 单向图确认了也拿不到世界坐标
+                render: (n: number) =>
+                  n >= 2
+                    ? <Tag color="green">双向</Tag>
+                    : <Tag color="orange">单向</Tag>,
+              },
+              {
+                title: '推荐理由', dataIndex: 'reason', ellipsis: true,
+                render: (text: string) => <Text type="secondary">{text}</Text>,
+              },
+              {
+                title: '', width: 80,
+                render: (_: unknown, row: AnchorSuggestion) => (
+                  <Button type="link" size="small"
+                          onClick={() => openDetail(row.drawing_id)}>
+                    去确认
+                  </Button>
+                ),
+              },
+            ] as never}
+          />
+        </Card>
       )}
 
       <Spin spinning={loading}>

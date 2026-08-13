@@ -779,3 +779,31 @@ export const propagateAxisZones = (projectId: string) =>
     `/api/v1/projects/${projectId}/axis-recognition/propagate-zones`,
     { method: 'POST' },
   )
+
+/**
+ * 荐锚项 —— 「该确认哪几张图最划算」（J1-3）。
+ *
+ * 实测未匹配原因中「对不上任何锚」占 **91%**、歧义仅 1% ⇒ 瓶颈是锚覆盖不足。
+ * 人工确认一次的成本是固定的，所以该优先确认**覆盖最广**的图，
+ * 而不是照单逐张确认 1052 张。
+ */
+export interface AnchorSuggestion {
+  drawing_id: string
+  drawing_no: string
+  title: string
+  /** 最长的一组轴距序列长度 —— 匹配按组做，这才是覆盖力 */
+  max_gaps: number
+  /** 方向数：**双向才能构成交点**，单向图确认了也拿不到世界坐标 */
+  directions: number
+  zones: number
+  /** 为什么推荐它；可疑者（圆形构件被当成轴号圈）会在这里标出 */
+  reason: string
+}
+
+export const getAnchorSuggestions = (
+  projectId: string,
+  limit = 5,
+): Promise<{ success: boolean; data: { items: AnchorSuggestion[]; total: number } }> =>
+  request(
+    `/api/v1/projects/${projectId}/axis-recognition/anchor-suggestions?limit=${limit}`,
+  )
