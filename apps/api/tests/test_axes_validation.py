@@ -33,14 +33,16 @@ def test_reject_axes_far_away():
     """实测 B1:轴网 x[-76,960] y[720,1306] vs 构件 x[-4,123] y[-35,144] → 必须剔除。"""
     ok, reason = axes_plausible(_axes(-76, 960, 720, 1306), _elements())
     assert ok is False
-    assert "远离" in reason
+    # 判据已从「边界不得超出」改为「中心错位 + 尺度比」——
+    # 判定不变(仍拒绝),理由措辞随之改变。见 test_axes_plausible_criterion.py。
+    assert "错位" in reason or "倍" in reason
 
 
 def test_reject_axes_too_small_span():
     """局部详图轴网(跨度过小)不能代表整层。"""
     ok, reason = axes_plausible(_axes(10, 15, 10, 14), _elements())
     assert ok is False
-    assert "跨度过小" in reason
+    assert "跨度" in reason and "局部详图" in reason
 
 
 def test_axes_may_extend_beyond_elements_slightly():
