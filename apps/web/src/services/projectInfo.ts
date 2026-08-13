@@ -807,3 +807,46 @@ export const getAnchorSuggestions = (
   request(
     `/api/v1/projects/${projectId}/axis-recognition/anchor-suggestions?limit=${limit}`,
   )
+
+/**
+ * 未分层图的定位状态 —— 供**图纸管理页**按类成批处理。
+ *
+ * 与工程模型页用**同一个判据**（后端 `classify_unzoned`）。
+ * 两处报的数字不一样，人就不知道该信哪个。
+ */
+export interface LocationStatusItem {
+  drawing_id: string
+  drawing_no: string
+  title: string
+  building_unit_key?: string
+  /** cross_floor / non_standard_floor_name / no_floor_hint / no_floor_by_nature */
+  reason: string
+  /** 人该做什么 */
+  action: string
+  /** 是否真的需要人补楼层 —— 跨层图与说明类为 false */
+  needs_floor_input: boolean
+  /** 识别到的非标准楼层名（如「台仓」），回显给人看 */
+  hint?: string
+}
+
+export interface LocationStatus {
+  items: LocationStatusItem[]
+  by_reason: Record<string, number>
+  /** 未分层总数，照实报 */
+  total: number
+  /** **只数真正要人动手的** —— 说明/目录本就没有楼层，不该计进待办 */
+  actionable: number
+}
+
+/** 未分层原因的中文名（与后端 REASON_* 一一对应） */
+export const LOCATION_REASON_LABELS: Record<string, string> = {
+  cross_floor: '跨楼层表达',
+  non_standard_floor_name: '非标准楼层名',
+  no_floor_hint: '无楼层线索',
+  no_floor_by_nature: '本就无楼层',
+}
+
+export const getLocationStatus = (
+  projectId: string,
+): Promise<{ success: boolean; data: LocationStatus }> =>
+  request(`/api/v1/projects/${projectId}/info/location-status`)

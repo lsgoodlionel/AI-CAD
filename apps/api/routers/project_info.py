@@ -160,6 +160,31 @@ async def info_axes(
     return {"axes": [_item_dict(r) for r in rows]}
 
 
+@router.get("/{project_id}/info/location-status")
+async def location_status(
+    project_id: str,
+    db=Depends(get_db),
+    _user=Depends(get_current_user),
+):
+    """未分层图的**分类清单**，供图纸管理页按类成批处理。
+
+    与工程模型页 `scene.quality.unclassified_drawings` **同一个判据**
+    （`classify_unzoned`）—— 两处报的数字不一样，人就不知道该信哪个。
+
+    `actionable` 只数真正需要人补楼层的：说明、目录、系统图本就没有楼层，
+    混进待办会让人去处理一个不存在的问题。
+    """
+    from services import model_builder, model_story
+    from services.drawing_location_status import summarize_location_status
+
+    _project, drawings, _issues, _c = await model_builder._fetch_inputs(
+        db, project_id)
+    annotations = await model_builder._load_annotation_overrides(db, project_id)
+    normalized = model_story.normalize_story_table(drawings, annotations)
+    data = summarize_location_status(normalized.unclassified_drawings)
+    return {"success": True, "data": data, "error": None}
+
+
 @router.post("/{project_id}/info/extract", status_code=202)
 async def trigger_extract(
     project_id: str,
