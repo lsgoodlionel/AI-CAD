@@ -261,3 +261,66 @@ def _fake_builder(axes, *, page_h, scale_m_pt):
     from services.axis_world_anchors import transform_from_axes
 
     return transform_from_axes(axes, page_h=page_h, scale_m_pt=scale_m_pt)
+
+
+# ── 自身比例同样要过门禁（我引入的回归）────────────────────────────
+
+@pytest.mark.unit
+def test_own_scale_is_also_gated():
+    """**回归用例**：我给借来的比例加了 §6.0.4 门禁，却漏了自身比例。
+
+    实测重跑后 22 条 `axes` 来源变换超出国标区间，最离谱 `S-0-11-001C`
+    是 **1:654464**，而 `confidence` 全是 1.00 ——
+    与 `transform_from_geometry` 的 1:335 万一模一样的形状：
+    错值带着满分置信度骗过所有下游。
+
+    同一个缺陷存在于两条路径，上一轮只修了几何那条。
+    """
+    from tasks.axis_recognition import _transform_of
+
+    result = {"transform": {"scale_m_pt": 231.0}, "page_h": 1000.0,
+              "axes": [{"label_kind": "numeric", "offset_pt": -200.0},
+                       {"label_kind": "alpha", "offset_pt": 300.0}]}
+    assert _transform_of(result, _fake_builder) is None
+
+
+@pytest.mark.unit
+def test_own_scale_is_not_snapped_to_the_standard_table():
+    """**不吸附**：这里的比例来自坐标标注 RANSAC 拟合，有残差可验证。
+
+    Phase I 实测 0.142757 m/pt、残差 **5.7 毫米**，对应分母 404.7 ——
+    吸附到 §6.0.4 的 400 会引入 0.9% 误差，在 100 米建筑上就是 **0.9 米**，
+    把 Phase I 辛苦拿到的 6.1 毫米精度毁掉。
+
+    吸附的用武之地是几何路径（读图面文字 + 几何估算，误差无从验证），
+    那里已经在 `transform_from_geometry` 里做过了。
+    **有残差背书的实测值优于规范表。**
+    """
+    from tasks.axis_recognition import _transform_of
+
+    result = {"transform": {"scale_m_pt": 0.142757}, "page_h": 1000.0,
+              "axes": [{"label_kind": "numeric", "offset_pt": -200.0},
+                       {"label_kind": "alpha", "offset_pt": 300.0}]}
+    got = _transform_of(result, _fake_builder)
+    assert got.scale_m_pt == pytest.approx(0.142757), "RANSAC 实测值不得被改动"
+
+
+@pytest.mark.unit
+def test_axes_confidence_reflects_whether_the_scale_is_standard():
+    """置信度要反映**比例是否可信**，不能恒为 1.0。
+
+    `transform_from_axes` 此前硬编码 `confidence=1.0`，于是分母 4905
+    （超出 §6.0.4 表的 1:2000，只是没超门禁余量）也带满分置信度。
+    几何路径早就有 `scale_score` 降级了，轴网路径漏了 ——
+    「错值带着满分置信度骗过所有下游」在这条路径上仍然成立。
+    """
+    from services.axis_world_anchors import transform_from_axes
+    from services.drawing_transform import PT_TO_MM
+
+    axes = [{"label_kind": "numeric", "offset_pt": -200.0},
+            {"label_kind": "alpha", "offset_pt": 300.0}]
+    standard = transform_from_axes(axes, page_h=1000.0,
+                                   scale_m_pt=150 * PT_TO_MM / 1000.0)
+    odd = transform_from_axes(axes, page_h=1000.0,
+                              scale_m_pt=4905 * PT_TO_MM / 1000.0)
+    assert standard.confidence > odd.confidence, "非标准比例要降置信度"

@@ -121,7 +121,7 @@ def transform_from_axes(axes: list[dict], *, page_h: float,
     轴线不足以定原点时返回 None(不落无效变换,让下游诚实降级)。
     """
     from services.drawing_transform import (
-        TRANSFORM_SOURCE_AXES, DrawingTransform,
+        TRANSFORM_SOURCE_AXES, DrawingTransform, is_standard_scale,
     )
 
     if page_h <= 0 or scale_m_pt <= 0:
@@ -135,6 +135,9 @@ def transform_from_axes(axes: list[dict], *, page_h: float,
         origin_x=float(min(xs)),
         origin_y=float(min(ys)),
         page_h=float(page_h),
-        confidence=1.0,
+        # **置信度要反映比例是否可信**，不能恒为 1.0：实测有分母 4905 的图
+        # （超出 §6.0.4 表的 1:2000，只是没超门禁余量）带着满分置信度。
+        # 几何路径早有此降级，这条路径漏了。
+        confidence=1.0 if is_standard_scale(scale_m_pt) else 0.5,
         source=TRANSFORM_SOURCE_AXES,
     )

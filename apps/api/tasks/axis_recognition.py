@@ -200,9 +200,20 @@ def _transform_of(result: dict, builder, fallback_scale: float | None = None):
     transform = result.get("transform") or {}
     scale = transform.get("scale_m_pt")
     if (not scale or scale <= 0) and fallback_scale and fallback_scale > 0:
-        scale = fallback_scale if is_scale_plausible(fallback_scale) else None
+        scale = fallback_scale
     if not scale or scale <= 0:
         return None
+    # **门禁对自身比例同样生效**（回归修复）：上一版只拦借来的比例，
+    # 于是重跑后 22 条 `axes` 变换超出国标区间，最离谱 1:654464，
+    # 且 confidence 恒为 1.0 —— 与 `transform_from_geometry` 的
+    # 1:335 万一模一样：错值带着满分置信度骗过所有下游。
+    if not is_scale_plausible(scale):
+        return None
+    # **不吸附到 §6.0.4 标准值**：吸附是为修正「读文字 + 几何估算」的测量
+    # 误差，而这里的比例来自坐标标注 RANSAC 拟合，有残差可验证
+    # （Phase I 实测 0.142757 m/pt、残差 5.7 毫米，对应分母 404.7）。
+    # 吸附到 400 会引入 0.9% 误差 —— 在 100 米建筑上就是 0.9 米，
+    # 把 Phase I 的 6.1 毫米精度毁掉。**有验证的实测值优于规范表。**
     return builder(result["axes"], page_h=result["page_h"], scale_m_pt=scale)
 
 
