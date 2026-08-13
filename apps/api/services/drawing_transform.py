@@ -97,6 +97,12 @@ class DrawingTransform:
     origin_y: float
     page_h: float
     confidence: float | None = None
+    #: 该方向**没有检出轴线**，原点按 0 兜底 —— 不是「原点真在 0」。
+    #: 实测 1436 条里 x 缺 72 张、y 缺 77 张（10.4%），
+    #: 而「两方向都缺」是 0 张 —— 它们缺的都是**一个**方向。
+    #: 该方向的构件坐标从图幅边缘算起，会整体偏移 `真原点 × 比例`。
+    origin_x_estimated: bool = False
+    origin_y_estimated: bool = False
 
 
 def pt_to_meter(x_pt: float, y_pt: float, t: DrawingTransform) -> tuple[float, float]:
@@ -138,10 +144,17 @@ def transform_from_geometry(geom: Any) -> DrawingTransform | None:
         label_score = (labeled / total) if total else 0.0
         scale_score = 1.0 if is_standard_scale(scale) else 0.5
         confidence = round(label_score * scale_score, 4)
+        # **原点缺失时按 0 落库但标记出来** —— 不拒绝,因为拒绝会让
+        # 149 张(10.4%)图失去定位、影响面大;标记是纯增量,
+        # 下游(包络/校验)可据此排除该方向（「降级必须可见」）。
+        origin_x_missing = origin[0] is None
+        origin_y_missing = origin[1] is None
         return DrawingTransform(
             scale_m_pt=float(scale),
-            origin_x=float(origin[0]),
-            origin_y=float(origin[1]),
+            origin_x=float(origin[0] or 0.0),
+            origin_y=float(origin[1] or 0.0),
+            origin_x_estimated=origin_x_missing,
+            origin_y_estimated=origin_y_missing,
             page_h=float(geom.page_h),
             confidence=confidence,
         )
@@ -151,13 +164,17 @@ def transform_from_geometry(geom: Any) -> DrawingTransform | None:
 
 _UPSERT_SQL = """
 INSERT INTO drawing_transform
-    (drawing_id, project_id, scale_m_pt, origin_x, origin_y, page_h, confidence, updated_at)
+    (drawing_id, project_id, scale_m_pt, origin_x, origin_y, page_h, confidence,
+     origin_x_estimated, origin_y_estimated, updated_at)
 VALUES
-    (:drawing_id, :project_id, :scale_m_pt, :origin_x, :origin_y, :page_h, :confidence, now())
+    (:drawing_id, :project_id, :scale_m_pt, :origin_x, :origin_y, :page_h, :confidence,
+     :origin_x_estimated, :origin_y_estimated, now())
 ON CONFLICT (drawing_id) DO UPDATE SET
     scale_m_pt = EXCLUDED.scale_m_pt,
     origin_x = EXCLUDED.origin_x,
     origin_y = EXCLUDED.origin_y,
+    origin_x_estimated = EXCLUDED.origin_x_estimated,
+    origin_y_estimated = EXCLUDED.origin_y_estimated,
     page_h = EXCLUDED.page_h,
     confidence = EXCLUDED.confidence,
     updated_at = now()
@@ -176,11 +193,14 @@ async def persist_transform(
         "origin_y": transform.origin_y,
         "page_h": transform.page_h,
         "confidence": transform.confidence,
+        "origin_x_estimated": bool(transform.origin_x_estimated),
+        "origin_y_estimated": bool(transform.origin_y_estimated),
     })
 
 
 _FETCH_SQL = """
-SELECT drawing_id, scale_m_pt, origin_x, origin_y, page_h, confidence
+SELECT drawing_id, scale_m_pt, origin_x, origin_y, page_h, confidence,
+       origin_x_estimated, origin_y_estimated
 FROM drawing_transform WHERE project_id = :project_id
 """
 

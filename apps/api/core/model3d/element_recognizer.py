@@ -177,10 +177,14 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str) -> Floor
 class _Ctx:
     """坐标换算上下文：y 翻转 → 平移轴网原点 → 比例换算（米）。"""
 
-    def __init__(self, page_h: float, scale: float, origin: tuple[float, float], src: str):
+    def __init__(self, page_h: float, scale: float,
+                 origin: tuple[float | None, float | None], src: str):
         self.page_h = page_h
         self.scale = scale
-        self.origin = origin
+        # 该方向没检出轴线时 `_origin_pt` 返回 None —— 按 0 兜底继续算，
+        # 但缺失本身记在 `origin_missing` 里供上层标记（降级必须可见）。
+        self.origin = (origin[0] or 0.0, origin[1] or 0.0)
+        self.origin_missing = (origin[0] is None, origin[1] is None)
         self.src = src
 
     def to_m(self, x: float, y: float) -> list[float]:
@@ -270,10 +274,18 @@ def _dedupe(axes: list[tuple[str, float]], tol: float = 2.0) -> list[tuple[str, 
     return merged
 
 
-def _min_labeled_pos(axes: list[tuple[str, float]]) -> float:
-    """源坐标基准：有轴号 → 轴号最小者的位置；无轴号 → 位置最小者。"""
+def _min_labeled_pos(axes: list[tuple[str, float]]) -> float | None:
+    """源坐标基准：有轴号 → 轴号最小者的位置；无轴号 → 位置最小者。
+
+    **没有轴线时返回 `None` 而不是 0.0** —— 0 是个合法坐标值，
+    返回它等于对下游说「原点就在 0」。实测 1436 条变换里
+    origin_x=0 有 72 张、origin_y=0 有 77 张（10.4%），
+    而「两方向都为 0」是 0 张 —— 它们是**缺一个方向**，不是原点真在 0。
+    这与 `drawing_transform` 的 1:335 万教训同源：
+    一个「看起来合法」的值比缺失更危险，缺失会让下游降级，假值一路通行。
+    """
     if not axes:
-        return 0.0
+        return None
     labeled = [(label, pos) for label, pos in axes if label]
     if labeled:
         return min(labeled, key=lambda a: _axis_label_sort_key(a[0]))[1]
@@ -282,8 +294,11 @@ def _min_labeled_pos(axes: list[tuple[str, float]]) -> float:
 
 def _origin_pt(
     axis_x: list[tuple[str, float]], axis_y: list[tuple[str, float]], page_h: float,
-) -> tuple[float, float]:
-    """统一源坐标点：最小轴号 X 轴 × 最小轴号 Y 轴 交点（无轴号回退最小位置）。"""
+) -> tuple[float | None, float | None]:
+    """统一源坐标点：最小轴号 X 轴 × 最小轴号 Y 轴 交点（无轴号回退最小位置）。
+
+    **逐方向返回**：缺哪个方向就是哪个为 `None`，调用方据此决定降级方式。
+    """
     ox = _min_labeled_pos(axis_x)
     flipped_y = [(label, page_h - pos) for label, pos in axis_y]
     oy = _min_labeled_pos(flipped_y)
