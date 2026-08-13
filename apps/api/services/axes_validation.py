@@ -45,26 +45,60 @@ def _robust_range(values: list[float]) -> tuple[float, float]:
     return ordered[cut], ordered[-1 - cut]
 
 
-def elements_bounds(elements: dict) -> tuple[float, float, float, float] | None:
-    """楼层构件包络 (min_x, max_x, min_y, max_y);无构件返回 None。"""
+#: 坐标系标识。实测「有世界锚点 ⇔ 世界坐标系」**100% 对应**
+#: （v50:33 张里 5 张世界 / 25 张局部,规则干净、不是随机混乱）。
+SYSTEM_WORLD = "world"
+SYSTEM_LOCAL = "local"
+
+#: 世界坐标系(工程坐标)的实测区间：大歌剧院锚点落在 −6326 ~ −6065。
+#: 留足余量以适配其他工程,但要与局部坐标(图幅尺度)拉开距离。
+WORLD_RANGE = (-100000.0, -1000.0)
+
+
+def coordinate_system_of(value: float) -> str:
+    """一个坐标值属于哪个坐标系。
+
+    局部米坐标是图幅尺度（3370pt × 1:150 ≈ 178 米）,
+    而工程坐标是几千米量级 —— 两者相差一个数量级以上,不会混淆。
+    """
+    lo, hi = WORLD_RANGE
+    return SYSTEM_WORLD if lo <= float(value) <= hi else SYSTEM_LOCAL
+
+
+def elements_bounds(
+    elements: dict, system: str | None = None,
+) -> tuple[float, float, float, float] | None:
+    """楼层构件包络 (min_x, max_x, min_y, max_y);无构件返回 None。
+
+    ``system`` 指定后**只算该坐标系内的构件**。
+
+    **为什么必须分组**（J7）：scene 里两个坐标系并存 —— 有世界锚点的图
+    在 −6300 附近,其余在 0~300。混算得到跨 6000 米的假基准,于是
+    `_clip_elements_to_envelope` 裁不掉任何东西、好轴网被判成「跨度过小」。
+    比较必须在**同一坐标系内**。
+    """
     xs: list[float] = []
     ys: list[float] = []
     # **只算结构主体**：GB/T 50001 §8 定位轴线用于确定主要承重构件位置。
     # 实测 F2 层管线 x 范围 −6309~111（机电图比例误差更大），
     # 把包络撑到 6513 米，于是好轴网被判成「跨度过小」。
     # 设备同理：它的位置本就是由楼层包络反推的，不能反过来定义包络。
+    def take(x: float, y: float) -> None:
+        if system is not None and coordinate_system_of(x) != system:
+            return
+        xs.append(x)
+        ys.append(y)
+
     for kind in ("columns", "slabs"):
         for item in (elements or {}).get(kind) or []:
             for p in item.get("outline") or []:
                 if len(p) >= 2:
-                    xs.append(float(p[0]))
-                    ys.append(float(p[1]))
+                    take(float(p[0]), float(p[1]))
     for kind in ("walls", "beams"):
         for item in (elements or {}).get(kind) or []:
             for p in item.get("path") or []:
                 if len(p) >= 2:
-                    xs.append(float(p[0]))
-                    ys.append(float(p[1]))
+                    take(float(p[0]), float(p[1]))
     if len(xs) < 2:
         return None
     return (*_robust_range(xs), *_robust_range(ys))
@@ -93,12 +127,19 @@ def axes_plausible(axes: dict, elements: dict) -> tuple[bool, str]:
     **不比「边界包含」**：轴网比构件大是常态（§8.0.2 轴号圈在轮廓外、
     构件识别不完整），按边界判会把好轴网大批误杀。
     """
-    eb = elements_bounds(elements)
     ab = axes_bounds(axes)
-    if eb is None:
-        return False, "楼层无构件,无法校验"
     if ab is None:
         return False, "轴网非双向(缺 x 或 y)"
+    # **在轴网自己的坐标系内比较**（J7）：scene 里世界坐标(−6300 附近)与
+    # 局部坐标(0~300)并存,拿全体构件求基准会得到跨 6000 米的假包络。
+    system = coordinate_system_of((ab[0] + ab[1]) / 2)
+    eb = elements_bounds(elements, system=system)
+    if eb is None:
+        # 该坐标系里没有构件 —— 退回全体,总比无从校验强;
+        # 但这说明轴网与构件不在同一坐标系,本身就值得存疑。
+        eb = elements_bounds(elements)
+    if eb is None:
+        return False, "楼层无构件,无法校验"
     ex0, ex1, ey0, ey1 = eb
     ax0, ax1, ay0, ay1 = ab
     espan_x, espan_y = max(ex1 - ex0, 1e-6), max(ey1 - ey0, 1e-6)
