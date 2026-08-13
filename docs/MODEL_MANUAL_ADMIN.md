@@ -1,6 +1,6 @@
 # 工程 3D 模型 · 操作手册(管理员版)
 
-> 版本 V1.3 ｜ 最后更新 2026-07-16 ｜ 适用对象:系统管理员、运维、后端负责人、技术负责人
+> 版本 V1.4 ｜ 最后更新 2026-08-13 ｜ 适用对象:系统管理员、运维、后端负责人、技术负责人
 >
 > 配套文档:一线业务用户请见《[工程 3D 模型 · 操作手册(用户版)](MODEL_MANUAL_USER.md)》。
 >
@@ -172,6 +172,46 @@ Query:`target_kind`(topology/naming/compliance/element/symbol)、`discipline`、
 | GET | `/{id}/pipeline/suggestions?status=` | 列出建议待办,缺省只看 `open` | 422 `INVALID_STATUS` |
 | POST | `/{id}/pipeline/suggestions/{sid}/accept` | 标记已采纳(不代为执行) | 404 `SUGGESTION_NOT_FOUND` / 409 `SUGGESTION_ALREADY_RESOLVED` |
 | POST | `/{id}/pipeline/suggestions/{sid}/dismiss` | 标记已忽略 | 同上 |
+
+### 4.8 轴网识别与定位状态 — `routers/axis_recognition.py` / `routers/project_info.py`(Phase I / J)
+
+前缀 `/api/v1`。**人工出口**集中在工程信息页的「轴网识别」面板与图纸管理页。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/projects/{id}/axis-recognition` | 识别结果汇总(轴号圈/轴线/分区/锚点/粗错/违规) |
+| POST | `/projects/{id}/axis-recognition` | 全项目重识别(Celery 扇出) |
+| POST | `/drawings/{id}/axis-recognition` | 单图重识别 |
+| POST | `/drawings/{id}/axis-recognition/zones/{n}/confirm` | **确认分区编号**(§8.0.5 几何推不出,每区一次) |
+| POST | `/projects/{id}/axis-recognition/propagate-zones` | 把人工确认的分区号传播到其他图 |
+| GET | `/projects/{id}/axis-recognition/anchor-suggestions?limit=` | **荐锚**:该确认哪几张图最划算 |
+| GET | `/projects/{id}/info/location-status` | **未分层图的分类清单**(供图纸管理页按类处理) |
+
+两个要点:
+
+1. **未确认分区号的图不产出世界锚点**。锚点身份是轴号对,没有分区号时
+   两个分区的 `1×A` 会撞身份、锚点串图。
+2. **`location-status` 的 `total` 与 `actionable` 必须分开看**。说明、目录、
+   系统图本就没有楼层,计进待办会让人去处理不存在的问题
+   (`building_unit_fallback` 那轮曾虚高 2.1 倍)。
+
+#### 坐标变换的来源与清理(migration 047)
+
+`drawing_transform` 一图一行,而**三条路径都往这一行写**:
+
+| `source` | 写入点 | 特点 |
+|---|---|---|
+| `axes` | `tasks/axis_recognition.py` | 原点可靠(轴号圈),比例需坐标标注做 RANSAC |
+| `geometry` | `tasks/drawing_info_extract.py` | 比例可靠(读图面文字),原点靠启发式 |
+| `manual` | `routers/project_info.py` 三个确认端点 | 人核过的真值 |
+| `unknown` | 迁移前的历史行 | 来源不可考,**不猜** |
+
+运维须知:
+
+- 自动路径**不会覆盖** `manual`(upsert 带 WHERE 条件),人工确认值只由人自己改;
+- 轴网路径算不出变换时只清 `source='axes'` 的行,不连坐其他来源;
+- 两条路径常各握一半(一个有比例没原点、一个有原点没比例),轴网路径会
+  **借用已落库的比例**,借来的仍要过 §6.0.4 比例门禁。
 
 ---
 
@@ -535,3 +575,4 @@ Phase D 合并了多处同类入口(见 `docs/PHASE_D_BLUEPRINT.md` §0.3),前�
 | V1.1 | 2026-07-14 | 阶段 3 楼板/墙识别接入 `classify_by_layer` 图层先验:楼板多板块收集 + 基础底板/筏板/承台(kind=raft, 0.5m)+ 地下室外墙宽缝召回(`_WIDE_WALL_GAP_MAX`);扩充 layer_conventions.yaml 与专业路由关键词。前端新增「楼层板片显隐」切换(用户手册 §7.6) |
 | V1.2 | 2026-07-14 | Phase D(D-22 手册同步):新增第 16 章《事件编排层与管线建议》(D-08 两个建议类型/阈值、`engine_params scope=pipeline` 开关及其「无管理界面,只能直接写库」的已知缺口、前端消费现状——数据看板项目视图已接入)、第 17 章《路由迁移与重定向》(`/`→`/hub`、套图审查旧路由→`/review`,旧页面源码保留未删);§4 新增 4.6 Finding 统一聚合 API(`routers/findings.py`,migration 026)与 4.7 管线建议 API(`routers/pipeline.py`,migration 027),并在 4.1 补充 QTO 转创效提案端点当前无前端入口的说明;§12 补登 migration 025–027;§18(原§16)维护约定增补两条触发项 |
 | V1.3 | 2026-07-16 | Phase E:§6.3 新增「图纸信息档案层 + PDF 几何识别」能力与诚实边界——档案层(导入即抽取/人审 verified/单一真相源,migration 029-031)、围护桩圆检测(整机 columns 3089→5794)、构件类型标签(档案 OCR 反哺);纯 PDF 项目边界(无图层/矢量文字取不到/圆检测/OCR回填滞后/板数十块量级)。详见 `docs/PHASE_E_BLUEPRINT.md`、`docs/PHASE_E_E3_AUDIT.md` |
+| V1.4 | 2026-08-13 | Phase I/J:§4.8 新增轴网识别与定位状态 API(识别/分区确认/传播/**荐锚**/未分层分类),并补「坐标变换的来源与清理」(migration 047)——`drawing_transform` 一图一行而三条路径共写,`manual` 不被自动覆盖、清理只动同来源、两条路径各握一半时轴网路径借用已落库比例(仍过 §6.0.4 门禁) |
