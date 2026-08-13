@@ -90,6 +90,16 @@ def is_standard_scale(scale_m_pt: float,
                for d in STANDARD_SCALE_DENOMINATORS)
 
 
+#: 变换的写入来源。一图一行而三条路径都往这行写 ——
+#: 没有来源就无从判断「该不该清掉这条陈旧变换」（migration 047）。
+TRANSFORM_SOURCE_AXES = "axes"          # Phase I 轴网路径
+TRANSFORM_SOURCE_GEOMETRY = "geometry"  # 图面文字读比例
+TRANSFORM_SOURCE_MANUAL = "manual"      # 人工确认端点
+#: 迁移前的历史行 —— 来源**不可考**，一律记 unknown，不猜。
+#: 清理只动来源相符的行，于是 1436 条历史变换不会被误删。
+TRANSFORM_SOURCE_UNKNOWN = "unknown"
+
+
 @dataclass(frozen=True)
 class DrawingTransform:
     scale_m_pt: float
@@ -103,6 +113,8 @@ class DrawingTransform:
     #: 该方向的构件坐标从图幅边缘算起，会整体偏移 `真原点 × 比例`。
     origin_x_estimated: bool = False
     origin_y_estimated: bool = False
+    #: 这条变换**是谁写的**（见 TRANSFORM_SOURCE_*）。
+    source: str = TRANSFORM_SOURCE_UNKNOWN
 
 
 def pt_to_meter(x_pt: float, y_pt: float, t: DrawingTransform) -> tuple[float, float]:
@@ -157,18 +169,24 @@ def transform_from_geometry(geom: Any) -> DrawingTransform | None:
             origin_y_estimated=origin_y_missing,
             page_h=float(geom.page_h),
             confidence=confidence,
+            source=TRANSFORM_SOURCE_GEOMETRY,
         )
     except Exception:  # noqa: BLE001 — 变换算不出则不落,下游降级
         return None
 
 
-_UPSERT_SQL = """
+#: **人工确认的比例尺不被自动路径覆盖**。
+#:
+#: 与 `filter_scene_axes` 对 `axes_source == "manual"` 的处置同源：
+#: 自动机制是用来挡自动识别的错值的，不该推翻人核过的真值。
+#: 没有这个 WHERE，一次重跑识别就会把人工确认结果冲掉。
+_UPSERT_SQL = f"""
 INSERT INTO drawing_transform
     (drawing_id, project_id, scale_m_pt, origin_x, origin_y, page_h, confidence,
-     origin_x_estimated, origin_y_estimated, updated_at)
+     origin_x_estimated, origin_y_estimated, source, updated_at)
 VALUES
     (:drawing_id, :project_id, :scale_m_pt, :origin_x, :origin_y, :page_h, :confidence,
-     :origin_x_estimated, :origin_y_estimated, now())
+     :origin_x_estimated, :origin_y_estimated, :source, now())
 ON CONFLICT (drawing_id) DO UPDATE SET
     scale_m_pt = EXCLUDED.scale_m_pt,
     origin_x = EXCLUDED.origin_x,
@@ -177,7 +195,21 @@ ON CONFLICT (drawing_id) DO UPDATE SET
     origin_y_estimated = EXCLUDED.origin_y_estimated,
     page_h = EXCLUDED.page_h,
     confidence = EXCLUDED.confidence,
+    source = EXCLUDED.source,
     updated_at = now()
+WHERE drawing_transform.source <> '{TRANSFORM_SOURCE_MANUAL}'
+   OR EXCLUDED.source = '{TRANSFORM_SOURCE_MANUAL}'
+"""
+
+#: 只删**同一来源**的行。
+#:
+#: 轴网路径算不出变换时,库里那条若也是它上次写的,就已不代表当前识别结果,
+#: 该清掉让下游诚实降级（「宁可没有变换，也不能有错变换」）;
+#: 但若那行来自几何路径或人工确认,它与本次识别无关,**不得连坐**。
+#: `unknown` 的历史行同理不动 —— 不知道是谁写的,就不能替它做主。
+_DELETE_SQL = """
+DELETE FROM drawing_transform
+WHERE drawing_id = :drawing_id AND source = :source
 """
 
 
@@ -195,12 +227,25 @@ async def persist_transform(
         "confidence": transform.confidence,
         "origin_x_estimated": bool(transform.origin_x_estimated),
         "origin_y_estimated": bool(transform.origin_y_estimated),
+        "source": transform.source or TRANSFORM_SOURCE_UNKNOWN,
     })
+
+
+async def clear_transform(db: Any, *, drawing_id: str, source: str) -> None:
+    """清掉**本来源**为该图写下的变换（算不出新值时调用）。
+
+    实测 `S-0-20-102.04C` 的轴网识别跑于 06:02、变换停在 01:47 ——
+    算不出时不清理，下游就一直在用上一次的过时值。
+    """
+    if source == TRANSFORM_SOURCE_MANUAL:
+        # 人工确认值只由人自己改，自动路径无权清除。
+        return
+    await db.execute(_DELETE_SQL, {"drawing_id": drawing_id, "source": source})
 
 
 _FETCH_SQL = """
 SELECT drawing_id, scale_m_pt, origin_x, origin_y, page_h, confidence,
-       origin_x_estimated, origin_y_estimated
+       origin_x_estimated, origin_y_estimated, source
 FROM drawing_transform WHERE project_id = :project_id
 """
 
@@ -210,11 +255,26 @@ async def fetch_project_transforms(db: Any, project_id: str) -> dict[str, Drawin
     rows = await db.fetch_all(_FETCH_SQL, {"project_id": project_id})
     out: dict[str, DrawingTransform] = {}
     for r in rows:
+        conf = _column(r, "confidence")
         out[str(r["drawing_id"])] = DrawingTransform(
             scale_m_pt=float(r["scale_m_pt"]),
             origin_x=float(r["origin_x"]),
             origin_y=float(r["origin_y"]),
             page_h=float(r["page_h"]),
-            confidence=float(r["confidence"]) if r["confidence"] is not None else None,
+            confidence=float(conf) if conf is not None else None,
+            # **落了库要读得回来** —— 上一轮加了列与 SELECT 却漏了这两行赋值，
+            # 于是下游（包络/校验）从来看不到「该方向原点是兜底的」。
+            origin_x_estimated=bool(_column(r, "origin_x_estimated", False)),
+            origin_y_estimated=bool(_column(r, "origin_y_estimated", False)),
+            source=str(_column(r, "source", TRANSFORM_SOURCE_UNKNOWN)),
         )
     return out
+
+
+def _column(row: Any, name: str, default: Any = None) -> Any:
+    """取一列，缺列或为 NULL 时给默认值（迁移未跑时不炸）。"""
+    try:
+        value = row[name]
+    except Exception:  # noqa: BLE001 — 行对象类型随驱动而异，缺列一律降级
+        return default
+    return default if value is None else value

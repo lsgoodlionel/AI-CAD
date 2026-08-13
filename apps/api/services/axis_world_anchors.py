@@ -120,7 +120,9 @@ def transform_from_axes(axes: list[dict], *, page_h: float,
 
     轴线不足以定原点时返回 None(不落无效变换,让下游诚实降级)。
     """
-    from services.drawing_transform import DrawingTransform
+    from services.drawing_transform import (
+        TRANSFORM_SOURCE_AXES, DrawingTransform,
+    )
 
     if page_h <= 0 or scale_m_pt <= 0:
         return None
@@ -134,4 +136,5 @@ def transform_from_axes(axes: list[dict], *, page_h: float,
         origin_y=float(min(ys)),
         page_h=float(page_h),
         confidence=1.0,
+        source=TRANSFORM_SOURCE_AXES,
     )

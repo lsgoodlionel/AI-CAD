@@ -123,7 +123,9 @@ async def _recognize_one(drawing_id: str) -> dict:
         fetch_zone_labels, save_result,
     )
     from services.axis_world_anchors import persist_anchors, transform_from_axes
-    from services.drawing_transform import persist_transform
+    from services.drawing_transform import (
+        TRANSFORM_SOURCE_AXES, clear_transform, persist_transform,
+    )
 
     db = _task_db()
     await db.connect()
@@ -159,10 +161,22 @@ async def _recognize_one(drawing_id: str) -> dict:
                           result=result)
         if result["anchors"]:
             await persist_anchors(db, project_id, drawing_id, result["anchors"])
-        transform = _transform_of(result, transform_from_axes)
+        # 借用已落库的比例（几何路径读的）——本路径常有原点没比例，见 _transform_of
+        existing = await db.fetch_one(
+            "SELECT scale_m_pt FROM drawing_transform WHERE drawing_id = :d",
+            {"d": drawing_id})
+        transform = _transform_of(
+            result, transform_from_axes,
+            fallback_scale=float(existing["scale_m_pt"]) if existing else None)
         if transform:
             await persist_transform(db, project_id=project_id,
                                     drawing_id=drawing_id, transform=transform)
+        else:
+            # **算不出就要让旧值失效**：实测 S-0-20-102.04C 识别跑于 06:02，
+            # 而它的变换停在 01:47（origin_x=0），下游一直在用那条过时的值。
+            # 只清 `axes` 来源 —— 几何路径的产出与人工确认值不受影响。
+            await clear_transform(db, drawing_id=drawing_id,
+                                  source=TRANSFORM_SOURCE_AXES)
         summary = summarize(result)
         logger.info("[axis_recognition] %s → %s", drawing_id, summary)
         return {"drawing_id": drawing_id, **summary}
@@ -170,10 +184,23 @@ async def _recognize_one(drawing_id: str) -> dict:
         await db.disconnect()
 
 
-def _transform_of(result: dict, builder):
-    """识别结果 → DrawingTransform;比例未定则不落(下游诚实降级)。"""
+def _transform_of(result: dict, builder, fallback_scale: float | None = None):
+    """识别结果 → DrawingTransform;比例未定则不落(下游诚实降级)。
+
+    `fallback_scale` 是**已落库的比例**（几何路径从图面文字读的）。
+    两条路径常常各握一半：轴网路径靠坐标标注做 RANSAC，没有标注就拿不到
+    比例；而几何路径能读到比例、原点却靠启发式，实测 149 张缺一个方向。
+
+    有原点没比例时借用它，好过整条放弃 —— 轴网原点依据更强
+    （Phase I 轴号圈在真值图上 100% 精确，几何路径的 `_detect_axes` 是启发式）。
+    借来的比例仍要过 §6.0.4 门禁：历史行可能写于门禁之前（1:335 万那批）。
+    """
+    from services.drawing_transform import is_scale_plausible
+
     transform = result.get("transform") or {}
     scale = transform.get("scale_m_pt")
+    if (not scale or scale <= 0) and fallback_scale and fallback_scale > 0:
+        scale = fallback_scale if is_scale_plausible(fallback_scale) else None
     if not scale or scale <= 0:
         return None
     return builder(result["axes"], page_h=result["page_h"], scale_m_pt=scale)

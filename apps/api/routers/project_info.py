@@ -328,7 +328,9 @@ async def confirm_drawing_scale(
     page_h 必须来自真实 PDF(档案坐标推断不可靠);轴号缺失时原点退化为页面左下角。
     """
     from services.scale_candidates import build_confirmed_transform
-    from services.drawing_transform import persist_transform, DrawingTransform
+    from services.drawing_transform import (
+        TRANSFORM_SOURCE_MANUAL, DrawingTransform, persist_transform,
+    )
 
     row = await db.fetch_one(
         "SELECT file_key, title FROM drawings WHERE id=:d AND project_id=:p",
@@ -380,7 +382,8 @@ async def confirm_drawing_scale(
         transform=DrawingTransform(
             scale_m_pt=payload["scale_m_pt"], origin_x=payload["origin_x"],
             origin_y=payload["origin_y"], page_h=payload["page_h"],
-            confidence=payload["confidence"]))
+            confidence=payload["confidence"],
+            source=TRANSFORM_SOURCE_MANUAL))
     return {"success": True, "data": {**payload, "drawing_id": drawing_id}, "error": None}
 
 
@@ -446,7 +449,9 @@ async def confirm_scales_batch(
     有歧义的(多候选/非标准)一律留给人逐张判断。
     """
     from services.scale_candidates import build_scale_candidates, build_confirmed_transform
-    from services.drawing_transform import persist_transform, DrawingTransform
+    from services.drawing_transform import (
+        TRANSFORM_SOURCE_MANUAL, DrawingTransform, persist_transform,
+    )
     from services.non_scaled_drawings import is_non_scaled
 
     rows = await db.fetch_all(_SCALE_QUEUE_SQL, {
@@ -1376,7 +1381,9 @@ async def derive_scale_from_manual_axes(
     需至少一条轴线填了 `spacing_to_prev_mm`。
     """
     from services.manual_axis import fetch_drawing_axes, scale_from_spacing
-    from services.drawing_transform import persist_transform, DrawingTransform
+    from services.drawing_transform import (
+        TRANSFORM_SOURCE_MANUAL, DrawingTransform, persist_transform,
+    )
 
     row = await db.fetch_one(
         "SELECT file_key FROM drawings WHERE id=:d AND project_id=:p",
@@ -1405,6 +1412,12 @@ async def derive_scale_from_manual_axes(
             scale_m_pt=got["scale_m_pt"],
             origin_x=min(xs) if xs else 0.0,
             origin_y=min(ys) if ys else 0.0,
+            # **同一个「0 兜底」缺陷**（见 element_recognizer._min_labeled_pos）：
+            # 人只标了一个方向的基准线时，另一方向的 0 不是「原点在 0」
+            # 而是「没标」。标出来，下游才分得清。
+            origin_x_estimated=not xs,
+            origin_y_estimated=not ys,
             page_h=float(page_h),
-            confidence=1.0))          # 人工量定 → 满置信
+            confidence=1.0,           # 人工量定 → 满置信
+            source=TRANSFORM_SOURCE_MANUAL))
     return {"success": True, "data": {**got, "page_h": page_h}, "error": None}
