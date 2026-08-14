@@ -106,6 +106,7 @@ def _match_direction(items: list[dict], scale: float,
 
 async def run_intersection_propagation(
     db: Any, project_id: str, anchor_drawing_id: str,
+    skip_drawings: set[str] | None = None, generation: int = 0,
 ) -> dict:
     """把锚图的世界坐标经序列匹配传播成其他图的交点；返回统计。
 
@@ -166,6 +167,10 @@ async def run_intersection_propagation(
     for did, groups, scale, page_w, page_h in candidates:
         if not page_w or not page_h:
             continue
+        # 已被前几代覆盖的图跳过：清理是按目标图做的，重复处理会让
+        # 后一代清掉前一代的结果（而前一代的世界坐标更可信，代数更低）
+        if skip_drawings and did in skip_drawings:
+            continue
         numeric = [(k, v) for k, v in groups.items() if k[1] == "numeric"]
         alpha = [(k, v) for k, v in groups.items() if k[1] == "alpha"]
         points: list[dict] = []
@@ -199,13 +204,17 @@ async def run_intersection_propagation(
         for point in points:
             await db.execute(_UPSERT_SQL, {
                 "project_id": project_id, "drawing_id": did,
-                "note": f"{NOTE_PREFIX}:{anchor_drawing_id[:8]}", **point})
+                # 代数记进 note：误差逐代累积，下游可据此降级
+                "note": f"{NOTE_PREFIX}:g{generation}:{anchor_drawing_id[:8]}",
+                **point})
         written += len(points)
         covered.add(did)
 
     stats = {"anchor_points": len(raw_points), "candidates": len(candidates),
              "anchor_rmse_m": round(float(anchor_world.get("rmse_m") or 0), 4),
-             "drawings": len(covered), "points": written}
+             "drawings": len(covered), "points": written,
+             # 迭代传播要知道**具体覆盖了哪些图** —— 它们是下一代锚的来源
+             "covered_drawings": sorted(covered)}
     logger.info("[IntersectionPropagation] 锚点 %d 条 → %d 张图 / %d 个交点",
                 stats["anchor_points"], stats["drawings"], stats["points"])
     return stats
@@ -245,6 +254,41 @@ async def fetch_anchor_candidates(db: Any, project_id: str) -> list[dict]:
     return out
 
 
+#: 传播最多迭代几代。
+#:
+#: **误差逐代累积**：第 2 代锚的世界坐标本身是第 1 代传播来的，
+#: 拿它再拟合变换等于在估计值上再估计。取 3 代：既让覆盖扩散开
+#: （实测第 0 代只有 **1 张**可用锚，而双向轴网有 856 张），
+#: 又不至于让误差滚雪球。每代记进 note，下游可据此降级。
+MAX_PROPAGATION_GENERATIONS = 3
+
+#: 能作为下一代锚的最大残差（米）。
+#:
+#: 第 0 代真锚实测残差 **6 毫米**；传播来的图残差会更大，
+#: 但超过半米就不该再当基准 —— 拿它作锚会把误差放大给下一代。
+MAX_ANCHOR_RESIDUAL_M = 0.5
+
+
+def next_generation_anchors(
+    covered: set[str], previous_anchors: set[str],
+    residuals: dict[str, float],
+) -> list[str]:
+    """本代新覆盖的图里，哪些够格当下一代锚（残差小者优先）。
+
+    - 已用过的不再作锚：否则每代都在重复同一批匹配；
+    - **算不出残差的不作锚**：变换没解出来就是判不出，不猜；
+    - 残差超 `MAX_ANCHOR_RESIDUAL_M` 的不作锚：误差会放大给下一代。
+    """
+    fresh = [
+        did for did in covered
+        if did not in previous_anchors
+        and residuals.get(did) is not None
+        and float(residuals[did]) <= MAX_ANCHOR_RESIDUAL_M
+    ]
+    # 残差小者优先；同残差按 id 定序（顺序依赖会让重建结果漂移）
+    return sorted(fresh, key=lambda d: (float(residuals[d]), d))
+
+
 async def run_auto_intersection_propagation(db: Any, project_id: str) -> dict:
     """自动选锚 → 传播。**锚图由内容判据选出，不硬编码图号**。"""
     from services.anchor_candidates import pick_anchor_drawing
@@ -255,6 +299,65 @@ async def run_auto_intersection_propagation(db: Any, project_id: str) -> dict:
     if anchor_id is None:
         return {"drawings": 0, "points": 0,
                 "note": "项目内没有可作锚的图（需 ≥2 个坐标标注锚点且变换可解）"}
-    stats = await run_intersection_propagation(db, project_id, anchor_id)
-    stats["anchor_drawing_id"] = anchor_id
-    return stats
+
+    # **迭代传播**：本代传播成功的图已带世界坐标，能拟合出自己的变换、
+    # 成为下一代锚。实测第 0 代只有 1 张可用锚，而双向轴网有 856 张 ——
+    # 用单张锚的序列去匹配全部，「对不上任何锚」占 91% 是必然的。
+    used: set[str] = set()
+    covered_all: set[str] = set()
+    total_points = 0
+    per_generation: list[dict] = []
+    anchors = [anchor_id]
+
+    for generation in range(MAX_PROPAGATION_GENERATIONS):
+        if not anchors:
+            break
+        gen_covered: set[str] = set()
+        gen_points = 0
+        for aid in anchors:
+            stats = await run_intersection_propagation(
+                db, project_id, aid,
+                skip_drawings=used | covered_all | gen_covered,
+                generation=generation)
+            gen_points += int(stats.get("points") or 0)
+            gen_covered |= set(stats.get("covered_drawings") or [])
+            used.add(aid)
+        per_generation.append({"generation": generation,
+                               "anchors": len(anchors),
+                               "drawings": len(gen_covered),
+                               "points": gen_points})
+        covered_all |= gen_covered
+        total_points += gen_points
+        if not gen_covered:
+            break
+        # 下一代锚 = 本代新覆盖且变换可解、残差够小的图
+        residuals = await _residuals_of(db, gen_covered)
+        anchors = next_generation_anchors(gen_covered, used, residuals)
+
+    return {
+        "drawings": len(covered_all),
+        "points": total_points,
+        "anchor_drawing_id": anchor_id,
+        "generations": per_generation,
+    }
+
+
+async def _residuals_of(db: Any, drawing_ids: set[str]) -> dict[str, float]:
+    """这些图各自的变换残差 —— 决定它们够不够格当下一代锚。
+
+    算不出的**不放进结果**（而不是给个大值）：`next_generation_anchors`
+    据此判「判不出就不作锚」，两处口径一致。
+    """
+    out: dict[str, float] = {}
+    for did in drawing_ids:
+        try:
+            points = [dict(r) for r in await db.fetch_all(
+                _FETCH_ANCHOR_POINTS_SQL, {"drawing_id": did})]
+            solved = solve_world_transform(points)
+            if solved and not solved.get("suspect"):
+                rmse = solved.get("rmse_m")
+                if rmse is not None:
+                    out[did] = float(rmse)
+        except Exception:  # noqa: BLE001 — 单图算不出不阻断整轮
+            continue
+    return out
