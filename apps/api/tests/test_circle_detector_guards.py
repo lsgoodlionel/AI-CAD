@@ -68,7 +68,8 @@ def test_budget_keeps_single_image_within_the_recognition_timeout():
 
     # 实测 2 MP 上该图 5.7 秒；留足余量应对更密的图
     assert MAX_RENDER_MEGAPIXELS <= 4.0, "超过 4 MP 实测就逼近/超出超时"
-    assert _RECOGNIZE_TIMEOUT_SEC >= 20
+    # 超时须容得下实测最慢的一张（S-1-32-201C 单跑 40.6 秒）
+    assert _RECOGNIZE_TIMEOUT_SEC >= 60
 
 
 @pytest.mark.unit
@@ -121,3 +122,20 @@ def test_present_origin_still_applies():
                                  page_h_pt=1000.0, scale_m_pt=0.05,
                                  origin_pt=(0.0, 0.0))
     assert with_origin[0] < without[0]
+
+
+@pytest.mark.unit
+def test_timeout_covers_the_slowest_measured_drawing():
+    """**提高超时几乎是纯收益** —— 计算无论如何都会发生。
+
+    `asyncio.wait_for` 取消不了 executor 里正在跑的同步函数：被放弃的图
+    仍会算到底、线程仍占着池。超时只决定**要不要用这个已算出的结果**。
+
+    实测三张此前被跳过的柱平面图：17.7 / 22.0 / **40.6** 秒，
+    合计 57 根柱此前被整批丢弃。60 秒覆盖最慢的一张并留 50% 余量
+    —— 重建时多线程竞争 CPU，实际耗时比单跑长（103C 单跑 17.7 秒
+    仍在重建中被判超时）。
+    """
+    from services.model_elements import _RECOGNIZE_TIMEOUT_SEC
+
+    assert _RECOGNIZE_TIMEOUT_SEC >= 40.6 * 1.4
