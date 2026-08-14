@@ -728,7 +728,14 @@ async def _recognize_one(
             timeout=_RECOGNIZE_TIMEOUT_SEC,
         )
     except Exception as exc:  # noqa: BLE001 — 单图识别失败跳过
-        logger.warning("[ModelElements] 构件识别跳过 %s: %s", drawing.get("id"), exc)
+        # **异常类型必须打出来**：`asyncio.TimeoutError` 的 str() 是空字符串，
+        # 只打 `exc` 会得到「构件识别跳过 <id>: 」——**跳过了却没说为什么**。
+        # 而超时恰恰是最该知道的：它说明那张图大到超了 `_RECOGNIZE_TIMEOUT_SEC`，
+        # 处置方式（拆图/提超时）与其他异常完全不同。
+        logger.warning(
+            "[ModelElements] 构件识别跳过 %s: %s: %s",
+            drawing.get("id"), type(exc).__name__, exc or "(无消息)",
+        )
         return None
 
 

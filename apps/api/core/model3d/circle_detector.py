@@ -26,6 +26,29 @@ DEFAULT_PARAM2 = 32          # HoughGradient 累加阈值:越小越敏感(误检
 _MAX_CIRCLES = 1500          # 单图圆柱上限(防噪声图刷爆)
 _MAX_RENDER_PX = 8000        # 仅超巨图降 dpi 兜底(150dpi 全分辨率保桩检出;+2705 实测在此成功)
 
+#: HoughCircles 的**总像素预算**(百万像素)。
+#:
+#: **为什么最长边不够**：`_MAX_RENDER_PX` 限的是最长边，8000×6000 仍有
+#: 4800 万像素。实测 v51 重建卡在「4层」**13 分钟零进展**，py-spy 抓到
+#: 两个线程都停在 `detect_circles_px`，而且都是已被 20 秒超时「放弃」的
+#: 僵尸——`asyncio.wait_for` 取消不了 executor 里的同步函数。
+#: 线程池 `max_workers=2` 被占满后，后续每张图都在等一个永不空出的池：
+#: **这不是慢，是死锁**。
+#:
+#: 取 2400 万(约 6000×4000)：既容得下常见 A0 图纸的全分辨率，
+#: 又把单图耗时压到秒级。超预算的图降采样后仍检测，**只是会少检出一些桩**
+#: ——卡死整个建模的代价远大于此，且降级会记进日志（降级必须可见）。
+MAX_RENDER_MEGAPIXELS = 24.0
+
+
+def render_scale_for(*, width_px: float, height_px: float) -> float:
+    """按总像素预算算渲染缩放比;在预算内返回 1.0（不误伤正常图）。"""
+    pixels = max(float(width_px), 0.0) * max(float(height_px), 0.0)
+    budget = MAX_RENDER_MEGAPIXELS * 1e6
+    if pixels <= budget or pixels <= 0:
+        return 1.0
+    return (budget / pixels) ** 0.5
+
 # 八边形单位方向(近似圆,渲染/算量足够)
 _OCT_DIRS = [
     (math.cos(math.pi * k / 4), math.sin(math.pi * k / 4)) for k in range(8)
@@ -39,15 +62,22 @@ def octagon_outline(cx: float, cy: float, r: float) -> list[list[float]]:
 
 def circle_px_to_meter(
     cx_px: float, cy_px: float, r_px: float, *,
-    dpi: int, page_h_pt: float, scale_m_pt: float, origin_pt: tuple[float, float],
+    dpi: int, page_h_pt: float, scale_m_pt: float,
+    origin_pt: tuple[float | None, float | None],
 ) -> tuple[float, float, float]:
-    """像素圆心/半径 → 米坐标(与 _Ctx.to_m 同口径:px→pt→翻转平移比例)。"""
+    """像素圆心/半径 → 米坐标(与 _Ctx.to_m 同口径:px→pt→翻转平移比例)。
+
+    `origin_pt` 的某个方向可能是 `None`（`_origin_pt` 用它区分「原点在 0」
+    与「没找到原点」）。**按 0 兜底而不是抛异常**：抛出去会被
+    `detect_pile_columns` 的 `except` 吞掉，**整张图的桩静默全丢**。
+    与 `transform_from_geometry` 同口径。
+    """
     pt_per_px = 72.0 / dpi
     cx_pt = cx_px * pt_per_px
     cy_pt = cy_px * pt_per_px
     r_pt = r_px * pt_per_px
-    fx = cx_pt - origin_pt[0]
-    fy = (page_h_pt - cy_pt) - origin_pt[1]
+    fx = cx_pt - float(origin_pt[0] or 0.0)
+    fy = (page_h_pt - cy_pt) - float(origin_pt[1] or 0.0)
     return fx * scale_m_pt, fy * scale_m_pt, r_pt * scale_m_pt
 
 
@@ -107,6 +137,21 @@ def detect_pile_columns(
             longest_px = max(page.rect.width, page.rect.height) * dpi / 72.0
             if longest_px > _MAX_RENDER_PX:
                 eff_dpi = dpi * _MAX_RENDER_PX / longest_px
+            # **总像素预算**（v51 死锁修复）：最长边限不住 8000×6000 = 4800 万
+            # 像素，HoughCircles 在这个规模上跑几分钟，而超时是假的
+            # （取消不了 executor 线程）⇒ 线程池被僵尸占死。
+            budget_scale = render_scale_for(
+                width_px=page.rect.width * eff_dpi / 72.0,
+                height_px=page.rect.height * eff_dpi / 72.0,
+            )
+            if budget_scale < 1.0:
+                eff_dpi *= budget_scale
+                # 降级必须可见：少检出的桩要有据可查
+                logger.info(
+                    "[circle] %s 超像素预算(%.0f MP)，dpi 降到 %.0f "
+                    "——桩检出会减少", src or "?",
+                    page.rect.width * page.rect.height * (dpi / 72.0) ** 2 / 1e6,
+                    eff_dpi)
             pix = page.get_pixmap(
                 matrix=fitz.Matrix(eff_dpi / 72.0, eff_dpi / 72.0), alpha=False
             )
