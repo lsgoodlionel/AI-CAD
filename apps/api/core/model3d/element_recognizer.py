@@ -109,8 +109,49 @@ def extract_elevations(all_text: str) -> list[float]:
     return sorted(values)
 
 
+#: 一张图换算后能表达的**实际宽度上限**（米）。
+#:
+#: **为什么不能只卡比例**：§6.0.4 表最大 1:2000，而 `is_scale_plausible`
+#: 的上限留到了 1:5000 的余量 —— 实测 `S-0-20-102.04C` 的 1:4222
+#: **正落在这段余量里，门禁放行**，于是 3370pt × 1.489 m/pt = 5019 米。
+#:
+#: 取 3000 米：1:2000 的 A0 图（3370pt）换算是 2377 米，仍在其内；
+#: 而 1:4222 的 5019 米被挡下。**判据是「这张图能有多大」这个工程事实**，
+#: 比单纯的比例区间更贴近现实。
+MAX_DRAWING_EXTENT_M = 3000.0
+
+
+def resolve_scale(detected: float, scale_override: float | None = None,
+                  page_w_pt: float | None = None) -> float:
+    """识别出的比例过 §6.0.4 门禁；不合理且有落库比例时改用后者。
+
+    **实测**（`S-0-20-102.04C`，图幅 3370×2384pt）：识别器算出 **1:4222**
+    而 `drawing_transform` 是 1:150 —— 差 28 倍，3370pt × 1.489 m/pt = 5019 米，
+    正是 F1 层墙跨度 2207 米的来源。
+
+    比例门禁此前加在 `transform_from_geometry` 与 `_transform_of` 上，
+    **唯独漏了识别器这条唯一决定构件坐标的路径**。
+
+    没有可借比例时保持原状：强行归零会让整张图坍缩到一点，比放着更糟。
+    """
+    from services.drawing_transform import is_scale_plausible
+
+    def usable(value: float) -> bool:
+        if not value or value <= 0 or not is_scale_plausible(value):
+            return False
+        # 图幅换算出的实际尺寸也要说得通（见 MAX_DRAWING_EXTENT_M）
+        return not (page_w_pt and page_w_pt * value > MAX_DRAWING_EXTENT_M)
+
+    if usable(detected):
+        return detected
+    if usable(scale_override or 0.0):
+        return float(scale_override)
+    return detected
+
+
 def recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
               origin_override: tuple[float | None, float | None] | None = None,
+              scale_override: float | None = None,
               ) -> FloorElements:
     """识别构件；任何异常返回空 FloorElements（scale=缺省）。
 
@@ -118,7 +159,8 @@ def recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     （梁图=含「梁」，机电 system=按专业关键词），discipline 兜底。
     """
     try:
-        return _recognize(geom, discipline, drawing_id, origin_override)
+        return _recognize(geom, discipline, drawing_id, origin_override,
+                          scale_override)
     except Exception as exc:  # noqa: BLE001 — 识别失败降级空构件
         logger.warning("[model3d] 构件识别失败(%s): %s", drawing_id, exc)
         return FloorElements(scale=_DEFAULT_SCALE)
@@ -126,6 +168,7 @@ def recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
 
 def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
                origin_override: tuple[float | None, float | None] | None = None,
+               scale_override: float | None = None,
                ) -> FloorElements:
     truncated = geom.primitive_count() > MAX_PRIMITIVES
     lines = geom.lines[:MAX_PRIMITIVES]
@@ -141,7 +184,9 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     axis_x, axis_y, axis_lines = _detect_axes(
         lines, geom.page_w, geom.page_h, geom.texts
     )
-    scale = _detect_scale(all_text, geom.page_w, axis_x, axis_y)
+    scale = resolve_scale(
+        _detect_scale(all_text, geom.page_w, axis_x, axis_y),
+        scale_override, geom.page_w)
     origin = _origin_pt(axis_x, axis_y, geom.page_h)
 
     ctx = _Ctx(geom.page_h, scale, origin, drawing_id,
