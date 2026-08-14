@@ -699,6 +699,7 @@ def _serialize_quality_issue(issue: model_story.ModelQualityIssue) -> dict[str, 
 def _quality_payload(
     normalization: model_story.StoryNormalizationResult,
     extra_issues: list | None = None,
+    coordinate_conflicts: list | None = None,
 ) -> dict[str, Any]:
     # extra_issues：normalization 之外链路的质量问题（如剖面 z 恢复的
     # z_story_count_mismatch / z_anchor_mismatch），此前被静默丢弃。
@@ -723,6 +724,10 @@ def _quality_payload(
             key: [_serialize_story_level(level) for level in levels]
             for key, levels in normalization.stories_by_building.items()
         },
+        # 层内坐标系矛盾汇总（用户第 3 项）：出矛盾点 + 原始依据，交人判断
+        "coordinate_conflicts": __import__(
+            "services.coordinate_conflict", fromlist=["x"]
+        ).summarize_conflicts(coordinate_conflicts or []),
         "unclassified_drawings": _with_unzoned_reasons(
             normalization.unclassified_drawings),
         "unassigned_story_count": len(normalization.unclassified_drawings),
@@ -920,6 +925,12 @@ async def _attach_floor_elements(
         # 这一层到底有多少图是真定位、多少只是相对贴合,前端与度量能直接读到。
         floor["placed_drawings"] = int(meta.get("placed") or 0)
         floor["registered_drawings"] = int(meta.get("registered") or 0)
+        # 层内坐标系矛盾（用户第 3 项）：补上楼层名后挂到楼层，供 scene.quality
+        # 汇总与前端展示 —— **降级必须可见**，不能默默退回局部。
+        conflict = meta.get("coordinate_conflict")
+        if conflict:
+            conflict = {**conflict, "floor": str(floor.get("key") or "")}
+            floor["coordinate_conflict"] = conflict
         floor["_lod_evidence"] = (
             dict(meta["lod_evidence"])
             if isinstance(meta.get("lod_evidence"), dict)
@@ -1776,7 +1787,8 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
         "unassigned_drawings": semantic_payload["unassigned_drawings"],
         "semantic_version": semantic_payload["semantic_version"],
         "quality": _quality_payload(
-            normalization, extra_issues=[*section_z.issues, *unregistered_issues]),
+            normalization, extra_issues=[*section_z.issues, *unregistered_issues],
+            coordinate_conflicts=[f.get("coordinate_conflict") for f in floors]),
         "annotation_queue": normalization.unclassified_drawings,
         "building_units": {
             "detected": normalization.building_units,

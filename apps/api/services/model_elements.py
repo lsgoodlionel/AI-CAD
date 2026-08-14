@@ -819,6 +819,24 @@ async def build_floor_elements(
     # 传入 transforms:选图要按**定位可靠度**排序、且**不跨单体混取**
     # ——这是同层两图构件中心差 83~103 米的根因(见 pick_element_drawings)
     picked = pick_element_drawings(floor_drawings, transforms, placements)
+    # **层内坐标系矛盾检测**（用户第 3 项）：既有绝对摆放又有相对配准时，
+    # 两组构件会落在相距数千米的两个坐标系里（实测 B1/F2/RF 虚报 6300+ 米）。
+    # 无法自动统一到世界坐标 —— 工程坐标与图纸有 70.29° 旋转，而 scene 的
+    # axes 是轴对齐结构，装不下斜轴线。**矛盾时整层退回局部，并出矛盾点**。
+    all_picked = [*picked["structure"], *picked["beam"], *picked["mep"]]
+    placed_ids = [str(d.get("id")) for d in all_picked
+                  if (placements or {}).get(str(d.get("id")))]
+    unplaced_ids = [str(d.get("id")) for d in all_picked
+                    if not (placements or {}).get(str(d.get("id")))]
+    floor_conflict = None
+    if placed_ids and unplaced_ids:
+        from services.coordinate_conflict import detect_floor_conflict
+        # 楼层名由调用方（model_builder）补 —— 本函数不知道自己在哪层
+        floor_conflict = detect_floor_conflict("", placed_ids, unplaced_ids)
+        if floor_conflict:
+            # 退回局部：宁可整层没有工程坐标，也不要一层里两套坐标系
+            placements = None
+
     tasks: list[tuple[dict, str, tuple[str, ...]]] = [
         *[(d, "structure", ("columns", "walls", "slabs")) for d in picked["structure"]],
         *[(d, "structure", ("beams",)) for d in picked["beam"]],
@@ -895,6 +913,8 @@ async def build_floor_elements(
     meta = {
         "elevations": sorted(set(elevations)),
         "registered": registered,
+        # 层内坐标系矛盾（用户第 3 项）：有则整层已退回局部，楼层名由调用方补
+        "coordinate_conflict": floor_conflict,
         # placed = 按工程坐标绝对定位的图数;与 registered(相对配准)并列报出,
         # 这一层到底有多少图是真定位、多少是相对贴合,一眼可见
         "placed": placed,
