@@ -109,20 +109,24 @@ def extract_elevations(all_text: str) -> list[float]:
     return sorted(values)
 
 
-def recognize(geom: DrawingGeometry, discipline: str, drawing_id: str) -> FloorElements:
+def recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
+              origin_override: tuple[float | None, float | None] | None = None,
+              ) -> FloorElements:
     """识别构件；任何异常返回空 FloorElements（scale=缺省）。
 
     图名判定约定：取 ``geom.texts`` 中的文本内容做关键词匹配
     （梁图=含「梁」，机电 system=按专业关键词），discipline 兜底。
     """
     try:
-        return _recognize(geom, discipline, drawing_id)
+        return _recognize(geom, discipline, drawing_id, origin_override)
     except Exception as exc:  # noqa: BLE001 — 识别失败降级空构件
         logger.warning("[model3d] 构件识别失败(%s): %s", drawing_id, exc)
         return FloorElements(scale=_DEFAULT_SCALE)
 
 
-def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str) -> FloorElements:
+def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
+               origin_override: tuple[float | None, float | None] | None = None,
+               ) -> FloorElements:
     truncated = geom.primitive_count() > MAX_PRIMITIVES
     lines = geom.lines[:MAX_PRIMITIVES]
     rects = geom.rects[:MAX_PRIMITIVES]
@@ -140,7 +144,8 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str) -> Floor
     scale = _detect_scale(all_text, geom.page_w, axis_x, axis_y)
     origin = _origin_pt(axis_x, axis_y, geom.page_h)
 
-    ctx = _Ctx(geom.page_h, scale, origin, drawing_id)
+    ctx = _Ctx(geom.page_h, scale, origin, drawing_id,
+               origin_override=origin_override)
     result = FloorElements(
         scale=scale, axes=_axes_dict(axis_x, axis_y, ctx, truncated, all_text)
     )
@@ -178,13 +183,25 @@ class _Ctx:
     """坐标换算上下文：y 翻转 → 平移轴网原点 → 比例换算（米）。"""
 
     def __init__(self, page_h: float, scale: float,
-                 origin: tuple[float | None, float | None], src: str):
+                 origin: tuple[float | None, float | None], src: str,
+                 origin_override: tuple[float | None, float | None] | None = None):
         self.page_h = page_h
         self.scale = scale
-        # 该方向没检出轴线时 `_origin_pt` 返回 None —— 按 0 兜底继续算，
-        # 但缺失本身记在 `origin_missing` 里供上层标记（降级必须可见）。
-        self.origin = (origin[0] or 0.0, origin[1] or 0.0)
-        self.origin_missing = (origin[0] is None, origin[1] is None)
+        # 该方向没检出轴线时 `_origin_pt` 返回 None。**先用轴网路径的原点补**
+        # （`origin_override`，来自 `drawing_transform`），补不上才按 0 兜底。
+        #
+        # 实测:修好 `S-0-20-102.04C` 的 drawing_transform 后重建，F1 的墙
+        # **跨度仍是 2207 米、范围 [149,2356] 一字未改** —— 因为构件坐标不走
+        # 那张表，`_Ctx` 自己算原点、缺了就当 0，于是从图幅边缘算起。
+        # 该图真原点 595.29pt × 1:150 ⇒ **整体偏移 31.5 米**。
+        override = origin_override or (None, None)
+        resolved = (
+            origin[0] if origin[0] is not None else override[0],
+            origin[1] if origin[1] is not None else override[1],
+        )
+        self.origin = (resolved[0] or 0.0, resolved[1] or 0.0)
+        # 补上了就不算缺失，否则下游会误以为这方向仍不可信
+        self.origin_missing = (resolved[0] is None, resolved[1] is None)
         self.src = src
 
     def to_m(self, x: float, y: float) -> list[float]:

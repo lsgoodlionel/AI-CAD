@@ -343,6 +343,7 @@ def _prefer_collected_axes(collected: dict | None, fallback: dict | None) -> dic
 
 def _recognize_sync(
     data: bytes, ext: str, discipline: str, drawing_id: str, allow_circles: bool = False,
+    origin_override: tuple[float | None, float | None] | None = None,
 ) -> dict | None:
     """线程池内执行：几何提取 + 构件识别 + spotting 融合回灌 → {elements, axes}；失败返回 None。"""
     from core.model3d import extract_dxf_geometry, extract_pdf_geometry, recognize
@@ -355,7 +356,8 @@ def _recognize_sync(
         return None
     if geom.primitive_count() == 0:
         return None
-    result = recognize(geom, discipline, drawing_id)
+    result = recognize(geom, discipline, drawing_id,
+                       origin_override=origin_override)
     elements = _reinject_fusion(result.as_dict(), geom, drawing_id)
     # E3/路径B：PDF 圆形桩/圆柱补识别——几何识别器只抓闭合近方多段线,抓不到
     # 圆(桩/钢立柱多画成圆)。栅格 HoughCircles 检圆 → 米坐标八边形柱,去重后并入。
@@ -707,9 +709,27 @@ def _has_labeled_axes(axes: dict) -> bool:
     )
 
 
+def _origin_override_of(transforms: dict | None,
+                        drawing_id: str) -> tuple[float | None, float | None] | None:
+    """该图已落库变换的原点（pt），供识别器补自己算不出的方向。
+
+    带 `origin_*_estimated` 标记的方向是**按 0 兜底的假值**，不能拿来补
+    —— 那等于把「没找到」当成「原点在 0」再传一手。
+    """
+    transform = (transforms or {}).get(drawing_id)
+    if transform is None:
+        return None
+    x = None if getattr(transform, "origin_x_estimated", False) else transform.origin_x
+    y = None if getattr(transform, "origin_y_estimated", False) else transform.origin_y
+    if x is None and y is None:
+        return None
+    return (x, y)
+
+
 async def _recognize_one(
     loop: asyncio.AbstractEventLoop, executor, drawing: dict,
     discipline: str, file_getter: Callable[[str], bytes],
+    transforms: dict | None = None,
 ) -> dict | None:
     """单图识别（下载 + 提取 + 识别，20s 超时；任何失败返回 None）。"""
     file_key = drawing.get("file_key") or ""
@@ -720,10 +740,14 @@ async def _recognize_one(
         data = await loop.run_in_executor(executor, file_getter, file_key)
         # 圆检测仅对平面图开启(剖面/立面/详图里的圆多是钢筋/符号,非平面桩)
         allow_circles = classify_view_type(drawing).view_type in ("plan", "unknown")
+        # **识别器算不出原点时，用轴网路径已落库的原点**：两条路径各算各的，
+        # 实测 S-0-20-102.04C 的 drawing_transform 修好后构件坐标纹丝不动
+        # （F1 墙跨度仍 2207 米）—— 因为构件坐标压根不读那张表。
+        origin_override = _origin_override_of(transforms, str(drawing["id"]))
         return await asyncio.wait_for(
             loop.run_in_executor(
                 executor, _recognize_sync, data, ext, discipline,
-                str(drawing["id"]), allow_circles,
+                str(drawing["id"]), allow_circles, origin_override,
             ),
             timeout=_RECOGNIZE_TIMEOUT_SEC,
         )
@@ -791,7 +815,8 @@ async def build_floor_elements(
     registered = 0
     placed = 0                           # 按工程坐标绝对定位的图数(H23)
     for drawing, discipline, kinds in tasks:
-        result = await _recognize_one(loop, executor, drawing, discipline, file_getter)
+        result = await _recognize_one(loop, executor, drawing, discipline,
+                                      file_getter, transforms)
         if not result:
             continue
         axes = result.get("axes") or {}
