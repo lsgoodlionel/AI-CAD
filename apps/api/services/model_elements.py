@@ -94,6 +94,30 @@ def _placement_suspect(placement: Any) -> bool:
     return bool(getattr(placement, "suspect", False))
 
 
+#: 详图的排序惩罚。**加在既有档位之上而不是覆盖它** ——
+#: 否则「有世界摆放的详图」会和「无变换的平面图」混在一起，
+#: 反而打乱既有优先级。取 10 保证任何详图都排在任何非详图之后。
+_DETAIL_PENALTY = 10
+
+
+def _is_detail(drawing: dict) -> int:
+    """是不是详图（1/0）—— 详图的坐标是大样比例，不是平面位置。
+
+    实测 `S-1-32-201C 一~三层柱配筋详图` 比例 **1:25**，
+    与同层柱平面图的 1:150 差 6 倍；它识别出的「柱」是配筋大样，
+    进模型就是 22 根坐标错误的柱。此前它因超时被跳过属**歪打正着**。
+
+    **不排除只降序**：用户约束「预留部分图纸建模」——
+    某层只有详图时，用详图总比没有强（见 MODELING_PIPELINE_BLUEPRINT §7）。
+    """
+    try:
+        from services.drawing_role import ROLE_DETAIL, classify_role
+
+        return 1 if classify_role(drawing or {}).role == ROLE_DETAIL else 0
+    except Exception:  # noqa: BLE001 — 判不出就按常规图，不压后
+        return 0
+
+
 def _transform_rank(drawing: dict, transforms: dict | None,
                     placements: dict | None = None) -> int:
     """图纸的定位可靠度排序键（越小越优先）。
@@ -112,18 +136,20 @@ def _transform_rank(drawing: dict, transforms: dict | None,
     did = str(drawing.get("id") or "")
     placement = (placements or {}).get(did)
     if placement is not None and not _placement_suspect(placement):
-        return -1
+        return -1 + _DETAIL_PENALTY * _is_detail(drawing)
+    penalty = _DETAIL_PENALTY * _is_detail(drawing)
     if not transforms:
-        return 2
+        return 2 + penalty
     transform = transforms.get(str(drawing.get("id") or ""))
     if transform is None:
-        return 2
+        return 2 + penalty
     try:
         from services.drawing_transform import is_standard_scale
 
-        return 0 if is_standard_scale(float(transform.scale_m_pt)) else 1
+        base = 0 if is_standard_scale(float(transform.scale_m_pt)) else 1
+        return base + penalty
     except Exception:  # noqa: BLE001 — 判不了就当非标准，不阻断
-        return 1
+        return 1 + penalty
 
 
 def _dominant_unit(drawings: list[dict]) -> str | None:
