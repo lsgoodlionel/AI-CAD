@@ -45,7 +45,30 @@ def test_huge_pages_are_scaled_within_the_pixel_budget():
 @pytest.mark.unit
 def test_normal_pages_are_not_scaled_down():
     """**不能误伤正常图** —— 降采样会削弱桩的检出（E3-B +2705 靠全分辨率）。"""
-    assert render_scale_for(width_px=3000, height_px=2000) == 1.0
+    assert render_scale_for(width_px=1400, height_px=1000) == 1.0
+
+
+@pytest.mark.unit
+def test_budget_keeps_single_image_within_the_recognition_timeout():
+    """**预算的判据是能否在超时内跑完**，不是理论上能否分辨最小目标。
+
+    我先按「0.5 米桩在 8 MP 下仍有 5px 半径」推算过 8 MP 够用 ——
+    分辨率的账算对了，**耗时的账完全没算**。在那张图上逐档实测：
+
+    | 预算 | 耗时 | 检出 |
+    |---|---:|---:|
+    | 8 MP | 76.1 s | 137 |
+    | 4 MP | 21.9 s | 134 |
+    | 2 MP | **5.7 s** | 129 |
+
+    76 秒的结果会被 `_RECOGNIZE_TIMEOUT_SEC=20` 丢弃 ⇒ **实际检出 0**。
+    所以预算必须让单图在超时内返回，否则算得再准也拿不到。
+    """
+    from services.model_elements import _RECOGNIZE_TIMEOUT_SEC
+
+    # 实测 2 MP 上该图 5.7 秒；留足余量应对更密的图
+    assert MAX_RENDER_MEGAPIXELS <= 4.0, "超过 4 MP 实测就逼近/超出超时"
+    assert _RECOGNIZE_TIMEOUT_SEC >= 20
 
 
 @pytest.mark.unit
@@ -62,7 +85,7 @@ def test_budget_is_bounded_by_hough_cost_not_by_longest_edge():
     8000×500（400 万像素）该原样跑，而 8000×6000（4800 万）必须降。
     旧判据只看最长边，两者都放行。
     """
-    assert render_scale_for(width_px=8000, height_px=500) == 1.0
+    assert render_scale_for(width_px=3000, height_px=400) == 1.0
     assert render_scale_for(width_px=8000, height_px=6000) < 1.0
 
 
