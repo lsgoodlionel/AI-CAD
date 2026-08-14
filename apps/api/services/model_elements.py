@@ -367,7 +367,8 @@ def _recognize_sync(
     #            ②仅结构/通用专业(机电图圆多是设备/管件)。
     if allow_circles and ext == "pdf" and discipline in ("structure", "general"):
         elements["columns"] = _augment_circle_columns(
-            data, geom, elements.get("columns") or [], drawing_id
+            data, geom, elements.get("columns") or [], drawing_id,
+            scale_override, origin_override,
         )
         # E3-4:桩增强后若无板,用桩包络补底板(基坑楼层得到板参与体量/算量)
         elements["slabs"] = ensure_slab_from_columns(
@@ -419,11 +420,19 @@ def ensure_slab_from_columns(
 
 def _augment_circle_columns(
     data: bytes, geom, existing_columns: list[dict], drawing_id: str,
+    scale_override: float | None = None,
+    origin_override: tuple[float | None, float | None] | None = None,
 ) -> list[dict]:
-    """圆检测补柱并去重（失败返回原柱,绝不阻断）。"""
+    """圆检测补柱并去重（失败返回原柱,绝不阻断）。
+
+    比例/原点必须与识别器**同口径**，否则同一张图的柱与桩落在两个坐标系
+    —— 实测 RF 层柱包络因此跨 6362 米。
+    """
     try:
         from core.model3d.circle_detector import dedupe_against, detect_pile_columns
-        circles = detect_pile_columns(data, geom, src=drawing_id)
+        circles = detect_pile_columns(
+            data, geom, src=drawing_id,
+            scale_override=scale_override, origin_override=origin_override)
         if not circles:
             return existing_columns
         fresh = dedupe_against(circles, existing_columns)

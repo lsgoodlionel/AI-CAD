@@ -179,10 +179,40 @@ def _render_gray(pdf_bytes: bytes, dpi: int, src: str):
             doc.close()
 
 
+def resolve_detection_frame(
+    detected_scale: float,
+    detected_origin: tuple[float | None, float | None],
+    scale_override: float | None = None,
+    origin_override: tuple[float | None, float | None] | None = None,
+    page_w_pt: float | None = None,
+) -> tuple[float, tuple[float | None, float | None]]:
+    """圆检测的比例/原点，与识别器**同口径**。
+
+    **实测（v53）**：`RF` 层的 `columns-envelope` 单图柱包络跨 **6362 米** ——
+    因为同一张图里几何识别的柱走了 `resolve_scale` + `origin_override`，
+    而圆检测的桩仍用自己的 `_detect_scale`/`_origin_pt`，两套坐标混进
+    同一个 `columns` 列表。
+
+    比例/原点的兜底此前补到了 `transform_from_geometry`、`_transform_of`、
+    `_recognize`，**唯独漏了这条**。
+    """
+    from .element_recognizer import resolve_scale
+
+    scale = resolve_scale(detected_scale, scale_override, page_w_pt)
+    override = origin_override or (None, None)
+    origin = (
+        detected_origin[0] if detected_origin[0] is not None else override[0],
+        detected_origin[1] if detected_origin[1] is not None else override[1],
+    )
+    return scale, origin
+
+
 def detect_pile_columns(
     pdf_bytes: bytes, geom, *, dpi: int = DEFAULT_DPI,
     size_range_m: tuple[float, float] = DEFAULT_SIZE_RANGE_M,
     param2: int = DEFAULT_PARAM2, src: str = "",
+    scale_override: float | None = None,
+    origin_override: tuple[float | None, float | None] | None = None,
 ) -> list[dict]:
     """栅格化 PDF → HoughCircles → 米坐标八边形柱(shape=circle)。
 
@@ -200,10 +230,15 @@ def detect_pile_columns(
             geom.lines, geom.page_w, geom.page_h, geom.texts
         )
         all_text = " ".join(t[2] for t in geom.texts)
-        scale = _detect_scale(all_text, geom.page_w, axis_x, axis_y)
+        # **与识别器同口径**（见 resolve_detection_frame）：不然同一张图的
+        # 柱与桩会落在两个坐标系，柱包络横跨两者（实测 6362 米）。
+        scale, origin = resolve_detection_frame(
+            _detect_scale(all_text, geom.page_w, axis_x, axis_y),
+            _origin_pt(axis_x, axis_y, geom.page_h),
+            scale_override, origin_override, geom.page_w,
+        )
         if scale <= 0:
             return []
-        origin = _origin_pt(axis_x, axis_y, geom.page_h)
 
         gray, eff_dpi = _render_gray(pdf_bytes, dpi, src)
         if gray is None:
