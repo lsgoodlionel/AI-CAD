@@ -32,6 +32,28 @@ from typing import Any
 MIN_CONFLICT_DISTANCE_M = 500.0
 
 
+def placement_offset(placement: dict | None) -> tuple[float, float] | None:
+    """该摆放会把本图原点搬到哪 —— 用作「这组构件落在何处」的估计。
+
+    **为什么需要它**：矛盾判定发生在摆放**之前**（要先判定才决定用不用
+    placement），此时拿不到构件中心。而摆放把本图原点映射到的位置，
+    正是这组构件的大致落点：局部组落在 0 附近，世界组落在 −6300 附近。
+
+    复用 `apply_similarity` 而不是直接读 `tx/ty`：变换形式若将来扩展
+    （已有 `reflect` 一例），这里不会悄悄漂移。
+
+    算不出就返回 None（**判不出就说判不出**），绝不阻断构建。
+    """
+    if not placement:
+        return None
+    try:
+        from services.drawing_anchor import apply_similarity
+
+        return apply_similarity((0.0, 0.0), placement)
+    except Exception:  # noqa: BLE001 — 摆放结构由上游决定，算不出即降级
+        return None
+
+
 def detect_floor_conflict(
     floor_key: str,
     placed_drawings: list[str],

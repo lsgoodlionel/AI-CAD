@@ -830,9 +830,26 @@ async def build_floor_elements(
                     if not (placements or {}).get(str(d.get("id")))]
     floor_conflict = None
     if placed_ids and unplaced_ids:
-        from services.coordinate_conflict import detect_floor_conflict
+        from services.coordinate_conflict import (
+            detect_floor_conflict, placement_offset,
+        )
+
+        # **两组落点**：判定在摆放之前，拿不到构件中心，用摆放把原点映射到
+        # 哪来估 —— 世界组落在 −6300 附近，局部组落在 0 附近。
+        # 缺了它，「两组本就在一起就不算矛盾」这一半判定会完全失效
+        # （实测 v57 的 5 条矛盾点 distance_m 全为 null）。
+        offsets = [placement_offset((placements or {}).get(did))
+                   for did in placed_ids]
+        offsets = [o for o in offsets if o]
+        placed_centre = (
+            (sum(o[0] for o in offsets) / len(offsets),
+             sum(o[1] for o in offsets) / len(offsets)) if offsets else None)
+        # 未摆放的图按轴号相对配准，参考系原点即 (0, 0)
+        unplaced_centre = (0.0, 0.0) if placed_centre else None
+
         # 楼层名由调用方（model_builder）补 —— 本函数不知道自己在哪层
-        floor_conflict = detect_floor_conflict("", placed_ids, unplaced_ids)
+        floor_conflict = detect_floor_conflict(
+            "", placed_ids, unplaced_ids, placed_centre, unplaced_centre)
         if floor_conflict:
             # 退回局部：宁可整层没有工程坐标，也不要一层里两套坐标系
             placements = None

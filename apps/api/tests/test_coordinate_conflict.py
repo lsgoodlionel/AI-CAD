@@ -106,3 +106,40 @@ def test_summary_is_serialisable():
 def test_summary_of_nothing_is_safe():
     assert summarize_conflicts([])["count"] == 0
     assert summarize_conflicts([None, None])["count"] == 0
+
+
+# ── 判定要真的用上距离（我接线时把这一半丢了）─────────────────────
+
+@pytest.mark.unit
+def test_placement_offset_estimates_where_the_group_lands():
+    """判定发生在摆放**之前**，拿不到构件中心 —— 用 placement 把原点映射到哪来估。
+
+    **实测缺陷**：v57 的 5 条矛盾点里 `distance_m` 全是 null，
+    因为接线时没传 centre ⇒「两组本就在一起就不算矛盾」这一半
+    **完全没生效**，退化成「只要有两类图就报」。
+    这正是我在本文件里写明的关键一半，自己接线时却漏了。
+    """
+    from services.coordinate_conflict import placement_offset
+
+    # 把本图原点搬到工程坐标 (−6200, −6300) 的摆放
+    placement = {"scale": 1.0, "rotation_deg": 0.0,
+                 "tx": -6200.0, "ty": -6300.0}
+    got = placement_offset(placement)
+    assert got is not None
+    assert got[0] == pytest.approx(-6200.0, abs=1.0)
+
+
+@pytest.mark.unit
+def test_no_placement_yields_no_offset():
+    from services.coordinate_conflict import placement_offset
+
+    assert placement_offset(None) is None
+    assert placement_offset({}) is None
+
+
+@pytest.mark.unit
+def test_offset_survives_an_unexpected_placement_shape():
+    """摆放结构由上游决定，**算不出就说算不出**，不能炸掉整个构建。"""
+    from services.coordinate_conflict import placement_offset
+
+    assert placement_offset({"unexpected": 1}) is None
