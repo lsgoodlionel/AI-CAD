@@ -43,7 +43,10 @@ def _rows_to_sequences(rows: Any) -> dict[str, dict[tuple, list[float]]]:
     return out
 
 
-async def run_zone_propagation(db: Any, project_id: str) -> dict:
+async def run_zone_propagation(
+    db: Any, project_id: str, *, dry_run: bool = False,
+    extra_anchor_drawing_id: str | None = None,
+) -> dict:
     """跑一轮传播，返回统计。
 
     统计里**必须报出 `anchor_zones`** —— 传播规模由锚覆盖决定
@@ -51,7 +54,7 @@ async def run_zone_propagation(db: Any, project_id: str) -> dict:
     只报成功数会让人以为是算法在起作用。
     """
     manual = await repo.fetch_manual_zones(db, project_id)
-    if not manual:
+    if not manual and not extra_anchor_drawing_id:
         return {"anchor_zones": 0, "candidates": 0, "propagated": 0,
                 "note": "无人工确认的分区，无锚可用"}
 
@@ -72,6 +75,17 @@ async def run_zone_propagation(db: Any, project_id: str) -> dict:
                 "zone_index": item["zone_index"],
                 "zone_label": item["zone_label"],
                 "sequence": sequence})
+    # **额外锚**（预估用）：把某图假设为已确认，看能多带动多少。
+    # 分区号是什么不影响「能匹配上几张」，所以用占位标签。
+    if extra_anchor_drawing_id:
+        for key, sequence in (by_drawing.get(extra_anchor_drawing_id) or {}).items():
+            anchors.append({
+                "key": (extra_anchor_drawing_id, *key),
+                "drawing_id": extra_anchor_drawing_id,
+                "zone_index": key[0],
+                "zone_label": f"?{key[0]}",
+                "sequence": sequence})
+
     if not anchors:
         return {"anchor_zones": 0, "candidates": len(by_drawing), "propagated": 0,
                 "note": "已确认分区的图没有可用轴距序列（轴线太少或无变换）"}
@@ -85,8 +99,10 @@ async def run_zone_propagation(db: Any, project_id: str) -> dict:
     confirmed = await repo.fetch_confirmed_keys(db, project_id)
     results = propagate_zone_labels(candidates, anchors,
                                     already_confirmed=confirmed)
-    written = await repo.save_propagations(db, project_id=project_id,
-                                           items=results)
+    # **dry-run 只统计不落库**：试算多个候选时，「看看哪张划算」
+    # 本身不该改动 axis_zone_confirmation。
+    written = len(results) if dry_run else await repo.save_propagations(
+        db, project_id=project_id, items=results)
     stats = {
         # **报去重后的真实锚数**:上一版报 len(anchors)(去重前),
         # 掩盖了「6 组锚被压成 3 组」这个 bug 整整一轮。
@@ -135,16 +151,56 @@ async def suggest_anchor_drawings(db: Any, project_id: str,
             "zones": len({key[0] for key in groups}),
             "zone_confirmed": did in confirmed,
         })
-    # **不在这里挂「可解锁量」预估** —— 口径不匹配（实测踩过）：
-    #
-    # 荐锚问的是「确认这张图的**分区号**后能带动多少」，影响的是
-    # **分区传播**；而 `run_intersection_propagation` 的 dry-run 衡量的是
-    # 「作为**交点传播**锚的价值」，它要求锚图自己有世界锚点。
-    # 荐锚列表里的图大多没有坐标标注 ⇒ 预估恒为 0，
-    # 数字没错，但回答的不是这里要问的问题。
-    #
-    # 正确做法是给 `run_zone_propagation` 加「额外锚 + dry-run」，
-    # 试算把某图当作已确认后 `propagated` 的增量。基础设施已就位
-    # （`run_intersection_propagation(dry_run=True)`、`rank_by_estimate`、
-    # `format_coverage_estimate`），待接。
-    return rank_anchor_candidates(candidates, limit=limit)
+    ranked = rank_anchor_candidates(candidates, limit=limit)
+    await _attach_zone_estimates(db, project_id, ranked)
+    # 按**实测解锁量**重排：覆盖力代理指标（最长序列 × 方向数）会被
+    # 符号场误检刷榜 —— 实测前 4 名理由全带「轴线数远超常见轴网」
+    # （最长序列 79/77/53/117 段），而它们一张也解锁不了。
+    from services.anchor_candidates import rank_by_estimate
+
+    return rank_by_estimate(ranked)
+
+
+async def _attach_zone_estimates(db: Any, project_id: str,
+                                 ranked: list[dict]) -> None:
+    """给每条推荐补「确认它能**多**带动几张」。
+
+    口径必须是**分区传播**：荐锚问的是确认分区号的价值，
+    而非该图作为交点传播锚的价值（后者要求它自己有世界锚点，
+    荐锚列表里的图大多没有 ⇒ 恒为 0，答非所问）。
+
+    基线只算一次（N+1 次而非 2N 次）；试算失败就不补该项。
+    """
+    from services.axis_intersection_propagate import format_coverage_estimate
+
+    try:
+        base = await run_zone_propagation(db, project_id, dry_run=True)
+        base_n = int(base.get("drawings_covered") or 0)
+    except Exception:  # noqa: BLE001 — 基线算不出就整体不补，不猜
+        return
+
+    for item in ranked:
+        try:
+            boosted = await run_zone_propagation(
+                db, project_id, dry_run=True,
+                extra_anchor_drawing_id=str(item["drawing_id"]))
+            gain = max(0, int(boosted.get("drawings_covered") or 0) - base_n)
+            item["estimated_drawings"] = gain
+            item["estimate"] = format_coverage_estimate(gain, 0)
+        except Exception:  # noqa: BLE001 — 单项试算失败不影响其余推荐
+            continue
+
+
+async def estimate_zone_unlock(db: Any, project_id: str,
+                               extra_anchor_drawing_id: str) -> int:
+    """确认这张图的分区号，能**多**带动几张图（增量）。
+
+    有它 − 没它 才是这次确认的贡献；只看「有它」会把已有锚的功劳算进来。
+    增量为负说明试算有噪声，报 0 而不是负数（宁可保守）。
+    """
+    base = await run_zone_propagation(db, project_id, dry_run=True)
+    boosted = await run_zone_propagation(
+        db, project_id, dry_run=True,
+        extra_anchor_drawing_id=extra_anchor_drawing_id)
+    return max(0, int(boosted.get("drawings_covered") or 0)
+               - int(base.get("drawings_covered") or 0))

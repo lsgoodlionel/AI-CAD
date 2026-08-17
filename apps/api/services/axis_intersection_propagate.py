@@ -410,6 +410,7 @@ def format_coverage_estimate(drawings: int, points: int) -> str:
     **0 也要直说**：让人别在这张图上花时间，比含糊其辞有用。
     """
     if not drawings:
-        return "预计解锁 0 张 —— 它的轴距序列匹配不上其他图，确认它不会扩大覆盖"
-    return (f"预计解锁 **{drawings} 张**图、约 {points} 个交点"
+        return "预计多带动 0 张 —— 它的轴距序列匹配不上其他图，确认它不会扩大覆盖"
+    tail = f"、约 {points} 个交点" if points else ""
+    return (f"确认后预计**多带动 {drawings} 张**图{tail}"
             "（按当前轴距序列试算，实际以重跑为准）")
