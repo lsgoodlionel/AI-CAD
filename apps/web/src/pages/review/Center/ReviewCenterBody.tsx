@@ -70,7 +70,9 @@ export default function ReviewCenterBody({ projectId }: ReviewCenterBodyProps): 
       })
       .catch(() => undefined)
 
-    listReviewBatches({ project_id: projectId, limit: 200 })
+    // 后端 `limit` 上限是 100（`Query(20, ge=1, le=100)` 的分页保护），
+    // 传 200 会被 FastAPI 判 **422**，整个批次下拉框拿不到数据。
+    listReviewBatches({ project_id: projectId, limit: 100 })
       .then((res: { items?: { id: string; created_at: string }[] }) => {
         setBatchOptions(
           (res.items ?? []).map((b) => ({
