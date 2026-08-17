@@ -730,17 +730,42 @@ export interface AxisRecognitionSummaryRow {
 export const startProjectAxisRecognition = (projectId: string) =>
   request(`/api/v1/projects/${projectId}/axis-recognition`, { method: 'POST' })
 
+/** 轴网识别汇总的待办计数 */
+export interface AxisRecognitionPending {
+  outliers: number
+  violations: number
+  drawings: number
+  with_anchors: number
+}
+
+/**
+ * 轴网识别汇总。
+ *
+ * **返回的是完整信封** `{success, data}` —— 响应拦截器不解包
+ * （见 `app.tsx`）。此前这里的类型声明写成 `{items, pending}`，
+ * **类型撒了谎而 TypeScript 查不出来**：运行时 `data.items` 恒为
+ * undefined（被 `|| []` 兜掉，面板一直空着），`data.pending` 也是
+ * undefined，渲染时读 `.drawings` 直接崩 ——
+ * 「Something went wrong. undefined is not an object」。
+ */
 export const listAxisRecognition = (
   projectId: string,
-): Promise<{ items: AxisRecognitionSummaryRow[]; pending: { outliers: number; violations: number; drawings: number; with_anchors: number } }> =>
+): Promise<{
+  success: boolean
+  data: { items: AxisRecognitionSummaryRow[]; pending: AxisRecognitionPending }
+}> =>
   request(`/api/v1/projects/${projectId}/axis-recognition`)
 
 export const startDrawingAxisRecognition = (drawingId: string) =>
   request(`/api/v1/drawings/${drawingId}/axis-recognition`, { method: 'POST' })
 
+/**
+ * 单图识别详情。**同样带信封** —— 与 `listAxisRecognition` 是同一个坑：
+ * 声明成裸对象会让 `detail.drawing_id.slice(...)` 在渲染时崩。
+ */
 export const getDrawingAxisRecognition = (
   drawingId: string,
-): Promise<AxisRecognitionResult> =>
+): Promise<{ success: boolean; data: AxisRecognitionResult }> =>
   request(`/api/v1/drawings/${drawingId}/axis-recognition`)
 
 /** 确认分区编号。**每个分区一次**,不是每条轴线;确认后后端会自动重跑识别 */

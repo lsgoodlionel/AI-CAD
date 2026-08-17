@@ -46,9 +46,11 @@ export default function AxisRecognitionPanel({ projectId }: AxisRecognitionPanel
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await listAxisRecognition(projectId)
-      setRows(data.items || [])
-      setPending(data.pending)
+      const res = await listAxisRecognition(projectId)
+      setRows(res.data?.items || [])
+      // **缺字段就保留默认值**：`setPending(undefined)` 会让渲染时
+      // 读 `.drawings` 直接崩掉整个页面（实测「Something went wrong」）。
+      if (res.data?.pending) setPending(res.data.pending)
     } catch {
       message.error('轴网识别结果加载失败')
     } finally {
@@ -92,7 +94,10 @@ export default function AxisRecognitionPanel({ projectId }: AxisRecognitionPanel
 
   const openDetail = async (drawingId: string) => {
     try {
-      setDetail(await getDrawingAxisRecognition(drawingId))
+      const res = await getDrawingAxisRecognition(drawingId)
+      // 缺 data 就不写入 —— 渲染要读 detail.drawing_id.slice(...)，写 undefined 会崩
+      if (res.data) setDetail(res.data)
+      else message.warning('该图识别结果为空')
     } catch {
       message.warning('该图尚未识别')
     }
