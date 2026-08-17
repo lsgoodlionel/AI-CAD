@@ -798,6 +798,15 @@ export interface AnchorSuggestion {
   zones: number
   /** 为什么推荐它；可疑者（圆形构件被当成轴号圈）会在这里标出 */
   reason: string
+  /**
+   * 确认它的分区号后，**预计能多带动几张**图（分区传播试算，不落库）。
+   *
+   * 这是排序的真依据：覆盖力代理指标（最长序列 × 方向数）会被符号场
+   * 误检刷榜 —— 实测旧榜首「最长 79 段」的图**一张也带不动**。
+   */
+  estimated_drawings?: number
+  /** 预估的人话版本；0 也直说，让人别在这张图上花时间 */
+  estimate?: string
 }
 
 export const getAnchorSuggestions = (

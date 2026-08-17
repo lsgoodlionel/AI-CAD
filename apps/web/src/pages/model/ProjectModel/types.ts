@@ -33,7 +33,30 @@ export interface LowConfidenceBuildingUnit {
   confidence?: number
 }
 
+/**
+ * 层内坐标系矛盾 —— 该层既有绝对摆放的图、又有只能相对配准的图。
+ *
+ * **不能自动统一到世界坐标**：工程坐标与图纸有 70.29° 旋转，而 scene 的
+ * `axes` 是轴对齐结构装不下斜轴线。所以矛盾层整层退回局部，
+ * 并把判断依据交给人（用户口径：矛盾时出矛盾点，提交人工判断）。
+ */
+export interface CoordinateConflict {
+  floor: string
+  /** 解出世界锚点的图数 */
+  placedCount: number
+  /** 只能相对配准的图数 */
+  unplacedCount: number
+  /** 两组构件中心相距多远（米）—— 千米量级才是真跨坐标系 */
+  distanceM?: number
+  /** 人话版：为什么算矛盾、两条处置路径分别意味着什么 */
+  explanation: string
+  /** 系统已经做了什么（降级必须可见） */
+  resolution: string
+}
+
 export interface ModelQualitySummary {
+  /** 坐标系矛盾的层 —— 它们的构件已退回局部，世界坐标暂不生效 */
+  coordinateConflicts: CoordinateConflict[]
   unassignedStoryCount: number
   floorConflictCount: number
   floorConflicts: FloorConflictSummary[]

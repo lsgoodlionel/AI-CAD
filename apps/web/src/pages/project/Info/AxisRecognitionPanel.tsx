@@ -224,7 +224,7 @@ export default function AxisRecognitionPanel({ projectId }: AxisRecognitionPanel
           title="该确认哪几张最划算"
           extra={
             <Text type="secondary" style={{ fontSize: 12 }}>
-              确认一次的成本是固定的，先确认覆盖最广的
+              按**实测能多带动几张**排序，不是按轴线多少
             </Text>
           }
         >
@@ -234,6 +234,17 @@ export default function AxisRecognitionPanel({ projectId }: AxisRecognitionPanel
             columns={[
               { title: '图号', dataIndex: 'drawing_no', width: 130 },
               { title: '图名', dataIndex: 'title', ellipsis: true },
+              {
+                // **排序的真依据**：覆盖力只是代理指标，会被符号场误检刷榜
+                // ——实测旧榜首「最长 79 段」的图一张也带不动。
+                title: '确认后多带动', dataIndex: 'estimated_drawings', width: 130,
+                render: (n?: number) => {
+                  if (n === undefined) return <Text type="secondary">未试算</Text>
+                  return n > 0
+                    ? <Tag color="green"><b>{n}</b> 张</Tag>
+                    : <Tag>0 张·确认它不扩大覆盖</Tag>
+                },
+              },
               {
                 // **最长的一组**才是覆盖力：匹配按组做，各组总和会把
                 // 「11 个分区各 4 段」这种符号场误检抬成榜首（实测发生过）

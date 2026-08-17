@@ -268,6 +268,36 @@ export default function ModelQualityPanel({
   return (
     <div>
       <Space direction="vertical" size={10} style={{ width: '100%' }}>
+        {quality.coordinateConflicts.length > 0 && (
+          <Alert
+            type="warning"
+            showIcon
+            message={
+              `${quality.coordinateConflicts.length} 个楼层的坐标系不统一，已退回局部坐标`
+            }
+            description={
+              <>
+                <div style={{ marginBottom: 6 }}>
+                  这些层里既有解出**世界锚点**的图、又有只能按轴号相对配准的图。
+                  两者相距数千米，混在一起会让整层跨度虚报 ——
+                  所以整层退回局部：<b>模型内部相对关系正确，只是不带工程坐标</b>。
+                </div>
+                {quality.coordinateConflicts.slice(0, 6).map((c) => (
+                  <div key={c.floor} style={{ fontSize: 12, marginTop: 2 }}>
+                    <b>{c.floor}</b>：{c.placedCount} 张有锚点 /
+                    {c.unplacedCount} 张仅配准
+                    {c.distanceM != null && ` · 两组中心相距 ${Math.round(c.distanceM)} 米`}
+                  </div>
+                ))}
+                <div style={{ fontSize: 12, marginTop: 6 }}>
+                  处置：给其余图补世界锚点（工程信息页「轴网识别」确认分区号，
+                  面板已按<b>确认后能多带动几张</b>排序），本层即可整体绝对摆放；
+                  若这些图本就没有坐标标注，保持局部配准即可。
+                </div>
+              </>
+            }
+          />
+        )}
         <div
           style={{
             display: 'grid',

@@ -11,6 +11,7 @@ import type {
   FloorConflictSummary,
   LodModeOption,
   LowConfidenceBuildingUnit,
+  CoordinateConflict,
   ModelQualitySummary,
   NormalizedModelInsights,
   SemanticReviewItemView,
@@ -441,6 +442,22 @@ function lodCapabilityMapFromModel(
   )
 }
 
+/** scene.quality.coordinate_conflicts.items → 视图模型（读不出就当没有）。 */
+function collectCoordinateConflicts(raw: unknown): CoordinateConflict[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((entry) => asRecord(entry))
+    .filter((r): r is UnknownRecord => r != null)
+    .map((r) => ({
+      floor: String(r.floor ?? ''),
+      placedCount: Number(r.placed_count ?? 0) || 0,
+      unplacedCount: Number(r.unplaced_count ?? 0) || 0,
+      distanceM: typeof r.distance_m === 'number' ? r.distance_m : undefined,
+      explanation: String(r.explanation ?? ''),
+      resolution: String(r.resolution ?? ''),
+    }))
+}
+
 function qualityFromModel(
   model: ProjectModelResponse,
   queue: AnnotationQueueItem[],
@@ -466,6 +483,8 @@ function qualityFromModel(
   )
 
   return {
+    coordinateConflicts: collectCoordinateConflicts(
+      asRecord(quality.coordinate_conflicts)?.items),
     unassignedStoryCount: readNumber(
       quality.unassigned_story_count,
       quality.unlayered_count,
