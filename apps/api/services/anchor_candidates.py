@@ -113,3 +113,30 @@ def rank_anchor_candidates(
         })
     ranked.sort(key=lambda c: (-c["coverage_score"], str(c["drawing_id"])))
     return ranked[:limit]
+
+
+def rank_by_estimate(items: list[dict] | None) -> list[dict]:
+    """按**实测解锁量**重排推荐 —— 覆盖力只是代理指标。
+
+    **实测证伪**：荐锚前 4 名的理由全带「轴线数远超常见轴网」
+    （最长序列 79/77/53/117 段），而预估解锁**全是 0 张**。
+    代理指标（最长序列 × 方向数）越长排越前，而符号场误检产生的
+    正是超长假序列 —— 排序等于被误检牵着走。
+
+    三档优先级：
+    1. 有预估且 > 0 —— 已证实能解锁，按解锁量降序；
+    2. 无预估 —— 「不知道」，保持原序；
+    3. 预估为 0 —— **已被证伪**，排最后（比「不知道」更该往后）。
+    """
+    ordered = list(items or [])
+
+    def key(pair: tuple[int, dict]) -> tuple[int, float, int]:
+        index, item = pair
+        estimate = item.get("estimated_drawings")
+        if estimate is None:
+            return (1, 0.0, index)          # 不知道
+        if int(estimate) <= 0:
+            return (2, 0.0, index)          # 已证伪
+        return (0, -float(estimate), index)  # 已证实
+
+    return [item for _i, item in sorted(enumerate(ordered), key=key)]

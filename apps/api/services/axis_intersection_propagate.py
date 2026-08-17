@@ -112,7 +112,7 @@ def _match_direction(items: list[dict], scale: float,
 async def run_intersection_propagation(
     db: Any, project_id: str, anchor_drawing_id: str,
     skip_drawings: set[str] | None = None, generation: int = 0,
-    prior: dict | None = None,
+    prior: dict | None = None, dry_run: bool = False,
 ) -> dict:
     """把锚图的世界坐标经序列匹配传播成其他图的交点；返回统计。
 
@@ -205,6 +205,12 @@ async def run_intersection_propagation(
                             "world_x": world[0], "world_y": world[1],
                         })
         if not points:
+            continue
+        covered.add(did)
+        # **dry-run 只统计不落库**：预估要试算多个候选，
+        # 光是「看看哪个划算」不该改动 axis_intersections。
+        if dry_run:
+            written += len(points)
             continue
         await db.execute(_CLEAR_SQL, {"drawing_id": did, "prefix": f"{NOTE_PREFIX}%"})
         for point in points:
@@ -396,3 +402,14 @@ async def _residuals_of(db: Any, drawing_ids: set[str],
         except Exception:  # noqa: BLE001 — 单图算不出不阻断整轮
             continue
     return out
+
+
+def format_coverage_estimate(drawings: int, points: int) -> str:
+    """把预估说成人能据以决策的一句话。
+
+    **0 也要直说**：让人别在这张图上花时间，比含糊其辞有用。
+    """
+    if not drawings:
+        return "预计解锁 0 张 —— 它的轴距序列匹配不上其他图，确认它不会扩大覆盖"
+    return (f"预计解锁 **{drawings} 张**图、约 {points} 个交点"
+            "（按当前轴距序列试算，实际以重跑为准）")

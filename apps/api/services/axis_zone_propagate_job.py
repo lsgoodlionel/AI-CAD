@@ -135,4 +135,16 @@ async def suggest_anchor_drawings(db: Any, project_id: str,
             "zones": len({key[0] for key in groups}),
             "zone_confirmed": did in confirmed,
         })
+    # **不在这里挂「可解锁量」预估** —— 口径不匹配（实测踩过）：
+    #
+    # 荐锚问的是「确认这张图的**分区号**后能带动多少」，影响的是
+    # **分区传播**；而 `run_intersection_propagation` 的 dry-run 衡量的是
+    # 「作为**交点传播**锚的价值」，它要求锚图自己有世界锚点。
+    # 荐锚列表里的图大多没有坐标标注 ⇒ 预估恒为 0，
+    # 数字没错，但回答的不是这里要问的问题。
+    #
+    # 正确做法是给 `run_zone_propagation` 加「额外锚 + dry-run」，
+    # 试算把某图当作已确认后 `propagated` 的增量。基础设施已就位
+    # （`run_intersection_propagation(dry_run=True)`、`rank_by_estimate`、
+    # `format_coverage_estimate`），待接。
     return rank_anchor_candidates(candidates, limit=limit)
