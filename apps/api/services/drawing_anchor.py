@@ -136,7 +136,8 @@ def align_drawings(a: list[dict], b: list[dict]) -> dict | None:
     return similarity_from_pairs(src, dst)
 
 
-def solve_world_transform(points: list[dict]) -> dict | None:
+def solve_world_transform(points: list[dict],
+                          prior: dict | None = None) -> dict | None:
     """由带世界坐标的交叉点解「图纸 → 工程坐标系」的变换(需求 5)。
 
     points 每项需含 `x_norm/y_norm`(图上归一化)与 `world_x/world_y`(米)。
@@ -148,7 +149,13 @@ def solve_world_transform(points: list[dict]) -> dict | None:
         if p.get("world_x") is not None and p.get("world_y") is not None
     ]
     if len(usable) < MIN_PAIRS:
-        return None
+        # **1 个点也别浪费**：相似变换 4 个自由度，1 点只给 2 个方程，
+        # 但比例与旋转可从已有可信锚图继承 —— 同一工程的图纸朝向一致
+        # 是工程常识（Phase I 实测该项目 70.29°），那一个点定平移。
+        #
+        # 实测全项目**只有 13 张图有坐标标注，其中 10 张只标了一处**，
+        # 此前这 10 个真实世界坐标点被完全浪费。
+        return _solve_from_single_point(usable, prior)
     src = [(float(p["x_norm"]), float(p["y_norm"])) for p in usable]
     dst = [(float(p["world_x"]), float(p["world_y"])) for p in usable]
     transform = similarity_from_pairs(src, dst)
@@ -156,8 +163,45 @@ def solve_world_transform(points: list[dict]) -> dict | None:
         return None
 
     zs = [float(p["world_z"]) for p in usable if p.get("world_z") is not None]
+    transform["prior_derived"] = False
     transform["z"] = sum(zs) / len(zs) if zs else None
     transform["rmse_m"] = transform["rmse"]
     # 残差大说明点配错了或轴号重名,如实标出而不是当成好结果用
     transform["suspect"] = transform["rmse_m"] > RESIDUAL_WARN_M
     return transform
+
+
+def _solve_from_single_point(usable: list[dict],
+                             prior: dict | None) -> dict | None:
+    """1 个锚点 + 先验朝向 → 变换；无可信先验则 None（**不猜**）。
+
+    先验必须残差合格：拿疑似错的朝向去推，只会把这一个真实点也带偏。
+    结果标记 `prior_derived`，让下游知道朝向是借来的而非本图实测。
+    """
+    if len(usable) != 1 or not prior:
+        return None
+    if prior.get("suspect") or float(prior.get("rmse_m") or 0) > RESIDUAL_WARN_M:
+        return None
+    scale = float(prior.get("scale") or 0)
+    if scale <= 0:
+        return None
+
+    point = usable[0]
+    # 先按先验的比例/旋转映射，再用差值补平移，保证这一个真实点精确落位
+    probe = {**prior, "tx": 0.0, "ty": 0.0}
+    mapped = apply_similarity(
+        (float(point["x_norm"]), float(point["y_norm"])), probe)
+    zs = [float(point["world_z"])] if point.get("world_z") is not None else []
+    return {
+        "scale": scale,
+        "rotation_deg": float(prior.get("rotation_deg") or 0.0),
+        "reflect": bool(prior.get("reflect")),
+        "tx": float(point["world_x"]) - mapped[0],
+        "ty": float(point["world_y"]) - mapped[1],
+        "z": zs[0] if zs else None,
+        # 只有一个点 ⇒ 它必然精确落位，残差为 0 **但不代表变换被验证过**
+        "rmse_m": 0.0,
+        "rmse": 0.0,
+        "suspect": False,
+        "prior_derived": True,
+    }

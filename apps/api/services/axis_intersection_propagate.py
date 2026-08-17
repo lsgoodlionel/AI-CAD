@@ -53,7 +53,12 @@ INSERT INTO axis_intersections
      world_x, world_y, note)
 VALUES (CAST(:project_id AS uuid), CAST(:drawing_id AS uuid),
         :label_x, :label_y, :x_norm, :y_norm, :world_x, :world_y, :note)
+ON CONFLICT (drawing_id, label_x, label_y) DO NOTHING
 """
+# **真值优先**：被先验救回的单锚点图**自己就有坐标标注行**（真实测量），
+# 而传播会给同一个轴号对写推算值 —— 撞唯一约束。
+# DO NOTHING 让先写入的真实标注保留，推算值不覆盖它。
+# （`_CLEAR_SQL` 只删 `auto:sequence_match%`，不碰 `auto:coord_annotation`。）
 
 _CLEAR_SQL = """
 DELETE FROM axis_intersections
@@ -107,6 +112,7 @@ def _match_direction(items: list[dict], scale: float,
 async def run_intersection_propagation(
     db: Any, project_id: str, anchor_drawing_id: str,
     skip_drawings: set[str] | None = None, generation: int = 0,
+    prior: dict | None = None,
 ) -> dict:
     """把锚图的世界坐标经序列匹配传播成其他图的交点；返回统计。
 
@@ -120,7 +126,7 @@ async def run_intersection_propagation(
     # **任意**轴号对都能求出世界坐标。
     raw_points = [dict(r) for r in await db.fetch_all(
         _FETCH_ANCHOR_POINTS_SQL, {"drawing_id": anchor_drawing_id})]
-    anchor_world = solve_world_transform(raw_points)
+    anchor_world = solve_world_transform(raw_points, prior=prior)
     if anchor_world is None:
         return {"anchor_points": len(raw_points), "drawings": 0, "points": 0,
                 "note": "锚图的世界锚点不足以解出变换(需 ≥2 个)"}
@@ -303,11 +309,39 @@ async def run_auto_intersection_propagation(db: Any, project_id: str) -> dict:
     # **迭代传播**：本代传播成功的图已带世界坐标，能拟合出自己的变换、
     # 成为下一代锚。实测第 0 代只有 1 张可用锚，而双向轴网有 856 张 ——
     # 用单张锚的序列去匹配全部，「对不上任何锚」占 91% 是必然的。
+    # **可信先验**：第 0 代锚（残差合格）的比例与旋转，供只有 1 个坐标标注
+    # 的图借用 —— 实测 13 张有标注的图里 **10 张只标了一处**，
+    # 没有先验它们一张都用不上。
+    prior_points = [dict(r) for r in await db.fetch_all(
+        _FETCH_ANCHOR_POINTS_SQL, {"drawing_id": anchor_id})]
+    prior = solve_world_transform(prior_points)
+    if prior and prior.get("suspect"):
+        prior = None
+
+    # **用先验重评所有候选，扩充第 0 代锚集**。
+    # 次序不能颠倒：先验只能由 ≥3 点的图解出，有了它单锚点图才可解 ——
+    # 而实测 13 张有坐标标注的图里 **10 张只标了一处**。
+    # （此前先验只接在下游，第 0 代锚集没扩，实测覆盖 40→40 纹丝不动。）
+    extra_anchors: list[str] = []
+    if prior:
+        for cand in candidates:
+            cid = str(cand.get("drawing_id") or "")
+            if not cid or cid == anchor_id:
+                continue
+            pts = [dict(r) for r in await db.fetch_all(
+                _FETCH_ANCHOR_POINTS_SQL, {"drawing_id": cid})]
+            solved = solve_world_transform(pts, prior=prior)
+            if solved and not solved.get("suspect"):
+                extra_anchors.append(cid)
+    if extra_anchors:
+        logger.info("[IntersectionPropagation] 先验救回 %d 张单锚点图作锚",
+                    len(extra_anchors))
+
     used: set[str] = set()
     covered_all: set[str] = set()
     total_points = 0
     per_generation: list[dict] = []
-    anchors = [anchor_id]
+    anchors = [anchor_id, *extra_anchors]
 
     for generation in range(MAX_PROPAGATION_GENERATIONS):
         if not anchors:
@@ -318,7 +352,7 @@ async def run_auto_intersection_propagation(db: Any, project_id: str) -> dict:
             stats = await run_intersection_propagation(
                 db, project_id, aid,
                 skip_drawings=used | covered_all | gen_covered,
-                generation=generation)
+                generation=generation, prior=prior)
             gen_points += int(stats.get("points") or 0)
             gen_covered |= set(stats.get("covered_drawings") or [])
             used.add(aid)
@@ -331,7 +365,7 @@ async def run_auto_intersection_propagation(db: Any, project_id: str) -> dict:
         if not gen_covered:
             break
         # 下一代锚 = 本代新覆盖且变换可解、残差够小的图
-        residuals = await _residuals_of(db, gen_covered)
+        residuals = await _residuals_of(db, gen_covered, prior)
         anchors = next_generation_anchors(gen_covered, used, residuals)
 
     return {
@@ -342,7 +376,8 @@ async def run_auto_intersection_propagation(db: Any, project_id: str) -> dict:
     }
 
 
-async def _residuals_of(db: Any, drawing_ids: set[str]) -> dict[str, float]:
+async def _residuals_of(db: Any, drawing_ids: set[str],
+                        prior: dict | None = None) -> dict[str, float]:
     """这些图各自的变换残差 —— 决定它们够不够格当下一代锚。
 
     算不出的**不放进结果**（而不是给个大值）：`next_generation_anchors`
@@ -353,7 +388,7 @@ async def _residuals_of(db: Any, drawing_ids: set[str]) -> dict[str, float]:
         try:
             points = [dict(r) for r in await db.fetch_all(
                 _FETCH_ANCHOR_POINTS_SQL, {"drawing_id": did})]
-            solved = solve_world_transform(points)
+            solved = solve_world_transform(points, prior=prior)
             if solved and not solved.get("suspect"):
                 rmse = solved.get("rmse_m")
                 if rmse is not None:

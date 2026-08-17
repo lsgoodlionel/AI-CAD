@@ -84,3 +84,21 @@ def test_best_residual_first():
 def test_generations_are_bounded():
     """**误差逐代累积**，必须有上限；同时至少要跑得动两代才有意义。"""
     assert 2 <= MAX_PROPAGATION_GENERATIONS <= 5
+
+
+@pytest.mark.unit
+def test_residuals_helper_takes_the_prior_explicitly():
+    """**未定义的名字会被宽泛 except 吞掉** —— 那是最难发现的一类。
+
+    我给 `_residuals_of` 里的求解加了 `prior=prior`，而 `prior`
+    根本不在它的作用域里 ⇒ `NameError` → 被 `except Exception` 吞掉
+    → 所有图都「算不出残差」→ **迭代传播静默退化成单代**，
+    而日志里一句话都没有。
+
+    所以签名要显式带 prior，别指望闭包。
+    """
+    import inspect
+
+    from services.axis_intersection_propagate import _residuals_of
+
+    assert "prior" in inspect.signature(_residuals_of).parameters
