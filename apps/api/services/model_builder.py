@@ -881,6 +881,7 @@ async def _attach_floor_elements(
     recognized_axes_by_drawing: dict | None = None,
     db=None, project_id: str | None = None,
     placements: dict | None = None,
+    gap_hints: dict | None = None,
 ) -> int:
     """为每楼层识别构件（V2）：floor 增 elements/element_stats；返回 YOLO 设备数。
 
@@ -913,7 +914,7 @@ async def _attach_floor_elements(
                 _executor, floor_drawings, get_file_bytes,
                 archive_axes_by_drawing, transforms, archive_text_by_drawing,
                 recognized_axes_by_drawing=recognized_axes_by_drawing,
-                placements=placements,
+                placements=placements, gap_hints=gap_hints,
             )
         except Exception as exc:  # noqa: BLE001 — 构件层失败回退贴图
             logger.warning("[ModelBuilder] 楼层构件识别失败 %s: %s", floor["key"], exc)
@@ -1715,9 +1716,14 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
                         str(propagation.get("anchor_drawing_id") or "")[:8])
     except Exception as exc:  # noqa: BLE001 — 传播失败不阻断建模，退回原有锚点
         logger.warning("[ModelBuilder] 交点传播跳过: %s", exc)
+    gap_hints: dict = {}
     try:
         from services.model_world_placement import placements_for_project
         placements = await placements_for_project(db, project_id, transforms)
+        # **第三道比例闸的输入**：全项目轴距共识 + 每图轴距中位数。
+        # 实测 736 张有轴距的图里只有 45% 比例正确，而前两道闸
+        # （分母区间、图幅上限）只防离谱、防不住彼此不一致。
+        gap_hints = await _axis_gap_hints(db, project_id)
         if placements:
             logger.info("[ModelBuilder] %d 张图按工程坐标绝对定位", len(placements))
     except Exception as exc:  # noqa: BLE001 — 摆放变换求解失败不阻断建模
@@ -1732,6 +1738,7 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
         archive_axes_by_drawing, transforms, archive_text_by_drawing,
         recognized_axes_by_drawing=recognized_axes_by_drawing,
         db=db, project_id=project_id, placements=placements,
+        gap_hints=gap_hints,
     )
     _clip_elements_to_envelope(floors)  # 裁掉离群构件(机电比例错误致管线冲到数千米)
     # B-07：剖面/详图截面回填构件（实测覆盖硬编码默认；无标注时全默认→无副作用）。
@@ -1988,4 +1995,33 @@ async def _role_evidence(db, project_id: str) -> dict:
             for r in rows}
     except Exception as exc:  # noqa: BLE001 — 证据取不到只降级判据，不阻断建模
         logger.info("[ModelBuilder] 角色判别证据取用跳过: %s", exc)
+        return {}
+
+
+async def _axis_gap_hints(db: Any, project_id: str) -> dict:
+    """{drawing_id: (本图轴距中位数, 全项目共识)} —— 第三道比例闸的输入。
+
+    算不出就返回空 dict：**没有共识时一张也不改**（判不出就说判不出）。
+    """
+    try:
+        from statistics import median
+
+        from services.axis_gap_consensus import consensus_gap
+        from services.axis_intersection_propagate import _FETCH_AXES_SQL
+        from services.axis_zone_propagate_job import _rows_to_sequences
+
+        rows = await db.fetch_all(_FETCH_AXES_SQL, {"project_id": project_id})
+        medians: dict[str, float] = {}
+        for did, groups in _rows_to_sequences(rows).items():
+            gaps = [g for seq in groups.values() for g in seq if g and g > 0.01]
+            if len(gaps) >= 3:
+                medians[did] = float(median(gaps))
+        consensus = consensus_gap(list(medians.values()))
+        if consensus is None:
+            return {}
+        logger.info("[ModelBuilder] 轴距共识 %.2f 米(样本 %d 张)",
+                    consensus, len(medians))
+        return {did: (gap, consensus) for did, gap in medians.items()}
+    except Exception as exc:  # noqa: BLE001 — 共识算不出不阻断建模
+        logger.warning("[ModelBuilder] 轴距共识跳过: %s", exc)
         return {}
