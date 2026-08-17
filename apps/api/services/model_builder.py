@@ -701,6 +701,7 @@ def _quality_payload(
     extra_issues: list | None = None,
     coordinate_conflicts: list | None = None,
     floor_metas: list | None = None,
+    axis_gap_anomalies: dict | None = None,
 ) -> dict[str, Any]:
     # extra_issues：normalization 之外链路的质量问题（如剖面 z 恢复的
     # z_story_count_mismatch / z_anchor_mismatch），此前被静默丢弃。
@@ -725,6 +726,10 @@ def _quality_payload(
             key: [_serialize_story_level(level) for level in levels]
             for key, levels in normalization.stories_by_building.items()
         },
+        # 轴距异常汇总：**只标记不修正** —— 实测 253 张异常里 183 张
+        # 是轴线误检（轴距 0.07~0.49 米不可能是柱网），只有 70 张是比例问题。
+        # 两者从数据上分不开，猜错会把构件坐标改坏（上一版正因此回退）。
+        "axis_gap_anomalies": axis_gap_anomalies or {"count": 0},
         # 识别超时汇总：超时的图仍占着线程池，多了就是池被侵蚀的信号
         "recognize_timeouts": __import__(
             "services.model_elements", fromlist=["x"]
@@ -1796,7 +1801,8 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
             normalization, extra_issues=[*section_z.issues, *unregistered_issues],
             coordinate_conflicts=[f.get("coordinate_conflict") for f in floors],
             floor_metas=[{"timeouts": f["_recognize_timeouts"]}
-                         for f in floors if "_recognize_timeouts" in f]),
+                         for f in floors if "_recognize_timeouts" in f],
+            axis_gap_anomalies=await _axis_gap_anomalies(db, project_id)),
         "annotation_queue": normalization.unclassified_drawings,
         "building_units": {
             "detected": normalization.building_units,
@@ -1989,3 +1995,40 @@ async def _role_evidence(db, project_id: str) -> dict:
     except Exception as exc:  # noqa: BLE001 — 证据取不到只降级判据，不阻断建模
         logger.info("[ModelBuilder] 角色判别证据取用跳过: %s", exc)
         return {}
+
+
+async def _axis_gap_anomalies(db: Any, project_id: str) -> dict:
+    """轴距异常汇总 —— **只标记不修正**。
+
+    实测 736 张有轴距的图里 253 张异常，其中 **183 张是轴线误检**
+    （轴距 0.07~0.49 米，不可能是柱网），只有 70 张是比例问题。
+    两种成因从数据上分不开，所以把证据摆给人，不替人猜。
+    """
+    try:
+        from statistics import median
+
+        from services.axis_gap_anomaly import (
+            detect_gap_anomaly, summarize_gap_anomalies,
+        )
+        from services.axis_intersection_propagate import _FETCH_AXES_SQL
+        from services.axis_zone_propagate_job import _rows_to_sequences
+
+        rows = await db.fetch_all(_FETCH_AXES_SQL, {"project_id": project_id})
+        stats = {}
+        for did, groups in _rows_to_sequences(rows).items():
+            gaps = [g for seq in groups.values() for g in seq if g and g > 0.01]
+            if len(gaps) >= 3:
+                stats[did] = (float(median(gaps)), len(gaps))
+        if len(stats) < 2:
+            return {"count": 0}
+        consensus = float(median([g for g, _n in stats.values()]))
+        summary = summarize_gap_anomalies([
+            detect_gap_anomaly(did, gap, consensus, n)
+            for did, (gap, n) in stats.items()
+        ])
+        logger.info("[ModelBuilder] 轴距异常 %d/%d 张(共识 %.2f 米)",
+                    summary["count"], len(stats), consensus)
+        return summary
+    except Exception as exc:  # noqa: BLE001 — 标记算不出不阻断建模
+        logger.warning("[ModelBuilder] 轴距异常统计跳过: %s", exc)
+        return {"count": 0}
