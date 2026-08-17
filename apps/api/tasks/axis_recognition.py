@@ -152,22 +152,26 @@ async def _recognize_one(drawing_id: str) -> dict:
         segments, page_w, page_h = segments_from_pdf(pdf)
         zone_labels = await fetch_zone_labels(db, drawing_id)
 
+        # 已落库的比例（几何路径读的）。**一次查询两处用**：
+        # ① 供「轴距过密」判据算米轴距（识别自身的 RANSAC 比例多数图没有）；
+        # ② 供 `_transform_of` 在自身无比例时借用。
+        existing = await db.fetch_one(
+            "SELECT scale_m_pt FROM drawing_transform WHERE drawing_id = :d",
+            {"d": drawing_id})
+        stored_scale = float(existing["scale_m_pt"]) if existing else None
         result = recognize(
             circles["circles"], strokes=strokes_from_pdf(pdf),
             segments=segments, page_w=page_w, page_h=page_h,
-            read_text=_ocr_reader(pdf), zone_labels=zone_labels)
+            read_text=_ocr_reader(pdf), zone_labels=zone_labels,
+            scale_m_pt=stored_scale)
 
         await save_result(db, project_id=project_id, drawing_id=drawing_id,
                           result=result)
         if result["anchors"]:
             await persist_anchors(db, project_id, drawing_id, result["anchors"])
-        # 借用已落库的比例（几何路径读的）——本路径常有原点没比例，见 _transform_of
-        existing = await db.fetch_one(
-            "SELECT scale_m_pt FROM drawing_transform WHERE drawing_id = :d",
-            {"d": drawing_id})
-        transform = _transform_of(
-            result, transform_from_axes,
-            fallback_scale=float(existing["scale_m_pt"]) if existing else None)
+        # 借用已落库的比例——本路径常有原点没比例，见 _transform_of
+        transform = _transform_of(result, transform_from_axes,
+                                  fallback_scale=stored_scale)
         if transform:
             await persist_transform(db, project_id=project_id,
                                     drawing_id=drawing_id, transform=transform)

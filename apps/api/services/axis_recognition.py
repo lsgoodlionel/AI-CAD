@@ -99,14 +99,31 @@ def should_skip_axes(drawing: Any) -> bool:
         return False
 
 
-def is_suspect_symbol_field(band_count: int) -> bool:
-    """带数是否多到疑为设备符号场。
+#: 轴距小于此值（米）即不可能是定位轴线。
+#:
+#: GB/T 50001 §8 的定位轴线用于**主要承重构件**定位，间距是柱网尺度。
+#: 实测误检图的「轴距」是 0.29~1.45 米 —— 那是桩位/设备符号被当成轴号圈，
+#: 而同批图上要求「≥60% 页幅长直线」的旧启发式**一条轴线都没检出**，
+#: 印证这些图本就没有贯通轴网。
+#:
+#: **必须用米而非 pt**：真值图 A-01-04A 约 4.9 米/轴距、误检图 0.29~1.45 米，
+#: 米能分开；而 pt 间距反倒是真值图更密（99 条 34pt vs 误检 66 条 51pt）。
+MIN_PLAUSIBLE_AXIS_GAP_M = 2.0
+
+
+def is_suspect_symbol_field(band_count: int,
+                            gap_m: float | None = None) -> bool:
+    """带数是否多到疑为设备符号场；轴距过密同样可疑。
 
     抽成纯函数,是为了让判据本身可直接测——用合成圆圈去凑出 60+ 条带
     会跟贪心分带算法较劲(错开的行会形成近竖向链被整条吸走),
     测出来的是分带算法而不是这条判据。
     """
-    return band_count > SYMBOL_FIELD_BAND_HINT
+    if band_count > SYMBOL_FIELD_BAND_HINT:
+        return True
+    # 轴距过密 —— 带数判据漏掉的那一类（实测 183 张假轴网）。
+    # 算不出米轴距时不猜，只用带数判。
+    return bool(gap_m and 0 < gap_m < MIN_PLAUSIBLE_AXIS_GAP_M)
 
 #: 一个分区至少要有一对**互相垂直**的带(横行标注竖向轴线、竖列标注横向轴线)。
 #: **此前这里用「成员数 ≥ 8」当主带门槛,那是从验证脚本带过来的魔数**——
@@ -118,7 +135,8 @@ MIN_BANDS_PER_ZONE = 2
 def recognize(circles: list[dict], *, strokes: list[tuple],
               segments: list[tuple], page_w: float, page_h: float,
               read_text, zone_labels: dict[int, str] | None = None,
-              directions: tuple[float, ...] = DEFAULT_DIRECTIONS) -> dict:
+              directions: tuple[float, ...] = DEFAULT_DIRECTIONS,
+              scale_m_pt: float | None = None) -> dict:
     """一次完整识别。`read_text(leader)` 返回该引线文字处的 OCR token 列表。
 
     传整条引线而非仅锚点:裁图窗口要按**引线尺度**算(见 `text_crop_rect`),
@@ -217,8 +235,35 @@ def recognize(circles: list[dict], *, strokes: list[tuple],
         logger.warning("[axis_recognition] 坐标标注环节降级: %s", exc)
         warnings.append(f"坐标标注读取失败(OCR/几何):{exc}")
 
+    # **轴距过密的二次判定**：带数判据看不到轴距（它在 bands 阶段就跑了），
+    # 而实测 183 张假轴网正是「带数没超、轴线却密到 0.29 米」。
+    # 需要比例尺才能算米轴距，所以只能等轴线出来后再判一次。
+    gap_m = _median_axis_gap_m(result.get("axes"), scale_m_pt)
+    if gap_m and not result.get("suspect_symbol_field"):
+        if is_suspect_symbol_field(0, gap_m):
+            result["suspect_symbol_field"] = True
+            warnings.append(
+                f"轴距中位数仅 {gap_m:.2f} 米,小于定位轴线的合理下限 "
+                f"{MIN_PLAUSIBLE_AXIS_GAP_M} 米(§8 定位轴线用于主要承重构件定位)"
+                " —— 疑为桩位/设备符号被当成轴号圈。轴线照常产出并留档,"
+                "但不进入 3D 场景与世界锚点,待人工确认")
     result["warnings"] = warnings
     return result
+
+
+def _median_axis_gap_m(axes: list | None,
+                       scale_m_pt: float | None) -> float | None:
+    """轴线的中位间距(米);无比例尺或轴线太少 → None(**判不出就说判不出**)。"""
+    if not axes or not scale_m_pt or scale_m_pt <= 0:
+        return None
+    offsets = sorted({round(float(a["offset_pt"]), 3) for a in axes
+                      if a.get("offset_pt") is not None})
+    gaps = [b - a for a, b in zip(offsets, offsets[1:]) if b > a]
+    if len(gaps) < 3:
+        return None
+    from statistics import median
+
+    return float(median(gaps)) * float(scale_m_pt)
 
 
 def _empty(page_w: float, page_h: float, circle_count: int) -> dict:

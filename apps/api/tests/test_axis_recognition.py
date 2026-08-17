@@ -475,3 +475,48 @@ def test_split_view_reports_the_continuous_numbering():
     assert plan[0]["start"] == 1
     # 第二幅接着第一幅(默认搭接 1 根)
     assert plan[1]["start"] == plan[0]["end"]
+
+
+# ── 轴距过密也是符号场特征（实测 183 张假轴网）────────────────────
+
+@pytest.mark.unit
+def test_tiny_axis_gap_is_suspect_even_when_bands_are_few():
+    """**带数判据漏掉了它们**：实测这批图带数没超 60，却检出几十条
+    间距 0.29~1.45 米的「轴线」。
+
+    对比同批图上的旧启发式（要求 ≥60% 页幅的长直线）——**一条都没检出**，
+    即这些图本就没有贯通轴网，那些「圈」是桩位/设备符号。
+
+    判据必须用**米**而非 pt：真值图 A-01-04A 约 4.9 米/轴距，
+    误检图 0.29~1.45 米，能分开；而 pt 间距反而是真值图更密
+    （99 条轴线 34pt vs 误检 66 条 51pt），分不开。
+    """
+    from services.axis_recognition import is_suspect_symbol_field
+
+    assert is_suspect_symbol_field(30, gap_m=0.29) is True
+    assert is_suspect_symbol_field(30, gap_m=1.45) is True
+
+
+@pytest.mark.unit
+def test_real_grid_gap_is_not_suspect():
+    """真轴网不能被误标 —— 「判错的代价不该是丢掉整层轴线」。"""
+    from services.axis_recognition import is_suspect_symbol_field
+
+    assert is_suspect_symbol_field(30, gap_m=4.9) is False
+    assert is_suspect_symbol_field(30, gap_m=8.0) is False
+
+
+@pytest.mark.unit
+def test_band_rule_still_applies():
+    """带数判据保留 —— 新判据是**补充**，不是替换。"""
+    from services.axis_recognition import is_suspect_symbol_field
+
+    assert is_suspect_symbol_field(200) is True
+
+
+@pytest.mark.unit
+def test_unknown_gap_falls_back_to_bands():
+    """算不出米轴距（无比例尺）时只用带数判 —— **判不出就说判不出**。"""
+    from services.axis_recognition import is_suspect_symbol_field
+
+    assert is_suspect_symbol_field(30, gap_m=None) is False
