@@ -763,6 +763,37 @@ def _has_labeled_axes(axes: dict) -> bool:
     )
 
 
+#: 单次构建里超时多少张就该警惕。
+#:
+#: 线程池 `max_workers=2`，而**超时的图仍占着线程**（`wait_for` 取消不了
+#: executor 里的同步函数）。超时数逼近池容量，就意味着池正在被侵蚀 ——
+#: 本轮实测过极端后果：两个僵尸把池占死，recognize **13 分钟零进展**。
+#:
+#: 取 2（= 池容量）：到这个数就该考虑换 `ProcessPoolExecutor`（超时可 kill 进程）。
+TIMEOUT_ALERT_THRESHOLD = 2
+
+
+def summarize_timeouts(floor_metas: list[dict] | None) -> dict:
+    """各层超时数汇总 —— 池健康度的直接指标。
+
+    **没有 `timeouts` 字段的层不参与统计**，不当作 0：那是「没测到」，
+    与「测到 0 次」是两回事（判不出就说判不出）。
+    """
+    measured = [m for m in (floor_metas or []) if "timeouts" in (m or {})]
+    total = sum(int(m.get("timeouts") or 0) for m in measured)
+    healthy = total < TIMEOUT_ALERT_THRESHOLD
+    return {
+        "count": total,
+        "floors_measured": len(measured),
+        "healthy": healthy,
+        "note": "" if healthy else (
+            f"单次构建有 {total} 张图识别超时，而线程池只有 2 个工位 —— "
+            "超时的图**仍占着线程**（wait_for 取消不了同步函数），"
+            "池可能正在被侵蚀。处置：① 查这些图为何慢（多半是幅面过大）；"
+            "② 若成为常态，改用 ProcessPoolExecutor 让超时真正可中断。"),
+    }
+
+
 def _origin_override_of(transforms: dict | None,
                         drawing_id: str) -> tuple[float | None, float | None] | None:
     """该图已落库变换的原点（pt），供识别器补自己算不出的方向。
@@ -789,7 +820,7 @@ def _scale_override_of(transforms: dict | None, drawing_id: str) -> float | None
 async def _recognize_one(
     loop: asyncio.AbstractEventLoop, executor, drawing: dict,
     discipline: str, file_getter: Callable[[str], bytes],
-    transforms: dict | None = None,
+    transforms: dict | None = None, timeouts: list[str] | None = None,
 ) -> dict | None:
     """单图识别（下载 + 提取 + 识别，20s 超时；任何失败返回 None）。"""
     file_key = drawing.get("file_key") or ""
@@ -821,6 +852,9 @@ async def _recognize_one(
             "[ModelElements] 构件识别跳过 %s: %s: %s",
             drawing.get("id"), type(exc).__name__, exc or "(无消息)",
         )
+        # 超时单独记：它意味着**线程仍占着池**，与其他失败性质不同
+        if isinstance(exc, asyncio.TimeoutError) and timeouts is not None:
+            timeouts.append(str(drawing.get("id") or ""))
         return None
 
 
@@ -910,9 +944,12 @@ async def build_floor_elements(
     aggregated_axes: dict | None = None  # 跨该层所有图配准对齐后聚合的轴网
     registered = 0
     placed = 0                           # 按工程坐标绝对定位的图数(H23)
+    # 本层超时的图。**显式传递而非模块级全局**：全局要靠「层间顺序调用」
+    # 这个隐含前提才安全，一旦哪天改成并发就会互相清空且难以察觉。
+    timeouts: list[str] = []
     for drawing, discipline, kinds in tasks:
         result = await _recognize_one(loop, executor, drawing, discipline,
-                                      file_getter, transforms)
+                                      file_getter, transforms, timeouts)
         if not result:
             continue
         axes = result.get("axes") or {}
@@ -978,6 +1015,8 @@ async def build_floor_elements(
         # placed = 按工程坐标绝对定位的图数;与 registered(相对配准)并列报出,
         # 这一层到底有多少图是真定位、多少是相对贴合,一眼可见
         "placed": placed,
+        # 超时数 = 池健康度：超时的图仍占着线程，多了就是池被侵蚀
+        "timeouts": len(timeouts),
         # 轴网**不受构件选图上限约束**:构件识别每图 10~40 秒所以限 2 张，
         # 而轴网只是坐标 + 标签的纯计算。实测 v33 有六层 scene 无轴网，
         # 而 F1 有 139 张「有轴号且有变换」的图被白白挡在外面。
