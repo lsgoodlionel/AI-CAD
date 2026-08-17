@@ -43,6 +43,7 @@ export const EMPTY_QUALITY: ModelQualitySummary = {
   unassignedStoryCount: 0,
   floorConflictCount: 0,
   floorConflicts: [],
+  unregisteredFloorCount: 0,
   lowConfidenceUnits: [],
   pendingManualCount: 0,
   pendingCandidateCount: 0,

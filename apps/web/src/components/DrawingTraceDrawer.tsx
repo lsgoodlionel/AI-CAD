@@ -79,6 +79,27 @@ export default function DrawingTraceDrawer({ drawingId, onClose }: DrawingTraceD
               ]}
               dataSource={catRows}
             />
+
+            {/* 具体内容样例(G4:不止计数,看到标高值/轴号/说明文字等真实识别内容) */}
+            {info?.samples && Object.keys(info.samples).length ? (
+              <div style={{ marginTop: 10 }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>识别内容样例</Text>
+                <Space direction="vertical" size={4} style={{ width: '100%', marginTop: 4 }}>
+                  {Object.entries(info.samples).map(([cat, texts]) => (
+                    <div key={cat} style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                      <Text style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                        {INFO_CATEGORY_LABEL[cat] ?? cat}
+                      </Text>
+                      <Space wrap size={4} style={{ flex: 1 }}>
+                        {texts.map((t, i) => (
+                          <Tag key={i} style={{ margin: 0, fontSize: 12 }}>{t}</Tag>
+                        ))}
+                      </Space>
+                    </div>
+                  ))}
+                </Space>
+              </div>
+            ) : null}
           </div>
 
           {/* 模型用途 */}

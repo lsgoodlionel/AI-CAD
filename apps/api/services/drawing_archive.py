@@ -188,6 +188,39 @@ async def fetch_drawing_archive(db: Any, drawing_id: str) -> list[dict]:
     return effective_values(rows)
 
 
+def group_rows_by_drawing(rows: list[dict]) -> dict[str, list[dict]]:
+    """按图分组，**每图内**各自择优——供几何配对使用。
+
+    与 `effective_values` 的区别只有一条:去重的**作用域**。
+    `effective_values` 按 `(category, normalized_key)` 做**全项目**去重，
+    而 `normalized_key` 里不含 `drawing_id`——于是全项目里同一个
+    `16.200` 只会留下一条(某张图的)，其余全被吃掉。
+
+    那对「项目级信息汇总」是对的(工程信息页要的是「这个项目有哪些标高」)，
+    但对**几何配对**是致命的:楼层名↔标高配对是**同一张图内**的操作，
+    需要那张图完整的标高链。实测拿去重后的数据，2309 张图只配出 1 条。
+
+    **择优要在图内做，不能跨图。**
+    """
+    by_drawing: dict[str, list[dict]] = {}
+    for row in rows:
+        drawing_id = str(row.get("drawing_id") or "")
+        if drawing_id:
+            by_drawing.setdefault(drawing_id, []).append(row)
+    return {did: kept for did, group in by_drawing.items()
+            if (kept := effective_values(group))}
+
+
+async def fetch_project_category_by_drawing(
+    db: Any, project_id: str, category: str,
+) -> dict[str, list[dict]]:
+    """全项目某类别，**按图分组**的生效值(几何配对消费)。"""
+    rows = [_coerce_row(r) for r in await db.fetch_all(
+        _FETCH_PROJECT_CATEGORY_SQL, {"project_id": project_id, "category": category}
+    )]
+    return group_rows_by_drawing(rows)
+
+
 async def fetch_project_category(db: Any, project_id: str, category: str) -> list[dict]:
     """全项目某类别生效值(建模消费:elevation / axis)。"""
     rows = [_coerce_row(r) for r in await db.fetch_all(

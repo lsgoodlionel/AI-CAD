@@ -17,6 +17,12 @@ import { useModelWorkspaceState } from './useModelWorkspaceState'
 import { DISCIPLINE_LABEL, SEVERITY_META, MARKER_TYPE_LABEL } from './modelWorkspaceConstants'
 import { ELEMENT_TYPE_LABEL } from './modes/elementFilterOptions'
 import DrawingTraceDrawer from '@/components/DrawingTraceDrawer'
+import ComponentEntityEvidence from './ComponentEntityEvidence'
+import DrawingOverlay from './DrawingOverlay'
+
+/** 真实图纸 id 为 UUID;合成源(如 piles-envelope 推断桩)非 UUID,不可追溯 */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const isDrawingId = (v: string | undefined): v is string => !!v && UUID_RE.test(v)
 
 const { Text } = Typography
 
@@ -42,6 +48,7 @@ interface ModelWorkspaceProps {
 export default function ModelWorkspace({ projectId, focusDrawingId }: ModelWorkspaceProps) {
   const state = useModelWorkspaceState(projectId, focusDrawingId)
   const [traceDrawing, setTraceDrawing] = useState<string | null>(null)
+  const [overlayDrawing, setOverlayDrawing] = useState<string | null>(null)
 
   if (state.isNotBuilt) {
     return (
@@ -90,6 +97,7 @@ export default function ModelWorkspace({ projectId, focusDrawingId }: ModelWorks
         <Row gutter={12} wrap>
           <Col key="left" flex={state.mode === 'browse' ? '280px' : '0px'} style={state.mode === 'browse' ? undefined : { display: 'none' }}>
             <BrowseModePanels
+              projectId={projectId}
               semanticTreeGroups={state.semanticTreeGroups}
               selectedSemanticNode={state.selectedSemanticNode}
               onSelectSemanticNode={state.handleSelectSemanticNode}
@@ -288,17 +296,41 @@ export default function ModelWorkspace({ projectId, focusDrawingId }: ModelWorks
               message="有信息的模型 · 可反向追溯"
               description="该构件由下列来源图纸经识别途径生成,点「追溯来源图纸」查看每张图识别了什么、用在哪。"
             />
+            {/* H6:该构件在装配层的实体证据(取首个真实来源图) */}
+            {(() => {
+              const realDid = (selection.element.sourceDrawings ?? []).find(isDrawingId)
+                ?? (isDrawingId(selection.element.src) ? selection.element.src : undefined)
+              return realDid ? (
+                <ComponentEntityEvidence
+                  projectId={projectId}
+                  drawingId={realDid}
+                  elementType={selection.element.elementType}
+                />
+              ) : null
+            })()}
             <Space direction="vertical" style={{ width: '100%', marginTop: 12 }} size={8}>
-              {(selection.element.sourceDrawings ?? []).slice(0, 20).map((did) => (
+              {(selection.element.sourceDrawings ?? []).filter(isDrawingId).slice(0, 20).map((did) => (
                 <Button key={did} block onClick={() => setTraceDrawing(did)}>
                   追溯来源图纸 {sourceDrawingLabel(did)}
                 </Button>
               ))}
-              {!selection.element.sourceDrawings?.length && selection.element.src ? (
+              {!(selection.element.sourceDrawings ?? []).some(isDrawingId) && isDrawingId(selection.element.src) ? (
                 <Button block onClick={() => setTraceDrawing(selection.element.src!)}>
                   追溯来源图纸
                 </Button>
               ) : null}
+              {!(selection.element.sourceDrawings ?? []).some(isDrawingId) && !isDrawingId(selection.element.src) ? (
+                <Text type="secondary" style={{ fontSize: 12 }}>该构件为推断生成(无直接来源图纸)</Text>
+              ) : null}
+              {(() => {
+                const realDid = (selection.element.sourceDrawings ?? []).find(isDrawingId)
+                  ?? (isDrawingId(selection.element.src) ? selection.element.src : undefined)
+                return realDid ? (
+                  <Button type="dashed" block onClick={() => setOverlayDrawing(realDid)}>
+                    在图上核对构件位置
+                  </Button>
+                ) : null
+              })()}
             </Space>
           </>
         ) : null}
@@ -307,6 +339,12 @@ export default function ModelWorkspace({ projectId, focusDrawingId }: ModelWorks
       <DrawingTraceDrawer
         drawingId={traceDrawing}
         onClose={() => setTraceDrawing(null)}
+      />
+
+      <DrawingOverlay
+        projectId={projectId}
+        drawingId={overlayDrawing}
+        onClose={() => setOverlayDrawing(null)}
       />
     </div>
   )

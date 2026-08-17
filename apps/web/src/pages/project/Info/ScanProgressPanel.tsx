@@ -169,6 +169,12 @@ export default function ScanProgressPanel({ projectId }: { projectId: string }) 
               完成 <Text strong>{overall.ready}</Text> / {overall.total} ·
               扫描中 <Text type="warning">{overall.extracting}</Text> ·
               待扫描 {overall.pending}
+              {overall.unprocessed ? (
+                <> · 未处理 <Text type="danger">{overall.unprocessed}</Text></>
+              ) : null}
+              {overall.failed ? (
+                <> · 失败 <Text type="danger">{overall.failed}</Text></>
+              ) : null}
             </Text>
           </Space>
           <Table<ScanDrawing>

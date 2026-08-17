@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@umijs/max'
 import { ProTable } from '@ant-design/pro-components'
 import type { ActionType, ProColumns, ProFormInstance } from '@ant-design/pro-components'
-import { Button, Modal, message, Badge } from 'antd'
+import { Alert, Button, Modal, Space, Tag, message, Badge } from 'antd'
 import type { PresetStatusColorType } from 'antd/es/_util/colors'
 import {
   PlusOutlined, EyeOutlined, RobotOutlined, AppstoreOutlined, BuildOutlined,
@@ -10,8 +10,13 @@ import {
 import { listDrawings, createReviewBatch } from '@/services/drawings'
 import type { CreateReviewBatchResult } from '@/services/drawings'
 import { listProjects } from '@/services/projects'
+import {
+  LOCATION_REASON_LABELS, LocationStatus, getLocationStatus,
+} from '@/services/projectInfo'
 import DrawingPreviewModal from '@/components/DrawingPreviewModal'
 import UploadWizard, { DISCIPLINE_OPTIONS, DISCIPLINE_LABEL, extractErrorMessage } from './UploadWizard'
+import DisciplineFilter from './DisciplineFilter'
+import DirectoryDrawer from './DirectoryDrawer'
 
 const STATUS_MAP: Record<string, { color: string; text: string }> = {
   draft:              { color: 'default',    text: '草稿' },
@@ -41,6 +46,8 @@ interface DrawingRow {
   drawing_no: string
   title: string
   discipline: string
+  /** 图框「专业」栏实读值(给排水/基坑围护…);null = 未读到,回落 discipline */
+  discipline_label?: string | null
   version: string
   status: string
   estimated_impact?: number
@@ -63,13 +70,32 @@ export default function DrawingList() {
   const [uploadOpen, setUploadOpen] = useState(false)
   const [selectedRows, setSelectedRows] = useState<DrawingRow[]>([])
   const [projects, setProjects] = useState<ProjectOption[]>([])
-  const [preview, setPreview] = useState<{ id: string; title: string } | null>(null)
+  const [preview, setPreview] =
+    useState<{ id: string; title: string; projectId: string } | null>(null)
+  // 专业快捷筛选(常驻一行,不必展开搜索表单)
+  const [discipline, setDiscipline] = useState('')
+  const [projectFilterId, setProjectFilterId] = useState<string | undefined>()
+  // 未分层图的分类 —— 选定项目后才有意义（定位状态是按项目算的）
+  const [locationStatus, setLocationStatus] = useState<LocationStatus | null>(null)
 
   useEffect(() => {
     listProjects({ limit: 200 }).then((res: { items?: ProjectOption[] }) =>
       setProjects(res.items ?? [])
     )
   }, [])
+
+  useEffect(() => {
+    if (!projectFilterId) { setLocationStatus(null); return }
+    // 定位状态是**辅助信息**，拉不到不该影响图纸列表本身
+    getLocationStatus(projectFilterId)
+      .then((res) => setLocationStatus(res.data ?? null))
+      .catch(() => setLocationStatus(null))
+  }, [projectFilterId])
+
+  /** drawing_id → 未分层项。**未选项目时为空**，此时该列不作判断 */
+  const locationIndex = new Map(
+    (locationStatus?.items ?? []).map((item) => [item.drawing_id, item]),
+  )
 
   const projectSelectOptions = projects.map((p) => ({
     label: `${p.name}${p.code ? ` (${p.code})` : ''}`,
@@ -103,8 +129,10 @@ export default function DrawingList() {
     {
       title: '专业',
       dataIndex: 'discipline',
-      width: 80,
-      render: (_, row) => DISCIPLINE_LABEL[row.discipline] ?? row.discipline,
+      width: 100,
+      // 图框实读专业优先(给排水/基坑围护…),读不到才回落粗粒度枚举
+      render: (_, row) =>
+        row.discipline_label ?? DISCIPLINE_LABEL[row.discipline] ?? row.discipline,
       valueEnum: Object.fromEntries(DISCIPLINE_OPTIONS.map(({ value, label }) => [value, { text: label }])),
     },
     {
@@ -136,6 +164,27 @@ export default function DrawingList() {
           : '—',
     },
     {
+      // 只在选定项目后有值 —— 定位状态是按项目算的
+      title: '定位',
+      dataIndex: 'location_status',
+      search: false,
+      width: 110,
+      render: (_, row) => {
+        // **没选项目就是没数据，不是「都已定位」** —— 空 Map 会让每一行
+        // 都显示成绿色的「已定位」，那是凭空捏造的结论。
+        if (!locationStatus) return '—'
+        const item = locationIndex.get(row.id)
+        if (!item) return <Tag color="green">已定位</Tag>
+        return (
+          <Tag color={item.needs_floor_input ? 'orange' : 'default'}
+               title={item.action}>
+            {LOCATION_REASON_LABELS[item.reason] ?? item.reason}
+            {item.hint ? `·${item.hint}` : ''}
+          </Tag>
+        )
+      },
+    },
+    {
       title: '创建人',
       dataIndex: 'creator_name',
       search: false,
@@ -165,7 +214,8 @@ export default function DrawingList() {
             size="small"
             icon={<EyeOutlined />}
             onClick={() =>
-              setPreview({ id: row.id, title: `${row.drawing_no} ${row.title}` })
+              setPreview({ id: row.id, title: `${row.drawing_no} ${row.title}`,
+                projectId: row.project_id })
             }
           >
             预览
@@ -238,8 +288,47 @@ export default function DrawingList() {
     navigate(`/model/${projectFilter}`)
   }
 
+  // 专业切换即刷新列表(ProTable 的 request 闭包读最新 discipline)
+  useEffect(() => { actionRef.current?.reload() }, [discipline])
+
   return (
     <div style={{ padding: 24 }}>
+      <DisciplineFilter
+        value={discipline}
+        onChange={setDiscipline}
+        projectId={projectFilterId}
+      />
+      {locationStatus && locationStatus.total > 0 && (
+        <Alert
+          type={locationStatus.actionable > 0 ? 'warning' : 'info'}
+          showIcon style={{ marginBottom: 12 }}
+          message={
+            <>
+              {locationStatus.total} 张图定位不到楼层，其中{' '}
+              <b>{locationStatus.actionable} 张需要你补楼层</b>
+            </>
+          }
+          description={
+            <>
+              <Space size={4} wrap style={{ marginBottom: 6 }}>
+                {Object.entries(locationStatus.by_reason).map(([reason, n]) => (
+                  <Tag key={reason}
+                       color={reason === 'no_floor_by_nature' ? 'default' : 'orange'}>
+                    {LOCATION_REASON_LABELS[reason] ?? reason} {n}
+                  </Tag>
+                ))}
+              </Space>
+              <div>
+                {/* 「本就没有」与「该有却没有」必须分开报：building_unit_fallback
+                    那轮原报 1866 张，拆开后真正要处理的只有 907 张（虚高 2.1 倍）*/}
+                说明、目录、系统图<b>本就没有楼层</b>，不必处理；
+                跨楼层表达的图硬指定楼层反而是错的；
+                <b>非标准楼层名</b>只需告知系统它对应哪一层，不必翻图。
+              </div>
+            </>
+          }
+        />
+      )}
       <ProTable<DrawingRow>
         actionRef={actionRef}
         formRef={formRef}
@@ -252,8 +341,12 @@ export default function DrawingList() {
         }}
         request={async (params) => {
           const { current, pageSize, ...rest } = params
+          // 选了项目则专业计数随之收敛(只在变化时置状态,避免重复渲染)
+          const pid = (rest as { project_id?: string }).project_id
+          setProjectFilterId((prev) => (prev === pid ? prev : pid))
           const res = await listDrawings({
             ...rest,
+            discipline_label: discipline || undefined,
             limit: pageSize,
             offset: ((current ?? 1) - 1) * (pageSize ?? 20),
           })
@@ -261,6 +354,7 @@ export default function DrawingList() {
         }}
         pagination={{ pageSize: 20 }}
         toolBarRender={() => [
+          <DirectoryDrawer key="directory" projectId={projectFilterId} />,
           <Button
             key="batch-review"
             icon={<RobotOutlined />}
@@ -304,6 +398,7 @@ export default function DrawingList() {
       <DrawingPreviewModal
         drawingId={preview?.id ?? null}
         title={preview?.title}
+        projectId={preview?.projectId}
         onClose={() => setPreview(null)}
       />
     </div>

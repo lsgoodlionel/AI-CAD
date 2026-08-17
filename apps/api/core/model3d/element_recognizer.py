@@ -38,6 +38,18 @@ _PAIR_MIN_OVERLAP_M = 1.0
 _PIPE_MIN_LEN_M = 3.0
 _EQUIPMENT_SIZE = (0.5, 5.0)
 _SLAB_MIN_AREA_M2 = 10.0
+
+# 板的来源依据。**只有 SLAB_BASIS_RECOGNISED 是真识别出来的**，其余三种是兜底
+# ——把它们混进同一个 slabs 计数，会让「板」这项能力看起来远比实际强：
+# 上海大歌剧院模型 v30 报 21 块板，13 层里 10 层恒为 2 块，全部来自兜底，
+# 靠图层判出来的是 0 块（该项目 2309 张图全是无图层 PDF，图层分支永不命中）。
+SLAB_BASIS_RECOGNISED = "layer"           # 图层/块名判定 —— 唯一的真识别
+SLAB_BASIS_LARGEST_POLYGON = "largest_polygon"   # 兜底：最大闭合多边形当整层单板
+SLAB_BASIS_AXIS_ENVELOPE = "axis_envelope"       # 兜底：轴网包络
+SLAB_BASIS_COLUMN_ENVELOPE = "column_envelope"   # 兜底：柱/桩包络
+SLAB_FALLBACK_BASES = (SLAB_BASIS_LARGEST_POLYGON, SLAB_BASIS_AXIS_ENVELOPE,
+                       SLAB_BASIS_COLUMN_ENVELOPE)
+
 _SLAB_THICKNESS_M = 0.12              # 普通楼板默认厚（无实测标注时）
 _RAFT_THICKNESS_M = 0.5              # 基础底板/筏板/承台默认厚（远厚于楼板）
 # 筏板/底板/承台判定（在已归类为 slab 的多边形上再细分，给更厚默认值）
@@ -97,20 +109,67 @@ def extract_elevations(all_text: str) -> list[float]:
     return sorted(values)
 
 
-def recognize(geom: DrawingGeometry, discipline: str, drawing_id: str) -> FloorElements:
+#: 一张图换算后能表达的**实际宽度上限**（米）。
+#:
+#: **为什么不能只卡比例**：§6.0.4 表最大 1:2000，而 `is_scale_plausible`
+#: 的上限留到了 1:5000 的余量 —— 实测 `S-0-20-102.04C` 的 1:4222
+#: **正落在这段余量里，门禁放行**，于是 3370pt × 1.489 m/pt = 5019 米。
+#:
+#: 取 3000 米：1:2000 的 A0 图（3370pt）换算是 2377 米，仍在其内；
+#: 而 1:4222 的 5019 米被挡下。**判据是「这张图能有多大」这个工程事实**，
+#: 比单纯的比例区间更贴近现实。
+MAX_DRAWING_EXTENT_M = 3000.0
+
+
+def resolve_scale(detected: float, scale_override: float | None = None,
+                  page_w_pt: float | None = None) -> float:
+    """识别出的比例过 §6.0.4 门禁；不合理且有落库比例时改用后者。
+
+    **实测**（`S-0-20-102.04C`，图幅 3370×2384pt）：识别器算出 **1:4222**
+    而 `drawing_transform` 是 1:150 —— 差 28 倍，3370pt × 1.489 m/pt = 5019 米，
+    正是 F1 层墙跨度 2207 米的来源。
+
+    比例门禁此前加在 `transform_from_geometry` 与 `_transform_of` 上，
+    **唯独漏了识别器这条唯一决定构件坐标的路径**。
+
+    没有可借比例时保持原状：强行归零会让整张图坍缩到一点，比放着更糟。
+    """
+    from services.drawing_transform import is_scale_plausible
+
+    def usable(value: float) -> bool:
+        if not value or value <= 0 or not is_scale_plausible(value):
+            return False
+        # 图幅换算出的实际尺寸也要说得通（见 MAX_DRAWING_EXTENT_M）
+        return not (page_w_pt and page_w_pt * value > MAX_DRAWING_EXTENT_M)
+
+    if usable(detected):
+        return detected
+    if usable(scale_override or 0.0):
+        return float(scale_override)
+    return detected
+
+
+def recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
+              origin_override: tuple[float | None, float | None] | None = None,
+              scale_override: float | None = None,
+              ) -> FloorElements:
     """识别构件；任何异常返回空 FloorElements（scale=缺省）。
 
     图名判定约定：取 ``geom.texts`` 中的文本内容做关键词匹配
     （梁图=含「梁」，机电 system=按专业关键词），discipline 兜底。
     """
     try:
-        return _recognize(geom, discipline, drawing_id)
+        return _recognize(geom, discipline, drawing_id, origin_override,
+                          scale_override)
     except Exception as exc:  # noqa: BLE001 — 识别失败降级空构件
         logger.warning("[model3d] 构件识别失败(%s): %s", drawing_id, exc)
         return FloorElements(scale=_DEFAULT_SCALE)
 
 
-def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str) -> FloorElements:
+def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
+               origin_override: tuple[float | None, float | None] | None = None,
+               scale_override: float | None = None,
+               ) -> FloorElements:
     truncated = geom.primitive_count() > MAX_PRIMITIVES
     lines = geom.lines[:MAX_PRIMITIVES]
     rects = geom.rects[:MAX_PRIMITIVES]
@@ -125,10 +184,13 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str) -> Floor
     axis_x, axis_y, axis_lines = _detect_axes(
         lines, geom.page_w, geom.page_h, geom.texts
     )
-    scale = _detect_scale(all_text, geom.page_w, axis_x, axis_y)
+    scale = resolve_scale(
+        _detect_scale(all_text, geom.page_w, axis_x, axis_y),
+        scale_override, geom.page_w)
     origin = _origin_pt(axis_x, axis_y, geom.page_h)
 
-    ctx = _Ctx(geom.page_h, scale, origin, drawing_id)
+    ctx = _Ctx(geom.page_h, scale, origin, drawing_id,
+               origin_override=origin_override)
     result = FloorElements(
         scale=scale, axes=_axes_dict(axis_x, axis_y, ctx, truncated, all_text)
     )
@@ -165,10 +227,26 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str) -> Floor
 class _Ctx:
     """坐标换算上下文：y 翻转 → 平移轴网原点 → 比例换算（米）。"""
 
-    def __init__(self, page_h: float, scale: float, origin: tuple[float, float], src: str):
+    def __init__(self, page_h: float, scale: float,
+                 origin: tuple[float | None, float | None], src: str,
+                 origin_override: tuple[float | None, float | None] | None = None):
         self.page_h = page_h
         self.scale = scale
-        self.origin = origin
+        # 该方向没检出轴线时 `_origin_pt` 返回 None。**先用轴网路径的原点补**
+        # （`origin_override`，来自 `drawing_transform`），补不上才按 0 兜底。
+        #
+        # 实测:修好 `S-0-20-102.04C` 的 drawing_transform 后重建，F1 的墙
+        # **跨度仍是 2207 米、范围 [149,2356] 一字未改** —— 因为构件坐标不走
+        # 那张表，`_Ctx` 自己算原点、缺了就当 0，于是从图幅边缘算起。
+        # 该图真原点 595.29pt × 1:150 ⇒ **整体偏移 31.5 米**。
+        override = origin_override or (None, None)
+        resolved = (
+            origin[0] if origin[0] is not None else override[0],
+            origin[1] if origin[1] is not None else override[1],
+        )
+        self.origin = (resolved[0] or 0.0, resolved[1] or 0.0)
+        # 补上了就不算缺失，否则下游会误以为这方向仍不可信
+        self.origin_missing = (resolved[0] is None, resolved[1] is None)
         self.src = src
 
     def to_m(self, x: float, y: float) -> list[float]:
@@ -258,10 +336,18 @@ def _dedupe(axes: list[tuple[str, float]], tol: float = 2.0) -> list[tuple[str, 
     return merged
 
 
-def _min_labeled_pos(axes: list[tuple[str, float]]) -> float:
-    """源坐标基准：有轴号 → 轴号最小者的位置；无轴号 → 位置最小者。"""
+def _min_labeled_pos(axes: list[tuple[str, float]]) -> float | None:
+    """源坐标基准：有轴号 → 轴号最小者的位置；无轴号 → 位置最小者。
+
+    **没有轴线时返回 `None` 而不是 0.0** —— 0 是个合法坐标值，
+    返回它等于对下游说「原点就在 0」。实测 1436 条变换里
+    origin_x=0 有 72 张、origin_y=0 有 77 张（10.4%），
+    而「两方向都为 0」是 0 张 —— 它们是**缺一个方向**，不是原点真在 0。
+    这与 `drawing_transform` 的 1:335 万教训同源：
+    一个「看起来合法」的值比缺失更危险，缺失会让下游降级，假值一路通行。
+    """
     if not axes:
-        return 0.0
+        return None
     labeled = [(label, pos) for label, pos in axes if label]
     if labeled:
         return min(labeled, key=lambda a: _axis_label_sort_key(a[0]))[1]
@@ -270,8 +356,11 @@ def _min_labeled_pos(axes: list[tuple[str, float]]) -> float:
 
 def _origin_pt(
     axis_x: list[tuple[str, float]], axis_y: list[tuple[str, float]], page_h: float,
-) -> tuple[float, float]:
-    """统一源坐标点：最小轴号 X 轴 × 最小轴号 Y 轴 交点（无轴号回退最小位置）。"""
+) -> tuple[float | None, float | None]:
+    """统一源坐标点：最小轴号 X 轴 × 最小轴号 Y 轴 交点（无轴号回退最小位置）。
+
+    **逐方向返回**：缺哪个方向就是哪个为 `None`，调用方据此决定降级方式。
+    """
     ox = _min_labeled_pos(axis_x)
     flipped_y = [(label, page_h - pos) for label, pos in axis_y]
     oy = _min_labeled_pos(flipped_y)
@@ -436,23 +525,27 @@ def _find_slabs(
             "outline": [ctx.to_m(x, y) for x, y in poly],
             "thickness": _RAFT_THICKNESS_M if is_raft else _SLAB_THICKNESS_M,
             "kind": "raft" if is_raft else "slab",
+            "basis": SLAB_BASIS_RECOGNISED,
             "src": ctx.src,
         })
         if len(layered) >= _CAPS["slabs"]:
             break
     if layered:
         return layered
-    # 2) 无图层命中 → 沿用「最大闭合多边形」作为整层单板
+    # 2) 无图层命中 → 兜底。**以下三条都不是识别结果**，各自标明依据，
+    #    让统计能把它们与图层命中的板分开数（否则 0 块真板会显示成 N 块）。
     if best is not None and best_area >= _SLAB_MIN_AREA_M2:
         return [{"outline": [ctx.to_m(x, y) for x, y in best],
-                 "thickness": _SLAB_THICKNESS_M, "src": ctx.src}]
+                 "thickness": _SLAB_THICKNESS_M,
+                 "basis": SLAB_BASIS_LARGEST_POLYGON, "src": ctx.src}]
     if len(axis_x) >= 2 and len(axis_y) >= 2:
         xs = [pos for _label, pos in axis_x]
         ys = [pos for _label, pos in axis_y]
         x0, x1 = min(xs), max(xs)
         y0, y1 = min(ys), max(ys)
         outline = [ctx.to_m(x0, y0), ctx.to_m(x1, y0), ctx.to_m(x1, y1), ctx.to_m(x0, y1)]
-        return [{"outline": outline, "thickness": _SLAB_THICKNESS_M, "src": ctx.src}]
+        return [{"outline": outline, "thickness": _SLAB_THICKNESS_M,
+                 "basis": SLAB_BASIS_AXIS_ENVELOPE, "src": ctx.src}]
     # 兜底:无大多边形、无 2×2 轴网,但已识别出柱 → 用柱包络(米)生成楼板,
     # 让缺清晰轴网的楼层也有楼板参与体量/算量(否则该层无板)。
     slab = _slab_from_columns(columns)
@@ -482,6 +575,7 @@ def _slab_from_columns(columns: list[dict]) -> dict | None:
     return {
         "outline": [[x0, y0], [x1, y0], [x1, y1], [x0, y1]],
         "thickness": _SLAB_THICKNESS_M,
+        "basis": SLAB_BASIS_COLUMN_ENVELOPE,
         "src": "columns-envelope",
     }
 

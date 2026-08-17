@@ -9,6 +9,17 @@ from typing import Any
 from services.floor_parser import parse_floor
 
 MIN_STORY_SPACING_M = 2.8
+#: 楼层**标高**的来源。与 `height_source`（层高来源）是两回事——
+#: 偏出 11.9 米的正是标高，而它此前完全没有 provenance。
+#:
+#: * `drawing` —— 从图纸标高文本推出
+#: * `override` —— 由 `z_overrides` 给定（配对/人工/剖面恢复，
+#:   具体来源见 override 里的 `source` 字段，会原样透传）
+#: * `default` —— **硬编码默认层高推的，不是图纸值**
+ELEVATION_SOURCE_DRAWING = "drawing"
+ELEVATION_SOURCE_OVERRIDE = "override"
+ELEVATION_SOURCE_DEFAULT = "default"
+
 DEFAULT_STORY_HEIGHT_M = 4.5
 DEFAULT_BASEMENT_HEIGHT_M = 4.2
 _DEFAULT_UNCLASSIFIED_STORY = ("UNZONED", "未分层", 0)
@@ -67,6 +78,10 @@ class StoryLevel:
     height_confidence: float = 0.55
     height_estimated: bool = True
     height_note: str = ""
+    # 楼层**标高** provenance（与 height_source 的「层高」语义分离）：
+    # default 时 elevation_estimated=True —— 界面必须能区分图纸值与默认值。
+    elevation_source: str = ELEVATION_SOURCE_DEFAULT
+    elevation_estimated: bool = True
 
 
 @dataclass(frozen=True)
@@ -513,16 +528,34 @@ def normalize_story_table(
             if override_elev is not None:
                 # 实测标高：直接采用，不走「过近默认校正」（校正仅对估算标高兜底）
                 chosen = round(float(override_elev), 3)
+                # 来源原样透传（level_elevation_pairing / manual / …）；
+                # override 没写 source 时退到通用 override，**不能算默认值**
+                elev_source = str(override.get("source")
+                                  or ELEVATION_SOURCE_OVERRIDE)
+                # **不能无条件判非估算**：override 的标高可能是由默认层高
+                # 累加出来的（`_accumulate_manual_elevations`）。实测 F2 标高
+                # 4.50 完全由「F1 的默认层高 4.5」推出，却与实测标高一样
+                # 显示为可信 —— 正是本门禁要防的事。
+                # 没带该字段的 override（如直接给实测标高的 pairing）保持非估算。
+                elev_estimated = bool(override.get("elevation_estimated", False))
             else:
                 explicit = sorted(set(round(value, 3) for value in entry["elevations"]))
                 if explicit:
                     chosen = explicit[0]
+                    elev_source = ELEVATION_SOURCE_DRAWING
+                    elev_estimated = False
                 elif story_order <= _FOUNDATION_SENTINEL_MAX:
                     chosen = foundation_default
+                    elev_source = ELEVATION_SOURCE_DEFAULT
+                    elev_estimated = True
                 elif story_order >= _ROOF_SENTINEL_MIN:
                     chosen = roof_default
+                    elev_source = ELEVATION_SOURCE_DEFAULT
+                    elev_estimated = True
                 else:
                     chosen = _default_story_elevation(story_order, highest_order)
+                    elev_source = ELEVATION_SOURCE_DEFAULT
+                    elev_estimated = True
                 if previous is not None and chosen - previous < MIN_STORY_SPACING_M:
                     detected_spacing = round(chosen - previous, 3)
                     issues.append(
@@ -541,6 +574,9 @@ def normalize_story_table(
                         )
                     )
                     chosen = round(previous + DEFAULT_STORY_HEIGHT_M, 3)
+                    # 被默认层高校正过 —— 不再是图纸值
+                    elev_source = ELEVATION_SOURCE_DEFAULT
+                    elev_estimated = True
             normalized_elevations[(unit_key, entry["story_key"])] = chosen
             previous = chosen
             levels.append(
@@ -558,6 +594,8 @@ def normalize_story_table(
                     height_confidence=h_conf,
                     height_estimated=h_estimated,
                     height_note=h_note,
+                    elevation_source=elev_source,
+                    elevation_estimated=elev_estimated,
                 )
             )
         stories_by_building[unit_key] = levels

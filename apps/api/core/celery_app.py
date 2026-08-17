@@ -17,6 +17,8 @@ celery_app = Celery(
         "tasks.pipeline",
         "tasks.partition_maintenance",
         "tasks.drawing_info_extract",
+        "tasks.axis_recognition",
+        "tasks.title_block_apply",
     ],
 )
 
@@ -48,6 +50,7 @@ celery_app.conf.update(
         "tasks.partition_maintenance.*": {"queue": "default"},
         # 工程信息抽取:逐图 OCR 较重但可断点重来,走 default 不抢 ai_review
         "tasks.drawing_info_extract.*": {"queue": "default"},
+        "tasks.axis_recognition.*": {"queue": "default"},
     },
     # Celery beat 定时任务
     beat_schedule={
@@ -65,6 +68,13 @@ celery_app.conf.update(
         "ensure-llm-log-partitions": {
             "task": "tasks.partition_maintenance.ensure_llm_log_partitions",
             "schedule": crontab(minute=30, hour=0, day_of_month="1,15"),
+        },
+        # 每小时 :20 回收卡在 extracting 的档案状态。抽取任务置位 extracting 后
+        # 若进程被杀(镜像重建/OOM/重启),状态会永久停在 extracting——既不会被
+        # 重抽,也不出现在失败列表里,是**静默丢失**。实测有真实图纸卡了 13 天。
+        "reap-stale-archive-status": {
+            "task": "tasks.drawing_info_extract.reap_stale_archive_status",
+            "schedule": crontab(minute=20),
         },
     },
 )

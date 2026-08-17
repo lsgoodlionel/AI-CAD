@@ -450,6 +450,8 @@ def _build_floors(
     ordered = sorted(floors.values(), key=lambda f: f["order"])
     for floor in ordered:
         floor["building_units"] = sorted(floor["building_units"])
+    # 楼层级标高门禁要能到界面上 —— 前端读的是 floors[]，不是 story_tables。
+    attach_floor_elevation_source(ordered, normalization)
     return ordered, floor_of
 
 
@@ -588,10 +590,57 @@ def _build_stats(
         "by_severity": by_severity,
         "by_discipline": by_discipline,
         "floors": len(floors),
+        # H24 定位口径:placed = 按工程坐标绝对定位的图数,registered = 相对轴号
+        # 配准的图数。两者分开报——「模型有多少是真定位」不能被「拼上去了」掩盖。
+        "placed_drawings": sum(
+            int(f.get("placed_drawings") or 0) for f in floors),
+        "registered_drawings": sum(
+            int(f.get("registered_drawings") or 0) for f in floors),
     }
     if ifc_skipped:
         stats["ifc_skipped"] = True
     return stats
+
+
+def attach_floor_elevation_source(floors: list[dict], normalization) -> None:
+    """把标高来源从 `story_tables` 透传到 `scene.floors[]`（原地补字段）。
+
+    前端楼层列表读的是 `floor.elevation_source` / `floor.elevation_estimated`，
+    而这两个字段此前只存在于 `scene.quality.story_tables` —— **另一套结构**。
+    结果是两个分支都 falsy，门禁标签**从未显示过**，图纸值与默认值
+    在界面上依旧长得一模一样。
+
+    **合并规则保守**：一层可由多个单体贡献（south/north 各有 F1）。
+    只要有任一单体是默认值，整层就算 `elevation_estimated=True` ——
+    部分是猜的，就不能对用户说「来自图纸」。
+
+    查不到对应 `StoryLevel` 时**不写字段**（如 `UNZONED`）：
+    写个假的比不写更糟，界面会给出比实际更强的保证。
+    """
+    stories = getattr(normalization, "stories_by_building", None) or {}
+    if not stories:
+        return
+    by_unit_story: dict[tuple[str, str], model_story.StoryLevel] = {
+        (unit_key, level.story_key): level
+        for unit_key, levels in stories.items()
+        for level in levels
+    }
+    for floor in floors:
+        story_key = str(floor.get("key") or "")
+        matched = [
+            level for unit_key in (floor.get("building_units") or [])
+            if (level := by_unit_story.get((str(unit_key), story_key))) is not None
+        ]
+        if not matched:
+            continue
+        floor["elevation_estimated"] = any(
+            bool(level.elevation_estimated) for level in matched)
+        # 一层可由多个单体贡献，来源可能不同（实测 F1 的 north 读自图纸配对、
+        # main 是人工录入）。只报第一个会让人以为整层都是那个来源，
+        # 所以来源不一致时报 `mixed`，并给出明细 —— 排序保证结果与输入顺序无关。
+        sources = sorted({str(level.elevation_source) for level in matched})
+        floor["elevation_sources"] = sources
+        floor["elevation_source"] = sources[0] if len(sources) == 1 else "mixed"
 
 
 def _serialize_story_level(level: model_story.StoryLevel) -> dict[str, Any]:
@@ -602,6 +651,11 @@ def _serialize_story_level(level: model_story.StoryLevel) -> dict[str, Any]:
         "display_name": level.display_name,
         "story_order": level.story_order,
         "elevation_m": level.elevation_m,
+        # 楼层级门禁:这一层的标高是图纸读的还是默认值推的。
+        # 项目级 `set_capability.elevations` 只能说「有没有立面/剖面」，
+        # 说不出**具体哪一层**是真的。
+        "elevation_source": level.elevation_source,
+        "elevation_estimated": level.elevation_estimated,
         "height_m": level.height_m,
         "source": level.source,
         "confidence": level.confidence,
@@ -610,6 +664,24 @@ def _serialize_story_level(level: model_story.StoryLevel) -> dict[str, Any]:
         "height_estimated": level.height_estimated,
         "height_note": level.height_note,
     }
+
+
+def _with_unzoned_reasons(items: list[dict] | None) -> list[dict]:
+    """给未分层清单补上**判不出的原因**与建议动作。
+
+    原先每条的 `reason` 都是同一个占位值 `story_unclassified` ——
+    人打开队列看到 1061 张，不知道每张为什么判不出、该补什么。
+    分成三类后人的动作才明确：跨层图无需指定楼层、
+    非标准名只需告知对应层、毫无线索的才要翻图。
+    """
+    from services.unzoned_reason import classify_unzoned
+
+    out = []
+    for item in items or []:
+        entry = dict(item)
+        entry.update(classify_unzoned(entry).as_dict())
+        out.append(entry)
+    return out
 
 
 def _serialize_quality_issue(issue: model_story.ModelQualityIssue) -> dict[str, Any]:
@@ -627,6 +699,7 @@ def _serialize_quality_issue(issue: model_story.ModelQualityIssue) -> dict[str, 
 def _quality_payload(
     normalization: model_story.StoryNormalizationResult,
     extra_issues: list | None = None,
+    coordinate_conflicts: list | None = None,
 ) -> dict[str, Any]:
     # extra_issues：normalization 之外链路的质量问题（如剖面 z 恢复的
     # z_story_count_mismatch / z_anchor_mismatch），此前被静默丢弃。
@@ -635,6 +708,11 @@ def _quality_payload(
         _serialize_quality_issue(issue)
         for issue in all_issues
         if issue.issue_type == "story_spacing_too_small"
+    ]
+    unregistered_floors = [          # G9:未配准楼层(位置可能不准)
+        _serialize_quality_issue(issue)
+        for issue in all_issues
+        if issue.issue_type == "floor_unregistered"
     ]
     low_confidence_units = [
         unit for unit in normalization.building_units
@@ -646,14 +724,45 @@ def _quality_payload(
             key: [_serialize_story_level(level) for level in levels]
             for key, levels in normalization.stories_by_building.items()
         },
-        "unclassified_drawings": normalization.unclassified_drawings,
+        # 层内坐标系矛盾汇总（用户第 3 项）：出矛盾点 + 原始依据，交人判断
+        "coordinate_conflicts": __import__(
+            "services.coordinate_conflict", fromlist=["x"]
+        ).summarize_conflicts(coordinate_conflicts or []),
+        "unclassified_drawings": _with_unzoned_reasons(
+            normalization.unclassified_drawings),
         "unassigned_story_count": len(normalization.unclassified_drawings),
         "pending_manual_count": len(normalization.unclassified_drawings),
         "story_conflict_count": len(story_conflicts),
         "story_conflicts": story_conflicts,
+        "unregistered_floor_count": len(unregistered_floors),
+        "unregistered_floors": unregistered_floors,
         "low_confidence_building_units": low_confidence_units,
         "issues": [_serialize_quality_issue(issue) for issue in all_issues],
     }
+
+
+def _unregistered_floor_issues(floors: list[dict]) -> list[model_story.ModelQualityIssue]:
+    """G9 止血:有构件但配准图纸数为 0 的楼层——其构件坐标处于未配准帧,
+    位置可能不可靠。发质量问题让用户知悉并人工核对(不改几何,仅暴露)。
+
+    须在 `_strip_private_lod_fields` 之前调用(依赖 `_lod_registered_drawings`)。
+    """
+    issues: list[model_story.ModelQualityIssue] = []
+    for floor in floors:
+        elements = floor.get("elements") or {}
+        element_count = sum(len(v or []) for v in elements.values())
+        if element_count > 0 and int(floor.get("_lod_registered_drawings") or 0) == 0:
+            issues.append(model_story.ModelQualityIssue(
+                issue_type="floor_unregistered",
+                severity="warning",
+                message=(
+                    f"楼层「{floor.get('label') or floor.get('key')}」有 {element_count} 个构件"
+                    f"但无配准轴网/坐标变换,位置可能不准(未配准帧,建议人工核对)"
+                ),
+                story_key=str(floor.get("key") or ""),
+                payload={"element_count": element_count},
+            ))
+    return issues
 
 
 def _semantic_scene_payload(drawings: list[dict]) -> dict[str, Any]:
@@ -730,13 +839,48 @@ async def _load_archive_axes(db, project_id: str) -> tuple[dict, dict, dict]:
         return {}, {}, {}
 
 
+async def _load_recognized_axes(db, project_id: str) -> dict:
+    """取轴网识别产出的轴线(按 drawing 分组)。
+
+    识别轴号带分区前缀(§8.0.5),身份唯一,质量高于档案路径的裸轴号;
+    表不存在或查询失败时返回空,建模照常走原路径(诚实降级)。
+    """
+    try:
+        rows = await db.fetch_all(
+            # **跳过疑为设备符号场的图**(migration 042):它们的轴线仍在库里
+            # 留档可查,但不该进 3D 场景 —— 见 axis_recognition
+            # .SYMBOL_FIELD_BAND_HINT「只标记不拦截」。
+            "SELECT drawing_id, axes FROM axis_recognition "
+            "WHERE project_id = CAST(:pid AS uuid) AND status = 'ready' "
+            "AND suspect_symbol_field = false",
+            {"pid": project_id})
+    except Exception as exc:  # noqa: BLE001
+        logger.info("[ModelBuilder] 轴网识别结果加载跳过: %s", exc)
+        return {}
+    import json as _json
+
+    out: dict[str, list] = {}
+    for row in rows:
+        raw = row["axes"]
+        axes = _json.loads(raw) if isinstance(raw, (str, bytes)) else raw
+        if axes:
+            out[str(row["drawing_id"])] = axes
+    return out
+
+
 async def _attach_floor_elements(
     floors: list[dict], drawings: list[dict], floor_of: dict[str, str],
     progress_cb=None,
     archive_axes_by_drawing: dict | None = None, transforms: dict | None = None,
     archive_text_by_drawing: dict | None = None,
+    recognized_axes_by_drawing: dict | None = None,
+    db=None, project_id: str | None = None,
+    placements: dict | None = None,
 ) -> int:
-    """为每楼层识别构件（V2）：floor 增 elements/element_stats；返回 YOLO 设备数。"""
+    """为每楼层识别构件（V2）：floor 增 elements/element_stats；返回 YOLO 设备数。
+
+    placements(H23):有工程坐标锚点的图按绝对坐标摆放,其余保持相对配准。
+    """
     drawings_by_floor: dict[str, list[dict]] = {}
     for drawing in drawings:
         key = floor_of.get(str(drawing["id"]), "UNZONED")
@@ -763,6 +907,8 @@ async def _attach_floor_elements(
             elements, yolo_count, meta = await model_elements.build_floor_elements(
                 _executor, floor_drawings, get_file_bytes,
                 archive_axes_by_drawing, transforms, archive_text_by_drawing,
+                recognized_axes_by_drawing=recognized_axes_by_drawing,
+                placements=placements,
             )
         except Exception as exc:  # noqa: BLE001 — 构件层失败回退贴图
             logger.warning("[ModelBuilder] 楼层构件识别失败 %s: %s", floor["key"], exc)
@@ -775,6 +921,16 @@ async def _attach_floor_elements(
         floor["axes"] = meta.get("axes") or None
         floor["_elevation_candidates"] = meta.get("elevations") or []
         floor["_lod_registered_drawings"] = int(meta.get("registered") or 0)
+        # H24:每层「按工程坐标绝对定位的图数」。与 registered(相对配准)并列存,
+        # 这一层到底有多少图是真定位、多少只是相对贴合,前端与度量能直接读到。
+        floor["placed_drawings"] = int(meta.get("placed") or 0)
+        floor["registered_drawings"] = int(meta.get("registered") or 0)
+        # 层内坐标系矛盾（用户第 3 项）：补上楼层名后挂到楼层，供 scene.quality
+        # 汇总与前端展示 —— **降级必须可见**，不能默默退回局部。
+        conflict = meta.get("coordinate_conflict")
+        if conflict:
+            conflict = {**conflict, "floor": str(floor.get("key") or "")}
+            floor["coordinate_conflict"] = conflict
         floor["_lod_evidence"] = (
             dict(meta["lod_evidence"])
             if isinstance(meta.get("lod_evidence"), dict)
@@ -782,6 +938,86 @@ async def _attach_floor_elements(
         )
         yolo_total += yolo_count
     _apply_real_elevations(floors)
+    # 真实度:柱截面模数化对齐(修几何提取的比例尺/像素抖动)。3D 渲染直接读
+    # scene.elements,故须在此生效。实测大歌剧院:柱宽偏离 50mm 模数 >10mm 占比
+    # 46.5%→0.2%,柱宽种类 124→32。仅柱(板轮廓/墙梁走向不动,避免破坏真实形状)。
+    # **人工标定轴线基准优先**:自动轴号识别撞到 OCR 物理上限(逆序率最好 0.21,
+    # 未过 0.15 门槛),故人指定的基准一旦存在即优先采用——这是绕开瓶颈的通道。
+    try:
+        if db is not None and project_id is not None:
+            from services.manual_axis import fetch_project_axes, to_scene_axes
+            manual = await fetch_project_axes(db, project_id)
+            if manual and transforms:
+                applied = 0
+                for floor in floors:
+                    best = None
+                    for drawing in floor.get("drawings") or []:
+                        did = str(drawing.get("drawing_id") or "")
+                        refs = manual.get(did)
+                        tf = (transforms or {}).get(did)
+                        if not refs or tf is None:
+                            continue
+                        axes = to_scene_axes(refs, tf)
+                        if axes["x"] and axes["y"]:
+                            n = min(len(axes["x"]), len(axes["y"]))
+                            if best is None or n > best[0]:
+                                best = (n, axes)
+                    if best:
+                        floor["axes"] = best[1]
+                        floor["axes_source"] = "manual"
+                        applied += 1
+                if applied:
+                    logger.info("[ModelBuilder] 采用人工标定轴线基准: %s 层", applied)
+    except Exception as exc:  # noqa: BLE001 — 人工基准读取失败不阻断建模
+        logger.warning("[ModelBuilder] 人工轴线基准应用失败: %s", exc)
+
+    # 轴网合理性校验:剔除坐标系与构件不一致的轴网(实测某层轴网偏离 700+ 米,
+    # 既让 3D 轴线远离主体,又让 grid_cell 关联主键全错)。宁可无轴网走米坐标兜底。
+    try:
+        from services.axes_validation import filter_scene_axes
+        axes_stat = filter_scene_axes(floors)
+        if axes_stat["dropped"]:
+            logger.warning("[ModelBuilder] 剔除不自洽轴网 %s 层: %s",
+                           axes_stat["dropped"],
+                           [d["floor"] for d in axes_stat["details"]])
+    except Exception as exc:  # noqa: BLE001 — 校验失败不阻断建模
+        logger.warning("[ModelBuilder] 轴网校验失败: %s", exc)
+    # 楼板厚度:用图纸真实标注替代硬编码常量。三个来源(用户领域知识):
+    # ①平面图内标注「板厚150」②图纸说明「未注明板厚为120mm」③剖面/筏板「H=1000mm」。
+    # 实测 403 张结构图中 178 张(44.2%)可提取;无提取值的保持兜底常量。
+    try:
+        if db is None or project_id is None:
+            raise RuntimeError("缺少 db/project_id,跳过板厚提取")
+        from services.slab_thickness import (
+            apply_scene_slab_thickness, extract_thickness_specs, pick_thickness)
+        rows = await db.fetch_all(
+            """SELECT e.drawing_id, d.title, array_agg(e.content) AS texts
+               FROM drawing_extracted_info e JOIN drawings d ON d.id = e.drawing_id
+               WHERE e.project_id = :p AND e.is_active
+               GROUP BY e.drawing_id, d.title""", {"p": project_id})
+        by_drawing = {}
+        for row in rows:
+            specs = extract_thickness_specs(list(row["texts"] or []))
+            if not specs:
+                continue
+            title = str(row["title"] or "")
+            is_raft = any(k in title for k in ("筏板", "基础", "底板"))
+            got = pick_thickness(specs, is_raft=is_raft)
+            if got:
+                by_drawing[str(row["drawing_id"])] = got
+        if by_drawing:
+            st = apply_scene_slab_thickness(floors, by_drawing)
+            logger.info("[ModelBuilder] 楼板厚度取自图纸标注: %s/%s 块(%s 张图有值)",
+                        st["updated"], st["total"], len(by_drawing))
+    except Exception as exc:  # noqa: BLE001 — 板厚提取失败不阻断建模
+        logger.warning("[ModelBuilder] 楼板厚度提取失败: %s", exc)
+    try:
+        from services.component_dimension import snap_scene_columns
+        stat = snap_scene_columns(floors)
+        if stat["snapped"]:
+            logger.info("[ModelBuilder] 柱截面模数化: %s/%s", stat["snapped"], stat["total"])
+    except Exception as exc:  # noqa: BLE001 — 模数化失败不影响建模主流程
+        logger.warning("[ModelBuilder] 柱截面模数化失败: %s", exc)
     return yolo_total
 
 
@@ -856,11 +1092,21 @@ def _accumulate_manual_elevations(normalization, overrides: dict) -> dict:
     result = dict(overrides)
     affected_units = {unit for (unit, _story) in overrides}
 
-    def height_of(unit_key: str, level) -> float:
+    def height_of(unit_key: str, level) -> tuple[float, bool]:
+        """→ (层高, 该层高是否为估算值)。
+
+        **来源必须跟着走**:标高是层高累加出来的,链上用过默认层高，
+        算出的标高就是估算值。此前只返回数值，于是 `_serialize_story_level`
+        看到 override 有标高就无条件判非估算 —— 实测 F2 标高 4.50
+        完全由「F1 的默认层高 4.5」推出，却与实测标高一样显示为可信。
+        """
         override = overrides.get((unit_key, level.story_key))
         if override and override.get("height_m"):
-            return float(override["height_m"])
-        return float(getattr(level, "height_m", None) or default_h)
+            return float(override["height_m"]), False   # 人工录入,不是估
+        height = getattr(level, "height_m", None)
+        if height:
+            return float(height), bool(getattr(level, "height_estimated", True))
+        return default_h, True
 
     for unit_key, levels in normalization.stories_by_building.items():
         if unit_key not in affected_units:
@@ -868,25 +1114,52 @@ def _accumulate_manual_elevations(normalization, overrides: dict) -> dict:
         ordered = sorted(levels, key=lambda lv: lv.story_order)
         if not ordered:
             continue
-        elevations = [0.0] * len(ordered)
+        # **实测标高是锚,不是待覆盖的初值**。
+        # 旧实现一路从 ±0.000 按层高累加，把 pairing 读出的图纸标高全冲掉：
+        # 实测 north RF 图纸 25.00 → 被写成 22.50（差 2.5 米），
+        # 而 `source` 仍是 `level_elevation_pairing` —— 标签说图纸读的、
+        # 值却是 4.5 默认层高推的。这比 provenance 标错严重得多。
+        elevations: list[float | None] = [None] * len(ordered)
+        estimated = [True] * len(ordered)
+        for i, level in enumerate(ordered):
+            measured = (overrides.get((unit_key, level.story_key)) or {}).get(
+                "elevation_bottom_m")
+            if measured is not None:
+                elevations[i] = round(float(measured), 3)
+                estimated[i] = False
+        # ±0.000 锚点层（§11.8.5 的基准）在没有实测值时兜底为 0，且不算估算。
         anchor = next((i for i, lv in enumerate(ordered) if lv.story_order == 1), None)
-        if anchor is None:
-            elevations[0] = float(getattr(ordered[0], "elevation_m", None) or 0.0)
-            for i in range(1, len(ordered)):
-                elevations[i] = round(elevations[i - 1] + height_of(unit_key, ordered[i - 1]), 3)
-        else:
+        if anchor is not None and elevations[anchor] is None:
             elevations[anchor] = 0.0
-            for i in range(anchor + 1, len(ordered)):
-                elevations[i] = round(elevations[i - 1] + height_of(unit_key, ordered[i - 1]), 3)
-            for i in range(anchor - 1, -1, -1):
-                elevations[i] = round(elevations[i + 1] - height_of(unit_key, ordered[i]), 3)
-        for level, elevation in zip(ordered, elevations):
+            estimated[anchor] = False
+        if all(value is None for value in elevations):
+            elevations[0] = float(getattr(ordered[0], "elevation_m", None) or 0.0)
+
+        # 未知层从**最近的已知层**累加（而不是一路从 order=1 推）。
+        for i in range(1, len(ordered)):
+            if elevations[i] is None and elevations[i - 1] is not None:
+                height, is_est = height_of(unit_key, ordered[i - 1])
+                elevations[i] = round(elevations[i - 1] + height, 3)
+                estimated[i] = estimated[i - 1] or is_est
+        for i in range(len(ordered) - 2, -1, -1):
+            if elevations[i] is None and elevations[i + 1] is not None:
+                height, is_est = height_of(unit_key, ordered[i])
+                elevations[i] = round(elevations[i + 1] - height, 3)
+                estimated[i] = estimated[i + 1] or is_est
+
+        for level, elevation, is_est in zip(ordered, elevations, estimated):
+            if elevation is None:
+                continue                     # 上下都无锚可依，不编一个值
             existing = result.get((unit_key, level.story_key), {})
+            height, _ = height_of(unit_key, level)
             result[(unit_key, level.story_key)] = {
-                "height_m": height_of(unit_key, level),
+                "height_m": height,
                 "elevation_bottom_m": elevation,
                 "source": existing.get("source", "manual"),
                 "confidence": existing.get("confidence", 1.0),
+                # 累加链的 provenance —— 消费方(model_story)据此判定
+                # `elevation_estimated`,不再无条件当作实测值。
+                "elevation_estimated": is_est,
             }
     return result
 
@@ -1399,7 +1672,12 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     section_z = await _recover_section_z(drawings, normalization, db=db, project_id=project_id)
     # Task 3：人工录入层高作为最高优先级 override（覆盖剖面/估算），消除均匀默认层高。
     manual_overrides = await model_story_manual.fetch_manual_overrides(db, project_id)
-    combined_overrides = {**(section_z.z_overrides or {}), **manual_overrides}
+    # P2：立面/剖面图的楼层名↔标高配对。**优先于剖面序列对齐**（按名字匹配比
+    # 按位置对齐可靠），但仍让位于人工录入。见 `_pairing_z_overrides`。
+    pairing_overrides = await _pairing_z_overrides(
+        db, project_id, normalization, drawings)
+    combined_overrides = {**(section_z.z_overrides or {}), **pairing_overrides,
+                          **manual_overrides}
     if combined_overrides:
         # 按累加层高补全每层真实底标高（锚定 ±0.000），使人工层高真正抬升上层楼层。
         combined_overrides = _accumulate_manual_elevations(normalization, combined_overrides)
@@ -1414,9 +1692,40 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     # A2/C-下一步：取档案轴号 + 构件类型标签文字 + 每图坐标变换。
     archive_axes_by_drawing, archive_text_by_drawing, transforms = \
         await _load_archive_axes(db, project_id)
+    # H23：人标的带工程坐标交叉点 → 每图「本图米坐标 → 工程坐标」变换。
+    # 只对锚点齐全且残差合格的图求解;其余图无变换,建模时保持相对配准(诚实降级)。
+    placements: dict = {}
+    try:
+        # J1：先把锚图的世界坐标经轴距序列匹配传播成其他图的交点，
+        # 再解摆放 —— 否则只有锚图自己有世界坐标（实测 placements 恒为 1 张）。
+        # 锚图由内容判据自动选出（残差最小者），**不硬编码图号**。
+        from services.axis_intersection_propagate import (
+            run_auto_intersection_propagation,
+        )
+        propagation = await run_auto_intersection_propagation(db, project_id)
+        if propagation.get("points"):
+            logger.info("[ModelBuilder] 交点传播:%d 张图 / %d 个交点(锚图 %s)",
+                        propagation.get("drawings") or 0, propagation["points"],
+                        str(propagation.get("anchor_drawing_id") or "")[:8])
+    except Exception as exc:  # noqa: BLE001 — 传播失败不阻断建模，退回原有锚点
+        logger.warning("[ModelBuilder] 交点传播跳过: %s", exc)
+    try:
+        from services.model_world_placement import placements_for_project
+        placements = await placements_for_project(db, project_id, transforms)
+        if placements:
+            logger.info("[ModelBuilder] %d 张图按工程坐标绝对定位", len(placements))
+    except Exception as exc:  # noqa: BLE001 — 摆放变换求解失败不阻断建模
+        logger.warning("[ModelBuilder] 工程坐标摆放跳过: %s", exc)
+    # Phase I:轴网识别产出的轴号(带分区前缀,身份唯一)优先于档案裸轴号
+    recognized_axes_by_drawing = await _load_recognized_axes(db, project_id)
+    if recognized_axes_by_drawing:
+        logger.info("[ModelBuilder] %d 张图有轴网识别轴号",
+                    len(recognized_axes_by_drawing))
     yolo_total = await _attach_floor_elements(
         floors, drawings, floor_of, progress_cb,
         archive_axes_by_drawing, transforms, archive_text_by_drawing,
+        recognized_axes_by_drawing=recognized_axes_by_drawing,
+        db=db, project_id=project_id, placements=placements,
     )
     _clip_elements_to_envelope(floors)  # 裁掉离群构件(机电比例错误致管线冲到数千米)
     # B-07：剖面/详图截面回填构件（实测覆盖硬编码默认；无标注时全默认→无副作用）。
@@ -1455,6 +1764,9 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
         project_name,
         normalized_assignments=normalization.drawing_assignments,
         building_units=normalization.building_units,
+        # 各单体用**自己**的标高：实测 north 的 RF 图纸值 25.00 与 main 的
+        # 33.90 差 8.9 米，共用汇总层的一个数就是把两个单体摞错位置。
+        stories_by_building=normalization.stories_by_building,
     )
     stats["buildings"] = len(buildings)
     model_scopes = _build_model_scopes(buildings, floors, ifc_models, section_z.matched_units)
@@ -1462,6 +1774,8 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
         scope.scope_key: evaluate_lod_capability(scope).as_dict()
         for scope in model_scopes
     }
+    role_evidence = await _role_evidence(db, project_id)
+    unregistered_issues = _unregistered_floor_issues(floors)  # G9:pop 前采集未配准层
     _strip_private_lod_fields(floors, buildings)
 
     scene = {
@@ -1472,7 +1786,9 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
         "semantic_tree": semantic_payload["semantic_tree"],
         "unassigned_drawings": semantic_payload["unassigned_drawings"],
         "semantic_version": semantic_payload["semantic_version"],
-        "quality": _quality_payload(normalization, extra_issues=section_z.issues),
+        "quality": _quality_payload(
+            normalization, extra_issues=[*section_z.issues, *unregistered_issues],
+            coordinate_conflicts=[f.get("coordinate_conflict") for f in floors]),
         "annotation_queue": normalization.unclassified_drawings,
         "building_units": {
             "detected": normalization.building_units,
@@ -1491,6 +1807,11 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
             "default_mode": stats["reconstruction"],
             "supported_modes": ["texture", "elements", "mixed"],
         },
+        # 图纸角色统计 + 建模能力评估。**降级必须可见**（蓝图 §7 约束 3）：
+        # 缺坐标基准图 → 没有世界坐标；缺立面/剖面 → 层高是默认值。
+        # 这些结论以前只存在于代码里，用户看不到。
+        "set_capability": build_set_capability_payload(
+            drawings, evidence_by_drawing=role_evidence, key="id"),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -1502,3 +1823,161 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
         scene["lod"]["supported_modes"] = ["ifc", "texture", "elements", "mixed"]
 
     return scene, assets
+
+
+async def _pairing_z_overrides(db, project_id: str, normalization,
+                               drawings: list[dict] | None = None) -> dict:
+    """P2 接线：立面/剖面图的**楼层名↔标高**配对 → z_overrides。
+
+    见 `docs/MODELING_PIPELINE_BLUEPRINT.md` P2。现有 `_recover_section_z`
+    按**序列窗口对齐**匹配（第 n 个标高配第 n 层），漏读一层就整条错位；
+    而立面图上写的是楼层名（`6F（设备层） 36.800`），名字直接给出归属。
+
+    只用**主标高链**上的配对（`chain_only=True`）——图例/索引区也会出现
+    同名楼层名，按「同一行 + 相邻」会配出错值。**错标高比没标高更糟**。
+
+    任何一步失败都返回 `{}`（诚实降级，建模照常走既有路径）。
+    """
+    try:
+        from services.drawing_archive import fetch_project_category_by_drawing
+        from services.level_elevation_overrides import build_z_overrides
+        from services.level_elevation_pairing import pair_levels_with_elevations
+
+        # **必须用按图分组的读取**：`fetch_project_category` 会做**全项目**去重
+        # （`normalized_key` 不含 drawing_id），同一个 `16.200` 全项目只留一条，
+        # 拿到的是跨图残片。实测那样 2309 张图只配出 1 条。见
+        # `drawing_archive.group_rows_by_drawing`。
+        elevations = await fetch_project_category_by_drawing(
+            db, project_id, "elevation")
+        levels = await fetch_project_category_by_drawing(
+            db, project_id, "level_name")
+        if not elevations or not levels:
+            return {}
+
+        # 配对结果必须带**单体**——同一层号在不同单体是不同标高。
+        # 实测 north(小歌剧厅)F3=9.350、south(大歌剧厅)F3=10.300;
+        # 不分单体会被判成冲突而两个都丢掉(见 level_elevation_overrides)。
+        from services.building_unit_fallback import classify_unit_assignment
+
+        meta = {str(d.get("id")): d for d in (drawings or ())}
+        pairs: list[dict] = []
+        for drawing_id, elev_items in elevations.items():
+            level_items = levels.get(drawing_id)
+            if not level_items:
+                continue
+            unit = classify_unit_assignment(meta.get(drawing_id) or {}).unit_key
+            for pair in pair_levels_with_elevations(
+                    elev_items, level_items, chain_only=True):
+                pairs.append({**pair, "building_unit_key": unit})
+        if not pairs:
+            return {}
+
+        # `StoryNormalizationResult` 的字段是 `stories_by_building`
+        # （dict[单体 → list[StoryLevel]]），**没有 `levels`**。
+        # 此前写成 `normalization.levels` 会抛 AttributeError，被下面的
+        # 宽泛 except 吞掉、静默返回 {} —— 这条接线从未真正生效过。
+        stories = [{"building_unit_key": level.building_unit_key,
+                    "story_key": level.story_key}
+                   for levels in (normalization.stories_by_building or {}).values()
+                   for level in levels]
+        overrides = build_z_overrides(pairs, stories)
+        if overrides:
+            logger.info("[ModelBuilder] 楼层名↔标高配对产出 %d 层实测标高",
+                        len(overrides))
+        return overrides
+    except (AttributeError, KeyError, TypeError) as exc:
+        # **这几类是代码错误，不是数据缺失** —— 必须以 error 级别喊出来。
+        # 教训:此前这里是宽泛 `except Exception` + info 日志，
+        # 把 `normalization.levels`（字段名根本不存在）的 AttributeError
+        # 吞成了「静默返回 {}」，整条 P2 接线从未生效而无人察觉。
+        logger.error("[ModelBuilder] 楼层标高配对存在代码缺陷,已跳过: %s",
+                     exc, exc_info=True)
+        return {}
+    except Exception as exc:  # noqa: BLE001 — 数据/IO 类失败不阻断建模
+        logger.info("[ModelBuilder] 楼层标高配对跳过(降级默认层高): %s", exc)
+        return {}
+
+
+def build_set_capability_payload(
+    drawings: list[dict], *,
+    evidence_by_drawing: dict | None = None,
+    key: str = "id",
+) -> dict:
+    """图纸角色统计 + 建模能力评估 → scene 载荷（纯函数，离线可测）。
+
+    **为什么必须进 scene**：模型 13 层里 10 层标高是默认值硬推的，
+    而界面上完全看不出来——用户看到的 `F6 24.9` 与从图纸读出的
+    `36.800` 长得一模一样。**降级必须可见**（蓝图 §7 约束 3）。
+
+    两轮判角色：先用内容 + 国标术语（**零编号知识**），
+    再用第一轮结果学出的编号模式回填图名缺失的那些。
+    见 `services/drawing_role.py` 的三级级联。
+    """
+    from services.drawing_role import (
+        ROLE_UNKNOWN, classify_role, learn_number_patterns,
+    )
+    from services.partial_set import assess_capability, plan_stages
+
+    evidence_by_drawing = evidence_by_drawing or {}
+
+    def _evidence(drawing: dict) -> dict | None:
+        return evidence_by_drawing.get(str(drawing.get(key) or ""))
+
+    first = [(d, classify_role(d, evidence=_evidence(d))) for d in drawings]
+    patterns = learn_number_patterns(
+        [(d, r.role) for d, r in first if r.role != ROLE_UNKNOWN])
+    final = [classify_role(d, evidence=_evidence(d), patterns=patterns)
+             for d in drawings]
+
+    counts: dict[str, int] = {}
+    for result in final:
+        counts[result.role] = counts.get(result.role, 0) + 1
+
+    capability = assess_capability(counts)
+    # 单体归属拆解:**把「本就没有单体」与「该有却没有」分开**。
+    # 混在一起报「80.8% 未分配」会让人去优化一个不存在的问题——
+    # 实测 1866 张里 959 张是目录/说明/详图/围护图，本就无单体归属。
+    from services.building_unit_fallback import summarize_assignments
+    return {
+        "roles": counts,
+        "unit_assignment": summarize_assignments(list(drawings)),
+        "learned_patterns": patterns,
+        "capability": {
+            "world_coords": capability.world_coords,
+            "floors": capability.floors,
+            "elevations": capability.elevations,
+            "can_build": capability.can_build,
+            "degradations": capability.degradations,
+        },
+        "stages": plan_stages(counts),
+    }
+
+
+async def _role_evidence(db, project_id: str) -> dict:
+    """轴网识别产出的内容证据 → `drawing_role` 第 1 级判据。
+
+    圈数(§8.0.2)与坐标标注引线数(§11.8)是判定「坐标基准图」的**内容指纹**，
+    与任何工程的图号体系无关。取不到就返回 `{}`——角色判别退回国标术语级。
+    """
+    try:
+        rows = await db.fetch_all(
+            # `transform_inliers` = RANSAC 内点数，「真读出成组一致的工程
+            # 坐标」的唯一可靠证据。引线数、粗错数、有无 transform 三个更弱的
+            # 判据都被实测否掉（见 drawing_role.MIN_TRANSFORM_INLIERS）。
+            "SELECT drawing_id, circle_count, leader_count, "
+            "       COALESCE((transform->>'inliers')::int, 0) "
+            "       AS transform_inliers, "
+            "       COALESCE((transform->>'rmse_m')::float, 0) "
+            "       AS transform_rmse_m "
+            "FROM axis_recognition "
+            "WHERE project_id = CAST(:pid AS uuid) AND status = 'ready'",
+            {"pid": project_id})
+        return {str(r["drawing_id"]): {
+            "axis_circle_count": int(r["circle_count"] or 0),
+            "coordinate_leader_count": int(r["leader_count"] or 0),
+            "transform_inliers": int(r["transform_inliers"] or 0),
+            "transform_rmse_m": float(r["transform_rmse_m"] or 0.0)}
+            for r in rows}
+    except Exception as exc:  # noqa: BLE001 — 证据取不到只降级判据，不阻断建模
+        logger.info("[ModelBuilder] 角色判别证据取用跳过: %s", exc)
+        return {}

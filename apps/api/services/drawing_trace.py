@@ -9,6 +9,34 @@ from typing import Any
 
 _ELEMENT_KINDS = ("columns", "walls", "beams", "slabs", "pipes", "equipment")
 
+# 每类别在追溯抽屉里展示的实际内容样例上限
+_SAMPLE_LIMIT = 8
+
+
+def summarize_samples(items: list[dict]) -> dict[str, list[str]]:
+    """按类别归集识别信息的**实际内容**样例(G5:具体什么内容)。
+
+    每类别取前 _SAMPLE_LIMIT 条去重后的 content 文本(截断 40 字),
+    让「正向追溯」不止给计数,而是看到标高值/轴号/说明文字等真实识别内容。
+    """
+    out: dict[str, list[str]] = {}
+    seen: dict[str, set[str]] = {}
+    for it in items:
+        category = it.get("category")
+        content = it.get("content")
+        if not category or not content:
+            continue
+        text = str(content).strip()
+        if not text:
+            continue
+        bucket = out.setdefault(category, [])
+        seen_set = seen.setdefault(category, set())
+        if len(bucket) >= _SAMPLE_LIMIT or text in seen_set:
+            continue
+        seen_set.add(text)
+        bucket.append(text[:40])
+    return out
+
 
 def model_usage_from_scene(scene: dict, drawing_id: str) -> dict:
     """从 scene 统计 src=drawing_id 的构件用途。
@@ -97,6 +125,7 @@ async def build_drawing_trace(db: Any, drawing_id: str) -> dict | None:
             "total": len(items),
             "by_category": by_category,
             "by_extractor": by_extractor,
+            "samples": summarize_samples(items),
         },
         "model_usage": usage,
     }

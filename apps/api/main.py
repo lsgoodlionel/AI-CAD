@@ -31,6 +31,7 @@ from routers.incentive import router as incentive_router
 from routers.regulations import router as regulations_router
 from routers.economic_calc import router as economic_calc_router
 from routers.dashboard import router as dashboard_router
+from routers.axis_recognition import router as axis_recognition_router
 
 
 @asynccontextmanager
@@ -83,6 +84,7 @@ app.include_router(incentive_router,        prefix=API_V1)
 app.include_router(regulations_router,      prefix=API_V1)
 app.include_router(economic_calc_router,    prefix=API_V1)
 app.include_router(dashboard_router,        prefix=API_V1)
+app.include_router(axis_recognition_router, prefix=API_V1)
 
 
 @app.get("/health")

@@ -278,6 +278,7 @@ export default function ModelQualityPanel({
           {[
             `未分层 ${quality.unassignedStoryCount}`,
             `楼层冲突 ${quality.floorConflictCount}`,
+            `未配准层 ${quality.unregisteredFloorCount}`,
             `低置信度单体 ${quality.lowConfidenceUnits.length}`,
             `待人工识别 ${quality.pendingManualCount}`,
             `待审语义 ${quality.pendingCandidateCount}`,

@@ -79,6 +79,40 @@ def test_recognize_slab_fallback_to_axis_envelope():
 
 
 @pytest.mark.unit
+def test_every_slab_declares_how_it_was_derived():
+    """板必须自报来源 —— 否则「识别出来的」和「兜底补的」混在一个数字里。
+
+    实测教训:上海大歌剧院模型 v30 显示 21 块板,看着像成果,
+    但 13 层里 10 层恒为 2 块 —— 全部来自兜底(最大多边形 1 + 柱包络 1)。
+    真正靠图层判出来的板是 **0** 块(该项目 2309 张图全是无图层 PDF)。
+    没有 `basis`,这个区别在任何统计里都看不出来。
+    """
+    from core.model3d.element_recognizer import SLAB_BASIS_RECOGNISED
+
+    result = recognize(_build_plan(), "structure", "d1")
+    assert result.slabs
+    for slab in result.slabs:
+        assert slab["basis"], "每块板都要标明依据"
+    # 本夹具无图层,只能走轴网包络兜底 —— 不该被算作识别成果
+    assert all(s["basis"] != SLAB_BASIS_RECOGNISED for s in result.slabs)
+
+
+@pytest.mark.unit
+def test_layer_recognised_slab_is_marked_as_recognised():
+    """有图层命中时才算「识别出来的板」。"""
+    from core.model3d.element_recognizer import SLAB_BASIS_RECOGNISED
+
+    from core.model3d import element_recognizer as er
+
+    # 直接测 _find_slabs 的图层分支:一个被图层判为 slab 的大多边形
+    big = [(0.0, 0.0), (300.0, 0.0), (300.0, 200.0), (0.0, 200.0)]
+    ctx = er._Ctx(page_h=400.0, scale=0.1, origin=(0.0, 0.0), src="d1")
+    slabs = er._find_slabs([big], ["S_楼板"], [""], [], [], ctx, [])
+    assert slabs, "图层命中应产出板"
+    assert slabs[0]["basis"] == SLAB_BASIS_RECOGNISED
+
+
+@pytest.mark.unit
 def test_recognize_beams_only_on_beam_drawings():
     plan = _build_plan()
     assert recognize(plan, "structure", "d1").beams == []

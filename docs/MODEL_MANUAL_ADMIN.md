@@ -1,6 +1,6 @@
 # 工程 3D 模型 · 操作手册(管理员版)
 
-> 版本 V1.3 ｜ 最后更新 2026-07-16 ｜ 适用对象:系统管理员、运维、后端负责人、技术负责人
+> 版本 V1.5 ｜ 最后更新 2026-08-14 ｜ 适用对象:系统管理员、运维、后端负责人、技术负责人
 >
 > 配套文档:一线业务用户请见《[工程 3D 模型 · 操作手册(用户版)](MODEL_MANUAL_USER.md)》。
 >
@@ -172,6 +172,87 @@ Query:`target_kind`(topology/naming/compliance/element/symbol)、`discipline`、
 | GET | `/{id}/pipeline/suggestions?status=` | 列出建议待办,缺省只看 `open` | 422 `INVALID_STATUS` |
 | POST | `/{id}/pipeline/suggestions/{sid}/accept` | 标记已采纳(不代为执行) | 404 `SUGGESTION_NOT_FOUND` / 409 `SUGGESTION_ALREADY_RESOLVED` |
 | POST | `/{id}/pipeline/suggestions/{sid}/dismiss` | 标记已忽略 | 同上 |
+
+### 4.8 轴网识别与定位状态 — `routers/axis_recognition.py` / `routers/project_info.py`(Phase I / J)
+
+前缀 `/api/v1`。**人工出口**集中在工程信息页的「轴网识别」面板与图纸管理页。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/projects/{id}/axis-recognition` | 识别结果汇总(轴号圈/轴线/分区/锚点/粗错/违规) |
+| POST | `/projects/{id}/axis-recognition` | 全项目重识别(Celery 扇出) |
+| POST | `/drawings/{id}/axis-recognition` | 单图重识别 |
+| POST | `/drawings/{id}/axis-recognition/zones/{n}/confirm` | **确认分区编号**(§8.0.5 几何推不出,每区一次) |
+| POST | `/projects/{id}/axis-recognition/propagate-zones` | 把人工确认的分区号传播到其他图 |
+| GET | `/projects/{id}/axis-recognition/anchor-suggestions?limit=` | **荐锚**:该确认哪几张图最划算 |
+| GET | `/projects/{id}/info/location-status` | **未分层图的分类清单**(供图纸管理页按类处理) |
+
+两个要点:
+
+1. **未确认分区号的图不产出世界锚点**。锚点身份是轴号对,没有分区号时
+   两个分区的 `1×A` 会撞身份、锚点串图。
+2. **`location-status` 的 `total` 与 `actionable` 必须分开看**。说明、目录、
+   系统图本就没有楼层,计进待办会让人去处理不存在的问题
+   (`building_unit_fallback` 那轮曾虚高 2.1 倍)。
+
+#### 坐标变换的来源与清理(migration 047)
+
+`drawing_transform` 一图一行,而**三条路径都往这一行写**:
+
+| `source` | 写入点 | 特点 |
+|---|---|---|
+| `axes` | `tasks/axis_recognition.py` | 原点可靠(轴号圈),比例需坐标标注做 RANSAC |
+| `geometry` | `tasks/drawing_info_extract.py` | 比例可靠(读图面文字),原点靠启发式 |
+| `manual` | `routers/project_info.py` 三个确认端点 | 人核过的真值 |
+| `unknown` | 迁移前的历史行 | 来源不可考,**不猜** |
+
+运维须知:
+
+- 自动路径**不会覆盖** `manual`(upsert 带 WHERE 条件),人工确认值只由人自己改;
+- 轴网路径算不出变换时只清 `source='axes'` 的行,不连坐其他来源;
+- 两条路径常各握一半(一个有比例没原点、一个有原点没比例),轴网路径会
+  **借用已落库的比例**,借来的仍要过 §6.0.4 比例门禁。
+
+### 4.9 坐标系与比例的四道兜底（J7）
+
+构件坐标由**比例**与**原点**两个量决定，而它们有四条产出路径。
+四条都要过同一套门禁，否则错值会从没设防的那条漏进构件坐标。
+
+| 路径 | 决定什么 | 兜底来源 |
+|---|---|---|
+| `transform_from_geometry` | 变换表 | — |
+| `_transform_of`（轴网） | 变换表 | 借几何路径的比例 |
+| `_recognize`（识别器） | **构件坐标** | 借 `drawing_transform` |
+| `detect_pile_columns`（圆检测） | **桩坐标** | 同上（`resolve_detection_frame`） |
+
+关键阈值：
+
+| 常量 | 值 | 含义 |
+|---|---|---|
+| `MAX_DRAWING_EXTENT_M` | 3000 米 | 一张图换算出的实际宽度上限。**比例区间挡不住 1:4222**（§6.0.4 表最大 1:2000，而门禁余量到 1:5000），改用工程事实兜底 |
+| `MAX_RENDER_MEGAPIXELS` | 2 MP | 圆检测栅格化预算。实测 8 MP 要 76 秒**且结果被 20 秒超时丢弃（实际检出 0）**，2 MP 只要 5.7 秒、检出仅少 6% |
+| `_RECOGNIZE_TIMEOUT_SEC` | 20 秒 | 单图识别超时。**注意它是「假超时」**：`wait_for` 取消不了 executor 里正在跑的同步函数，被放弃的线程仍占着线程池 |
+
+⚠️ **运维须知**：`max_workers=2` 的线程池被两个僵尸线程占满时，
+后续每张图都在等一个永不空出的池 —— 表现为 recognize 阶段长时间零进展，
+而 **CPU 满载看起来像在干活**。判据是**日志时间戳是否推进**；
+定性用 `py-spy dump --pid <pid>`（容器内 `pip install py-spy`）。
+
+#### 层内坐标系矛盾（`scene.quality.coordinate_conflicts`）
+
+同一层里既有绝对摆放的图（工程坐标，−6300 附近）又有只能相对配准的图
+（局部坐标，0~200）时，同层跨度会虚报数千米。
+
+**不能自动统一到世界坐标**：工程坐标与图纸有 70.29° 旋转，而 scene 的
+`axes` 是轴对齐结构，装不下斜轴线。
+
+现行策略：**矛盾层整层退回局部**，并在 `scene.quality.coordinate_conflicts`
+出矛盾点（含图纸清单、两组中心距离、两条处置路径）。实测 B1 由 6358 米
+收敛到 248 米、F2 由 6513 米到 200 米，**构件数不变**。
+
+人工处置有二：① 给其余图补世界锚点（轴网识别面板确认分区号 / 人工标定坐标标注），
+本层即可整体绝对摆放；② 若这些图本就没有坐标标注，保持局部配准即可 ——
+模型内部相对关系正确，只是不带工程坐标。
 
 ---
 
@@ -481,6 +562,52 @@ Phase D 合并了多处同类入口(见 `docs/PHASE_D_BLUEPRINT.md` §0.3),前�
 
 ---
 
+## 图纸角色判别与部分图纸建模(管理员视角)
+
+### 判别链路(`services/drawing_role.py`)
+
+三级级联,**越靠前越不依赖图号体系**:
+
+| 级 | 依据 | 依赖编号吗 | 置信度 |
+|---|---|---|---:|
+| 1 | 内容特征:轴号圈数(§8.0.2)+ 坐标标注引线数(§11.8)/ 竖向标高链 / 轴网带 + 构件数 | **完全不依赖** | 0.92 |
+| 2 | 国标术语:平面图/立面图/剖面图/详图/系统图/说明/目录(GB/T 50001 §3.3.1、GB/T 50104) | 不依赖 | 0.75 |
+| 3 | 编号模式:**从本批图纸归纳**,同段角色纯度 ≥80% 且样本 ≥3 才学 | 依赖,但是学的 | 0.55 |
+
+**运维要点**:第 1 级依赖 `axis_recognition.circle_count` 与 `leader_count`
+(migration 043)。若这两列为 0,判别会退回第 2 级——表现为坐标基准图漏判。
+新增图纸后需跑轴网识别才能填上这两列。
+
+### 换一个工程要不要改代码
+
+**不用。** 判据里没有任何硬编码的图号前缀。实测 2309 张图在
+**零编号知识**起步下,仅靠内容 + 国标术语就判出 89.1%;
+学到编号段后覆盖率 90.8%。换成 `JZ-SG-01` 之类的陌生体系同样成立。
+
+### 部分图纸建模(`services/partial_set.py`)
+
+`scene.set_capability` 给出三项档位与降级说明,前端 `SetCapabilityPanel`
+默认展开显示。缺任一阶段只降级该阶段,**不阻断**后续阶段。
+
+四个实测场景:
+
+| 场景 | 世界坐标 | 楼层 | 标高 | 可建模 |
+|---|---|---|---|---|
+| 全套 2309 张 | full | full | full | ✅ |
+| 只有建筑平面图 95 张 | none | full | none | ✅ |
+| 只有结构图 319 张 | none | full | full | ✅ |
+| 只有详图 381 张 | none | none | none | ❌ |
+
+### 不可违反的设计约束
+
+1. 图号体系不得硬编码——任何 `drawing_no.startswith("A-01")` 都是错的
+2. 兜底标准是国标
+3. 降级必须可见,默认值不得冒充图纸实测值
+4. 缺失不得阻断,只降级该阶段
+5. 判不出就返回 `unknown`,猜一个不是
+
+---
+
 ## 版本历史
 
 | 版本 | 日期 | 变更 |
@@ -489,3 +616,5 @@ Phase D 合并了多处同类入口(见 `docs/PHASE_D_BLUEPRINT.md` §0.3),前�
 | V1.1 | 2026-07-14 | 阶段 3 楼板/墙识别接入 `classify_by_layer` 图层先验:楼板多板块收集 + 基础底板/筏板/承台(kind=raft, 0.5m)+ 地下室外墙宽缝召回(`_WIDE_WALL_GAP_MAX`);扩充 layer_conventions.yaml 与专业路由关键词。前端新增「楼层板片显隐」切换(用户手册 §7.6) |
 | V1.2 | 2026-07-14 | Phase D(D-22 手册同步):新增第 16 章《事件编排层与管线建议》(D-08 两个建议类型/阈值、`engine_params scope=pipeline` 开关及其「无管理界面,只能直接写库」的已知缺口、前端消费现状——数据看板项目视图已接入)、第 17 章《路由迁移与重定向》(`/`→`/hub`、套图审查旧路由→`/review`,旧页面源码保留未删);§4 新增 4.6 Finding 统一聚合 API(`routers/findings.py`,migration 026)与 4.7 管线建议 API(`routers/pipeline.py`,migration 027),并在 4.1 补充 QTO 转创效提案端点当前无前端入口的说明;§12 补登 migration 025–027;§18(原§16)维护约定增补两条触发项 |
 | V1.3 | 2026-07-16 | Phase E:§6.3 新增「图纸信息档案层 + PDF 几何识别」能力与诚实边界——档案层(导入即抽取/人审 verified/单一真相源,migration 029-031)、围护桩圆检测(整机 columns 3089→5794)、构件类型标签(档案 OCR 反哺);纯 PDF 项目边界(无图层/矢量文字取不到/圆检测/OCR回填滞后/板数十块量级)。详见 `docs/PHASE_E_BLUEPRINT.md`、`docs/PHASE_E_E3_AUDIT.md` |
+| V1.4 | 2026-08-13 | Phase I/J:§4.8 新增轴网识别与定位状态 API(识别/分区确认/传播/**荐锚**/未分层分类),并补「坐标变换的来源与清理」(migration 047)——`drawing_transform` 一图一行而三条路径共写,`manual` 不被自动覆盖、清理只动同来源、两条路径各握一半时轴网路径借用已落库比例(仍过 §6.0.4 门禁) |
+| V1.5 | 2026-08-14 | J7:§4.9 新增「坐标系与比例的四道兜底」——四条产出路径共用同一套门禁(漏掉的两条恰是决定构件坐标的)、三个关键阈值(`MAX_DRAWING_EXTENT_M`/`MAX_RENDER_MEGAPIXELS`/`_RECOGNIZE_TIMEOUT_SEC` 及其「假超时」性质)、线程池被僵尸占满的排查方法(判据是日志时间戳而非 CPU,定性用 py-spy)、层内坐标系矛盾机制(B1 6358→248 米,构件数不变) |

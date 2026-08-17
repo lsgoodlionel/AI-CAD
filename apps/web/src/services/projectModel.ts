@@ -2,6 +2,96 @@ import { request } from '@umijs/max'
 
 const BASE = '/api/v1/projects'
 
+/** H4:装配 ComponentInstance 汇总(有信息的模型) */
+export interface ModelComponentsSummary {
+  project_id: string
+  model_version: number
+  total: number
+  with_z: number
+  with_grid: number
+  auto: number
+  conflict: number
+  confirmed: number
+  by_type: Record<string, number>
+}
+
+export const getModelComponents = (projectId: string): Promise<ModelComponentsSummary> =>
+  request(`${BASE}/${projectId}/model/components`)
+
+/** H4+:待人审构件(低置信 conflict)+ 来源图纸/识别途径 */
+export interface ComponentReviewItem {
+  id: string
+  type: string
+  grid_ref: string | null
+  type_label: string | null
+  confidence: number
+  building_key: string
+  source_drawings: string[]
+  engines: string[]
+  obs_count: number
+}
+
+export const getComponentReviewQueue = (
+  projectId: string, limit = 50,
+): Promise<{ queue: ComponentReviewItem[]; model_version: number }> =>
+  request(`${BASE}/${projectId}/model/components/review-queue`, { params: { limit } })
+
+export const submitComponentReview = (
+  projectId: string, instanceId: string,
+  body: { action: 'confirm' | 'reject' | 'reclass'; new_type?: string; note?: string },
+): Promise<{ success: boolean }> =>
+  request(`${BASE}/${projectId}/model/components/${instanceId}/review`, {
+    method: 'POST', data: body,
+  })
+
+/** H5:大模型复核建议(available=false 表示 LLM 不可用/无建议) */
+export interface ComponentLlmRecommendation {
+  available: boolean
+  verdict: 'confirm' | 'reject' | 'reclass' | null
+  suggested_type: string | null
+  reason: string
+}
+
+export const llmReviewComponent = (
+  projectId: string, instanceId: string,
+): Promise<{ instance_id: string; recommendation: ComponentLlmRecommendation }> =>
+  request(`${BASE}/${projectId}/model/components/${instanceId}/llm-review`, { method: 'POST' })
+
+/** H6:某图纸某类构件在装配层的证据(3D 点击 → 实体层) */
+export interface ComponentsBySource {
+  total: number
+  confirmed: number
+  conflict: number
+  with_z: number
+  instances: {
+    id: string; grid_ref: string | null; review_state: string
+    confidence: number; z_source: string | null; type_label: string | null
+  }[]
+}
+
+export const getComponentsBySource = (
+  projectId: string, drawingId: string, compType: string,
+): Promise<ComponentsBySource> =>
+  request(`${BASE}/${projectId}/model/components/by-source`, {
+    params: { drawing_id: drawingId, comp_type: compType },
+  })
+
+/** H4+ 回投:构件在图纸上的归一化标记(x/y 同除 page_h,前端按显示高度换算像素) */
+export interface OverlayMarker {
+  id: string
+  type: string
+  review_state: string
+  x: number
+  y: number
+}
+
+export const getComponentsOverlay = (
+  projectId: string, drawingId: string,
+): Promise<{ available: boolean; markers: OverlayMarker[] }> =>
+  request(`${BASE}/${projectId}/model/components/overlay`, {
+    params: { drawing_id: drawingId },
+  })
+
 // ── scene JSON 契约类型（对齐 docs/MODEL_BASE_BLUEPRINT.md 第 4 节，key 一字不差）──
 
 export interface SceneProject {
@@ -119,9 +209,31 @@ export interface SceneFloorAxes {
 }
 
 /** V2 楼层：V1 字段全保留，追加 elements / element_stats / 真实标高 */
+/**
+ * 楼层**标高**的来源。与层高来源是两回事——偏出 11.9 米的正是标高。
+ *
+ * * `drawing` —— 图纸标高文本推出
+ * * `override` / `level_elevation_pairing` / `manual` —— 由覆盖给定
+ * * `default` —— **硬编码默认层高推的，不是图纸值**
+ */
+export type ElevationSource = 'drawing' | 'override' | 'default' | string
+
 export interface SceneFloorV2 extends SceneFloor {
   /** 图纸标高文本推导的真实标高（米）；无法确定时为 null */
   elevation_m?: number | null
+  /**
+   * 这一层标高的来源；旧模型无此字段。
+   * 一层可由多个单体贡献、来源不同，此时为 `mixed`，明细见 `elevation_sources`。
+   */
+  elevation_source?: ElevationSource | 'mixed'
+  /** 各贡献单体的来源明细（去重且定序）；来源一致时只有一项 */
+  elevation_sources?: ElevationSource[]
+  /**
+   * true = 该层标高是**估算/默认值**，不是图纸实测。
+   * 包含「累加链上用过默认层高」的情形 —— 实测 F2 标高 4.50 完全由
+   * 「F1 的默认层高 4.5」推出，此前被当作实测值显示。
+   */
+  elevation_estimated?: boolean
   elements?: SceneFloorElements
   element_stats?: SceneElementStats
   /** 楼层轴网（无带轴号图时为 null/缺省，前端判空不渲染） */
@@ -186,6 +298,60 @@ export interface SceneStats {
   yolo_equipment?: number
 }
 
+/** 建模能力档位。`partial` = **能出结果但是降级的**，不可按 full 处理。 */
+export type CapabilityLevel = 'full' | 'partial' | 'none'
+
+/**
+ * 这批图能建到什么程度 + 降级说明。
+ *
+ * **为什么必须显示**：模型 13 层里 10 层标高是默认值硬推的，
+ * 而界面上完全看不出来——用户看到的 `F6 24.9` 与从图纸读出的
+ * `36.800` 长得一模一样。降级必须可见。
+ */
+export interface SetCapability {
+  /** 有无坐标基准图（轴号圈 + 坐标标注）；none = 只有相对几何 */
+  world_coords: CapabilityLevel
+  /** 楼层来源；partial = 靠专业平面图图名归纳，可能缺层 */
+  floors: CapabilityLevel
+  /** 标高来源；none = **层高是默认值，不是图纸实测值** */
+  elevations: CapabilityLevel
+  can_build: boolean
+  /** 直接展示给用户的降级说明原文 */
+  degradations: string[]
+}
+
+/**
+ * 单体归属拆解。
+ *
+ * **为什么要分开**:原先只报一个「未分配 1866 张（80.8%）」,
+ * 而其中 959 张是目录/说明/详图/围护图——**本就没有单体归属**。
+ * 混在一起报会让人去优化一个不存在的问题。
+ */
+export interface UnitAssignmentSummary {
+  /** 从图名读出了单体 */
+  assigned: number
+  /** 有楼层但无单体,降级挂默认单体（可用,但需事后纠正） */
+  defaulted: number
+  /** 本就没有单体归属——**不计入损失** */
+  not_applicable: number
+  /** 既无单体又无楼层 */
+  unresolved: number
+  /** 真正需要处理的 = defaulted + unresolved */
+  needs_attention: number
+}
+
+export interface SetCapabilityPayload {
+  /** 各建模角色的图纸张数 */
+  roles: Record<string, number>
+  /** 从**本批图纸**学到的「编号段 → 角色」；不是硬编码的体系 */
+  learned_patterns: Record<string, string>
+  capability: SetCapability
+  /** 单体归属拆解;旧模型无此字段 */
+  unit_assignment?: UnitAssignmentSummary | null
+  /** 按依赖顺序排出的处理阶段 */
+  stages: Array<{ stage: number; role: string; count: number }>
+}
+
 export interface ModelScene {
   /** 缺省=V1 楼层贴图模型；2=构件级重建（buildings/elements 可用） */
   schema_version?: number
@@ -196,6 +362,8 @@ export interface ModelScene {
   cross_links: CrossLink[]
   ifc_models: SceneIfcModel[]
   stats: SceneStats
+  /** 图纸角色统计与建模能力评估；旧模型无此字段 */
+  set_capability?: SetCapabilityPayload | null
   generated_at: string
 }
 
@@ -415,6 +583,11 @@ export interface StoryHeightRow {
   manual_height_m: number | null
   manual_elevation_m: number | null
   note: string | null
+  /** 方向1:平面图标注恢复的标高建议(须人审,置信低者慎用) */
+  suggested_elevation_m?: number | null
+  suggestion_support?: number | null
+  suggestion_confidence?: number | null
+  suggestion_source?: string | null
 }
 
 export interface StoryHeightSaveItem {

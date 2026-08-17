@@ -37,7 +37,7 @@ import type {
   FloorUserData,
 } from './sceneBuilder'
 import type { ElementUserData } from './elementsBuilder'
-import { resolveEquipmentPick } from './elementsBuilder'
+import { resolveItemPick } from './elementsBuilder'
 import type { ModelLodMode } from './types'
 
 const CLICK_MOVE_TOLERANCE_PX = 6
@@ -354,10 +354,21 @@ export default function ModelViewer({
       if (data.kind === 'drawing') {
         onSelectDrawingRef.current(data.drawing)
       } else if (onSelectElementRef.current) {
-        // 设备合批：faceIndex 反查具体设备的 label / 来源图纸
-        if (data.elementType === 'equipment' && data.equipmentPicks && hit.faceIndex != null) {
-          const pick = resolveEquipmentPick(data.equipmentPicks, hit.faceIndex)
-          onSelectElementRef.current({ ...data, count: 1, label: pick?.label, src: pick?.src })
+        // G4 逐构件合批：faceIndex 反查**单个构件**的来源图纸/识别途径/类型/label
+        const picks = data.itemPicks ?? data.equipmentPicks
+        if (picks && hit.faceIndex != null) {
+          const pick = resolveItemPick(picks, hit.faceIndex)
+          onSelectElementRef.current(pick ? {
+            ...data,
+            count: 1,
+            label: pick.label,
+            src: pick.src,
+            sourceDrawings: pick.src ? [pick.src] : data.sourceDrawings,
+            sourcePaths: pick.source ? [pick.source] : data.sourcePaths,
+            typeLabels: pick.typeText
+              ? [pick.typeText]
+              : (pick.typeLabel ? [pick.typeLabel] : data.typeLabels),
+          } : data)
         } else {
           onSelectElementRef.current(data)
         }

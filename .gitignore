@@ -82,3 +82,19 @@ apps/api/data/model3d/dataset/**/*.png
 apps/api/data/model3d/dataset/**/*.jpg
 apps/api/data/model3d/dataset/**/*.jpeg
 research/cadtx/
+
+# 离线构建用的 wheel 缓存(几 GB,只在本地)
+apps/wheelhouse/*
+!apps/wheelhouse/.gitkeep
+
+# Celery beat 运行时调度库(dbm),每次启动重建,不入库
+celerybeat-schedule
+celerybeat-schedule.*
+celerybeat.pid
+
+# 本地 pip 缓存(3.2GB)与工具目录,不入库
+.pip-cache/
+.superpowers/
+
+# 编辑器工作区文件
+*.code-workspace

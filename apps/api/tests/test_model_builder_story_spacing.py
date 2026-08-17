@@ -130,3 +130,25 @@ async def test_build_scene_emits_quality_payload_and_dynamic_building_units(fake
     buildings = {item["key"]: item for item in scene["buildings"]}
     assert buildings["building_2"]["label"] == "2#楼"
     assert buildings["south"]["floors"][1]["elevation_m"] == pytest.approx(4.5)
+
+
+def test_unregistered_floor_issues_flags_only_unregistered_floors_with_elements():
+    """G9 止血:有构件但配准图纸数为 0 的楼层报 floor_unregistered;已配准/空层不报。"""
+    from services.model_builder import _unregistered_floor_issues
+
+    floors = [
+        {"key": "F1", "label": "一层", "elements": {"columns": [{}, {}], "walls": []},
+         "_lod_registered_drawings": 0},   # 有构件 + 未配准 → 报
+        {"key": "F2", "label": "二层", "elements": {"columns": [{}]},
+         "_lod_registered_drawings": 2},   # 有构件 + 已配准 → 不报
+        {"key": "F3", "label": "三层", "elements": {"columns": [], "walls": []},
+         "_lod_registered_drawings": 0},   # 无构件 → 不报
+    ]
+
+    issues = _unregistered_floor_issues(floors)
+
+    assert len(issues) == 1
+    assert issues[0].issue_type == "floor_unregistered"
+    assert issues[0].severity == "warning"
+    assert issues[0].story_key == "F1"
+    assert issues[0].payload["element_count"] == 2

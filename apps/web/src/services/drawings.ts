@@ -7,10 +7,39 @@ const BASE = '/api/v1'
 export const listDrawings = (params?: {
   project_id?: string
   discipline?: string
+  discipline_label?: string
   status?: string
   limit?: number
   offset?: number
 }) => request(`${BASE}/drawings`, { params })
+
+/** 专业分组:key 为图框实读专业(给排水/基坑围护…),未读到的回落粗粒度枚举 */
+export interface DisciplineBucket {
+  key: string
+  count: number
+  /** true = 图框实读的细分专业;false = 粗粒度枚举兜底 */
+  is_detail: boolean
+}
+
+export const getDisciplineSummary = (params?: { project_id?: string; status?: string }):
+  Promise<{ items: DisciplineBucket[]; total: number }> =>
+  request(`${BASE}/drawings/discipline-summary`, { params })
+
+/** 图纸目录树:目录图 → 它列出的图纸(按目录顺序) */
+export interface DirectoryChild {
+  id: string
+  drawing_no: string
+  title: string
+}
+
+export interface DirectorySheet extends DirectoryChild {
+  discipline: string
+  children: DirectoryChild[]
+}
+
+export const getDirectoryTree = (projectId: string):
+  Promise<{ sheets: DirectorySheet[]; unlisted_count: number }> =>
+  request(`${BASE}/drawings/directory-tree`, { params: { project_id: projectId } })
 
 export const getDrawing = (id: string) =>
   request(`${BASE}/drawings/${id}`)

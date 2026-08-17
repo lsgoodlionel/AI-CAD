@@ -477,6 +477,7 @@ function qualityFromModel(
       quality.story_conflict_count,
     ) ?? floorConflicts.length,
     floorConflicts,
+    unregisteredFloorCount: readNumber(quality.unregistered_floor_count) ?? 0,
     lowConfidenceUnits,
     pendingManualCount: readNumber(
       quality.pending_manual_count,

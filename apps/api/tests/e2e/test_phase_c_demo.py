@@ -14,6 +14,8 @@ import re
 import sys
 from pathlib import Path
 
+from tests.repo_paths import require_docs
+
 import pytest
 
 from core.model3d.eval.harness import EvalSample, run_comparison
@@ -26,7 +28,8 @@ from services import phase_c_signoff as sg
 
 _API_ROOT = Path(__file__).resolve().parents[2]
 _REPO_ROOT = _API_ROOT.parent.parent
-_DOCS = _REPO_ROOT / "docs"
+# docs/ 改为按标记上溯定位;容器只挂载 apps/api 时明确 skip
+# (原先按固定层数推导,在容器里算出 /docs,造成稳定的**假失败**)
 
 
 # ── 合成一张结构平面（柱/梁 + 机电管线）──────────────────────────
@@ -154,14 +157,14 @@ def test_standard_5_dataset_split_no_leakage_and_docs():
     ds.assert_no_project_leakage(splits)  # 同项目不跨 split，否则抛异常
 
     for doc in ("PHASE_C_DATASET_SPEC.md", "PHASE_C_ANNOTATION_GUIDE.md"):
-        assert (_DOCS / doc).exists()
+        assert (require_docs() / doc).exists()
     assert (_API_ROOT / "data" / "model3d" / "dataset" / "DATASHEET.md").exists()
 
 
 # ── 验收标准 6：能力边界如实（25–30% + 不承诺一键出 BIM）──────────
 
 def test_standard_6_capability_boundary_honest():
-    acceptance = (_DOCS / "PHASE_C_ACCEPTANCE.md").read_text(encoding="utf-8")
+    acceptance = (require_docs() / "PHASE_C_ACCEPTANCE.md").read_text(encoding="utf-8")
     assert "25" in acceptance and "30" in acceptance          # 效率现实值区间
     assert "人工审改" in acceptance or "人工审校" in acceptance
     # 不承诺一键出 BIM

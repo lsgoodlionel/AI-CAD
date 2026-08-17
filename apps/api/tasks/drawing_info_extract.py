@@ -176,10 +176,51 @@ async def _extract_one(db, row: dict, version: int, with_vlm: bool = False) -> i
         except Exception as exc:  # noqa: BLE001
             logger.debug("[drawing_info] 变换落库跳过 %s: %s", drawing_id, exc)
 
+    await _apply_title_block_fields(db, drawing_id, items)
+
     summary = build_scan_summary(items, vlm_backend=vlm_backend)
     await _set_status(db, drawing_id, project_id, "ready", version, written,
                       extractors_done=extractors, summary=summary)
     return written
+
+
+async def _apply_title_block_fields(db, drawing_id: str, items: list) -> None:
+    """抽取完即读图框:专业权威覆盖,图号仅在文件名缺失时补。
+
+    专业 —— 图框「专业」栏是设计单位填写的权威值,比文件名猜测准,直接覆盖。
+    图号 —— 实测图框图号与文件名解析值只有 **86% 一致**,不一致的多是 OCR
+             字符级糊字(`P-31-23`→`D-31-23`、`.01C`→`.010`)。文件名是导入时的
+             确定信息,更可信,故**只在文件名没给出图号时才补**,绝不静默覆盖。
+    """
+    try:
+        from services.title_block_discipline import (
+            _bbox, coarse_discipline, discipline_from_items, drawing_no_from_items,
+        )
+        boxed = [(i.get("content") or "", _bbox(i.get("location_json")))
+                 for i in items]
+        boxed = [(c, b) for c, b in boxed if b]
+        if not boxed:
+            return
+
+        label = discipline_from_items(boxed)
+        if label:
+            await db.execute(
+                "UPDATE drawings SET discipline_label=:l, discipline=:c, "
+                "updated_at=now() WHERE id=:id",
+                {"l": label, "c": coarse_discipline(label) or "general",
+                 "id": drawing_id})
+
+        row = await db.fetch_one(
+            "SELECT drawing_no FROM drawings WHERE id=:id", {"id": drawing_id})
+        current = (row["drawing_no"] or "").strip() if row else ""
+        if not current:
+            no = drawing_no_from_items(boxed)
+            if no:
+                await db.execute(
+                    "UPDATE drawings SET drawing_no=:n, updated_at=now() WHERE id=:id",
+                    {"n": no, "id": drawing_id})
+    except Exception as exc:  # noqa: BLE001 — 读不到图框字段不阻断抽取
+        logger.debug("[drawing_info] 图框字段读取跳过 %s: %s", drawing_id, exc)
 
 
 @celery_app.task(bind=True, max_retries=1, default_retry_delay=60)
@@ -249,3 +290,67 @@ async def _do_extract_single(drawing_id: str, version: int | None = None, with_v
         return {"drawing_id": drawing_id, "items": items, "version": version}
     finally:
         await db.disconnect()
+
+
+# ── 僵死状态回收(beat 定时)────────────────────────────────────────
+
+_SELECT_STALE_STATUS = """
+SELECT drawing_id, project_id, status, started_at, summary
+FROM drawing_archive_status
+WHERE status = :status
+"""
+
+_RESET_STATUS_SQL = """
+UPDATE drawing_archive_status
+SET status = :next_status,
+    summary = COALESCE(summary, '{}'::jsonb) || CAST(:patch AS jsonb),
+    updated_at = now()
+WHERE drawing_id = :drawing_id
+"""
+
+
+@celery_app.task(bind=True, max_retries=1, default_retry_delay=300)
+def reap_stale_archive_status(self) -> dict:
+    """回收长时间卡在 extracting 的档案状态,并有限次重派抽取。
+
+    抽取任务置位 extracting 后若进程被杀,状态会永久停在 extracting——
+    既不会被重抽,也不出现在失败列表里(静默丢失)。实测有真实图纸卡了 13 天。
+    判据与次数上限见 `services.drawing_archive_reaper`。
+    """
+    try:
+        return asyncio.run(_reap_stale())
+    except Exception as exc:  # noqa: BLE001
+        logger.error("[drawing_info] 僵死状态回收失败: %s", exc)
+        raise self.retry(exc=exc)
+
+
+async def _reap_stale() -> dict:
+    import json
+
+    from services.drawing_archive_reaper import (
+        ACTIVE_STATUS, attempts_summary, plan_reap,
+    )
+
+    db = _task_db()
+    await db.connect()
+    try:
+        rows = [dict(r) for r in await db.fetch_all(
+            _SELECT_STALE_STATUS, {"status": ACTIVE_STATUS})]
+        plan = plan_reap(rows)
+        for item in plan:
+            await db.execute(_RESET_STATUS_SQL, {
+                "drawing_id": item["drawing_id"],
+                "next_status": item["next_status"],
+                "patch": json.dumps(attempts_summary(item["reap_attempts"])),
+            })
+    finally:
+        await db.disconnect()
+
+    requeued = [i for i in plan if i["requeue"]]
+    for item in requeued:
+        extract_single_drawing_info.delay(str(item["drawing_id"]))
+
+    result = {"scanned": len(rows), "reaped": len(plan), "requeued": len(requeued)}
+    if plan:
+        logger.warning("[drawing_info] 回收僵死 extracting: %s", result)
+    return result

@@ -1,0 +1,10 @@
+# 离线 wheel 预下载目录（占位，必须提交）。
+#
+# apps/api/Dockerfile 有 `--mount=type=bind,source=wheelhouse,target=/wheels`，
+# **bind mount 的源目录不存在时构建直接失败**：
+#   ERROR: failed to calculate checksum of ref ...: "/wheelhouse": not found
+#
+# 本地有这个目录（手工建过）而仓库里没有，于是本地构建通过、CI 干净检出必挂。
+# .gitignore 忽略目录内容但保留本文件，正是为了让空目录进得了版本库。
+#
+# 用法见 infra/DEV.md：网络差时先在宿主把 wheel 下全，构建时优先用本地的。
