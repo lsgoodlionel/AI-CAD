@@ -388,7 +388,6 @@ def _recognize_sync(
     data: bytes, ext: str, discipline: str, drawing_id: str, allow_circles: bool = False,
     origin_override: tuple[float | None, float | None] | None = None,
     scale_override: float | None = None,
-    gap_hint: tuple[float | None, float | None] | None = None,
 ) -> dict | None:
     """线程池内执行：几何提取 + 构件识别 + spotting 融合回灌 → {elements, axes}；失败返回 None。"""
     from core.model3d import extract_dxf_geometry, extract_pdf_geometry, recognize
@@ -403,8 +402,7 @@ def _recognize_sync(
         return None
     result = recognize(geom, discipline, drawing_id,
                        origin_override=origin_override,
-                       scale_override=scale_override,
-                       gap_hint=gap_hint)
+                       scale_override=scale_override)
     elements = _reinject_fusion(result.as_dict(), geom, drawing_id)
     # E3/路径B：PDF 圆形桩/圆柱补识别——几何识别器只抓闭合近方多段线,抓不到
     # 圆(桩/钢立柱多画成圆)。栅格 HoughCircles 检圆 → 米坐标八边形柱,去重后并入。
@@ -823,7 +821,6 @@ async def _recognize_one(
     loop: asyncio.AbstractEventLoop, executor, drawing: dict,
     discipline: str, file_getter: Callable[[str], bytes],
     transforms: dict | None = None, timeouts: list[str] | None = None,
-    gap_hints: dict | None = None,
 ) -> dict | None:
     """单图识别（下载 + 提取 + 识别，20s 超时；任何失败返回 None）。"""
     file_key = drawing.get("file_key") or ""
@@ -839,13 +836,10 @@ async def _recognize_one(
         # （F1 墙跨度仍 2207 米）—— 因为构件坐标压根不读那张表。
         origin_override = _origin_override_of(transforms, str(drawing["id"]))
         scale_override = _scale_override_of(transforms, str(drawing["id"]))
-        # 轴距共识（本图轴距, 全项目共识）—— 第三道比例闸
-        gap_hint = (gap_hints or {}).get(str(drawing["id"]))
         return await asyncio.wait_for(
             loop.run_in_executor(
                 executor, _recognize_sync, data, ext, discipline,
-                str(drawing["id"]), allow_circles, origin_override,
-                scale_override, gap_hint,
+                str(drawing["id"]), allow_circles, origin_override, scale_override,
             ),
             timeout=_RECOGNIZE_TIMEOUT_SEC,
         )
@@ -877,7 +871,6 @@ async def build_floor_elements(
     archive_text_by_drawing: dict | None = None,
     recognized_axes_by_drawing: dict | None = None,
     placements: dict | None = None,
-    gap_hints: dict | None = None,
 ) -> tuple[dict[str, list], int, dict]:
     """构建单楼层 elements（识别 → 轴号配准 → 合并 + YOLO 补充）。
 
@@ -956,8 +949,7 @@ async def build_floor_elements(
     timeouts: list[str] = []
     for drawing, discipline, kinds in tasks:
         result = await _recognize_one(loop, executor, drawing, discipline,
-                                      file_getter, transforms, timeouts,
-                                      gap_hints)
+                                      file_getter, transforms, timeouts)
         if not result:
             continue
         axes = result.get("axes") or {}

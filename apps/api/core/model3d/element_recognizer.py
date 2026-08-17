@@ -122,9 +122,7 @@ MAX_DRAWING_EXTENT_M = 3000.0
 
 
 def resolve_scale(detected: float, scale_override: float | None = None,
-                  page_w_pt: float | None = None,
-                  gap_hint: tuple[float | None, float | None] | None = None,
-                  ) -> float:
+                  page_w_pt: float | None = None) -> float:
     """识别出的比例过 §6.0.4 门禁；不合理且有落库比例时改用后者。
 
     **实测**（`S-0-20-102.04C`，图幅 3370×2384pt）：识别器算出 **1:4222**
@@ -144,29 +142,16 @@ def resolve_scale(detected: float, scale_override: float | None = None,
         # 图幅换算出的实际尺寸也要说得通（见 MAX_DRAWING_EXTENT_M）
         return not (page_w_pt and page_w_pt * value > MAX_DRAWING_EXTENT_M)
 
-    def with_consensus(value: float) -> float:
-        """**第三道闸**：同一工程的轴距应当同一量级。
-
-        前两道只防「离谱」，防不住「看似合理却彼此不一致」——
-        而实测那才是大头（736 张图里只有 45% 比例正确）。
-        """
-        if not gap_hint:
-            return value
-        from services.axis_gap_consensus import correct_scale_by_consensus
-
-        return correct_scale_by_consensus(value, gap_hint[0], gap_hint[1])
-
     if usable(detected):
-        return with_consensus(detected)
+        return detected
     if usable(scale_override or 0.0):
-        return with_consensus(float(scale_override))
-    return with_consensus(detected)
+        return float(scale_override)
+    return detected
 
 
 def recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
               origin_override: tuple[float | None, float | None] | None = None,
               scale_override: float | None = None,
-              gap_hint: tuple[float | None, float | None] | None = None,
               ) -> FloorElements:
     """识别构件；任何异常返回空 FloorElements（scale=缺省）。
 
@@ -175,7 +160,7 @@ def recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     """
     try:
         return _recognize(geom, discipline, drawing_id, origin_override,
-                          scale_override, gap_hint)
+                          scale_override)
     except Exception as exc:  # noqa: BLE001 — 识别失败降级空构件
         logger.warning("[model3d] 构件识别失败(%s): %s", drawing_id, exc)
         return FloorElements(scale=_DEFAULT_SCALE)
@@ -184,7 +169,6 @@ def recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
 def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
                origin_override: tuple[float | None, float | None] | None = None,
                scale_override: float | None = None,
-               gap_hint: tuple[float | None, float | None] | None = None,
                ) -> FloorElements:
     truncated = geom.primitive_count() > MAX_PRIMITIVES
     lines = geom.lines[:MAX_PRIMITIVES]
@@ -202,7 +186,7 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     )
     scale = resolve_scale(
         _detect_scale(all_text, geom.page_w, axis_x, axis_y),
-        scale_override, geom.page_w, gap_hint)
+        scale_override, geom.page_w)
     origin = _origin_pt(axis_x, axis_y, geom.page_h)
 
     ctx = _Ctx(geom.page_h, scale, origin, drawing_id,
