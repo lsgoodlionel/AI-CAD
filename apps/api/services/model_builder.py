@@ -1975,12 +1975,21 @@ async def _pairing_z_overrides(db, project_id: str, normalization,
         # 重构才有承载对象。发现机制零后缀词表(见 sub_unit_discovery)。
         from services.sub_unit_discovery import discover_sub_units
 
-        all_level_names = [str(i.get("content") or "")
-                           for items in levels.values() for i in items]
-        sub_units = discover_sub_units(all_level_names)
+        # **语料必须是「配上过标高的楼层名」**,不是 level_name 档案全量:
+        # 档案里混着整句 OCR 文本,实测全量跑出 218 个「子单体」,
+        # 大半是「引至」「见」「第」这类句子碎片 —— 结构正则洗不净语料。
+        # 配对(bbox 邻接+链/共识)本身就是过滤器:配不上标高的
+        # 「楼层名」不是楼层证据。
+        paired_names = [str(p.get("level_name") or "")
+                        for p in (pairs + free_pairs)]
+        sub_units = discover_sub_units(paired_names)
         sub_unit_levels = [
             i for i in consensus_items
             if i["building_unit_key"] in sub_units]
+        # **发现提名,共识确认**:只报有 ≥2 图共识标高背书的子单体 ——
+        # 残留的 OCR 碎片(「监控AHU」等)拿不到共识标高,报出去只是噪声。
+        confirmed_units = {i["building_unit_key"] for i in sub_unit_levels}
+        sub_units = sub_units & confirmed_units
         _pairing_z_overrides.last_sub_unit_report = {
             "discovered": sorted(sub_units),
             "consensus_levels": sub_unit_levels,

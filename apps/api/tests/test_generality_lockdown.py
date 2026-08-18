@@ -121,3 +121,26 @@ def test_alias_learning_works_for_residential_naming():
     titled = [("1区A栋三层平面图", "zone1")] * 3 + [("2区B栋平面图", "zone2")] * 2
     got = learn_unit_aliases({"A栋", "B栋"}, titled)
     assert got == {"A栋": "zone1", "B栋": "zone2"}
+
+
+@pytest.mark.unit
+def test_equipment_codes_are_not_sub_units():
+    """**实测垃圾**:AHU(空调机组)/AP\\/C(配电箱)/「:」被当成子单体 ——
+    层 token 正则松到连裸数字都匹配,「AHU3」拆成 AHU+3。
+
+    收紧仍是**结构约束**(零词表):层 token 必须是真楼层形态
+    (1~2 位数字且带 F/层、B 层、中文层、屋面等),前缀须含中文、不含符号。
+    """
+    from services.sub_unit_discovery import discover_sub_units
+
+    garbage = ["AHU3", "AHU4", "AP/C1", "AP/C2", ":3", ":5",
+               "ANT-1F", "ANT-2F"]
+    assert discover_sub_units(garbage) == set()
+
+
+@pytest.mark.unit
+def test_bare_digits_are_not_floor_tokens():
+    from services.sub_unit_discovery import split_level_prefix
+
+    assert split_level_prefix("AHU3") == (None, "AHU3")
+    assert split_level_prefix("大歌剧厅3F") == ("大歌剧厅", "3F")
