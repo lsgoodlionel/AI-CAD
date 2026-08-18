@@ -100,7 +100,9 @@ def test_pdf_paths_carry_their_layer_into_geometry():
             self.x, self.y = x, y
 
     class _Rect:
-        x0, y0, width, height = 0.0, 0.0, 10.0, 10.0
+        # 真实 fitz.Rect 有 x1/y1（旋转变换按角点算，需要它们）
+        x0, y0, x1, y1 = 0.0, 0.0, 10.0, 10.0
+        width, height = 10.0, 10.0
 
     drawings = [
         {"fill": None, "layer": "PLAN_F01$0$0S-BEAM-I",
@@ -109,6 +111,8 @@ def test_pdf_paths_carry_their_layer_into_geometry():
          "items": [("re", _Rect())]},
     ]
     class _Page:
+        rotation = 0          # 真实 page 必有此属性
+
         def get_drawings(self):
             return drawings
 
@@ -131,6 +135,8 @@ def test_pdf_without_layers_still_fills_empty_strings():
             self.x, self.y = x, y
 
     class _Page:
+        rotation = 0
+
         def get_drawings(self):
             return [{"fill": None, "items": [("l", _P(0, 0), _P(1, 1))]}]
 
@@ -151,6 +157,8 @@ def test_filled_path_polygon_also_carries_the_layer():
             self.x, self.y = x, y
 
     class _Page:
+        rotation = 0
+
         def get_drawings(self):
             return [{
                 "fill": (0, 0, 0), "layer": "COLS_F01$0$0S-COLS-I",

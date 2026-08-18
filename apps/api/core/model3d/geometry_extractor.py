@@ -62,8 +62,34 @@ def extract_pdf_geometry(data: bytes, page_index: int = 0) -> DrawingGeometry:
     return geom
 
 
+def _apply_rotation(matrix, x: float, y: float) -> tuple[float, float]:
+    """把图元坐标变换到**显示坐标系**（人看图的方向）。
+
+    **为什么必须做**：`page.get_drawings()` 返回的坐标在 **mediabox**
+    （旋转前）坐标系，而 `geom.page_w/page_h` 取自 `page.rect`（旋转后）——
+    实测 270° 旋转页两者宽高**恰好颠倒**（2384×3370 vs 3370×2384）。
+    下游任何用 `page_h` 做 y 翻转、用 `page_w` 估比例的地方都会错，
+    而这类错误**不报异常**，只让构件位置悄悄偏掉。
+
+    实测受影响面：轨道交通 14/60、大歌剧院 9/40（各约 23%）。
+
+    `matrix` 为 None（未旋转）或变换失败时原样返回 —— 绝不因此丢几何。
+    """
+    if matrix is None:
+        return float(x), float(y)
+    try:
+        import fitz
+
+        point = fitz.Point(float(x), float(y)) * matrix
+        return float(point.x), float(point.y)
+    except Exception:  # noqa: BLE001 — 变换算不出就用原值
+        return float(x), float(y)
+
+
 def _collect_pdf_drawings(page, geom: DrawingGeometry) -> None:
     """解析 page.get_drawings() 的绘图项：l=线段 re=矩形 c/qu=折线化。"""
+    # 页面旋转 → 图元变换到显示坐标系（见 `_apply_rotation`）
+    rot = page.rotation_matrix if getattr(page, "rotation", 0) else None
     for drawing in page.get_drawings():
         if geom.primitive_count() >= MAX_PRIMITIVES:
             return
@@ -81,21 +107,30 @@ def _collect_pdf_drawings(page, geom: DrawingGeometry) -> None:
             kind = item[0]
             if kind == "l":
                 p0, p1 = item[1], item[2]
-                _add_line(geom, p0.x, p0.y, p1.x, p1.y, layer)
-                path_points.extend([(p0.x, p0.y), (p1.x, p1.y)])
+                a = _apply_rotation(rot, p0.x, p0.y)
+                b = _apply_rotation(rot, p1.x, p1.y)
+                _add_line(geom, a[0], a[1], b[0], b[1], layer)
+                path_points.extend([a, b])
             elif kind == "re":
                 rect = item[1]
-                _add_rect(geom, rect.x0, rect.y0, rect.width, rect.height,
+                # 旋转后矩形的宽高互换，用两个角点重算包围盒
+                c0 = _apply_rotation(rot, rect.x0, rect.y0)
+                c1 = _apply_rotation(rot, rect.x1, rect.y1)
+                _add_rect(geom, min(c0[0], c1[0]), min(c0[1], c1[1]),
+                          abs(c1[0] - c0[0]), abs(c1[1] - c0[1]),
                           filled, layer)
             elif kind == "qu":
                 quad = item[1]
-                pts = [(p.x, p.y) for p in (quad.ul, quad.ur, quad.lr, quad.ll)]
+                pts = [_apply_rotation(rot, p.x, p.y)
+                       for p in (quad.ul, quad.ur, quad.lr, quad.ll)]
                 _add_poly(geom, pts, layer)
             elif kind == "c":
                 # 贝塞尔曲线：按端点折线化
                 p0, p3 = item[1], item[4]
-                _add_line(geom, p0.x, p0.y, p3.x, p3.y, layer)
-                path_points.extend([(p0.x, p0.y), (p3.x, p3.y)])
+                a = _apply_rotation(rot, p0.x, p0.y)
+                b = _apply_rotation(rot, p3.x, p3.y)
+                _add_line(geom, a[0], a[1], b[0], b[1], layer)
+                path_points.extend([a, b])
         # 填充路径且首尾闭合 → 记为多边形（柱等实体填充识别依赖）
         if filled and len(path_points) >= 3:
             _add_poly(geom, path_points, layer)
@@ -112,13 +147,15 @@ def _collect_pdf_texts(page, geom: DrawingGeometry) -> None:
     """
     from core.model3d.text_integrity import is_trustworthy_text
 
+    rot = page.rotation_matrix if getattr(page, "rotation", 0) else None
     for word in page.get_text("words"):
         if len(geom.texts) >= MAX_PRIMITIVES:
             return
         x0, y0, _x1, _y1, content = word[0], word[1], word[2], word[3], word[4]
         text = str(content).strip()
         if text and is_trustworthy_text(text):
-            geom.texts.append((float(x0), float(y0), text))
+            px, py = _apply_rotation(rot, x0, y0)
+            geom.texts.append((px, py, text))
 
 
 def extract_dxf_geometry(data: bytes) -> DrawingGeometry:
