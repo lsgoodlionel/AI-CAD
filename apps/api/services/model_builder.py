@@ -853,7 +853,8 @@ async def _load_archive_axes(db, project_id: str) -> tuple[dict, dict, dict]:
         return {}, {}, {}
 
 
-async def _load_recognized_axes(db, project_id: str) -> dict:
+async def _load_recognized_axes(db, project_id: str,
+                                drawings: list | None = None) -> dict:
     """取轴网识别产出的轴线(按 drawing 分组)。
 
     识别轴号带分区前缀(§8.0.5),身份唯一,质量高于档案路径的裸轴号;
@@ -873,8 +874,22 @@ async def _load_recognized_axes(db, project_id: str) -> dict:
         return {}
     import json as _json
 
+    # **详图的轴线不参与装配**（第二工程实测 5 张详图产出 7~35 条轴线）。
+    # 轴距判据是绝对尺度，在详图上失效 —— 详图比例尺比平面图大一个量级。
+    # 更根本的判据是 GB/T 50001 §8：定位轴线用于**平面定位**，
+    # 详图表达局部构造。与符号场一致：只排除不删除，留档可查。
+    from services.axis_assembly_filter import excluded_from_assembly
+
+    excluded = {str(d.get("id")) for d in (drawings or ())
+                if excluded_from_assembly(d)}
+    if excluded:
+        logger.info("[ModelBuilder] %d 张详图的轴线不参与装配（留档可查）",
+                    len(excluded))
+
     out: dict[str, list] = {}
     for row in rows:
+        if str(row["drawing_id"]) in excluded:
+            continue
         raw = row["axes"]
         axes = _json.loads(raw) if isinstance(raw, (str, bytes)) else raw
         if axes:
@@ -1749,7 +1764,8 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     except Exception as exc:  # noqa: BLE001 — 摆放变换求解失败不阻断建模
         logger.warning("[ModelBuilder] 工程坐标摆放跳过: %s", exc)
     # Phase I:轴网识别产出的轴号(带分区前缀,身份唯一)优先于档案裸轴号
-    recognized_axes_by_drawing = await _load_recognized_axes(db, project_id)
+    recognized_axes_by_drawing = await _load_recognized_axes(
+        db, project_id, drawings)
     if recognized_axes_by_drawing:
         logger.info("[ModelBuilder] %d 张图有轴网识别轴号",
                     len(recognized_axes_by_drawing))

@@ -294,3 +294,56 @@ def test_decoration_plan_is_not_a_skeleton():
     got = classify_role(
         {"title": "2F平面布置图", "discipline": "decoration"})
     assert got.role == ROLE_COMPONENT_SOURCE
+
+
+# ── 详图的轴线不参与装配(第二工程实测 5 张)──────────────────────
+
+@pytest.mark.unit
+def test_detail_drawings_do_not_contribute_axes():
+    """**实测**:5 张详图产出 7~35 条轴线,全部未被符号场判据拦下。
+
+    `钢立柱及立柱桩详图` 的 21 个「圈」显然是**桩位**,
+    但轴距判据(绝对尺度 <2 米)在详图上失效 ——
+    **详图比例尺比平面图大一个量级**(1:20 vs 1:100),
+    同样的图上距离换算出的米数完全不同。
+
+    更根本的判据是国标本身:**§8 定位轴线用于平面定位**,
+    而详图表达的是局部构造,不表达平面定位。
+
+    处置与符号场一致:**只排除不删除** —— 轴线照常留档可查,
+    只是不进 3D 场景与世界锚点。
+    """
+    from services.axis_assembly_filter import excluded_from_assembly
+
+    detail = {"title": "地下连续墙预埋件详图", "discipline": "structure"}
+    got = excluded_from_assembly(detail)
+    assert got and "详图" in got
+
+
+@pytest.mark.unit
+def test_plans_do_contribute_axes():
+    """平面图正常参与装配 —— 它们正是轴网的来源。"""
+    from services.axis_assembly_filter import excluded_from_assembly
+
+    assert not excluded_from_assembly(
+        {"title": "首层平面图", "discipline": "architecture"})
+    assert not excluded_from_assembly(
+        {"title": "围护体平面布置图", "discipline": "structure"})
+
+
+@pytest.mark.unit
+def test_sections_still_contribute():
+    """剖面/立面带轴号是常规做法,不排除。"""
+    from services.axis_assembly_filter import excluded_from_assembly
+
+    assert not excluded_from_assembly(
+        {"title": "地下连续墙配筋剖面图（二）", "discipline": "structure"})
+
+
+@pytest.mark.unit
+def test_missing_metadata_is_not_excluded():
+    """**判不出就不排除** —— 宁可多一张待人审,不可少一张真轴网。"""
+    from services.axis_assembly_filter import excluded_from_assembly
+
+    assert not excluded_from_assembly({})
+    assert not excluded_from_assembly(None)
