@@ -198,3 +198,39 @@ def test_a_few_beam_lines_do_not_make_it_a_beam_drawing():
 
     layers = ["PLAN_F01$0$0S-BEAM-I"] * 5 + ["COLS_F01$0$0S-COLS-I"] * 300
     assert not _is_beam_drawing("柱平面布置图", line_layers=layers)
+
+
+# ── 标注/文字图层不是构件图层(大歌剧院实测)──────────────────────
+
+@pytest.mark.unit
+def test_annotation_layers_are_not_components():
+    """**实测**:`1区立柱桩及钢立柱平面布置图` 一张图贡献 **3410 根柱**,
+    全部来自图层名「**立柱桩标注**」—— 那是**标注图层**,画的是
+    引线与文字,不是柱本身。
+
+    中文图层名靠子串「柱」判 column,把标注层一并吃了进来。
+    AIA 规范里这类层有明确后缀(`-TEXT`/`-DIMS`/`-NOTE`/`-IDEN`),
+    中文则用「标注」「文字」「标高」「说明」——**都是通用制图用语**,
+    不是某工程的命名习惯。
+    """
+    from core.model3d.layer_conventions import classify_by_layer
+
+    from core.model3d.layer_conventions import is_annotation_layer
+
+    for layer in ("立柱桩标注", "柱编号文字", "梁配筋标注",
+                  "S-COLS-TEXT", "S-BEAM-DIMS", "A-WALL-IDEN"):
+        assert is_annotation_layer(layer), layer
+
+
+@pytest.mark.unit
+def test_real_component_layers_still_match():
+    """**不得误伤构件层** —— 只排除标注,不排除构件。"""
+    from core.model3d.layer_conventions import classify_by_layer
+
+    from core.model3d.layer_conventions import is_annotation_layer
+
+    assert not is_annotation_layer("立柱桩")
+    assert classify_by_layer("立柱桩") == "column"
+    assert classify_by_layer("PLAN_F01$0$0S-BEAM-I") == "beam"
+    assert classify_by_layer("COLS_F01$0$0S-COLS-HATCH") == "column"
+    assert classify_by_layer("结构-柱") == "column"

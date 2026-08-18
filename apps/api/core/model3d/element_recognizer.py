@@ -9,7 +9,9 @@ import logging
 import re
 
 from .geometry_extractor import MAX_PRIMITIVES
-from .layer_conventions import classify_by_layer, classify_system
+from .layer_conventions import (
+    classify_by_layer, classify_system, is_annotation_layer,
+)
 from .types import DrawingGeometry, FloorElements
 
 
@@ -390,7 +392,11 @@ def _find_columns(
 ) -> list[dict]:
     columns: list[dict] = []
     for i, (x, y, w, h, filled) in enumerate(rects):
-        is_column_layer = classify_by_layer(_at(rect_layers, i), _at(rect_blocks, i)) == "column"
+        # **标注图层不产出构件**：实测「立柱桩标注」一层造出 3410 根假柱。
+        _layer = _at(rect_layers, i)
+        is_column_layer = (not is_annotation_layer(_layer)
+                           and classify_by_layer(
+                               _layer, _at(rect_blocks, i)) == "column")
         # 图层/块名明确为柱时，即使未填充也识别（修复「柱必须 filled 才识别」漏检）
         if not filled and not is_column_layer:
             continue
@@ -508,7 +514,8 @@ def _is_beam_drawing(all_text: str, line_layers: list | None = None) -> bool:
     """
     if line_layers:
         beam_lines = sum(1 for layer in line_layers
-                         if layer and classify_by_layer(layer) == "beam")
+                         if layer and not is_annotation_layer(layer)
+                         and classify_by_layer(layer) == "beam")
         if beam_lines >= MIN_BEAM_LINES_FOR_BEAM_DRAWING:
             return True
     return "梁" in all_text and "图" in all_text

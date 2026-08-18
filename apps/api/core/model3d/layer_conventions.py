@@ -194,6 +194,30 @@ def _match_substring_or_pattern(name: str, rules: tuple[_KindRule, ...]) -> str 
 _XREF_BOUND_RE = re.compile(r"^.*\$\d+\$\d*")
 
 
+#: **标注/文字图层不是构件图层**。实测大歌剧院一张
+#: 「1区立柱桩及钢立柱平面布置图」贡献 3410 根「柱」，
+#: 全部来自图层名「**立柱桩标注**」—— 那画的是引线与文字，不是柱。
+#:
+#: 中文用「标注/文字/标高/说明/编号/尺寸」，AIA 用
+#: `-TEXT`/`-DIMS`/`-NOTE`/`-IDEN`/`-ANNO` 后缀 ——
+#: **都是通用制图用语**，不是某工程的命名习惯。
+_ANNOTATION_LAYER_RE = re.compile(
+    r"标注|文字|说明|编号|尺寸标|标高标|注释|图例"
+    r"|-(?:TEXT|DIMS?|NOTE|IDEN|ANNO|TAG|LABEL)(?:-|$)",
+    re.IGNORECASE)
+
+
+def is_annotation_layer(layer: str | None) -> bool:
+    """该图层画的是标注而非构件本身。
+
+    **与 `classify_by_layer` 是两个问题**：后者答「这个图层属于哪个构件
+    类别」（`S-BEAM-TEXT` 属于梁），本函数答「这条线是不是构件几何」
+    （梁的文字标注不是梁）。我第一版把两者混为一谈，
+    直接让 `classify_by_layer` 对标注层返回 None，打断了 4 个既有断言。
+    """
+    return bool(_ANNOTATION_LAYER_RE.search(str(layer or "")))
+
+
 def normalize_layer_name(layer: str | None) -> str:
     """剥离 AutoCAD xref 绑定前缀，得到原始图层名。无前缀时原样返回。"""
     name = str(layer or "")
