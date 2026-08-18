@@ -142,3 +142,125 @@ def test_expansion_of_nothing_is_safe():
 
     assert consensus_to_pairs([]) == []
     assert consensus_to_pairs(None) == []
+
+
+# ── 厅名单体 → 楼层表单体:从见证图学映射,不硬编码词表 ─────────────
+
+@pytest.mark.unit
+def test_fallback_unit_is_learned_from_witnesses():
+    """**实测死因**:7 条共识项的单体是「大/中/小歌剧厅」,而楼层表只有
+    main/north/south ⇒ 全被「该单体没有这一层」拒掉。
+
+    映射不能硬编码词表(用户约束:名称体系不得硬编码)——
+    但**见证图自己带着答案**:「小歌剧厅2F」的见证图,外部分类器
+    判它们属哪个区,一致票就是厅→区的映射,从数据学出来的。
+    """
+    pairs = [_p("a", "小歌剧厅2F", 4.8, unit="north"),
+             _p("b", "小歌剧厅2F", 4.8, unit="north"),
+             _p("c", "小歌剧厅2F", 4.8, unit=None)]
+    got = consensus_overrides(pairs)
+    assert len(got) == 1
+    assert got[0]["building_unit_key"] == "小歌剧厅"
+    assert got[0]["fallback_unit"] == "north"
+
+
+@pytest.mark.unit
+def test_fallback_unit_is_none_when_witnesses_disagree():
+    """见证图分类不一致 ⇒ 学不出映射,**判不出就说判不出**。"""
+    pairs = [_p("a", "小歌剧厅2F", 4.8, unit="north"),
+             _p("b", "小歌剧厅2F", 4.8, unit="south")]
+    got = consensus_overrides(pairs)
+    assert got[0]["fallback_unit"] is None
+
+
+@pytest.mark.unit
+def test_fallback_ignores_none_votes():
+    """None 不参与投票 —— 「不知道」不该稀释一致性。"""
+    pairs = [_p("a", "大歌剧厅3F", 10.3, unit=None),
+             _p("b", "大歌剧厅3F", 10.3, unit="south")]
+    got = consensus_overrides(pairs)
+    assert got[0]["fallback_unit"] == "south"
+
+
+# ── 从图名共现学「厅 → 区」映射(零硬编码词表) ───────────────────
+
+@pytest.mark.unit
+def test_alias_mapping_is_learned_from_titles():
+    """**项目图纸自己写着答案**:图名「南区(大、中歌剧厅)…」的共现零歧义
+    (实测 大:南10/北0、中:南125/北0、小:南0/北63)。
+
+    别名来自楼层名、映射来自图名共现+分类器 —— 全数据驱动,
+    不写「大歌剧厅=south」这种词表(用户约束:名称体系不得硬编码)。
+    """
+    from services.level_elevation_consensus import learn_unit_aliases
+
+    # 注意真实语料两种写法并存:「大歌剧厅舞台图」(字面)与
+    # 「南区（大、中歌剧厅）」(枚举缩写,字面不含「大歌剧厅」)。
+    # 字面共现即可学出(实测 10 张字面含「大歌剧厅」且全在南区);
+    # 枚举缩写展开是已知不做的边界 —— 语义解析的复杂度不值得。
+    titled = [("南区大歌剧厅舞台平面图", "south")] * 3 + [
+        ("北区（小歌剧厅）二层平面图", "north")] * 2
+    got = learn_unit_aliases({"大歌剧厅", "小歌剧厅"}, titled)
+    assert got == {"大歌剧厅": "south", "小歌剧厅": "north"}
+
+
+@pytest.mark.unit
+def test_ambiguous_alias_is_not_learned():
+    """同一别名在两个区都出现 ⇒ 学不出,**判不出就说判不出**。"""
+    from services.level_elevation_consensus import learn_unit_aliases
+
+    titled = [("南区（歌剧厅）", "south"), ("北区（歌剧厅）", "north")]
+    assert learn_unit_aliases({"歌剧厅"}, titled) == {}
+
+
+@pytest.mark.unit
+def test_unseen_alias_is_not_learned():
+    from services.level_elevation_consensus import learn_unit_aliases
+
+    assert learn_unit_aliases({"音乐厅"}, [("南区图", "south")]) == {}
+
+
+@pytest.mark.unit
+def test_split_handles_generic_venue_suffixes():
+    """拆分按**场馆后缀**(厅/馆)泛化,不绑具体名字。"""
+    assert split_unit_from_level("音乐厅2F") == ("音乐厅", "2F")
+    assert split_unit_from_level("体育馆B1") == ("体育馆", "B1")
+
+
+@pytest.mark.unit
+def test_default_unit_does_not_veto_learning():
+    """**默认兜底值没有否决权**:main 是「没匹配上」时给的默认
+    (DEFAULT_UNIT_KEY),不是真实判定。实测「中歌剧厅」的票是
+    south 125 / main 5 / None 14 —— 5 张 default 噪声不该否掉 125 张共识。
+    """
+    from services.level_elevation_consensus import learn_unit_aliases
+
+    titled = [("南区中歌剧厅三层", "south")] * 5 + [("中歌剧厅详图", "main")]
+    got = learn_unit_aliases({"中歌剧厅"}, titled, ignore_units={"main"})
+    assert got == {"中歌剧厅": "south"}
+
+
+@pytest.mark.unit
+def test_two_real_units_still_veto():
+    """真实单体之间的分歧仍然否决 —— 只豁免默认值,不放松一致性。"""
+    from services.level_elevation_consensus import learn_unit_aliases
+
+    titled = [("南区中歌剧厅", "south"), ("北区中歌剧厅", "north")]
+    assert learn_unit_aliases({"中歌剧厅"}, titled, ignore_units={"main"}) == {}
+
+
+@pytest.mark.unit
+def test_shared_target_zone_is_not_remapped():
+    """**实测倒退**:大、中歌剧厅都映到 south,而两厅同名层标高不同
+    (F4: 16.1 vs 14.5)——挤进同一单体互相打架,把链式原本能出的键
+    也炸掉了(合并后 10 层反而变 8 层)。
+
+    楼层表的粒度装不下两个厅,硬塞就是赌。
+    **目标区被多个别名共享 ⇒ 歧义,一个都不映**;独占目标才安全。
+    """
+    from services.level_elevation_consensus import learn_unit_aliases
+
+    titled = ([("南区大歌剧厅", "south")] * 3 + [("南区中歌剧厅", "south")] * 3
+              + [("北区小歌剧厅", "north")] * 3)
+    got = learn_unit_aliases({"大歌剧厅", "中歌剧厅", "小歌剧厅"}, titled)
+    assert got == {"小歌剧厅": "north"}, "south 被两厅共享,不得映射"

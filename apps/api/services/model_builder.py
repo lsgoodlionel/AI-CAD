@@ -1898,13 +1898,50 @@ async def _pairing_z_overrides(db, project_id: str, normalization,
             consensus_conflicts, consensus_overrides, consensus_to_pairs,
         )
 
-        chain_keys = {(p.get("building_unit_key"), p.get("level_name"))
-                      for p in pairs}
+        # **跳过判据必须用归一化楼层键**：「2F」与「小歌剧厅2F」字符串不等
+        # 却归一化到同一层 —— 用原始名判重会让共识对落进链式已占的键，
+        # 触发冲突剔除把原有产出炸掉（实测合并后 10 层反而变 7 层）。
+        # 保守起见按**楼层**判（不含单体）：链式碰过的层共识一律不碰，
+        # 保证合并结果 ⊇ 基线，只增不减。
+        from services.level_elevation_overrides import story_key_for_level_name
+
+        chain_stories = {story_key_for_level_name(p.get("level_name", ""))
+                         for p in pairs}
+        chain_stories.discard(None)
+        known_units = set((normalization.stories_by_building or {}).keys())
+        consensus_items = consensus_overrides(free_pairs)
+        # **从图名共现学「厅 → 区」映射**（零硬编码词表）：厅名单体不在
+        # 楼层表里，而项目图纸自己写着答案 —— 图名「南区（大、中歌剧厅）」
+        # 把厅与区写在一起（实测共现零歧义）。别名来自楼层名，
+        # 映射来自图名+分类器一致票。
+        from services.level_elevation_consensus import learn_unit_aliases
+
+        unknown_aliases = {i["building_unit_key"] for i in consensus_items
+                           if i["building_unit_key"] is not None
+                           and i["building_unit_key"] not in known_units}
+        from services.building_unit_fallback import DEFAULT_UNIT_KEY
+
+        aliases = learn_unit_aliases(unknown_aliases, [
+            (str(d.get("title") or ""),
+             classify_unit_assignment(d).unit_key)
+            for d in (drawings or ())],
+            ignore_units={DEFAULT_UNIT_KEY}) if unknown_aliases else {}
+        if aliases:
+            logger.info("[ModelBuilder] 图名共现学得单体别名 %s", aliases)
         added = 0
-        for item in consensus_overrides(free_pairs):
-            key = (item["building_unit_key"], item["level_name"])
-            if key in chain_keys:
-                continue        # 链式对是单图强证据，优先保留
+        for item in consensus_items:
+            if story_key_for_level_name(item["level_name"]) in chain_stories:
+                continue        # 链式对是单图强证据，它碰过的层不再混入
+            # **厅名单体 → 楼层表单体**：楼层名内嵌的「小歌剧厅」不在楼层表
+            #（那里是 main/north/south），直接送下去会被「该单体没有这一层」
+            # 拒掉（实测 7 条全灭）。映射不硬编码词表 —— 用见证图分类的
+            # 一致票（fallback_unit），从数据学出；学不出就保持原样，
+            # 由下游如实拒绝。
+            unit = item["building_unit_key"]
+            if unit is not None and unit not in known_units:
+                target = aliases.get(unit) or item.get("fallback_unit")
+                if target in known_units:
+                    item = {**item, "building_unit_key": target}
             # **按见证图数展开**：下游 build_z_overrides 有 MIN_SAMPLES=2，
             # 单条会被当孤证杀掉（实测 19 层补进去、产出纹丝不动）。
             # N 张见证图就是 N 个独立样本，展开是如实表示。
