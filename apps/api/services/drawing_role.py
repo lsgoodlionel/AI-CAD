@@ -99,6 +99,13 @@ _TERM_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"平面图|平面布置|平面$"), ROLE_COMPONENT_SOURCE),
 )
 
+#: 楼层平面图：`N层平面…` / `NF平面…`（N 为中文或阿拉伯数字）。
+#: 「平面布置」也算 —— 实测第二工程建筑专业用的正是 `2F平面布置图`。
+_FLOOR_PLAN_RE = re.compile(
+    r"(?:[一二三四五六七八九十百]+|\d{1,3})\s*(?:层|F)\s*平面"
+    r"|首层平面|地下[一二三四五六七八九十\d]+层平面")
+
+
 # ── 第 3 级：编号模式 ──
 
 #: 编号段：去掉最后一节流水号。`A-10-04C` → `A-10`；`JZ-SG-01-02` → `JZ-SG-01`。
@@ -190,6 +197,17 @@ def _by_term(drawing: Mapping[str, Any]) -> RoleResult | None:
     # 源的先后即权威性：title > drawing_no > filename。
     sources = [str(drawing.get(key) or "").strip()
                for key in ("title", "drawing_no", "filename")]
+    # **建筑专业的楼层平面图 = 楼层骨架**（国标专业分工）。
+    # 原规则只认「完整平面图|平面总图|整体平面」—— 那是大歌剧院这家院的
+    # 措辞；轨道交通就叫「六层平面图」，实测 11 张全判成了构件来源。
+    # 判据不绑措辞：建筑专业的平面图定义楼层轮廓与房间，是骨架；
+    # 结构/机电/装饰的平面图表达构件与管线，是构件来源。
+    if str(drawing.get("discipline") or "").lower() == "architecture":
+        for text in sources:
+            if _FLOOR_PLAN_RE.search(text):
+                return RoleResult(
+                    ROLE_FLOOR_SKELETON, CONF_TERM, "term",
+                    f"建筑专业的楼层平面图「{text}」——定义楼层轮廓与房间")
     for pattern, role in _TERM_RULES:
         for text in sources:
             if text and pattern.search(text):

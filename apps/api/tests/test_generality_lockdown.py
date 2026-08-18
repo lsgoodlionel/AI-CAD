@@ -243,3 +243,54 @@ def test_plan_detail_is_also_a_detail():
 
     hit = match_view_type_keyword("卫生间平面大样图")
     assert hit and hit.view_type == VIEW_TYPE_DETAIL
+
+
+# ── 楼层骨架的识别不该依赖「完整」二字 ──────────────────────────
+
+@pytest.mark.unit
+def test_architectural_floor_plan_is_a_floor_skeleton():
+    """**实测缺陷**:第二工程建筑专业有 11 张「N层平面图」,
+    是楼层骨架却全判成 `component_source`。
+
+    原规则是 `完整平面图|平面总图|整体平面` —— 「完整平面图」是
+    **大歌剧院这家院的措辞**,轨道交通就叫「六层平面图」。
+
+    通用判据取自国标专业分工:**建筑专业的楼层平面图定义楼层轮廓与房间**,
+    是骨架;结构/机电的平面图表达构件与管线,是构件来源。
+    """
+    from services.drawing_role import ROLE_FLOOR_SKELETON, classify_role
+
+    for title in ("六层平面图", "2F平面布置图", "首层平面图"):
+        got = classify_role(
+            {"title": title, "discipline": "architecture"})
+        assert got.role == ROLE_FLOOR_SKELETON, title
+
+
+@pytest.mark.unit
+def test_structural_floor_plan_is_a_component_source():
+    """**不得把结构平面图也升级** —— 它表达构件,不定义楼层轮廓。"""
+    from services.drawing_role import ROLE_COMPONENT_SOURCE, classify_role
+
+    got = classify_role(
+        {"title": "六层梁配筋平面图", "discipline": "structure"})
+    assert got.role == ROLE_COMPONENT_SOURCE
+
+
+@pytest.mark.unit
+def test_the_original_phrase_still_works():
+    """大歌剧院的「完整平面图」措辞不受影响。"""
+    from services.drawing_role import ROLE_FLOOR_SKELETON, classify_role
+
+    got = classify_role(
+        {"title": "地下一层完整平面图", "discipline": "architecture"})
+    assert got.role == ROLE_FLOOR_SKELETON
+
+
+@pytest.mark.unit
+def test_decoration_plan_is_not_a_skeleton():
+    """装饰/幕墙的平面布置图也不是楼层骨架(实测各有 9、8 张)。"""
+    from services.drawing_role import ROLE_COMPONENT_SOURCE, classify_role
+
+    got = classify_role(
+        {"title": "2F平面布置图", "discipline": "decoration"})
+    assert got.role == ROLE_COMPONENT_SOURCE
