@@ -94,12 +94,23 @@ def _collect_pdf_drawings(page, geom: DrawingGeometry) -> None:
 
 
 def _collect_pdf_texts(page, geom: DrawingGeometry) -> None:
+    """收集矢量文字。**坏 CMap 的乱码不收** —— 见 `text_integrity`。
+
+    第二工程(轨道交通)实测:有文字的页里 29.4% 是未嵌入 ToUnicode
+    的子集字体,字形画得对但字符码映射丢了,提取出的是
+    「语法有效的垃圾」。大歌剧院是取不到(空 → 安全降级 OCR),
+    这里是**取得到但是错的** —— 下游(比例读取、标高抽取、构件标签)
+    全都信任 `geom.texts`,不拦就是**静默污染**。
+    """
+    from core.model3d.text_integrity import is_trustworthy_text
+
     for word in page.get_text("words"):
         if len(geom.texts) >= MAX_PRIMITIVES:
             return
         x0, y0, _x1, _y1, content = word[0], word[1], word[2], word[3], word[4]
-        if str(content).strip():
-            geom.texts.append((float(x0), float(y0), str(content).strip()))
+        text = str(content).strip()
+        if text and is_trustworthy_text(text):
+            geom.texts.append((float(x0), float(y0), text))
 
 
 def extract_dxf_geometry(data: bytes) -> DrawingGeometry:
