@@ -162,6 +162,18 @@ def match_view_type_keyword(text: str | None) -> ViewTypeKeywordHit | None:
     """
     if not text:
         return None
+    # **图种声明优先于表达手法**（第二工程实测 310 张误判）：
+    # 「详图/大样/节点」是显式的图种声明，「剖」「平面」只是画法。
+    # 幕墙的「横剖节点详图」是局部构造详图，不是表达层高关系的剖面图 ——
+    # 误判会让 section-z 拿幕墙节点去找楼层标高。
+    detail = _VIEW_DETAIL_RE.search(text)
+    if detail:
+        for pattern, _view_type in _VIEW_TYPE_RULES[:-1]:
+            if pattern.search(text):
+                return ViewTypeKeywordHit(
+                    view_type=VIEW_TYPE_DETAIL, keyword=detail.group(0),
+                    span=detail.span()
+                )
     for pattern, view_type in _VIEW_TYPE_RULES:
         match = pattern.search(text)
         if match:

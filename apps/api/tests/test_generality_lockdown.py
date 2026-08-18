@@ -196,3 +196,50 @@ def test_real_units_survive_the_stricter_token():
     got = discover_sub_units(["大歌剧厅3F", "大歌剧厅4F",
                               "小歌剧厅2F", "小歌剧厅4F"])
     assert got == {"大歌剧厅", "小歌剧厅"}
+
+
+# ── 第二工程实测:剖切**手法** vs 详图**图种** ──────────────────
+
+@pytest.mark.unit
+def test_node_detail_drawn_in_section_is_a_detail():
+    """**实测 310 张**:幕墙「横剖节点详图」被判成 section。
+
+    区别是实质性的:**剖面图**表达整栋的层高/标高关系(建模靠它恢复 z),
+    **节点详图**是局部构造,用剖切方式画而已。误判会让 section-z
+    拿幕墙节点去找楼层标高。
+
+    通用判据:「详图/大样/节点」是**显式图种声明**,
+    「剖」只是**表达手法** —— 共现时图种声明优先。
+    """
+    from services.drawing_filename_parser import (
+        VIEW_TYPE_DETAIL, match_view_type_keyword,
+    )
+
+    for title in ("C1玻璃幕墙横剖节点详图", "C6明框幕墙横剖节点图",
+                  "地面通用节点大样图", "竖剖节点大样"):
+        hit = match_view_type_keyword(title)
+        assert hit and hit.view_type == VIEW_TYPE_DETAIL, title
+
+
+@pytest.mark.unit
+def test_a_real_section_is_still_a_section():
+    """**不得误伤真剖面** —— 大歌剧院靠剖面图恢复标高(13 个候选)。"""
+    from services.drawing_filename_parser import (
+        VIEW_TYPE_SECTION, match_view_type_keyword,
+    )
+
+    for title in ("基坑支护剖面图（三）", "1-1剖面图", "建筑剖面图",
+                  "地下连续墙配筋剖面图（二）"):
+        hit = match_view_type_keyword(title)
+        assert hit and hit.view_type == VIEW_TYPE_SECTION, title
+
+
+@pytest.mark.unit
+def test_plan_detail_is_also_a_detail():
+    """同理:平面词与详图词共现时也归详图。"""
+    from services.drawing_filename_parser import (
+        VIEW_TYPE_DETAIL, match_view_type_keyword,
+    )
+
+    hit = match_view_type_keyword("卫生间平面大样图")
+    assert hit and hit.view_type == VIEW_TYPE_DETAIL

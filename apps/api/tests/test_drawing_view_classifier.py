@@ -27,7 +27,8 @@ from services.drawing_view_classifier import ViewTypeResult, classify_view_type
         ("A-A剖面图", VIEW_TYPE_SECTION),
         ("1-1剖面", VIEW_TYPE_SECTION),
         ("楼梯剖视图", VIEW_TYPE_SECTION),
-        ("墙身剖切详图", VIEW_TYPE_SECTION),
+        # 局部构造详图，非表达整栋层高的剖面
+        ("墙身剖切详图", VIEW_TYPE_DETAIL),
         ("南立面图", VIEW_TYPE_ELEVATION),
         ("①-⑨立面", VIEW_TYPE_ELEVATION),
         ("East Elevation", VIEW_TYPE_ELEVATION),
@@ -47,10 +48,22 @@ def test_match_view_type_keyword_basic(text, expected):
 
 
 @pytest.mark.unit
-def test_match_view_type_priority_section_over_detail():
-    """剖面与详图并存 → 剖面胜（保留 z 信息，剖/立面召回优先）"""
+def test_match_view_type_priority_detail_over_section():
+    """详图与剖切并存 → **详图胜**（第二工程实测 310 张误判后更正）。
+
+    旧规则是「剖面胜，保留 z 信息，召回优先」。但 `section` 的**唯一
+    实质用途**是从剖面图恢复楼层标高（`model_builder._section_levels`），
+    而「楼梯剖面大样」「幕墙横剖节点详图」这类局部构造详图
+    **根本不表达整栋层高** —— 召回它们不是提高召回，是引入噪声。
+
+    通用判据：「详图/大样/节点」是**显式图种声明**，
+    「剖」只是**表达手法**。
+
+    实测影响：轨道交通排除 310 张伪剖面；
+    **大歌剧院 24 张真剖面零受影响**（无一含详图词）。
+    """
     hit = match_view_type_keyword("楼梯剖面大样图")
-    assert hit.view_type == VIEW_TYPE_SECTION
+    assert hit.view_type == VIEW_TYPE_DETAIL
 
 
 @pytest.mark.unit
@@ -60,9 +73,10 @@ def test_match_view_type_priority_elevation_over_plan():
 
 
 @pytest.mark.unit
-def test_match_view_type_priority_plan_over_detail():
+def test_match_view_type_priority_detail_over_plan():
+    """同理：平面词与详图词并存时也归详图（图种声明优先于画法）。"""
     hit = match_view_type_keyword("标准层平面大样")
-    assert hit.view_type == VIEW_TYPE_PLAN
+    assert hit.view_type == VIEW_TYPE_DETAIL
 
 
 @pytest.mark.unit
@@ -234,11 +248,11 @@ _SAMPLE_SET: tuple[tuple[dict, str], ...] = (
     ({"title": "1-1剖面图"}, VIEW_TYPE_SECTION),
     ({"title": "A-A剖面图"}, VIEW_TYPE_SECTION),
     ({"title": "楼梯剖面图"}, VIEW_TYPE_SECTION),
-    ({"title": "墙身剖面大样"}, VIEW_TYPE_SECTION),
+    ({"title": "墙身剖面大样"}, VIEW_TYPE_DETAIL),
     ({"title": "2-2剖视图"}, VIEW_TYPE_SECTION),
     ({"filename": "结施-31 B-B剖面.pdf"}, VIEW_TYPE_SECTION),
     ({"title": "电梯井道剖面图"}, VIEW_TYPE_SECTION),
-    ({"title": "承台剖面详图"}, VIEW_TYPE_SECTION),
+    ({"title": "承台剖面详图"}, VIEW_TYPE_DETAIL),
     ({"title": "南立面图"}, VIEW_TYPE_ELEVATION),
     ({"title": "北立面图"}, VIEW_TYPE_ELEVATION),
     ({"title": "东立面图"}, VIEW_TYPE_ELEVATION),
