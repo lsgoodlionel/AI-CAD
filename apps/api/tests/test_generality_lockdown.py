@@ -144,3 +144,55 @@ def test_bare_digits_are_not_floor_tokens():
 
     assert split_level_prefix("AHU3") == (None, "AHU3")
     assert split_level_prefix("大歌剧厅3F") == ("大歌剧厅", "3F")
+
+
+# ── 第二工程(轨道交通调度大楼)实测:楼层表达被误拆成幽灵单体 ────────
+
+@pytest.mark.unit
+def test_negative_floor_is_not_a_unit():
+    """**实测幽灵单体「负」**(17 例):`负3F` 是「地下三层」的写法,
+    `\\d{1,2}F` 从索引 1 匹配,把「负」剩成了前缀。
+
+    它通过了所有既有闸门(含中文✓、无禁用标点✓、≥2 个不同楼层✓)——
+    **闸门再多也挡不住 token 本身划错边界**。
+    """
+    from services.sub_unit_discovery import discover_sub_units, split_level_prefix
+
+    assert split_level_prefix("负3F隔墙图") == (None, "负3F隔墙图")
+    assert discover_sub_units(["负3F隔墙图", "负2F平顶尺寸图",
+                               "负1F综合平顶图"]) == set()
+
+
+@pytest.mark.unit
+def test_roof_top_structure_is_not_a_unit():
+    """**实测幽灵单体「出」**(2 例):「出屋面」是完整楼层表达
+    (屋面以上构筑物层),不是「出」+「屋面」。"""
+    from services.sub_unit_discovery import discover_sub_units, split_level_prefix
+
+    assert split_level_prefix("出屋面结构平面图")[0] is None
+    assert discover_sub_units(["出屋面结构平面图",
+                               "出屋面梁、幕墙构架平面整体配筋图"]) == set()
+
+
+@pytest.mark.unit
+def test_a_single_building_yields_no_sub_units():
+    """**单体建筑就该发现 0 个子单体** —— 这才是正确答案。
+
+    轨道交通调度大楼是 9 层 + B3 的单体办公楼,此前却「发现」了
+    「负」「出」两个,全是假的。
+    """
+    from services.sub_unit_discovery import discover_sub_units
+
+    names = ["负3F隔墙图", "负2F平顶尺寸图", "负1F综合平顶图",
+             "出屋面结构平面图", "3F平面布置图", "7F铝板收口节点图"]
+    assert discover_sub_units(names) == set()
+
+
+@pytest.mark.unit
+def test_real_units_survive_the_stricter_token():
+    """收紧不得误伤真单体 —— 大歌剧院的三个厅仍要发现得出。"""
+    from services.sub_unit_discovery import discover_sub_units
+
+    got = discover_sub_units(["大歌剧厅3F", "大歌剧厅4F",
+                              "小歌剧厅2F", "小歌剧厅4F"])
+    assert got == {"大歌剧厅", "小歌剧厅"}
