@@ -69,28 +69,36 @@ def _collect_pdf_drawings(page, geom: DrawingGeometry) -> None:
             return
         filled = drawing.get("fill") is not None
         path_points: list[tuple[float, float]] = []
-        # PDF 无图层/块概念：并行列表统一填 ""（经 _add_* 保证对齐）
+        # **PDF 也可能带图层**（OCG / 可选内容组）。
+        # 此处原本写着「PDF 无图层/块概念」统一填 "" —— 那个假设对
+        # 大歌剧院成立（0 图层），对第二工程不成立：实测图元
+        # **100% 带 layer**（51688/51689），图层名遵循 AIA 规范
+        # （S-BEAM 梁 / S-COLS 柱）。`DrawingGeometry` 的 `*_layers`
+        # 并行列表与下游 `_find_slabs(polys, poly_layers, …)` 早已就位，
+        # 一直在等一个非空值。无图层时仍填 ""，契约不变。
+        layer = str(drawing.get("layer") or "")
         for item in drawing.get("items", []):
             kind = item[0]
             if kind == "l":
                 p0, p1 = item[1], item[2]
-                _add_line(geom, p0.x, p0.y, p1.x, p1.y)
+                _add_line(geom, p0.x, p0.y, p1.x, p1.y, layer)
                 path_points.extend([(p0.x, p0.y), (p1.x, p1.y)])
             elif kind == "re":
                 rect = item[1]
-                _add_rect(geom, rect.x0, rect.y0, rect.width, rect.height, filled)
+                _add_rect(geom, rect.x0, rect.y0, rect.width, rect.height,
+                          filled, layer)
             elif kind == "qu":
                 quad = item[1]
                 pts = [(p.x, p.y) for p in (quad.ul, quad.ur, quad.lr, quad.ll)]
-                _add_poly(geom, pts)
+                _add_poly(geom, pts, layer)
             elif kind == "c":
                 # 贝塞尔曲线：按端点折线化
                 p0, p3 = item[1], item[4]
-                _add_line(geom, p0.x, p0.y, p3.x, p3.y)
+                _add_line(geom, p0.x, p0.y, p3.x, p3.y, layer)
                 path_points.extend([(p0.x, p0.y), (p3.x, p3.y)])
         # 填充路径且首尾闭合 → 记为多边形（柱等实体填充识别依赖）
         if filled and len(path_points) >= 3:
-            _add_poly(geom, path_points)
+            _add_poly(geom, path_points, layer)
 
 
 def _collect_pdf_texts(page, geom: DrawingGeometry) -> None:

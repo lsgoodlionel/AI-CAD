@@ -79,3 +79,85 @@ def test_empty_layer_is_safe():
     """大歌剧院 0 图层 —— 空输入必须安全返回,不能抛也不能瞎猜。"""
     assert classify_by_layer(None) is None
     assert classify_by_layer("") is None
+
+
+# ── PDF 图层要真正流进几何(下游一直在等,上游没给)─────────────────
+
+@pytest.mark.unit
+def test_pdf_paths_carry_their_layer_into_geometry():
+    """**核心用例**:`DrawingGeometry` 早有 `*_layers` 并行列表,
+    下游 `_find_slabs(polys, poly_layers, ...)` 也一直在接收 ——
+    但 PDF 提取处写着「PDF 无图层/块概念」,统一填空串。
+
+    那个假设对大歌剧院成立(0 图层),对第二工程不成立:
+    实测图元 **100% 带 layer**(51688/51689)。
+    """
+    from core.model3d.geometry_extractor import _collect_pdf_drawings
+    from core.model3d.types import DrawingGeometry
+
+    class _P:
+        def __init__(self, x, y):
+            self.x, self.y = x, y
+
+    class _Rect:
+        x0, y0, width, height = 0.0, 0.0, 10.0, 10.0
+
+    drawings = [
+        {"fill": None, "layer": "PLAN_F01$0$0S-BEAM-I",
+         "items": [("l", _P(0, 0), _P(10, 0))]},
+        {"fill": (0, 0, 0), "layer": "COLS_F01$0$0S-COLS-HATCH",
+         "items": [("re", _Rect())]},
+    ]
+    class _Page:
+        def get_drawings(self):
+            return drawings
+
+    geom = DrawingGeometry()
+    _collect_pdf_drawings(_Page(), geom)
+
+    assert geom.line_layers == ["PLAN_F01$0$0S-BEAM-I"]
+    assert geom.rect_layers == ["COLS_F01$0$0S-COLS-HATCH"]
+
+
+@pytest.mark.unit
+def test_pdf_without_layers_still_fills_empty_strings():
+    """**无图层 PDF 不得退化**:大歌剧院走的就是这条路,
+    并行列表必须仍与几何等长(下游依赖该契约)。"""
+    from core.model3d.geometry_extractor import _collect_pdf_drawings
+    from core.model3d.types import DrawingGeometry
+
+    class _P:
+        def __init__(self, x, y):
+            self.x, self.y = x, y
+
+    class _Page:
+        def get_drawings(self):
+            return [{"fill": None, "items": [("l", _P(0, 0), _P(1, 1))]}]
+
+    geom = DrawingGeometry()
+    _collect_pdf_drawings(_Page(), geom)
+    assert geom.line_layers == [""]
+    assert len(geom.line_layers) == len(geom.lines)
+
+
+@pytest.mark.unit
+def test_filled_path_polygon_also_carries_the_layer():
+    """填充路径合成的多边形(柱识别依赖它)同样要带图层。"""
+    from core.model3d.geometry_extractor import _collect_pdf_drawings
+    from core.model3d.types import DrawingGeometry
+
+    class _P:
+        def __init__(self, x, y):
+            self.x, self.y = x, y
+
+    class _Page:
+        def get_drawings(self):
+            return [{
+                "fill": (0, 0, 0), "layer": "COLS_F01$0$0S-COLS-I",
+                "items": [("l", _P(0, 0), _P(1, 0)),
+                          ("l", _P(1, 0), _P(1, 1))],
+            }]
+
+    geom = DrawingGeometry()
+    _collect_pdf_drawings(_Page(), geom)
+    assert geom.poly_layers and geom.poly_layers[-1] == "COLS_F01$0$0S-COLS-I"
