@@ -50,23 +50,48 @@ def _robust_range(values: list[float]) -> tuple[float, float]:
 SYSTEM_WORLD = "world"
 SYSTEM_LOCAL = "local"
 
-#: 世界坐标系(工程坐标)的实测区间：大歌剧院锚点落在 −6326 ~ −6065。
-#: 留足余量以适配其他工程,但要与局部坐标(图幅尺度)拉开距离。
-WORLD_RANGE = (-100000.0, -1000.0)
+#: 动态区间外扩的余量比例。锚点只覆盖有标注的角落,构件会超出一些。
+_WORLD_RANGE_MARGIN = 0.5
+
+#: 区间最小外扩(米):锚点聚得很拢时按比例外扩不够用。
+_WORLD_RANGE_MIN_PAD = 500.0
 
 
-def coordinate_system_of(value: float) -> str:
+def world_range_from_anchors(
+    world_values: list[float] | None,
+) -> tuple[float, float] | None:
+    """从**项目自己的锚点**推导工程坐标区间;无锚点 → None(无世界坐标概念)。
+
+    **为什么不能写死**(通用性审计):旧常量 (-100000, -1000) 假定
+    「工程坐标为负几千米」—— 那是大歌剧院的坐标系特征。
+    正值城市坐标系(X≈40000)的工程,分组判据会把世界坐标全判成局部。
+    工程坐标系因项目而异,唯一可靠的来源是该项目已解出的锚点。
+    """
+    values = [float(v) for v in (world_values or []) if v is not None]
+    if not values:
+        return None
+    lo, hi = min(values), max(values)
+    pad = max((hi - lo) * _WORLD_RANGE_MARGIN, _WORLD_RANGE_MIN_PAD)
+    return lo - pad, hi + pad
+
+
+def coordinate_system_of(
+    value: float, world_range: tuple[float, float] | None = None,
+) -> str:
     """一个坐标值属于哪个坐标系。
 
-    局部米坐标是图幅尺度（3370pt × 1:150 ≈ 178 米）,
-    而工程坐标是几千米量级 —— 两者相差一个数量级以上,不会混淆。
+    `world_range` 来自 `world_range_from_anchors`;**不传即无世界坐标概念**
+    ——没有锚点的项目一切都是局部,这正是事实。
     """
-    lo, hi = WORLD_RANGE
+    if world_range is None:
+        return SYSTEM_LOCAL
+    lo, hi = world_range
     return SYSTEM_WORLD if lo <= float(value) <= hi else SYSTEM_LOCAL
 
 
 def elements_bounds(
     elements: dict, system: str | None = None,
+    world_range: tuple[float, float] | None = None,
 ) -> tuple[float, float, float, float] | None:
     """楼层构件包络 (min_x, max_x, min_y, max_y);无构件返回 None。
 
@@ -84,7 +109,7 @@ def elements_bounds(
     # 把包络撑到 6513 米，于是好轴网被判成「跨度过小」。
     # 设备同理：它的位置本就是由楼层包络反推的，不能反过来定义包络。
     def take(x: float, y: float) -> None:
-        if system is not None and coordinate_system_of(x) != system:
+        if system is not None and coordinate_system_of(x, world_range) != system:
             return
         xs.append(x)
         ys.append(y)
@@ -113,7 +138,9 @@ def axes_bounds(axes: dict) -> tuple[float, float, float, float] | None:
     return min(xc), max(xc), min(yc), max(yc)
 
 
-def axes_plausible(axes: dict, elements: dict) -> tuple[bool, str]:
+def axes_plausible(axes: dict, elements: dict,
+                   world_range: tuple[float, float] | None = None,
+                   ) -> tuple[bool, str]:
     """轴网是否与构件坐标系自洽 → (是否可用, 原因)。
 
     三条判据：
@@ -132,8 +159,8 @@ def axes_plausible(axes: dict, elements: dict) -> tuple[bool, str]:
         return False, "轴网非双向(缺 x 或 y)"
     # **在轴网自己的坐标系内比较**（J7）：scene 里世界坐标(−6300 附近)与
     # 局部坐标(0~300)并存,拿全体构件求基准会得到跨 6000 米的假包络。
-    system = coordinate_system_of((ab[0] + ab[1]) / 2)
-    eb = elements_bounds(elements, system=system)
+    system = coordinate_system_of((ab[0] + ab[1]) / 2, world_range)
+    eb = elements_bounds(elements, system=system, world_range=world_range)
     if eb is None:
         # 该坐标系里没有构件 —— 退回全体,总比无从校验强;
         # 但这说明轴网与构件不在同一坐标系,本身就值得存疑。
@@ -163,7 +190,9 @@ def axes_plausible(axes: dict, elements: dict) -> tuple[bool, str]:
     return True, "轴网与构件坐标系自洽"
 
 
-def filter_scene_axes(floors: list[dict]) -> dict:
+def filter_scene_axes(floors: list[dict],
+                      world_range: tuple[float, float] | None = None,
+                      ) -> dict:
     """对 scene 各层轴网做合理性校验,**剔除坐标系不一致者**(置 None)。
 
     返回 {kept, dropped, details}。宁可无轴网(降级米坐标兜底),也不要错轴网——
@@ -180,7 +209,8 @@ def filter_scene_axes(floors: list[dict]) -> dict:
         if floor.get("axes_source") == "manual":
             kept += 1
             continue
-        ok, reason = axes_plausible(axes, floor.get("elements") or {})
+        ok, reason = axes_plausible(axes, floor.get("elements") or {},
+                                    world_range)
         if ok:
             kept += 1
         else:

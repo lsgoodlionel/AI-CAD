@@ -22,20 +22,16 @@ from typing import Any
 #: 同一张图重复条目不算 —— 那只是同一处标注被抽了两次。
 MIN_WITNESS_DRAWINGS = 2
 
-#: 楼层名里内嵌的单体：**场馆后缀**模式（…厅 / …馆），不绑具体名字
-#:（用户约束：名称体系不得硬编码）。楼层名写在图上，比外部分类器可靠。
-_UNIT_IN_LEVEL_RE = re.compile(r"^([\u4e00-\u9fff]{1,6}?[厅馆])(?=\S)")
-
-
 def split_unit_from_level(level_name: str) -> tuple[str | None, str]:
-    """「大歌剧厅3F」→ ("大歌剧厅", "3F")；无内嵌单体 → (None, 原名)。"""
-    name = str(level_name or "").strip()
-    matched = _UNIT_IN_LEVEL_RE.match(name)
-    if not matched:
-        return None, name
-    unit = matched.group(1)
-    rest = name[len(unit):].strip()
-    return unit, rest or name
+    """「大歌剧厅3F」→ ("大歌剧厅", "3F")；无内嵌单体 → (None, 原名)。
+
+    委托给通用的 `split_level_prefix`（**零后缀词表**，通用性审计修复）：
+    「××厅」是剧院命名、「A栋」是住宅的 —— 任何后缀词表只覆盖一类工程。
+    通用的是结构：楼层名 = [子单体前缀] + 标准层 token。
+    """
+    from services.sub_unit_discovery import split_level_prefix
+
+    return split_level_prefix(level_name)
 
 
 def _keyed(pairs: list[dict] | None):

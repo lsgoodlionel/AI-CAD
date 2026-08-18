@@ -726,6 +726,10 @@ def _quality_payload(
             key: [_serialize_story_level(level) for level in levels]
             for key, levels in normalization.stories_by_building.items()
         },
+        # 子单体报告（架构待办「厅级单体粒度」数据层）：发现的子单体
+        # 与其共识标高 —— 楼层表装不下的粒度先可见，重构才有依据。
+        "sub_units": getattr(_pairing_z_overrides,
+                             "last_sub_unit_report", None) or {"discovered": []},
         # 轴距异常汇总：**只标记不修正** —— 实测 253 张异常里 183 张
         # 是轴线误检（轴距 0.07~0.49 米不可能是柱网），只有 70 张是比例问题。
         # 两者从数据上分不开，猜错会把构件坐标改坏（上一版正因此回退）。
@@ -985,8 +989,25 @@ async def _attach_floor_elements(
     # 轴网合理性校验:剔除坐标系与构件不一致的轴网(实测某层轴网偏离 700+ 米,
     # 既让 3D 轴线远离主体,又让 grid_cell 关联主键全错)。宁可无轴网走米坐标兜底。
     try:
-        from services.axes_validation import filter_scene_axes
-        axes_stat = filter_scene_axes(floors)
+        from services.axes_validation import (
+            filter_scene_axes, world_range_from_anchors,
+        )
+
+        # **工程坐标区间从项目自己的锚点推导**(通用性审计修复):
+        # 旧常量 (-100000,-1000) 假定「工程坐标为负几千米」,
+        # 那是大歌剧院的特征;正值城市坐标系的工程会全判成局部。
+        try:
+            anchor_rows = await db.fetch_all(
+                "SELECT world_x, world_y FROM axis_intersections "
+                "WHERE project_id = CAST(:p AS uuid) "
+                "  AND world_x IS NOT NULL", {"p": project_id})
+            world_values = [float(r["world_x"]) for r in anchor_rows] + [
+                float(r["world_y"]) for r in anchor_rows
+                if r["world_y"] is not None]
+        except Exception:  # noqa: BLE001 — 查不到就当无世界坐标,全按局部
+            world_values = []
+        axes_stat = filter_scene_axes(
+            floors, world_range_from_anchors(world_values))
         if axes_stat["dropped"]:
             logger.warning("[ModelBuilder] 剔除不自洽轴网 %s 层: %s",
                            axes_stat["dropped"],
@@ -1948,9 +1969,29 @@ async def _pairing_z_overrides(db, project_id: str, normalization,
             pairs.extend(consensus_to_pairs([item]))
             added += 1
         conflicts = consensus_conflicts(free_pairs)
+        # **子单体发现**(架构待办「厅级单体粒度」的数据层落地):
+        # 大歌剧厅 F4=16.1 与中歌剧厅 F4=14.5 装不进 main/south/north 的
+        # 楼层表 —— 先把子单体与其共识标高**发现并报出**,楼层表粒度
+        # 重构才有承载对象。发现机制零后缀词表(见 sub_unit_discovery)。
+        from services.sub_unit_discovery import discover_sub_units
+
+        all_level_names = [str(i.get("content") or "")
+                           for items in levels.values() for i in items]
+        sub_units = discover_sub_units(all_level_names)
+        sub_unit_levels = [
+            i for i in consensus_items
+            if i["building_unit_key"] in sub_units]
+        _pairing_z_overrides.last_sub_unit_report = {
+            "discovered": sorted(sub_units),
+            "consensus_levels": sub_unit_levels,
+            "conflicts": conflicts,
+        }
         if added or conflicts:
             logger.info("[ModelBuilder] 标高跨图共识补 %d 层,冲突待人判 %d 处",
                         added, len(conflicts))
+        if sub_units:
+            logger.info("[ModelBuilder] 发现子单体 %s,厅级标高 %d 条",
+                        sorted(sub_units), len(sub_unit_levels))
         if not pairs:
             return {}
 
