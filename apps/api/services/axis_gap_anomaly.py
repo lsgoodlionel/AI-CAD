@@ -30,11 +30,22 @@ GAP_SANE_RANGE_M = (2.0, 30.0)
 DEVIATION_FACTOR = 2.0
 
 
+#: 多少张图给出同一尺度，就不再按「工程合理区间」判它为噪声。
+#: **噪声不会在多张图上撞出同一个值** —— 沿用本项目一贯的
+#: 「孤证不立，多证可立」。
+MIN_WITNESSES_TO_TRUST_SCALE = 2
+
+
 def detect_gap_anomaly(
     drawing_id: str, gap_m: float | None, consensus_m: float | None,
-    samples: int = 0,
+    samples: int = 0, witnesses: int = 1,
 ) -> dict[str, Any] | None:
     """该图轴距是否异常 → 证据（正常返回 None）。
+
+    `witnesses` 是**给出同一轴距的图数**。实测第二工程 4 张不同的
+    支撑平面布置图给出完全相同的 **45.6 米** —— 超出
+    `GAP_SANE_RANGE_M` 上限（30 米），但那个区间是按**房建柱网**标定的，
+    而基坑支撑体系跨越整个基坑，几十米是真实尺度。
 
     **不给「建议比例」**：反推不成立，给了就是诱导人接受错值。
     """
@@ -46,6 +57,11 @@ def detect_gap_anomaly(
         return None
 
     low, high = GAP_SANE_RANGE_M
+    # **上限可被多图共识豁免**：几十米的轴距在基坑/厂房里是真实尺度。
+    # **下限不豁免** —— 多张桩位图一致给出 0.3 米仍是符号误检：
+    # §8 定位轴线用于主要承重构件定位，不可能这么密。
+    if gap_m > high and witnesses >= MIN_WITNESSES_TO_TRUST_SCALE:
+        return None
     if gap_m < low or gap_m > high:
         cause = ("轴线检测噪声——这个间距不可能是柱网"
                  "（多半把两条紧邻的线、或非轴线的构造线当成了轴网）")

@@ -103,3 +103,51 @@ def test_summary_groups_by_cause():
 @pytest.mark.unit
 def test_summary_of_nothing_is_safe():
     assert summarize_gap_anomalies([])["count"] == 0
+
+
+# ── 多图共识的尺度不是噪声(第二工程实测)─────────────────────────
+
+@pytest.mark.unit
+def test_cross_drawing_consensus_exempts_the_sane_range():
+    """**实测**:4 张不同的支撑平面布置图给出完全相同的 **45.6 米**轴距。
+
+    45.6 超出 `GAP_SANE_RANGE_M` 上限(30 米),会被判为「轴线检测噪声」——
+    但那个区间是按**房建柱网**标定的,而基坑支撑体系跨越整个基坑,
+    几十米是真实尺度。
+
+    判据复用本项目一贯的「孤证不立,多证可立」:
+    **多张图给出同一尺度就不是噪声** —— 噪声不会在多张图上撞出同一个值。
+    """
+    got = detect_gap_anomaly("d1", 45.6, consensus_m=45.6, samples=8,
+                             witnesses=4)
+    assert got is None, "4 张图一致背书,不该判为噪声"
+
+
+@pytest.mark.unit
+def test_a_lone_outlier_is_still_flagged():
+    """**孤证仍要标记** —— 单张图的离谱轴距照旧是可疑的。"""
+    got = detect_gap_anomaly("d1", 45.6, consensus_m=8.0, samples=8,
+                             witnesses=1)
+    assert got is not None
+
+
+@pytest.mark.unit
+def test_consensus_does_not_excuse_sub_metre_gaps():
+    """**下限不豁免**:多张桩位图一致给出 0.3 米,那仍是符号误检 ——
+    定位轴线不可能这么密(§8 用于主要承重构件定位)。
+
+    **已知局限**(写在这里以免被当成 bug):若**整个项目**都是噪声,
+    共识本身就是噪声值,`ratio` 会落在正常区间而提前返回 None ——
+    判不出来。跨图共识对付的是「少数图偏离多数」,
+    对付不了「全体一致地错」。
+    """
+    got = detect_gap_anomaly("d1", 0.3, consensus_m=8.0, samples=10,
+                             witnesses=5)
+    assert got is not None
+    assert "噪声" in got["likely_cause"]
+
+
+@pytest.mark.unit
+def test_witnesses_default_keeps_old_behaviour():
+    """不传 witnesses 时行为不变(向后兼容)。"""
+    assert detect_gap_anomaly("d1", 45.6, consensus_m=8.0, samples=8) is not None

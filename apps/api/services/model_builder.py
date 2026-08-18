@@ -2156,8 +2156,17 @@ async def _axis_gap_anomalies(db: Any, project_id: str) -> dict:
         if len(stats) < 2:
             return {"count": 0}
         consensus = float(median([g for g, _n in stats.values()]))
+        # **同一轴距被几张图给出** —— 多图共识可豁免「工程合理区间」上限。
+        # 实测第二工程 4 张支撑平面布置图一致给出 45.6 米：超出按房建
+        # 柱网标定的 30 米上限，但那是基坑支撑的真实跨度。
+        # 按 0.5 米分桶计票 —— 完全相等太苛刻，识别误差会打散共识。
+        witness_count: dict[float, int] = {}
+        for gap, _n in stats.values():
+            bucket = round(gap * 2) / 2
+            witness_count[bucket] = witness_count.get(bucket, 0) + 1
         summary = summarize_gap_anomalies([
-            detect_gap_anomaly(did, gap, consensus, n)
+            detect_gap_anomaly(did, gap, consensus, n,
+                               witness_count.get(round(gap * 2) / 2, 1))
             for did, (gap, n) in stats.items()
         ])
         logger.info("[ModelBuilder] 轴距异常 %d/%d 张(共识 %.2f 米)",
