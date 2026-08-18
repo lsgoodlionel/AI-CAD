@@ -239,7 +239,17 @@ class Orchestrator:
         for issues in parallel_results:
             all_issues.extend(issues)
 
-        all_issues.sort(key=lambda i: _SEVERITY_ORDER.get(i.severity, 9))
+        # 先 severity、再**实证代价风险**（`cost_risk`，208 工程语料）。
+        # 同为 warning 时，「施工顺序/设计变更/图纸不一致」这类过程与版本
+        # 问题排在几何偏差之前 —— 它们的 LIFT 高出 2~3 倍，
+        # 而现有 severity 完全看不出这个差别。
+        from core.ai_review.cost_risk import cost_risk_score
+
+        all_issues.sort(key=lambda i: (
+            _SEVERITY_ORDER.get(i.severity, 9),
+            -cost_risk_score(f"{getattr(i, 'title', '')} "
+                             f"{getattr(i, 'description', '')}"),
+        ))
 
         total = len(all_issues)
         critical = sum(1 for i in all_issues if i.severity == IssueSeverity.CRITICAL)
