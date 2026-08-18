@@ -186,6 +186,20 @@ def _match_substring_or_pattern(name: str, rules: tuple[_KindRule, ...]) -> str 
     return None
 
 
+#: AutoCAD **xref 绑定**产生的前缀分隔符：外部参照被绑定进图纸时，
+#: 其图层名会变成 `原图名$N$N原图层名`（N 为绑定序号）。
+#: 实测轨道交通图纸大量如此：`PLAN_F01$0$0S-BEAM-I`。
+#: 不剥离的话，AIA 代码不在开头，所有 prefixes 匹配落空 ——
+#: 实测该图 4240 个梁图元**零命中**。这是 AutoCAD 的通用约定，非工程特有。
+_XREF_BOUND_RE = re.compile(r"^.*\$\d+\$\d*")
+
+
+def normalize_layer_name(layer: str | None) -> str:
+    """剥离 AutoCAD xref 绑定前缀，得到原始图层名。无前缀时原样返回。"""
+    name = str(layer or "")
+    return _XREF_BOUND_RE.sub("", name)
+
+
 def classify_by_layer(layer: str | None, block: str = "") -> str | None:
     """图层名（+ 可选块名）→ 构件类型；无法判定返回 ``None``。
 
@@ -205,7 +219,7 @@ def classify_by_layer(layer: str | None, block: str = "") -> str | None:
     if not conv.kind_rules:
         return None
 
-    layer_n = _norm(layer)
+    layer_n = _norm(normalize_layer_name(layer))
     block_n = _norm(block)
 
     # 1. 精确别名（先 layer 后 block）
@@ -244,7 +258,7 @@ def classify_system(layer: str | None, block: str = "") -> str | None:
     if not conv.system_rules:
         return None
 
-    layer_n = _norm(layer)
+    layer_n = _norm(normalize_layer_name(layer))
     block_n = _norm(block)
 
     for name in (layer_n, block_n):

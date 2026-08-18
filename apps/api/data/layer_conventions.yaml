@@ -69,12 +69,17 @@ conventions:
     substrings: ["门"]
     patterns: ['^M\d', 'DOOR']
 
-  # 窗（洞口）：窗 / WINDOW / C- 窗编号 / A-GLAZ
+  # 窗（洞口）：窗 / WINDOW / C+数字 窗编号 / A-GLAZ
+  #
+  # **`C-` 前缀已移除**：它撞上 AIA CAD Layer Guidelines 的
+  # **C = Civil 学科代码**，实测把 `C-SHET-TTLB`（图框标题块）判成了窗，
+  # 导致 window 命中数虚高到 49670。中国院的窗编号是 **C + 数字**
+  # （C1、C-1），已由 `patterns: ^C\d` 与 `^C-\d` 覆盖，信息不丢。
   - kind: window
-    aliases: ["A-GLAZ", "A-WIND", "窗", "WINDOW", "C"]
-    prefixes: ["A-GLAZ", "A-WIND", "窗-", "C-", "CHUANG-", "WIN-", "WINDOW-"]
+    aliases: ["A-GLAZ", "A-WIND", "窗", "WINDOW"]
+    prefixes: ["A-GLAZ", "A-WIND", "窗-", "CHUANG-", "WIN-", "WINDOW-"]
     substrings: ["窗"]
-    patterns: ['^C\d', 'WIND']
+    patterns: ['^C\d', '^C-\d', 'WIND']
 
   # 机电管线：暖通风管 / 给排水管 / 中文「管」；system 另由 systems 段判定
   - kind: pipe
