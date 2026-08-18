@@ -1895,7 +1895,7 @@ async def _pairing_z_overrides(db, project_id: str, normalization,
         # （单体,楼层,标高），乱配不可能在多张图上撞出同一个值。
         # 真冲突只报不选（用户口径：矛盾时出矛盾点交人判断）。
         from services.level_elevation_consensus import (
-            consensus_conflicts, consensus_overrides,
+            consensus_conflicts, consensus_overrides, consensus_to_pairs,
         )
 
         chain_keys = {(p.get("building_unit_key"), p.get("level_name"))
@@ -1905,9 +1905,10 @@ async def _pairing_z_overrides(db, project_id: str, normalization,
             key = (item["building_unit_key"], item["level_name"])
             if key in chain_keys:
                 continue        # 链式对是单图强证据，优先保留
-            pairs.append({"level_name": item["level_name"],
-                          "elevation_m": item["elevation_m"],
-                          "building_unit_key": item["building_unit_key"]})
+            # **按见证图数展开**：下游 build_z_overrides 有 MIN_SAMPLES=2，
+            # 单条会被当孤证杀掉（实测 19 层补进去、产出纹丝不动）。
+            # N 张见证图就是 N 个独立样本，展开是如实表示。
+            pairs.extend(consensus_to_pairs([item]))
             added += 1
         conflicts = consensus_conflicts(free_pairs)
         if added or conflicts:

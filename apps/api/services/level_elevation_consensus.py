@@ -94,3 +94,22 @@ def consensus_conflicts(pairs: list[dict] | None) -> list[dict[str, Any]]:
                     "请人工核对；系统不替人选。"),
             })
     return out
+
+
+def consensus_to_pairs(items: list[dict] | None) -> list[dict[str, Any]]:
+    """共识项 → 配对列表，**每张见证图一条**。
+
+    实测断点：共识补 19 层、`build_z_overrides` 产出仍 10 层 ——
+    它的 `MIN_SAMPLES=2` 把每条共识项当 1 个样本杀掉，
+    「孤证不立」被重复计了两次。N 张见证图就是 N 个独立样本，
+    按图展开是**如实表示**，不是权重技巧。
+    """
+    out: list[dict[str, Any]] = []
+    for item in items or []:
+        for _did in item.get("drawing_ids") or []:
+            out.append({
+                "level_name": item["level_name"],
+                "elevation_m": item["elevation_m"],
+                "building_unit_key": item.get("building_unit_key"),
+            })
+    return out

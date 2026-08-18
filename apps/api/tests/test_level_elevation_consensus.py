@@ -111,3 +111,34 @@ def test_witness_threshold_is_at_least_two():
 def test_empty_input_is_safe():
     assert consensus_overrides([]) == []
     assert consensus_overrides(None) == []
+
+
+# ── 共识对进 build_z_overrides 不能再被「孤证不立」杀一遍 ─────────
+
+@pytest.mark.unit
+def test_consensus_expands_to_one_pair_per_witness():
+    """**实测断点**：共识补 19 层、最终产出仍 10 层 ——
+    `build_z_overrides` 的 `MIN_SAMPLES=2` 把每条共识对当 1 个样本杀掉，
+    「孤证不立」被重复计了两次。
+
+    修法是**如实展开**：共识对有 N 张见证图，就是 N 个独立样本 ——
+    每张图各出一条 pair，不是权重 hack。
+    """
+    from services.level_elevation_consensus import consensus_to_pairs
+
+    items = [{"building_unit_key": None, "level_name": "3F",
+              "elevation_m": 10.8, "witnesses": 3,
+              "drawing_ids": ["a", "b", "c"],
+              "source": "cross_drawing_consensus"}]
+    pairs = consensus_to_pairs(items)
+    assert len(pairs) == 3
+    assert all(p["elevation_m"] == pytest.approx(10.8) for p in pairs)
+    assert {p["level_name"] for p in pairs} == {"3F"}
+
+
+@pytest.mark.unit
+def test_expansion_of_nothing_is_safe():
+    from services.level_elevation_consensus import consensus_to_pairs
+
+    assert consensus_to_pairs([]) == []
+    assert consensus_to_pairs(None) == []
