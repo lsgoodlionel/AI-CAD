@@ -1875,6 +1875,7 @@ async def _pairing_z_overrides(db, project_id: str, normalization,
 
         meta = {str(d.get("id")): d for d in (drawings or ())}
         pairs: list[dict] = []
+        free_pairs: list[dict] = []
         for drawing_id, elev_items in elevations.items():
             level_items = levels.get(drawing_id)
             if not level_items:
@@ -1883,6 +1884,35 @@ async def _pairing_z_overrides(db, project_id: str, normalization,
             for pair in pair_levels_with_elevations(
                     elev_items, level_items, chain_only=True):
                 pairs.append({**pair, "building_unit_key": unit})
+            # 自由配对单独收集 —— 单图内是弱证据，**跨图共识**才采纳
+            for pair in pair_levels_with_elevations(
+                    elev_items, level_items, chain_only=False):
+                free_pairs.append({**pair, "building_unit_key": unit,
+                                   "drawing_id": drawing_id})
+
+        # **孤证不立，多证可立**：链式配对只覆盖 65/1578 张图（4.1%，
+        # 平面图的标高是散点不是链）。自由配对若有 ≥2 张图给同一
+        # （单体,楼层,标高），乱配不可能在多张图上撞出同一个值。
+        # 真冲突只报不选（用户口径：矛盾时出矛盾点交人判断）。
+        from services.level_elevation_consensus import (
+            consensus_conflicts, consensus_overrides,
+        )
+
+        chain_keys = {(p.get("building_unit_key"), p.get("level_name"))
+                      for p in pairs}
+        added = 0
+        for item in consensus_overrides(free_pairs):
+            key = (item["building_unit_key"], item["level_name"])
+            if key in chain_keys:
+                continue        # 链式对是单图强证据，优先保留
+            pairs.append({"level_name": item["level_name"],
+                          "elevation_m": item["elevation_m"],
+                          "building_unit_key": item["building_unit_key"]})
+            added += 1
+        conflicts = consensus_conflicts(free_pairs)
+        if added or conflicts:
+            logger.info("[ModelBuilder] 标高跨图共识补 %d 层,冲突待人判 %d 处",
+                        added, len(conflicts))
         if not pairs:
             return {}
 
