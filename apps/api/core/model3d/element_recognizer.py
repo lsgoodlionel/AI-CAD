@@ -206,7 +206,7 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     result.columns = _find_columns(
         rects, rect_layers, rect_blocks, polys, poly_layers, poly_blocks, ctx
     )
-    pairs_are_beams = _is_beam_drawing(all_text)
+    pairs_are_beams = _is_beam_drawing(all_text, line_layers)
     pairs = _find_parallel_pairs(
         lines, line_layers, axis_lines,
         _BEAM_GAP if pairs_are_beams else _WALL_GAP, ctx,
@@ -490,7 +490,27 @@ def _pair_up(
     return result
 
 
-def _is_beam_drawing(all_text: str) -> bool:
+#: 判定「这是梁图」所需的最少梁图层线数。
+#: 一张梁配筋图实测有数千条梁线（S-31-07A 为 7809 条）；
+#: 而柱图里偶尔引用几条梁线远不到这个量级。
+MIN_BEAM_LINES_FOR_BEAM_DRAWING = 100
+
+
+def _is_beam_drawing(all_text: str, line_layers: list | None = None) -> bool:
+    """这张图是否表达梁。**图层优先于图内文字**。
+
+    图内文字是弱证据：实测那张「首层框架梁平面整体配筋图」只有
+    **4 条可信文字**（全是水印签章），其余是坏 CMap 乱码被正确拦截，
+    于是拿不到「梁」字 —— 图层里明明有 **7809 条梁线**，却产出 0 根梁。
+
+    图层是设计师**明确标注**的（AIA `S-BEAM`），比图内文字可靠。
+    无图层时退回文本判据，大歌剧院路径不变。
+    """
+    if line_layers:
+        beam_lines = sum(1 for layer in line_layers
+                         if layer and classify_by_layer(layer) == "beam")
+        if beam_lines >= MIN_BEAM_LINES_FOR_BEAM_DRAWING:
+            return True
     return "梁" in all_text and "图" in all_text
 
 

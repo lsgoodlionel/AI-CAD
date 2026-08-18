@@ -161,3 +161,40 @@ def test_filled_path_polygon_also_carries_the_layer():
     geom = DrawingGeometry()
     _collect_pdf_drawings(_Page(), geom)
     assert geom.poly_layers and geom.poly_layers[-1] == "COLS_F01$0$0S-COLS-I"
+
+
+# ── 图种判断:图层是强证据,图内文字是弱证据 ──────────────────────
+
+@pytest.mark.unit
+def test_beam_drawing_is_decided_by_layers_when_available():
+    """**核心用例**:图层里 7809 条梁线,却因图内文字判不出而产出 0 根梁。
+
+    实测那张「首层框架梁平面整体配筋图」只有 **4 条可信文字**
+    (全是水印签章),其余是坏 CMap 乱码 —— 被 `text_integrity` 正确拦截,
+    于是 `_is_beam_drawing` 拿不到「梁」字。
+
+    图层是设计师**明确标注**的,比图内文字可靠得多。
+    """
+    from core.model3d.element_recognizer import _is_beam_drawing
+
+    layers = ["PLAN_F01$0$0S-BEAM-I"] * 200
+    assert _is_beam_drawing("", line_layers=layers)
+
+
+@pytest.mark.unit
+def test_text_evidence_still_works_without_layers():
+    """**无图层不得退化**:大歌剧院走的正是文本这条路。"""
+    from core.model3d.element_recognizer import _is_beam_drawing
+
+    assert _is_beam_drawing("三层梁配筋图")
+    assert _is_beam_drawing("三层梁配筋图", line_layers=[""] * 100)
+    assert not _is_beam_drawing("柱平面布置图")
+
+
+@pytest.mark.unit
+def test_a_few_beam_lines_do_not_make_it_a_beam_drawing():
+    """**少量引用不算** —— 柱图里引几条梁线不该把整张图判成梁图。"""
+    from core.model3d.element_recognizer import _is_beam_drawing
+
+    layers = ["PLAN_F01$0$0S-BEAM-I"] * 5 + ["COLS_F01$0$0S-COLS-I"] * 300
+    assert not _is_beam_drawing("柱平面布置图", line_layers=layers)
