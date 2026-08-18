@@ -28,6 +28,26 @@ logger = logging.getLogger(__name__)
 
 # OCR token 入库置信门槛(与 consume._DEFAULT_MIN_CONF 对齐:低置信读错比缺失糟)
 OCR_MIN_CONFIDENCE = 0.6
+
+#: 矢量文字达到这个条数就跳过 OCR —— **矢量文字比 OCR 又快又准**。
+#:
+#: 阈值必须高于「页脚水印」的 span 数：实测第二工程 65.6% 的页只有
+#: 4~6 个水印 span（设计单位名 + 日期），数量像「有文字」，实际无信息。
+#: 取 20 留足余量；真正有内容的图动辄数百条。
+MIN_VECTOR_TEXTS_TO_SKIP_OCR = 20
+
+
+def should_skip_ocr(texts) -> bool:
+    """矢量文字是否已充足到不必跑 OCR。
+
+    **数量与质量都要看**：坏 CMap 的乱码若算进来，会跳过 OCR
+    而把一堆垃圾入库（第二工程实测 29.4% 的有文字页是乱码）。
+    """
+    from core.model3d.text_integrity import is_trustworthy_text
+
+    trustworthy = sum(1 for item in (texts or [])
+                      if is_trustworthy_text(str(item[2] if len(item) > 2 else "")))
+    return trustworthy >= MIN_VECTOR_TEXTS_TO_SKIP_OCR
 # 单图条目上限(防说明书级图纸刷爆表;超限截断并记 warning)
 MAX_ITEMS_PER_DRAWING = 2000
 
@@ -226,6 +246,13 @@ def extract_drawing_info(
         logger.warning("[drawing_info] 几何抽取失败(%s): %s", ext, exc)
 
     ocr_result: OcrResult | None = None
+    # 矢量文字够用就不跑 OCR：又快又准（实测单图 OCR 约 50 秒，
+    # 而矢量文字是原始数据、无识别误差）。降级仍然可见 ——
+    # 跳过与否只影响来源，条目该有的照样有。
+    if geom is not None and should_skip_ocr(geom.texts):
+        run_ocr_pass = False
+        logger.debug("[drawing_info] 矢量文字充足(%d 条)，跳过 OCR",
+                     len(geom.texts))
     if run_ocr_pass and ext in ("pdf", "png", "jpg", "jpeg"):
         try:
             from core.model3d.ocr import run_ocr
