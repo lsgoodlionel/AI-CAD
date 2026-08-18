@@ -234,3 +234,42 @@ def test_real_component_layers_still_match():
     assert classify_by_layer("PLAN_F01$0$0S-BEAM-I") == "beam"
     assert classify_by_layer("COLS_F01$0$0S-COLS-HATCH") == "column"
     assert classify_by_layer("结构-柱") == "column"
+
+
+# ── 钢筋图层不是构件图层 + xref 剥离不得丢失主层名 ────────────────
+
+@pytest.mark.unit
+def test_rebar_layers_are_not_components():
+    """**实测根因**:墙配筋图上 711 个「柱」来自图层
+    `S-S-WALL-1F$0$墙柱纵筋` / `墙柱箍筋` / `墙柱箍筋大样` ——
+    那画的是**钢筋**(纵筋/箍筋),不是构件本身。
+
+    「纵筋/箍筋/配筋/钢筋」是通用的结构制图用语,不是某工程的命名。
+    """
+    from core.model3d.layer_conventions import is_annotation_layer
+
+    for layer in ("墙柱纵筋", "墙柱箍筋", "墙柱箍筋大样",
+                  "梁配筋", "板底钢筋", "S-COLS-REBAR"):
+        assert is_annotation_layer(layer), layer
+
+
+@pytest.mark.unit
+def test_xref_prefix_carries_the_authoritative_layer_name():
+    """**xref 剥离丢了更可靠的信息**:`S-S-WALL-1F$0$墙柱纵筋` 的
+    主层名是 **S-WALL**(墙),剥离后只剩「墙柱纵筋」,含「柱」判成了柱。
+
+    修法:**先用完整名匹配,失败再用剥离后的名** ——
+    xref 前缀里的 AIA 代码是设计师在原图里的标注,比子层名可靠。
+    """
+    from core.model3d.layer_conventions import classify_by_layer
+
+    assert classify_by_layer("S-S-WALL-1F$0$0S-WALL-HATCH边缘构件") == "wall"
+
+
+@pytest.mark.unit
+def test_stripping_still_works_when_prefix_has_no_code():
+    """前缀里没有 AIA 代码时,剥离后的名仍要能用(第二工程的形态)。"""
+    from core.model3d.layer_conventions import classify_by_layer
+
+    assert classify_by_layer("PLAN_F01$0$0S-BEAM-I") == "beam"
+    assert classify_by_layer("COLS_F01$0$0S-COLS-HATCH") == "column"

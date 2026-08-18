@@ -154,6 +154,7 @@ def resolve_scale(detected: float, scale_override: float | None = None,
 def recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
               origin_override: tuple[float | None, float | None] | None = None,
               scale_override: float | None = None,
+              drawing_title: str | None = None,
               ) -> FloorElements:
     """识别构件；任何异常返回空 FloorElements（scale=缺省）。
 
@@ -162,7 +163,7 @@ def recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     """
     try:
         return _recognize(geom, discipline, drawing_id, origin_override,
-                          scale_override)
+                          scale_override, drawing_title)
     except Exception as exc:  # noqa: BLE001 — 识别失败降级空构件
         logger.warning("[model3d] 构件识别失败(%s): %s", drawing_id, exc)
         return FloorElements(scale=_DEFAULT_SCALE)
@@ -171,6 +172,7 @@ def recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
 def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
                origin_override: tuple[float | None, float | None] | None = None,
                scale_override: float | None = None,
+               drawing_title: str | None = None,
                ) -> FloorElements:
     truncated = geom.primitive_count() > MAX_PRIMITIVES
     lines = geom.lines[:MAX_PRIMITIVES]
@@ -205,8 +207,13 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
         _clip_to_axes(result)
         return result
 
+    # **墙图上的填充截面是墙不是柱**（实测 1404 根假柱）。
+    # 仍保留「图层明确为柱」的路径 —— 那是设计师的明确标注，
+    # 比图名更强（墙图上确实可能画几根柱）。
+    wall_drawing = is_wall_drawing(drawing_title)
     result.columns = _find_columns(
-        rects, rect_layers, rect_blocks, polys, poly_layers, poly_blocks, ctx
+        rects, rect_layers, rect_blocks, polys, poly_layers, poly_blocks, ctx,
+        layer_only=wall_drawing,
     )
     pairs_are_beams = _is_beam_drawing(all_text, line_layers)
     pairs = _find_parallel_pairs(
@@ -389,7 +396,13 @@ def _axes_dict(
 def _find_columns(
     rects: list, rect_layers: list, rect_blocks: list,
     polys: list, poly_layers: list, poly_blocks: list, ctx: _Ctx,
+    layer_only: bool = False,
 ) -> list[dict]:
+    """填充截面 + 图层 → 柱。
+
+    `layer_only=True` 时**只认图层明确标注为柱的**，不按尺寸猜 ——
+    用于墙图（墙截面的尺寸常落在柱的判据范围内，实测造出 1404 根假柱）。
+    """
     columns: list[dict] = []
     for i, (x, y, w, h, filled) in enumerate(rects):
         # **标注图层不产出构件**：实测「立柱桩标注」一层造出 3410 根假柱。
@@ -400,14 +413,22 @@ def _find_columns(
         # 图层/块名明确为柱时，即使未填充也识别（修复「柱必须 filled 才识别」漏检）
         if not filled and not is_column_layer:
             continue
-        if is_column_layer or _is_column_size(ctx.len_m(w), ctx.len_m(h)):
+        if is_column_layer or (not layer_only
+                               and _is_column_size(ctx.len_m(w), ctx.len_m(h))):
             columns.append(_rect_element(x, y, w, h, ctx))
         if len(columns) >= _CAPS["columns"]:
             return columns
     for i, poly in enumerate(polys):
         x, y, w, h = _poly_bbox(poly)
-        is_column_layer = classify_by_layer(_at(poly_layers, i), _at(poly_blocks, i)) == "column"
-        if is_column_layer or _is_column_size(ctx.len_m(w), ctx.len_m(h)):
+        # **标注/钢筋图层不产出构件**（与矩形分支同一条纪律）——
+        # 我第一版只在矩形分支加了这道闸，而实测那 711 根假柱
+        # 全部来自**多边形**（`墙柱纵筋` 图层），修了一半等于没修。
+        _pl = _at(poly_layers, i)
+        is_column_layer = (not is_annotation_layer(_pl)
+                           and classify_by_layer(
+                               _pl, _at(poly_blocks, i)) == "column")
+        if is_column_layer or (not layer_only
+                               and _is_column_size(ctx.len_m(w), ctx.len_m(h))):
             columns.append({"outline": [ctx.to_m(px, py) for px, py in poly[:8]], "src": ctx.src})
         if len(columns) >= _CAPS["columns"]:
             break
@@ -500,6 +521,30 @@ def _pair_up(
 #: 一张梁配筋图实测有数千条梁线（S-31-07A 为 7809 条）；
 #: 而柱图里偶尔引用几条梁线远不到这个量级。
 MIN_BEAM_LINES_FOR_BEAM_DRAWING = 100
+
+#: 墙图关键词。「墙」在「柱」之前出现即认为主语是墙 ——
+#: 「墙柱配筋平面图」是墙柱共同表达，「柱墙连接节点」以柱为主。
+#: 判据不完美，但**判错只影响归类、不丢构件**。
+_WALL_WORD_RE = re.compile(r"墙")
+_COLUMN_WORD_RE = re.compile(r"柱")
+
+
+def is_wall_drawing(title: str | None) -> bool:
+    """图名是否声明这是**墙**图（墙配筋图 / 剪力墙平面图…）。
+
+    **实测 1404 根假柱**：F5 层 1921 根「柱」里，1337 + 67 根来自
+    「××墙配筋平面图」—— 墙的截面填充多边形尺寸落在柱判据范围内，
+    就被判成了柱。**图名明确声明了图种，几何判据却没听。**
+
+    与「梁图上的平行线对被当成墙」是同一类问题的镜像，
+    处置沿用同一条原则：**图种声明优先于几何猜测**。
+    """
+    text = str(title or "")
+    wall = _WALL_WORD_RE.search(text)
+    if not wall:
+        return False
+    column = _COLUMN_WORD_RE.search(text)
+    return column is None or wall.start() < column.start()
 
 
 def _is_beam_drawing(all_text: str, line_layers: list | None = None) -> bool:

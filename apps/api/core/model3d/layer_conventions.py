@@ -201,9 +201,13 @@ _XREF_BOUND_RE = re.compile(r"^.*\$\d+\$\d*")
 #: 中文用「标注/文字/标高/说明/编号/尺寸」，AIA 用
 #: `-TEXT`/`-DIMS`/`-NOTE`/`-IDEN`/`-ANNO` 后缀 ——
 #: **都是通用制图用语**，不是某工程的命名习惯。
+#: 同理，**钢筋图层也不是构件图层**：`墙柱纵筋` / `墙柱箍筋` 画的是钢筋，
+#: 却因含「柱」被判成柱（实测一张墙配筋图造出 711 根假柱）。
+#: 「纵筋/箍筋/配筋/钢筋」是通用结构制图用语，非某工程命名。
 _ANNOTATION_LAYER_RE = re.compile(
     r"标注|文字|说明|编号|尺寸标|标高标|注释|图例"
-    r"|-(?:TEXT|DIMS?|NOTE|IDEN|ANNO|TAG|LABEL)(?:-|$)",
+    r"|纵筋|箍筋|配筋|钢筋|拉筋|分布筋"
+    r"|-(?:TEXT|DIMS?|NOTE|IDEN|ANNO|TAG|LABEL|REBAR|REIN)(?:-|$)",
     re.IGNORECASE)
 
 
@@ -243,6 +247,10 @@ def classify_by_layer(layer: str | None, block: str = "") -> str | None:
     if not conv.kind_rules:
         return None
 
+    # **完整名优先于剥离名**：xref 前缀里的 AIA 代码是设计师在原图里的
+    # 标注，比子层名可靠。实测 `S-S-WALL-1F$0$墙柱纵筋` 剥离后只剩
+    # 「墙柱纵筋」，含「柱」被判成柱 —— 而主层名 S-WALL 明说是墙。
+    full_n = _norm(layer)
     layer_n = _norm(normalize_layer_name(layer))
     block_n = _norm(block)
 
@@ -260,7 +268,11 @@ def classify_by_layer(layer: str | None, block: str = "") -> str | None:
     if kind is not None:
         return kind
 
-    # 3. 图层前缀
+    # 3. 图层前缀 —— 先试完整名（含 xref 前缀的 AIA 代码），再试剥离名
+    if full_n != layer_n:
+        kind = _match_prefix(full_n, conv.kind_rules)
+        if kind is not None:
+            return kind
     kind = _match_prefix(layer_n, conv.kind_rules)
     if kind is not None:
         return kind
