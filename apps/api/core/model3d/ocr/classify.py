@@ -100,6 +100,13 @@ def classify_text(text: str) -> tuple[TokenKind, float | None]:
     if is_label_fragment(raw):
         return "title_block_label", None
 
+    # **平法构件编号**（22G101）—— 必须在轴号之前判：
+    # 轴号规则认「字母+数字」，`KZ1`/`Q1` 会被它整批吃掉。
+    from core.model3d.component_mark import parse_component_mark
+
+    if parse_component_mark(raw) is not None:
+        return "component_mark", None
+
     # 标高（数值形态，或"标高"字样后接数值）
     if _RE_ELEVATION.match(raw):
         return "elevation", _parse_elevation(raw)
