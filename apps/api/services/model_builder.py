@@ -938,6 +938,9 @@ async def _attach_floor_elements(
                 archive_axes_by_drawing, transforms, archive_text_by_drawing,
                 recognized_axes_by_drawing=recognized_axes_by_drawing,
                 placements=placements,
+                # **日志要能说出是哪一层** —— 少了它，「本层 2 张图」
+                # 这种记录没法对应到任何楼层，等于没打。
+                floor_key=str(floor.get("key") or "?"),
             )
         except Exception as exc:  # noqa: BLE001 — 构件层失败回退贴图
             logger.warning("[ModelBuilder] 楼层构件识别失败 %s: %s", floor["key"], exc)

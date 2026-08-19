@@ -270,6 +270,7 @@ MAX_AXIS_DISAGREEMENT_RATIO = 0.3
 def collect_floor_axes(
     floor_drawings: list[dict], *, transforms: dict | None,
     recognized: dict | None, max_drawings: int = MAX_AXIS_SOURCE_PLANS,
+    floor_key: str = "?",
 ) -> dict:
     """从本层**所有**有轴号且有变换的图聚合轴网(不受构件选图上限约束)。
 
@@ -280,6 +281,9 @@ def collect_floor_axes(
     所以最可靠的那张要排在前面。
     """
     if not transforms or not recognized:
+        # 上游整个没传 —— 与「本层没有可用图」是两回事，分开报
+        logger.info("[ModelElements] 轴网聚合跳过 %s：无变换表或无识别结果",
+                    floor_key)
         return {"x": [], "y": []}
 
     from services.axis_recognition import axes_to_scene
@@ -307,9 +311,9 @@ def collect_floor_axes(
         # 却无轴网」追查花掉 8 层的直接原因 —— 前七层排除的全是别的可能，
         # 而真正的断点在这里连一行日志都没留。
         logger.info(
-            "[ModelElements] 轴网聚合无可用图：本层 %d 张，"
+            "[ModelElements] 轴网聚合无可用图 %s：本层 %d 张，"
             "其中有变换 %d 张、有识别轴线 %d 张",
-            len(floor_drawings),
+            floor_key, len(floor_drawings),
             sum(1 for d in floor_drawings
                 if str(d.get("id") or "") in (transforms or {})),
             sum(1 for d in floor_drawings
@@ -888,6 +892,7 @@ async def build_floor_elements(
     archive_text_by_drawing: dict | None = None,
     recognized_axes_by_drawing: dict | None = None,
     placements: dict | None = None,
+    floor_key: str = "?",
 ) -> tuple[dict[str, list], int, dict]:
     """构建单楼层 elements（识别 → 轴号配准 → 合并 + YOLO 补充）。
 
@@ -1041,7 +1046,8 @@ async def build_floor_elements(
         "axes": _axes_scene_payload(
             _prefer_collected_axes(
                 collect_floor_axes(floor_drawings, transforms=transforms,
-                                   recognized=recognized_axes_by_drawing),
+                                   recognized=recognized_axes_by_drawing,
+                                   floor_key=floor_key),
                 aggregated_axes),
             ref_axes_drawing_id),
     }
