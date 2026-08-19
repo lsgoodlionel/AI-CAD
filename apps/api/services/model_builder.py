@@ -1537,8 +1537,16 @@ def _section_texts_sync(data: bytes, ext: str) -> list[str]:
         return []
 
 
-async def _recover_component_sections(drawings: list[dict]) -> dict:
-    """从剖面/详图标注构建构件截面表（B-07）。无剖面/详图时回落全默认。"""
+async def _recover_component_sections(drawings: list[dict],
+                                      archive_texts: list | None = None) -> dict:
+    """从剖面/详图标注构建构件截面表（B-07）。无剖面/详图时回落全默认。
+
+    `archive_texts`：**档案层（OCR 产出）的文本**。本函数的正则本就认得
+    `DN100`/`De75`/`φ100`，但图内矢量文字在大歌剧院**常取不到**
+    （E3-0 审计已记）—— 于是档案层里 4047 条管径标注、覆盖 303 张图，
+    建模侧却仍用硬编码 0.1m。与 E2-consume「section-z 改读档案标高」
+    同一思路：**抽取一次、多处消费**。
+    """
     targets = [
         drawing for drawing in drawings
         if classify_view_type(drawing).view_type in ("section", "detail")
@@ -1565,7 +1573,9 @@ async def _recover_component_sections(drawings: list[dict]) -> dict:
             logger.warning("[ModelBuilder] 截面表跳过 %s: %s", drawing.get("id"), exc)
             continue
         texts.extend(geom_texts)
-    return model_component_sections.build_component_sections(texts)
+    primary = model_component_sections.build_component_sections(texts)
+    # **分层而非混料**：图内取不到的项才用档案补（见 fill_missing_sections）
+    return model_component_sections.fill_missing_sections(primary, archive_texts)
 
 
 def _build_model_scopes(
@@ -1780,7 +1790,34 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     )
     _clip_elements_to_envelope(floors)  # 裁掉离群构件(机电比例错误致管线冲到数千米)
     # B-07：剖面/详图截面回填构件（实测覆盖硬编码默认；无标注时全默认→无副作用）。
-    component_sections = await _recover_component_sections(drawings)
+    # **档案层的管径/截面标注一并入料**：本函数的正则认得 `DN100`，
+    # 但图内矢量文字在大歌剧院常取不到 —— 实测档案层有 4047 条管径标注、
+    # 覆盖 303 张图，而建模侧此前一直用硬编码 0.1m。
+    # **必须与图内文字同一限定：只取剖面/详图**。
+    # 实测把全库 756268 条档案文本喂进去，梁高众数变成 0.2m（默认 0.6m）——
+    # 全库里混着门窗洞口尺寸 `900x2100`、砖尺寸、房间面积，
+    # `_BH_RE` 分不出它们与梁截面，**噪声会直接压过真值**。
+    section_archive_texts: list[str] = []
+    if db is not None and project_id is not None:
+        section_ids = [
+            str(d.get("id")) for d in drawings
+            if classify_view_type(d).view_type in ("section", "detail")
+        ]
+        if section_ids:
+            try:
+                rows = await db.fetch_all(
+                    "SELECT content FROM drawing_extracted_info "
+                    "WHERE project_id = CAST(:p AS uuid) AND is_active "
+                    "  AND drawing_id = ANY(CAST(:ids AS uuid[])) "
+                    "  AND length(content) BETWEEN 3 AND 24",
+                    {"p": project_id, "ids": section_ids})
+                section_archive_texts = [str(r["content"]) for r in rows]
+                logger.info("[ModelBuilder] 截面表档案补料: %d 条(来自 %d 张剖面/详图)",
+                            len(section_archive_texts), len(section_ids))
+            except Exception as exc:  # noqa: BLE001 — 读不到就只用图内文字
+                logger.info("[ModelBuilder] 截面表档案补料跳过: %s", exc)
+    component_sections = await _recover_component_sections(
+        drawings, section_archive_texts)
     model_component_sections.apply_component_sections(floors, component_sections)
     await _notify(progress_cb, _progress_payload("assemble", "组装场景与统计", "", 0, 1))
 

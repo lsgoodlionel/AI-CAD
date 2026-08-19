@@ -21,6 +21,18 @@ DEFAULT_SLAB_THICKNESS_M = 0.12
 DEFAULT_WALL_THICKNESS_M = 0.2
 DEFAULT_PIPE_DIAMETER_M = 0.1
 
+#: 档案补料的样本量下限。**只作用于档案路径**，不作用于图内文字 ——
+#: 剖面图上一条 `梁300x600` 就是确凿的梁截面（原设计如此，是对的），
+#: 而档案层是全图 OCR，混着门窗洞口、砖尺寸，**必须有量才可信**。
+MIN_ARCHIVE_SAMPLES = 50
+
+#: 档案值的**离散度上限**（四分位跨度 / 中位数）。
+#: 实测管径跨 DN25~DN300（**12 倍**），中位数 32mm 是**支管**的值 ——
+#: 拿它覆盖全楼管道会让主管从 100mm 缩成 32mm；
+#: 而梁高多在 400~600mm（1.5 倍），中位数是有代表性的。
+#: **离散度太大时一个值代表不了全体**，退回默认。
+MAX_ARCHIVE_DISPERSION = 0.8
+
 COMPONENT_TYPES = ("beam", "column", "slab", "wall", "pipe")
 
 # 标注正则（mm）
@@ -286,3 +298,93 @@ def _parse_evidence(value: Any) -> dict[str, Any]:
         except (json.JSONDecodeError, ValueError):
             return {}
     return dict(value) if isinstance(value, dict) else {}
+
+
+def merge_section_texts(geom_texts: list | None,
+                        archive_texts: list | None) -> list[str]:
+    """图内文字 + 档案层文本 → 截面表的输入。
+
+    **为什么要并进来**：本模块的正则本就认得 `DN100`/`De75`/`φ100`，
+    但输入只来自图内矢量文字，而大歌剧院的矢量文字**常取不到**
+    （E3-0 审计已记）。于是档案层（OCR 产出）里 **4047 条**管径标注、
+    覆盖 **303 张图**，建模侧却仍用硬编码 0.1m。
+
+    与 E2-consume「建模 section-z 改读档案标高」同一思路：
+    **抽取一次、多处消费**。两路**并列入料**，不互相覆盖 ——
+    众数逻辑自会让多处一致的值胜出。
+    """
+    out: list[str] = []
+    for source in (geom_texts, archive_texts):
+        for text in source or ():
+            if isinstance(text, str) and text:
+                out.append(text)
+    return out
+
+
+def _too_dispersed(values: list[float]) -> bool:
+    """样本离散到无法用一个值代表？（四分位跨度 / 中位数）"""
+    if len(values) < 4:
+        return False
+    ordered = sorted(values)
+    q1 = ordered[len(ordered) // 4]
+    q3 = ordered[len(ordered) * 3 // 4]
+    median = _median(ordered)
+    if median <= 0:
+        return True
+    return (q3 - q1) / median > MAX_ARCHIVE_DISPERSION
+
+
+def _archive_values(texts: list, key: str) -> list[float]:
+    """重跑一遍抽取，拿到该项的原始样本（用于离散度判断）。"""
+    pipes: list[float] = []
+    walls: list[float] = []
+    slabs: list[float] = []
+    bh: list[tuple[float, float]] = []
+    for text in texts or ():
+        if not isinstance(text, str):
+            continue
+        for match in _BH_RE.finditer(text):
+            pair = _mm_pair(match.group(1), match.group(2), _SECTION_MM_RANGE)
+            if pair is not None:
+                bh.append(pair)
+        walls.extend(_mm_values(_WALL_RE, text, _WALL_MM_RANGE))
+        slabs.extend(_slab_thicknesses(text))
+        pipes.extend(_mm_values(_PIPE_RE, text, _PIPE_MM_RANGE))
+    if key == "pipe":
+        return pipes
+    if key == "wall":
+        return walls
+    if key == "slab":
+        return slabs
+    return [p[1] for p in bh]
+
+
+def fill_missing_sections(primary: dict, archive_texts: list | None) -> dict:
+    """图内文字取不到的构件项，用**档案层**补上（分层，不混料）。
+
+    **为什么不直接 merge 两路文本**：图内文字来自剖面/详图，
+    一条 `梁300x600` 就是确凿的梁截面（原设计只取剖面/详图，是对的）；
+    而档案层是全图 OCR，混着门窗洞口 `900x2100`、砖尺寸、房间面积 ——
+    混进去会**让噪声压过真值**（实测梁高众数由 0.6m 变 0.2m）。
+
+    所以：图内有值就用图内的；只有图内**没取到**（`estimated=True`）的项，
+    才看档案，且要求样本量 ≥ `MIN_ARCHIVE_SAMPLES`。
+    """
+    if not archive_texts:
+        return primary
+    fallback = build_component_sections(archive_texts, source="archive")
+    out = dict(primary)
+    for key, section in primary.items():
+        if not section.estimated:
+            continue                      # 图内已有实测值，不动
+        candidate = fallback.get(key)
+        if candidate is None or candidate.estimated:
+            continue
+        samples = (candidate.evidence or {}).get("samples", 0)
+        if samples < MIN_ARCHIVE_SAMPLES:
+            continue
+        # **离散度太大时一个值代表不了全体**（见 MAX_ARCHIVE_DISPERSION）
+        if _too_dispersed(_archive_values(archive_texts, key)):
+            continue
+        out[key] = candidate
+    return out
