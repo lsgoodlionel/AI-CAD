@@ -114,6 +114,14 @@ def classify_text(text: str) -> tuple[TokenKind, float | None]:
     if parse_construction_layer(raw) is not None:
         return "construction_layer", None
 
+    # **管径** —— `DN100` 形态；放在 dimension 之前，
+    # 否则 `100` 会被当成纯尺寸而丢掉 `DN` 这个关键信息。
+    from core.model3d.pipe_diameter import parse_pipe_diameter
+
+    diameter = parse_pipe_diameter(raw)
+    if diameter is not None:
+        return "pipe_diameter", diameter.dn_mm
+
     # 标高（数值形态，或"标高"字样后接数值）
     if _RE_ELEVATION.match(raw):
         return "elevation", _parse_elevation(raw)
