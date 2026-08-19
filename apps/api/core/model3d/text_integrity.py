@@ -15,6 +15,8 @@
 """
 from __future__ import annotations
 
+import re
+
 from typing import Any
 
 #: 乱码字符占比超过它就判为不可信。
@@ -44,6 +46,8 @@ def _is_mojibake_char(ch: str) -> bool:
         return True
     if 0x3400 <= code <= 0x4DBF:                      # CJK 扩展 A
         return True
+    if code == 0xFFFD:                                # 替换字符 —— 编码失败的标准标志
+        return True
     return False
 
 
@@ -56,10 +60,30 @@ def mojibake_ratio(text: str) -> float:
     return hits / len(body)
 
 
+#: `(cid:NN)` —— ToUnicode CMap 缺失时 pdfminer/PyMuPDF 的典型输出。
+#: **它不是单个坏字符，而是一串可打印 ASCII**，逐字符判永远判不出，
+#: 必须按模式识别。实测这是 PDF 文字提取最常见的两种乱码之一。
+_CID_PATTERN = re.compile(r"\(cid:\d+\)")
+
+#: cid 片段占比超过这个比例即判为不可信（正文里偶现一两个不算）。
+CID_RATIO_THRESHOLD = 0.3
+
+
+def cid_ratio(text: str) -> float:
+    """`(cid:NN)` 片段占全文字符数的比例。"""
+    body = str(text or "")
+    if not body:
+        return 0.0
+    covered = sum(len(m.group(0)) for m in _CID_PATTERN.finditer(body))
+    return covered / len(body)
+
+
 def is_trustworthy_text(text: str) -> bool:
     """这段提取文字能否入库。空串 → False(取不到,应走 OCR)。"""
     body = str(text or "")
     if not body.strip():
+        return False
+    if cid_ratio(body) > CID_RATIO_THRESHOLD:
         return False
     if len(body) < MIN_LENGTH_FOR_RATIO:
         # 短文本只看有没有**确凿**的乱码字符,不看比例
