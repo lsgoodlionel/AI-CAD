@@ -571,6 +571,52 @@ def _is_raft_layer(layer: str, block: str) -> bool:
     return bool(_RAFT_RE.search(layer or "") or _RAFT_RE.search(block or ""))
 
 
+#: 兜底板的数量上限 —— 兜底不是识别结果，不该无限产出。
+_FALLBACK_SLAB_CAP = 12
+
+
+def _bbox_of(poly: list) -> tuple[float, float, float, float]:
+    xs = [float(pt[0]) for pt in poly if len(pt) >= 2]
+    ys = [float(pt[1]) for pt in poly if len(pt) >= 2]
+    if not xs or not ys:
+        return (0.0, 0.0, 0.0, 0.0)
+    return (min(xs), min(ys), max(xs), max(ys))
+
+
+def _bbox_contains(outer: tuple, inner: tuple) -> bool:
+    """outer 的包围盒是否套住 inner 的。"""
+    return (outer[0] <= inner[0] and outer[1] <= inner[1]
+            and outer[2] >= inner[2] and outer[3] >= inner[3])
+
+
+def pick_fallback_slab_polygons(polys: list, *, area_of, min_area: float = 0.0,
+                                cap: int = _FALLBACK_SLAB_CAP) -> list:
+    """无图层命中时，挑出可当楼板的多边形（**多块**，不只最大那一块）。
+
+    **为什么要多块**：三条兜底原先各只返回 1 块，而大歌剧院图层命中率
+    仅 6.6%，绝大多数图走兜底 ⇒ 实测每层只有 1~6 块板（柱却有上千根）。
+
+    **互不包含**是关键：结构平面图上大轮廓常层层嵌套
+    （外墙轮廓套房间轮廓套洞口），全收会把同一块楼板数很多遍。
+    按面积降序取，后来者若被已选中的套住就跳过。
+    """
+    scored = [(float(area_of(poly)), poly) for poly in polys or []]
+    scored = [(area, poly) for area, poly in scored if area >= min_area]
+    scored.sort(key=lambda item: -item[0])
+
+    picked: list = []
+    boxes: list[tuple] = []
+    for _area, poly in scored:
+        box = _bbox_of(poly)
+        if any(_bbox_contains(kept, box) for kept in boxes):
+            continue        # 被已选中的套住 —— 同一块板不数两遍
+        picked.append(poly)
+        boxes.append(box)
+        if len(picked) >= cap:
+            break
+    return picked
+
+
 def _find_slabs(
     polys: list, poly_layers: list, poly_blocks: list,
     axis_x: list[float], axis_y: list[float], ctx: _Ctx,
@@ -606,10 +652,20 @@ def _find_slabs(
         return layered
     # 2) 无图层命中 → 兜底。**以下三条都不是识别结果**，各自标明依据，
     #    让统计能把它们与图层命中的板分开数（否则 0 块真板会显示成 N 块）。
-    if best is not None and best_area >= _SLAB_MIN_AREA_M2:
-        return [{"outline": [ctx.to_m(x, y) for x, y in best],
+    # **兜底也要多块**：原先只返回最大那一个，而大歌剧院图层命中率仅 6.6%，
+    # 绝大多数图走兜底 ⇒ 实测每层只有 1~6 块板（柱却有上千根）。
+    # 依据仍标 LARGEST_POLYGON —— 它本就不是识别结果，统计要能分开数。
+    def _area_m2(poly: list) -> float:
+        _x, _y, w, h = _poly_bbox(poly)
+        return ctx.len_m(w) * ctx.len_m(h)
+
+    fallback = pick_fallback_slab_polygons(
+        polys, area_of=_area_m2, min_area=_SLAB_MIN_AREA_M2)
+    if fallback:
+        return [{"outline": [ctx.to_m(x, y) for x, y in poly],
                  "thickness": _SLAB_THICKNESS_M,
-                 "basis": SLAB_BASIS_LARGEST_POLYGON, "src": ctx.src}]
+                 "basis": SLAB_BASIS_LARGEST_POLYGON, "src": ctx.src}
+                for poly in fallback]
     if len(axis_x) >= 2 and len(axis_y) >= 2:
         xs = [pos for _label, pos in axis_x]
         ys = [pos for _label, pos in axis_y]
