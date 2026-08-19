@@ -1322,6 +1322,26 @@ def axis_sequence_outliers(entries: list[dict]) -> int:
     return outliers
 
 
+#: 「两套轴网交织」至少要有**两条**逆序。实测 B1 层 y 向只有 5 条轴线，
+#: 1 条逆序 = 20% 恰好触线，整个方向被作废 —— 而单个离群点更像识别噪声。
+#: 这不是放宽比例，是给比例加一个样本量前提。
+MIN_SEQUENCE_OUTLIERS_TO_DROP = 2
+
+
+def should_drop_direction(outliers: int, total: int) -> bool:
+    """该方向的轴号是否乱到不该输出（§8.0.3 依次注写）。
+
+    两个条件**同时**满足才作废：
+    - 逆序**比例** ≥ `MAX_SEQUENCE_OUTLIER_RATIO`
+    - 逆序**条数** ≥ `MIN_SEQUENCE_OUTLIERS_TO_DROP`（小样本前提）
+    """
+    if total <= 0 or outliers <= 0:
+        return False
+    if outliers < MIN_SEQUENCE_OUTLIERS_TO_DROP:
+        return False
+    return outliers / total >= MAX_SEQUENCE_OUTLIER_RATIO
+
+
 def _axes_scene_payload(axes: dict | None, source_drawing_id: str | None) -> dict | None:
     """聚合轴网 → scene floor.axes 载荷；无带标签轴网返回 None。
 
@@ -1357,7 +1377,7 @@ def _axes_scene_payload(axes: dict | None, source_drawing_id: str | None) -> dic
     for direction, entries in (("x", x_entries), ("y", y_entries)):
         bad = axis_sequence_outliers(entries)
         inversions += bad
-        if entries and bad / len(entries) >= MAX_SEQUENCE_OUTLIER_RATIO:
+        if entries and should_drop_direction(bad, len(entries)):
             logger.warning(
                 "[ModelElements] %s 向轴号离群 %d/%d（≥%.0f%%）—— 疑为两套轴网"
                 "交织，不输出该方向", direction, bad, len(entries),
