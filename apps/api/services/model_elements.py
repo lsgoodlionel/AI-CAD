@@ -264,7 +264,6 @@ MAX_AXIS_SOURCE_PLANS = 12
 #:
 #: **更多来源 ≠ 更好的结果**。逐张检验:对不上的比例超过此值就跳过该图，
 #: 让聚合自动收敛到「变换一致的那一组」。
-MAX_AXIS_DISAGREEMENT_RATIO = 0.3
 
 
 def collect_floor_axes(
@@ -320,75 +319,63 @@ def collect_floor_axes(
                 if (recognized or {}).get(str(d.get("id") or ""))))
         return {"x": [], "y": []}
 
-    group = _largest_consistent_group(candidates)
-    aggregated: dict | None = None
-    for _did, scene_axes in group:
-        aggregated = _merge_axes(aggregated, scene_axes, authoritative=True)
-    result = aggregated or {"x": [], "y": []}
-    # **无条件报结果**：此前只在「有图被丢弃」时才打日志，
-    # 于是「全部采纳但合出空轴网」这一种情况**一行日志都没有** ——
-    # B1 层追到第 13 层才发现这个盲点。产出多少轴线要能直接看见。
-    logger.info("[ModelElements] 轴网聚合 %s：%d/%d 张 → x=%d y=%d",
-                floor_key, len(group), len(candidates),
-                len(result.get("x") or []), len(result.get("y") or []))
-    return result
+    consensus = _solve_and_log_consensus(candidates, floor_key)
+    return consensus.axes
 
 
-def _largest_consistent_group(
-    candidates: list[tuple[str, dict]],
-) -> list[tuple[str, dict]]:
-    """找出**彼此一致的最大那组**图纸。
+def _solve_and_log_consensus(candidates: list, floor_key: str):
+    """候选 → 共识求解(替代旧「最大一致组」)。
 
-    **为什么不能只与第一张比**:排序取到的第一张若恰好是离群值，
-    后面**正确的会被全部挡掉**。实测 v35 里 F1（195 张图）、F2、F3、B1
-    在只与第一张比时全部失去轴网，而它们在 v33 是有的 ——
-    基准选错的代价是整层归零。
-
-    做法:以每张图为基准各试一遍，取能吸纳最多图的那一组。
-    候选最多 `MAX_AXIS_SOURCE_PLANS` 张，O(n²) 完全可接受。
-    平局时取靠前的（已按定位可靠度排序）。
+    **升级的本质**:旧逻辑只能「选出一致的」,不能修复带系统偏移的图 ——
+    整体平移 30 米的图会被丢弃。共识求解把它**对齐后收回**
+    (实测 B1 层 9 张里 7 张残差 0.00m,旧逻辑只采纳 4/12)。
+    平移解释不了的(比例/旋转错)才是外点,排除并列名。
     """
-    best: list[tuple[str, dict]] = []
-    for base_index, (_bid, base_axes) in enumerate(candidates):
-        group = [candidates[base_index]]
-        merged = dict(base_axes)
-        for index, (did, axes) in enumerate(candidates):
-            if index == base_index:
-                continue
-            if _axes_disagree(merged, axes):
-                continue
-            group.append((did, axes))
-            merged = _merge_axes(dict(merged), axes, authoritative=True)
-        if len(group) > len(best):
-            best = group
-    return best
+    from services.global_axis_consensus import solve_scene_consensus
+
+    consensus = solve_scene_consensus(candidates)
+    logger.info(
+        "[ModelElements] 轴网共识 %s：采纳 %d/%d 张 → x=%d y=%d%s",
+        floor_key, consensus.adopted, len(candidates),
+        len(consensus.axes.get("x") or []), len(consensus.axes.get("y") or []),
+        f"（外点 {consensus.outliers}）" if consensus.outliers else "")
+    return consensus
 
 
-def _axes_disagree(
-    aggregated: dict, candidate: dict,
-    max_ratio: float = MAX_AXIS_DISAGREEMENT_RATIO,
-) -> bool:
-    """候选轴网与已聚合的主组是否**位置对不上**。
+def floor_axis_consensus(
+    floor_drawings: list[dict], *, transforms: dict | None,
+    recognized: dict | None, max_drawings: int = MAX_AXIS_SOURCE_PLANS,
+    floor_key: str = "?",
+):
+    """本层轴网共识（含每图对齐平移量）；无可用图返回 None。
 
-    只比**同名**轴号 —— 没有同名的说明两者覆盖不同区域，那不是矛盾，
-    是互补，应当并入。
+    与 `collect_floor_axes` 同一条求解，多暴露 `shifts`/`outliers` ——
+    构件循环用 shifts 把**元素坐标**也对齐到共识坐标系（融合点：
+    轴网共识不只修轴网，还修构件位置）。
     """
-    compared = mismatched = 0
-    for direction in ("x", "y"):
-        known = {}
-        for label, pos in aggregated.get(direction) or ():
-            text = str(label or "").strip()
-            if text:
-                known.setdefault(text, float(pos))
-        for label, pos in candidate.get(direction) or ():
-            text = str(label or "").strip()
-            if text and text in known:
-                compared += 1
-                if abs(float(pos) - known[text]) > _AXIS_MERGE_TOL_M:
-                    mismatched += 1
-    if compared == 0:
-        return False          # 无同名可比 —— 是互补不是矛盾
-    return mismatched / compared > max_ratio
+    if not transforms or not recognized:
+        return None
+    usable = [d for d in floor_drawings
+              if str(d.get("id") or "") in transforms
+              and recognized.get(str(d.get("id") or ""))]
+    if not usable:
+        return None
+    usable.sort(key=lambda d: (_transform_rank(d, transforms),
+                               str(d.get("id") or "")))
+    from services.axis_recognition import axes_to_scene
+
+    candidates: list[tuple[str, dict]] = []
+    for drawing in usable[:max_drawings]:
+        did = str(drawing.get("id") or "")
+        try:
+            candidates.append((did, axes_to_scene(recognized[did], transforms[did])))
+        except Exception as exc:  # noqa: BLE001 — 单图失败不拖垮整层
+            logger.info("[ModelElements] 轴网聚合跳过 %s: %s", did, exc)
+    if not candidates:
+        return None
+    return _solve_and_log_consensus(candidates, floor_key)
+
+
 
 
 def _prefer_collected_axes(collected: dict | None, fallback: dict | None) -> dict | None:
@@ -957,6 +944,15 @@ async def build_floor_elements(
             # 退回局部：宁可整层没有工程坐标，也不要一层里两套坐标系
             placements = None
 
+    # **融合点**:本层轴网共识(含每图对齐平移)。轴网共识不只修轴网,
+    # 还把**构件坐标**一并对齐到共识坐标系 —— 此前构件按各图自己的变换
+    # 落位,变换间的系统偏移(实测 B1 有两张图整体偏 4.8 米)直接变成
+    # 构件错位;现在偏移在共识里解出来,元素跟着轴网一起归位。
+    axis_consensus = floor_axis_consensus(
+        floor_drawings, transforms=transforms,
+        recognized=recognized_axes_by_drawing, floor_key=floor_key)
+    consensus_aligned = 0
+
     tasks: list[tuple[dict, str, tuple[str, ...]]] = [
         *[(d, "structure", ("columns", "walls", "slabs")) for d in picked["structure"]],
         *[(d, "structure", ("beams",)) for d in picked["beam"]],
@@ -1013,13 +1009,34 @@ async def build_floor_elements(
             part = place_elements(part, placement)
             placed += 1
 
-        # 轴号配准：以本层首张带轴号的图为参考系，其余图按共有轴号平移对齐
+        # **共识平移优先**:该图在本层共识里有解时,元素与轴网一起
+        # 平移到共识坐标系(绝对摆放的图不动 —— 世界坐标是更强的真值)。
+        consensus_shift = None
+        is_consensus_outlier = False
+        if axis_consensus is not None and not placement:
+            consensus_shift = axis_consensus.shifts.get(did)
+            is_consensus_outlier = did in axis_consensus.outliers
+        if consensus_shift is not None and (
+                abs(consensus_shift[0]) > 1e-9 or abs(consensus_shift[1]) > 1e-9):
+            part = _shift_elements(part, *consensus_shift)
+            consensus_aligned += 1
+
+        # 轴号配准：共识覆盖不到的图仍走成对配准(以首张带轴号图为参考系)
         # 已绝对定位的图不再相对平移——否则会被拉离它的真实工程坐标
         if _has_labeled_axes(axes):
-            if ref_axes is None:
-                ref_axes = axes
-                ref_axes_drawing_id = str(drawing.get("id") or "")
-                aligned_axes = axes
+            if consensus_shift is not None:
+                aligned_axes = _shift_axes(axes, *consensus_shift)
+                if ref_axes is None:
+                    ref_axes = aligned_axes
+                    ref_axes_drawing_id = did
+            elif ref_axes is None:
+                # **外点不当参考系**:它的坐标平移救不了,当基准会带偏全层
+                if is_consensus_outlier:
+                    aligned_axes = axes
+                else:
+                    ref_axes = axes
+                    ref_axes_drawing_id = str(drawing.get("id") or "")
+                    aligned_axes = axes
             elif placement:
                 aligned_axes = axes
             else:
@@ -1027,9 +1044,10 @@ async def build_floor_elements(
                 part = _shift_elements(part, dx, dy)
                 aligned_axes = _shift_axes(axes, dx, dy)
                 registered += 1
-            # E2 覆盖提升：聚合本层所有已识别图的轴网（对齐到同一坐标系），
-            # 不再只取首张——多张结构/梁图各识别到部分轴线，并集才完整。
-            aggregated_axes = _merge_axes(aggregated_axes, aligned_axes)
+            # E2 覆盖提升：聚合本层所有已识别图的轴网（对齐到同一坐标系）。
+            # **外点的轴号不进聚合** —— 否则同名冲突卷土重来。
+            if not is_consensus_outlier:
+                aggregated_axes = _merge_axes(aggregated_axes, aligned_axes)
         _merge_elements(elements, part, kinds)
 
     yolo_count = await _yolo_supplement(loop, executor, picked["mep"], elements, file_getter)
@@ -1047,11 +1065,12 @@ async def build_floor_elements(
         # 而轴网只是坐标 + 标签的纯计算。实测 v33 有六层 scene 无轴网，
         # 而 F1 有 139 张「有轴号且有变换」的图被白白挡在外面。
         # 先用本层可用图聚合，聚不出再退回构件循环里攒的那份。
+        # 按共识平移的图数(与 registered 并列:后者是成对配准的兜底路径)
+        "consensus_aligned": consensus_aligned,
         "axes": _axes_scene_payload(
             _prefer_collected_axes(
-                collect_floor_axes(floor_drawings, transforms=transforms,
-                                   recognized=recognized_axes_by_drawing,
-                                   floor_key=floor_key),
+                axis_consensus.axes if axis_consensus is not None
+                else {"x": [], "y": []},
                 aggregated_axes),
             ref_axes_drawing_id),
     }

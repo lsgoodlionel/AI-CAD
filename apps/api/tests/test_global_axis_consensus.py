@@ -91,3 +91,97 @@ def test_residual_reports_disagreement():
 def test_empty_input():
     assert solve_global_axes({}) == {}
     assert solve_global_axes(None) == {}
+
+
+# ── 完整形态:两遍求解 + 残差门限(接入聚合前的最后一块)──────────
+
+def _scene(x=None, y=None):
+    return {"x": [[k, v] for k, v in (x or {}).items()],
+            "y": [[k, v] for k, v in (y or {}).items()]}
+
+
+@pytest.mark.unit
+def test_scene_consensus_adopts_consistent_drawings():
+    """**核心用例**:三张一致的图 → 全部采纳,轴网为并集。"""
+    from services.global_axis_consensus import solve_scene_consensus
+
+    got = solve_scene_consensus([
+        ("d1", _scene(x={"1": 0.0, "2": 8.0})),
+        ("d2", _scene(x={"2": 8.0, "3": 16.0})),
+        ("d3", _scene(x={"3": 16.0, "4": 24.0})),
+    ])
+    assert got.outliers == []
+    assert {e[0] for e in got.axes["x"]} == {"1", "2", "3", "4"}
+    assert all(abs(dx) < 1e-6 and abs(dy) < 1e-6
+               for dx, dy in got.shifts.values())
+
+
+@pytest.mark.unit
+def test_pure_translation_drawing_is_repaired_not_dropped():
+    """**升级的核心**:整体平移 30 米的图,旧逻辑(最大一致组)只能丢弃,
+    共识求解把它**对齐后收回** —— 丢掉的从来不是噪声,是没被调和的观测。"""
+    from services.global_axis_consensus import solve_scene_consensus
+
+    base = {"1": 0.0, "2": 8.0, "3": 16.0}
+    shifted = {k: v + 30.0 for k, v in base.items()}
+    got = solve_scene_consensus([
+        ("g1", _scene(x=base)), ("g2", _scene(x=base)),
+        ("g3", _scene(x=base)), ("moved", _scene(x=shifted)),
+    ])
+    assert got.outliers == []
+    assert got.shifts["moved"][0] == pytest.approx(-30.0)
+    # 对齐后位置回到基准,不是折中值
+    assert dict(got.axes["x"]) == pytest.approx({"1": 0.0, "2": 8.0, "3": 16.0})
+
+
+@pytest.mark.unit
+def test_scrambled_drawing_is_gated_out():
+    """**平移解释不了的图才是外点**(比例/旋转错):残差过门限 → 排除,
+    其轴号不进全局(否则同名冲突卷土重来),但要**列名可查**。"""
+    from services.global_axis_consensus import solve_scene_consensus
+
+    base = {"1": 0.0, "2": 8.0, "3": 16.0}
+    scrambled = {"1": 0.0, "2": 50.0, "3": 3.0}      # 平移救不了
+    got = solve_scene_consensus([
+        ("g1", _scene(x=base)), ("g2", _scene(x=base)),
+        ("g3", _scene(x=base)), ("bad", _scene(x=scrambled)),
+    ])
+    assert got.outliers == ["bad"]
+    assert dict(got.axes["x"]) == pytest.approx(base)
+    assert "bad" not in got.shifts
+
+
+@pytest.mark.unit
+def test_unique_coverage_drawing_is_kept():
+    """只覆盖独有区域的图(无共有轴号)照收 —— **互补不是矛盾**。"""
+    from services.global_axis_consensus import solve_scene_consensus
+
+    got = solve_scene_consensus([
+        ("g1", _scene(x={"1": 0.0, "2": 8.0})),
+        ("solo", _scene(x={"9": 90.0})),
+    ])
+    assert got.outliers == []
+    assert dict(got.axes["x"])["9"] == 90.0
+
+
+@pytest.mark.unit
+def test_y_direction_solved_independently():
+    """x/y 独立求解 —— 一图的 x 向可信不代表 y 向可信。"""
+    from services.global_axis_consensus import solve_scene_consensus
+
+    got = solve_scene_consensus([
+        ("d1", _scene(x={"1": 0.0}, y={"A": 0.0, "B": 8.0})),
+        ("d2", _scene(x={"1": 0.0}, y={"A": 5.0, "B": 13.0})),   # y 整体 +5
+        ("d3", _scene(y={"A": 0.0, "B": 8.0})),
+    ])
+    assert got.outliers == []
+    assert got.shifts["d2"][1] == pytest.approx(-5.0)
+    assert dict(got.axes["y"])["A"] == pytest.approx(0.0)
+
+
+@pytest.mark.unit
+def test_scene_consensus_empty():
+    from services.global_axis_consensus import solve_scene_consensus
+
+    got = solve_scene_consensus([])
+    assert got.axes == {"x": [], "y": []} and got.outliers == []
