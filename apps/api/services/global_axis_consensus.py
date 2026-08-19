@@ -110,76 +110,136 @@ def _obs_of(scene_axes: dict, direction: str) -> dict[str, float]:
     return out
 
 
+#: 修复量上限(米)。修复语义针对**变换误差**(实测 4.8 米量级);
+#: 单体间距是几十米量级 —— 两个恰好平移等价的单体若不设上限会被强行
+#: 合并成一套轴网。上限取 15:变换误差之上、单体间距之下。
+MAX_REPAIR_SHIFT_M = 15.0
+
+
+def _pair_relation(obs_a: dict, obs_b: dict,
+                   max_residual_m: float) -> tuple[bool, bool]:
+    """两图在一个方向上的关系 → (有共有轴号, 平移等价)。
+
+    平移等价 = 对齐后残差 ≤ 门限 **且** 修复量 ≤ 上限。
+    共有轴号不足 2 个时残差无意义,只报「有关系」不连边。
+    """
+    shared = [(obs_a[k], obs_b[k]) for k in obs_a.keys() & obs_b.keys()]
+    if not shared:
+        return False, False
+    if len(shared) < 2:
+        # 单共有轴号:证据不足以做平移修复(等价性不可证伪),
+        # 但**同位置即等价**(旧合并语义)—— 链式覆盖靠它连通。
+        return True, abs(shared[0][0] - shared[0][1]) <= max_residual_m
+    diffs = [a - b for a, b in shared]
+    offset = _median_of(diffs)
+    if abs(offset) > MAX_REPAIR_SHIFT_M:
+        return True, False
+    residual = _median_of([abs(d - offset) for d in diffs])
+    return True, residual <= max_residual_m
+
+
+def _solve_direction(dids: list[str], obs_d: dict[str, dict[str, float]],
+                     max_residual_m: float) -> tuple[dict, dict, set]:
+    """单方向:聚类 → 最大簇 → 簇内两遍共识。
+
+    返回 (全局位置, {did: 平移量}, 该方向的簇成员集合)。
+    """
+    with_labels = [d for d in dids if obs_d[d]]
+    if not with_labels:
+        return {}, {}, set()
+
+    parent = {d: d for d in with_labels}
+
+    def find(x: str) -> str:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    related = {d: False for d in with_labels}
+    for i, a in enumerate(with_labels):
+        for b in with_labels[i + 1:]:
+            shared, equivalent = _pair_relation(obs_d[a], obs_d[b],
+                                                max_residual_m)
+            if shared:
+                related[a] = related[b] = True
+                if equivalent:
+                    parent[find(a)] = find(b)
+
+    groups: dict[str, list[str]] = {}
+    for d in with_labels:
+        groups.setdefault(find(d), []).append(d)
+    main = max(groups.values(),
+               key=lambda ms: (len(ms), sum(len(obs_d[m]) for m in ms),
+                               min(ms)))
+    members = set(main) | {d for d in with_labels
+                           if not related[d] and d not in main}
+
+    # 簇内两遍共识
+    global_1 = solve_global_axes({m: obs_d[m] for m in members})
+    shifts: dict[str, float] = {}
+    for d in members:
+        offset = align_offset(obs_d[d], global_1)
+        shifts[d] = offset if offset is not None else 0.0
+    aligned = {d: {label: pos + shifts[d]
+                   for label, pos in obs_d[d].items()} for d in members}
+    return solve_global_axes(aligned), shifts, members
+
+
 def solve_scene_consensus(
     candidates: list[tuple[str, dict]] | None,
     max_residual_m: float = MAX_CONSENSUS_RESIDUAL_M,
 ) -> SceneConsensus:
-    """多图轴网观测 → 全局共识 + 每图对齐平移 + 外点名单。
+    """多图轴网观测 → **逐方向**聚类与簇内共识。
 
-    **推导**（空间智能方法论落到轴网的最简完整形态）：每图变换含
-    平移误差 → 同一轴号的多图观测构成一维约束网络 → 这是**仅平移参数
-    的一维 Bundle Adjustment**。取中位数即 L1 最小化（对外点稳健，
-    实测 19% 粗差下最小二乘残差无分界）；两遍求解（共识→对齐→重解）
-    是 IRLS 的一次迭代；残差门限是截断估计。
+    **推导**(空间智能方法论落到轴网的完整形态):同一轴号的多图观测
+    构成一维约束网络 → 仅平移参数的一维 Bundle Adjustment。
+    中位数 = L1 最小化;两遍求解 = IRLS 一次迭代;
+    聚类边 = 平移等价(残差 ≤ 门限 且 修复量 ≤ MAX_REPAIR_SHIFT_M)。
 
-    与旧的「最大一致组」的本质区别：**整体平移的图被对齐后收回**，
-    而不是丢弃 —— 丢掉的从来不是噪声，是没被调和的观测。
-    平移解释不了的（比例/旋转错）才是外点，排除并**列名可查**。
+    **为什么必须先聚类**(B1 第一手重建反馈):楼层横跨多单体时,
+    单一中位数框架被混合污染,连同单体的图也被挤成外点(实测 3/12)。
 
-    x/y 独立求解：一图的 x 向可信不代表 y 向可信。
-    调用方必须保证候选**同属一个单体/分区** —— 轴号 `1` 在 520 张图上
-    出现，不同单体各有自己的 1 号轴，跨单体求解会把不同楼强行对齐。
+    **为什么逐方向**(B1 第二手调试反馈):分图间 x 向一致、
+    y 向差 53~64 米且非常数(y 向变换真不一致);而我此前的验证把
+    x/y 混进一个字典 —— x 向多数一致把 y 向不一致**在中位数里掩盖了**。
+    整图门禁会把好的 x 向陪葬;逐方向采纳:收 x、弃 y。
+
+    比例差(总图 vs 分图,位置差线性增长)平移救不了 —— 正确落为外点,
+    那要靠上游变换修复(主线 J1),本模块不越权硬修。
     """
     items = [(str(did), scene) for did, scene in (candidates or [])]
     if not items:
         return SceneConsensus(axes={"x": [], "y": []})
 
+    dids = [did for did, _ in items]
     obs = {
         direction: {did: _obs_of(scene, direction) for did, scene in items}
         for direction in ("x", "y")
     }
 
-    # 第一遍:直接共识
-    global_1 = {d: solve_global_axes(obs[d]) for d in ("x", "y")}
-
-    # 每图对齐量与残差(两向取最坏 —— 有一向对不上就整图存疑)
-    shifts: dict[str, tuple[float, float]] = {}
-    residuals: dict[str, float] = {}
-    outliers: list[str] = []
-    for did, _scene in items:
-        per_dir_shift: dict[str, float] = {}
-        worst = None
-        for d in ("x", "y"):
-            offset = align_offset(obs[d][did], global_1[d])
-            if offset is None:
-                per_dir_shift[d] = 0.0        # 无共有轴号:互补不是矛盾
-                continue
-            per_dir_shift[d] = offset
-            res = alignment_residual(obs[d][did], global_1[d])
-            worst = res if worst is None else max(worst, res)
-        if worst is not None and worst > max_residual_m:
-            outliers.append(did)
-            residuals[did] = worst
-            continue
-        shifts[did] = (per_dir_shift["x"], per_dir_shift["y"])
-        residuals[did] = worst if worst is not None else 0.0
-
-    # 第二遍:外点剔除、内点对齐后重解 —— 消掉第一遍里外点/偏移图
-    # 对中位数的污染(两观测时中位数取均值,会落在两者中间)
-    aligned = {
-        d: {
-            did: {label: pos + shifts[did][0 if d == "x" else 1]
-                  for label, pos in obs[d][did].items()}
-            for did, _ in items if did in shifts
-        }
-        for d in ("x", "y")
-    }
-    global_2 = {d: solve_global_axes(aligned[d]) for d in ("x", "y")}
+    per_dir = {d: _solve_direction(dids, obs[d], max_residual_m)
+               for d in ("x", "y")}
 
     axes = {
-        d: sorted(([label, round(pos, 3)] for label, pos in global_2[d].items()),
+        d: sorted(([label, round(pos, 3)]
+                   for label, pos in per_dir[d][0].items()),
                   key=lambda e: e[1])
         for d in ("x", "y")
     }
+    shifts: dict[str, tuple[float, float]] = {}
+    residuals: dict[str, float] = {}
+    outliers: list[str] = []
+    for did in dids:
+        member_x = did in per_dir["x"][2]
+        member_y = did in per_dir["y"][2]
+        has_x = bool(obs["x"][did])
+        has_y = bool(obs["y"][did])
+        if not member_x and not member_y and (has_x or has_y):
+            outliers.append(did)          # 每个有标签的方向都进不了簇
+            continue
+        shifts[did] = (per_dir["x"][1].get(did, 0.0),
+                       per_dir["y"][1].get(did, 0.0))
+        residuals[did] = 0.0
     return SceneConsensus(axes=axes, shifts=shifts, residuals=residuals,
                           outliers=sorted(outliers), adopted=len(shifts))
