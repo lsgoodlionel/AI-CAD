@@ -73,6 +73,26 @@ def build_project_model(self, project_id: str) -> dict:
         raise self.retry(exc=exc)
 
 
+def build_outcome(version: int | None,
+                  project_id: str | None = None) -> dict:
+    """构建结果 → 返回载荷。**落库影响 0 行判为失败**。
+
+    `version is None` 说明 `UPDATE project_models … RETURNING version`
+    没打中任何行 —— 该工程还没有模型记录（`INSERT` 在 API 层）。
+    此时整轮计算的结果无处可存，**必须报错而不是报 ready**。
+    """
+    if version is None:
+        return {
+            "project_id": project_id,
+            "status": "failed",
+            "version": None,
+            "error": ("落库失败：project_models 无该工程的记录 —— "
+                      "请先经 API 创建（INSERT INTO project_models）"
+                      "再触发构建；直接调用内部构建函数会跳过这一步。"),
+        }
+    return {"project_id": project_id, "status": "ready", "version": version}
+
+
 async def _do_build(project_id: str) -> dict:
     """建立 DB 连接并执行构建（连接模式与 tasks/ai_review._do_review 一致）。"""
     db = databases.Database(settings.database_url)
@@ -123,6 +143,15 @@ async def _do_build(project_id: str) -> dict:
             },
         )
         version = row["version"] if row is not None else None
+        if version is None:
+            # **落库影响 0 行 = 失败，不是成功**。实测对从未建模的工程
+            # 直接调本函数，它跑满 969 秒算完全部楼层，然后返回 ready ——
+            # 而数据库里一条记录都没有。`UPDATE` 打不中不存在的行，
+            # 代码本已察觉（下面 `if version is not None` 会跳过装配），
+            # 却仍报告成功，把整轮计算结果悄悄丢弃。
+            logger.error("模型落库失败: project_id=%s 无 project_models 记录",
+                         project_id)
+            return build_outcome(version=None, project_id=project_id)
         logger.info("模型基座构建完成: project_id=%s version=%s", project_id, version)
 
         # ── H4:实体中心装配 —— scene 构件 → ComponentInstance 入库(可追溯) ──
