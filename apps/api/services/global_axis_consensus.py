@@ -98,6 +98,29 @@ class SceneConsensus:
     adopted: int = 0
 
 
+#: 轴号里的分区前缀（§8.0.5「分区号-轴线号」）。
+#: 不含 `/` —— 那是附加轴线的分数式（§8.0.6 `2-1/k`），整体是一个标签。
+_ZONE_PREFIX_RE = __import__("re").compile(r"^(\d+)-(?![^/]*/)")
+
+
+def zone_of_scene(scene_axes: dict | None) -> str | None:
+    """从轴号标签取该图的**分区身份**（取多数）。
+
+    **为什么用它**：共识此前要求「调用方保证同分区」，但没人保证。
+    实测大歌剧院 822 张多分区图里 **616 张已人工确认分区号**，
+    轴号带 `1-` 前缀 —— **前缀即分区身份**，是现成的硬先验。
+    """
+    counts: dict[str, int] = {}
+    for direction in ("x", "y"):
+        for label, _pos in (scene_axes or {}).get(direction) or ():
+            matched = _ZONE_PREFIX_RE.match(str(label or "").strip())
+            if matched:
+                counts[matched.group(1)] = counts.get(matched.group(1), 0) + 1
+    if not counts:
+        return None
+    return max(sorted(counts), key=lambda k: counts[k])
+
+
 def _obs_of(scene_axes: dict, direction: str) -> dict[str, float]:
     out: dict[str, float] = {}
     for label, pos in (scene_axes or {}).get(direction) or ():
@@ -189,6 +212,7 @@ def _solve_direction(dids: list[str], obs_d: dict[str, dict[str, float]],
 def solve_scene_consensus(
     candidates: list[tuple[str, dict]] | None,
     max_residual_m: float = MAX_CONSENSUS_RESIDUAL_M,
+    group_of: dict[str, str] | None = None,
 ) -> SceneConsensus:
     """多图轴网观测 → **逐方向**聚类与簇内共识。
 
@@ -211,6 +235,38 @@ def solve_scene_consensus(
     items = [(str(did), scene) for did, scene in (candidates or [])]
     if not items:
         return SceneConsensus(axes={"x": [], "y": []})
+
+    # **分区硬分组优先于几何自聚类**：同分区才求共识 —— 不同分区各有
+    # 自己的 1 号轴，混算会互相污染（B1 层实测采纳 3/12 就是这么来的）。
+    # 未提供分组时按轴号前缀自取；都没有则退回几何自聚类（旧能力不丢）。
+    resolved_groups = dict(group_of or {})
+    if not resolved_groups:
+        for did, scene in items:
+            zone = zone_of_scene(scene)
+            if zone:
+                resolved_groups[did] = zone
+    if resolved_groups and len(set(resolved_groups.values())) > 1:
+        merged_axes: dict[str, list] = {"x": [], "y": []}
+        merged_shifts: dict = {}
+        merged_res: dict = {}
+        merged_outliers: list[str] = []
+        by_group: dict[str, list] = {}
+        for did, scene in items:
+            by_group.setdefault(resolved_groups.get(did, ""), []).append(
+                (did, scene))
+        for key in sorted(by_group):
+            part = solve_scene_consensus(by_group[key], max_residual_m)
+            for d in ("x", "y"):
+                merged_axes[d].extend(part.axes.get(d) or [])
+            merged_shifts.update(part.shifts)
+            merged_res.update(part.residuals)
+            merged_outliers.extend(part.outliers)
+        for d in ("x", "y"):
+            merged_axes[d].sort(key=lambda e: e[1])
+        return SceneConsensus(axes=merged_axes, shifts=merged_shifts,
+                              residuals=merged_res,
+                              outliers=sorted(merged_outliers),
+                              adopted=len(merged_shifts))
 
     dids = [did for did, _ in items]
     obs = {

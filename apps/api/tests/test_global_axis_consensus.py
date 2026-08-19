@@ -299,3 +299,68 @@ def test_scale_mismatch_is_not_translation_repairable():
     ])
     assert dict(got.axes["x"]) == pytest.approx(base)
     assert got.outliers == ["overview"]
+
+
+# ── 分区硬分组（比几何自聚类更强的先验）────────────────────────
+
+@pytest.mark.unit
+def test_zone_groups_are_solved_independently():
+    """**共识此前要求「调用方保证同分区」,但没人保证**。
+
+    实测大歌剧院:822 张多分区图里 **616 张已人工确认分区号**,
+    其轴号带 `1-` 前缀 —— **前缀即分区身份**,是现成的硬先验。
+
+    同分区才求共识:不同分区各有自己的 1 号轴,混算会互相污染
+    (B1 层实测采纳 3/12 就是这么来的)。
+    """
+    from services.global_axis_consensus import solve_scene_consensus
+
+    zone_a = {"1-1": 0.0, "1-2": 8.0, "1-3": 16.0}
+    zone_b = {"2-1": 0.0, "2-2": 8.0, "2-3": 16.0}   # 位置相同但是**另一个区**
+    got = solve_scene_consensus(
+        [("a1", _scene(x=zone_a)), ("a2", _scene(x=zone_a)),
+         ("b1", _scene(x=zone_b)), ("b2", _scene(x=zone_b))],
+        group_of={"a1": "Z1", "a2": "Z1", "b1": "Z2", "b2": "Z2"})
+    # 两组各自成共识，标签互不干扰
+    assert got.adopted == 4
+    labels = {e[0] for e in got.axes["x"]}
+    assert labels == {"1-1", "1-2", "1-3", "2-1", "2-2", "2-3"}
+
+
+@pytest.mark.unit
+def test_outliers_are_per_group():
+    """外点判定也按组算 —— 甲组的偏移图不该被乙组的分布裁决。"""
+    from services.global_axis_consensus import solve_scene_consensus
+
+    base = {"1-1": 0.0, "1-2": 8.0, "1-3": 16.0}
+    scrambled = {"1-1": 0.0, "1-2": 90.0, "1-3": 5.0}
+    got = solve_scene_consensus(
+        [("a1", _scene(x=base)), ("a2", _scene(x=base)),
+         ("a3", _scene(x=base)), ("bad", _scene(x=scrambled)),
+         ("solo", _scene(x={"2-1": 0.0, "2-2": 8.0}))],
+        group_of={"a1": "Z1", "a2": "Z1", "a3": "Z1", "bad": "Z1",
+                  "solo": "Z2"})
+    assert got.outliers == ["bad"]
+    assert "solo" in got.shifts          # 独立组不受 Z1 的外点牵连
+
+
+@pytest.mark.unit
+def test_without_groups_falls_back_to_geometric_clustering():
+    """**没有分区信息时退回几何自聚类** —— 不因为新增先验而丢掉旧能力。"""
+    from services.global_axis_consensus import solve_scene_consensus
+
+    base = {"1": 0.0, "2": 8.0, "3": 16.0}
+    got = solve_scene_consensus([("g1", _scene(x=base)), ("g2", _scene(x=base))])
+    assert got.adopted == 2
+
+
+@pytest.mark.unit
+def test_zone_prefix_extracted_from_labels():
+    """从轴号标签直接取分区身份 —— 无需额外数据源。"""
+    from services.global_axis_consensus import zone_of_scene
+
+    assert zone_of_scene(_scene(x={"1-1": 0.0, "1-2": 8.0})) == "1"
+    assert zone_of_scene(_scene(x={"2-1": 0.0}, y={"2-A": 0.0})) == "2"
+    assert zone_of_scene(_scene(x={"1": 0.0, "2": 8.0})) is None   # 裸标签无分区
+    # 混用时取多数
+    assert zone_of_scene(_scene(x={"1-1": 0.0, "1-2": 8.0, "2-9": 99.0})) == "1"
