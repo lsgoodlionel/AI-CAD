@@ -1446,3 +1446,41 @@ async def derive_scale_from_manual_axes(
             confidence=1.0,           # 人工量定 → 满置信
             source=TRANSFORM_SOURCE_MANUAL))
     return {"success": True, "data": {**got, "page_h": page_h}, "error": None}
+
+@router.get("/projects/{project_id}/component-marks")
+async def component_marks(project_id: str, mark: str | None = None,
+                          limit: int = 100, db=Depends(get_db),
+                          _user=Depends(get_current_user)) -> dict:
+    """构件编号索引 —— **按编号追溯**它出现在哪些图、哪些层。
+
+    会审 133 条检查项里「定位信息是否完整」要求人能答出
+    「问题具体对应哪张图、哪个部位」；实测大歌剧院 587 个编号里
+    **214 个跨多图出现**（`M1124` 在 84 张图上），
+    一个构件的信息本就分散在多图里。
+
+    传 `mark` 查单个编号，不传则返回**跨图最多**的前 N 个。
+    """
+    from services.component_mark_index import build_mark_index, mark_summary
+
+    rows = await db.fetch_all(
+        """SELECT e.content, e.drawing_id, d.title
+           FROM drawing_extracted_info e JOIN drawings d ON d.id = e.drawing_id
+           WHERE e.project_id = CAST(:p AS uuid)
+             AND length(e.content) BETWEEN 2 AND 12""",
+        {"p": project_id})
+    index = build_mark_index([dict(r) for r in rows])
+    if mark:
+        entry = index.get(mark)
+        if not entry:
+            return {"success": True, "data": {"mark": mark, "found": False}}
+        return {"success": True, "data": {
+            "mark": mark, "found": True, "kind": entry["kind"],
+            "drawings": sorted(entry["drawings"]),
+            "titles": sorted(entry["titles"])[:50],
+        }}
+    return {"success": True, "data": {
+        "items": mark_summary(index, limit=limit),
+        "total_marks": len(index),
+        "cross_drawing_marks": sum(
+            1 for e in index.values() if len(e["drawings"]) > 1),
+    }}
