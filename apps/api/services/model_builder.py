@@ -957,6 +957,12 @@ async def _attach_floor_elements(
         # 这一层到底有多少图是真定位、多少只是相对贴合,前端与度量能直接读到。
         floor["placed_drawings"] = int(meta.get("placed") or 0)
         floor["registered_drawings"] = int(meta.get("registered") or 0)
+        # **共识平移修正过的图数**：与 registered（成对配准兜底）并列。
+        # 加这个字段是为了**用观测代替推断** —— 此前只能从「落库层数没变」
+        # 反推「构件没被对齐」，而那是猜的。
+        # 注意：`_attach_floor_elements` 里 meta 的字段是**显式挑选**写入
+        # floor 的，算了不挑等于没算（本轮在这里栽过一次）。
+        floor["consensus_aligned"] = int(meta.get("consensus_aligned") or 0)
         # 层内坐标系矛盾（用户第 3 项）：补上楼层名后挂到楼层，供 scene.quality
         # 汇总与前端展示 —— **降级必须可见**，不能默默退回局部。
         floor["_recognize_timeouts"] = int(meta.get("timeouts") or 0)
