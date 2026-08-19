@@ -91,3 +91,43 @@ def test_sequence_break_is_not_a_clause():
 def test_empty_input():
     assert regroup_clauses([]) == []
     assert regroup_clauses(None) == []
+
+
+# ── 按块重组（实测:全局单调性拒掉 90% 真条文）────────────────
+
+@pytest.mark.unit
+def test_regroup_blocks_resets_monotonicity():
+    """**实测**:整图 80 行匹配条文号,全局单调性**拒了 72 行**(90%)——
+    因为阅读顺序在图纸级别难以完全恢复,编号呈 `1, 1.1, 2.10.2, 3.3` 乱序。
+
+    单调性的本意是防「表格里的 1.5 被当条文号」,那是**块内**的问题;
+    跨块比较没有依据 —— 两个说明块各自从 1 开始编号完全正常。
+    ⇒ **按块重置**:块内单调,跨块不比。
+    """
+    from core.model3d.spec_clause import regroup_clause_blocks
+
+    blocks = [
+        ["1 总则", "依据…", "2 材料"],      # 块内单调
+        ["1 施工", "要求…"],                # 另一块**重新从 1 开始**
+    ]
+    got = regroup_clause_blocks(blocks)
+    numbers = [c.number for c in got if c.number]
+    # 若用全局单调，第二块的 `1` 会被拒（1 < 2）—— 那正是实测里 90% 被误伤的成因
+    assert numbers == ["1", "2", "1"], f"跨块不该被单调性拒掉: {numbers}"
+
+
+@pytest.mark.unit
+def test_block_internal_monotonicity_still_guards():
+    """**块内仍要防表格数字** —— `1.5` 夹在 `1.2`/`1.3` 之间不算条文。"""
+    from core.model3d.spec_clause import regroup_clause_blocks
+
+    got = regroup_clause_blocks([["1.2 保护层", "板厚 1.5 mm", "1.3 锚固"]])
+    assert [c.number for c in got if c.number] == ["1.2", "1.3"]
+
+
+@pytest.mark.unit
+def test_empty_blocks():
+    from core.model3d.spec_clause import regroup_clause_blocks
+
+    assert regroup_clause_blocks([]) == []
+    assert regroup_clause_blocks(None) == []

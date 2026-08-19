@@ -116,3 +116,19 @@ def regroup_clauses(lines: list[str] | None) -> list[SpecClause]:
                                   level=0, parent=None))
     _flush()
     return clauses
+
+
+def regroup_clause_blocks(blocks: list[list[str]] | None) -> list[SpecClause]:
+    """**按块**重组条文（每块独立重置单调性）。
+
+    **为什么必须按块**（实测）：整图 80 行匹配条文号，
+    全局单调性**拒了 72 行（90%）** —— 阅读顺序在图纸级别难以完全恢复，
+    编号呈 `1, 1.1, 2.10.2, 3.3` 乱序。
+
+    而单调性的本意是防「表格里的 `1.5` 被当条文号」，那是**块内**的问题；
+    跨块比较没有依据 —— 两个说明块各自从 1 开始编号完全正常。
+    """
+    out: list[SpecClause] = []
+    for block in blocks or []:
+        out.extend(regroup_clauses(block))
+    return out
