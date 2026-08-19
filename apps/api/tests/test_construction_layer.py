@@ -67,7 +67,7 @@ def test_layer_role_is_classified():
              ("3.0厚自粘改性沥青防水卷材", "waterproof"),
              ("30厚带铝箔岩棉板内保温", "insulation"),
              ("100厚C15混凝土垫层", "cushion"),
-             ("120厚现浇钢筋混凝土板", "structural")]
+             ("120厚现浇钢筋混凝土板", "structural_slab")]
     for text, role in cases:
         got = parse_construction_layer(text)
         assert got is not None and got.role == role, f"{text} → {got}"
@@ -93,10 +93,10 @@ def test_masonry_walls_are_structural():
     砌块/砌体/墙体是**承重或围护结构**,建模时要出实体,
     与找平层、保温层的处理完全不同。
     """
-    for text in ("200厚蒸压加气混凝土砌块墙体", "100厚ALC轻质隔墙板",
-                 "240厚烧结页岩砖砌体", "150厚加气块隔墙"):
+    for text in ("200厚蒸压加气混凝土砌块墙体", "240厚烧结页岩砖砌体",
+                 "150厚加气块隔墙"):
         got = parse_construction_layer(text)
-        assert got is not None and got.role == "structural", f"{text} → {got}"
+        assert got is not None and got.role == "structural_wall", f"{text} → {got}"
 
 
 @pytest.mark.unit
@@ -106,4 +106,41 @@ def test_role_priority_is_stable():
     `100厚保温砌块` 既有「保温」又有「砌块」——它首先是墙体。
     """
     got = parse_construction_layer("100厚保温砌块墙")
-    assert got is not None and got.role == "structural"
+    assert got is not None and got.role == "structural_wall"
+
+
+# ── 结构层必须分墙与板（接建模前的必要细化）────────────────────
+
+@pytest.mark.unit
+def test_structural_splits_wall_and_slab():
+    """**接建模前必须分开** —— 实测 `structural` 里混着墙和板:
+
+        100厚ALC预制板斜墙        ← 墙（77 条 100mm 大多是它）
+        200厚蒸压加气混凝土砌块墙体 ← 墙
+        120厚现浇钢筋混凝土板      ← 板
+
+    拿它做板厚会**把墙厚当板厚**。
+    """
+    walls = ("100厚ALC预制板斜墙", "200厚蒸压加气混凝土砌块墙体",
+             "150厚加气块隔墙", "240厚烧结页岩砖砌体", "100厚轻质墙板")
+    slabs = ("120厚现浇钢筋混凝土板", "100厚楼板", "150厚屋面板",
+             "130厚叠合板", "180厚结构板")
+    for text in walls:
+        got = parse_construction_layer(text)
+        assert got is not None and got.role == "structural_wall", f"{text} → {got}"
+    for text in slabs:
+        got = parse_construction_layer(text)
+        assert got is not None and got.role == "structural_slab", f"{text} → {got}"
+
+
+@pytest.mark.unit
+def test_wall_wins_when_both_words_present():
+    """`ALC预制板斜墙` 同时含「板」与「墙」—— **它是墙**。
+
+    「预制板…墙」是墙的做法名（用板材砌的墙），不是楼板。
+    以**末位构件词**为准：谁在最后，说的就是谁。
+    """
+    got = parse_construction_layer("100厚ALC预制板斜墙")
+    assert got is not None and got.role == "structural_wall"
+    got2 = parse_construction_layer("120厚墙上现浇板")
+    assert got2 is not None and got2.role == "structural_slab"

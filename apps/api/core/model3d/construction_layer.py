@@ -40,11 +40,13 @@ _DESIGN_NOTE_RE = re.compile(
 #: 构造层的**作用**（建模时保温层与结构层处理完全不同）。
 #: 顺序即优先级 —— `钢筋混凝土板` 同时含「混凝土」与「板」，结构层优先。
 _ROLE_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
-    # 砌块/砌体/墙体是**承重或围护结构**（实测 `200厚蒸压加气混凝土砌块墙体`
-    # 曾落进 other）；建模时要出实体，与找平层、保温层处理完全不同。
+    # **结构层必须分墙与板**：实测 `structural` 里混着
+    # `100厚ALC预制板斜墙`（墙）与 `120厚现浇钢筋混凝土板`（板），
+    # 拿它做板厚会**把墙厚当板厚**。两者由 `_structural_role` 按
+    # **末位构件词**判定（谁在最后，说的就是谁）。
     ("structural", ("钢筋混凝土板", "现浇板", "结构板", "楼板", "屋面板",
                     "预制板", "叠合板", "砌块", "砌体", "墙体", "隔墙",
-                    "轻质墙", "板墙")),
+                    "轻质墙", "板墙", "墙板", "斜墙")),
     ("waterproof", ("防水", "隔汽", "防潮")),
     ("insulation", ("保温", "岩棉", "挤塑", "聚苯", "隔热", "隔声", "吸声")),
     ("cushion", ("垫层", "素土", "夯实", "碎石", "级配")),
@@ -58,14 +60,40 @@ class ConstructionLayer:
     """一层构造做法。"""
     thickness_mm: float
     material: str
-    role: str          # structural/waterproof/insulation/cushion/leveling/finish/other
+    role: str          # structural_slab / structural_wall / waterproof /
+                       # insulation / cushion / leveling / finish / other
     raw: str
+
+
+#: 结构层里区分墙与板的构件词。**以末位者为准** ——
+#: `ALC预制板斜墙` 同时含「板」与「墙」，它是用板材砌的**墙**；
+#: `墙上现浇板` 反过来是**板**。
+_WALL_WORDS = ("墙", "砌块", "砌体")
+_SLAB_WORDS = ("板",)
+
+
+#: **复合词优先于末位规则**。「墙板」是做墙用的板材，整体指墙，
+#: 但「板」在末位 —— 中文复合词拆开看会判反（实测 `100厚轻质墙板`）。
+_WALL_COMPOUNDS = ("墙板", "隔墙板", "条板墙", "墙体板", "板式墙")
+
+
+def _structural_role(material: str) -> str:
+    """结构层是墙还是板。
+
+    先查**复合词**（`墙板` 整体指墙），再取**最后出现**的构件词
+    （`ALC预制板斜墙` 是墙、`墙上现浇板` 是板）。
+    """
+    if any(word in material for word in _WALL_COMPOUNDS):
+        return "structural_wall"
+    last_wall = max((material.rfind(w) for w in _WALL_WORDS), default=-1)
+    last_slab = max((material.rfind(w) for w in _SLAB_WORDS), default=-1)
+    return "structural_wall" if last_wall > last_slab else "structural_slab"
 
 
 def _classify_role(material: str) -> str:
     for role, keywords in _ROLE_RULES:
         if any(word in material for word in keywords):
-            return role
+            return _structural_role(material) if role == "structural" else role
     return "other"
 
 
