@@ -215,7 +215,11 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
         rects, rect_layers, rect_blocks, polys, poly_layers, poly_blocks, ctx,
         layer_only=wall_drawing,
     )
-    pairs_are_beams = _is_beam_drawing(all_text, line_layers)
+    # **图名对图种有否决权**：墙配筋图上的平行线对是墙不是梁
+    # （实测 F4 层因此墙 0 梁 186）。
+    pairs_are_beams = is_beam_drawing_effective(
+        beam_like=_is_beam_drawing(all_text, line_layers),
+        drawing_title=drawing_title)
     pairs = _find_parallel_pairs(
         lines, line_layers, axis_lines,
         _BEAM_GAP if pairs_are_beams else _WALL_GAP, ctx,
@@ -527,6 +531,38 @@ MIN_BEAM_LINES_FOR_BEAM_DRAWING = 100
 #: 判据不完美，但**判错只影响归类、不丢构件**。
 _WALL_WORD_RE = re.compile(r"墙")
 _COLUMN_WORD_RE = re.compile(r"柱")
+_BEAM_WORD_RE = re.compile(r"梁")
+
+
+def is_beam_drawing_effective(*, beam_like: bool,
+                              drawing_title: str | None) -> bool:
+    """几何/图层判出「像梁图」后，再让**图名**有一次否决权。
+
+    **实测缺陷**：「三~四层大歌剧厅**墙**配筋平面图」`is_wall_drawing=True`，
+    却仍产出 18 根梁、0 面墙 —— 整层 F4 因此墙 0 梁 186。
+    上一版加的 `is_wall_drawing` **只用在柱识别**，没用在墙/梁分流。
+
+    与「梁图上的平行线对归梁」是同一条规则的另一半：
+    **图种声明优先于几何猜测**，两个方向都要成立。
+    """
+    if is_wall_drawing(drawing_title):
+        return False
+    # **图名也能正向认定**：`_is_beam_drawing` 只看图内文字，
+    # 而大歌剧院矢量文字常取不到 —— 实测「地下一层主梁配筋图（四）」
+    # 产出 516 面墙、0 根梁，图名白纸黑字却没被采信。
+    if _title_asserts_beam(drawing_title):
+        return True
+    return beam_like
+
+
+def _title_asserts_beam(title: str | None) -> bool:
+    """图名是否声明这是梁图（「梁」出现且不在「墙」之后）。"""
+    text = str(title or "")
+    beam = _BEAM_WORD_RE.search(text)
+    if not beam:
+        return False
+    wall = _WALL_WORD_RE.search(text)
+    return wall is None or beam.start() < wall.start()
 
 
 def is_wall_drawing(title: str | None) -> bool:

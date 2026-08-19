@@ -82,3 +82,55 @@ def test_wall_drawing_suppresses_geometric_columns():
                            drawing_title="四~五层中歌剧厅墙配筋平面图")
     without = recognize(geom, "structure", "d1")
     assert len(with_title.columns) < len(without.columns) or not without.columns
+
+
+# ── 墙图上的平行线对归墙，不归梁 ────────────────────────────────
+
+@pytest.mark.unit
+def test_wall_drawing_beats_beam_heuristic():
+    """**实测缺陷**:「三~四层大歌剧厅**墙**配筋平面图」
+    `is_wall_drawing=True`,却仍产出 18 根梁、**0 面墙** ——
+    整层 F4 因此墙 0 梁 186。
+
+    根因:我上一版加了 `is_wall_drawing`,**只用在柱识别**,
+    没用在墙/梁分流。图名声明是墙图时,平行线对必须归墙。
+
+    这与「梁图上的平行线对归梁」是同一条规则的另一半 ——
+    **图种声明优先于几何猜测**,两个方向都要成立。
+    """
+    from core.model3d.element_recognizer import is_beam_drawing_effective
+
+    # 图名说是墙图 → 无论几何/图层多像梁，都不按梁图处理
+    assert not is_beam_drawing_effective(
+        beam_like=True, drawing_title="三~四层大歌剧厅墙配筋平面图")
+    # 图名说是梁图 → 照常
+    assert is_beam_drawing_effective(
+        beam_like=True, drawing_title="四层梁配筋平面图")
+    # 图名两不沾 → 由几何判据决定
+    assert is_beam_drawing_effective(beam_like=True, drawing_title="四层平面图")
+    assert not is_beam_drawing_effective(beam_like=False, drawing_title="四层平面图")
+
+
+@pytest.mark.unit
+def test_title_can_also_assert_a_beam_drawing():
+    """**图名有双向发言权** —— 否决是一半,认定是另一半。
+
+    实测「地下一层**主梁**配筋图（四）」产出 **516 面墙、0 根梁**:
+    `_is_beam_drawing` 只看**图内文字**,而大歌剧院矢量文字常取不到,
+    于是图名白纸黑字写着「主梁配筋图」却没判成梁图。
+
+    对称地:图名含「梁」且「梁」在「墙」之前 → 认定为梁图。
+    """
+    from core.model3d.element_recognizer import is_beam_drawing_effective
+
+    # 几何判不出，但图名说是梁图 → 认定
+    assert is_beam_drawing_effective(
+        beam_like=False, drawing_title="地下一层主梁配筋图（四）")
+    assert is_beam_drawing_effective(
+        beam_like=False, drawing_title="三层次梁平法施工图")
+    # 墙在前 → 仍是墙图，不因含「梁」翻盘
+    assert not is_beam_drawing_effective(
+        beam_like=False, drawing_title="墙梁配筋平面图")
+    # 两不沾且几何判不出 → 不认定
+    assert not is_beam_drawing_effective(
+        beam_like=False, drawing_title="四层平面图")
