@@ -88,9 +88,16 @@ def classify_text(text: str) -> tuple[TokenKind, float | None]:
     # **标题栏字段标签优先** —— 它是确定集合（ISO 7200 / GB/T 10609.1），
     # 不与任何值形态重叠；不先判掉的话「设计」「比例」会被后面的
     # 房间/说明分支吃掉，混进 `other` 再也分不出来。
-    from services.title_block_labels import is_title_block_label
+    from services.title_block_labels import (
+        is_label_fragment, is_title_block_label,
+    )
 
     if is_title_block_label(raw):
+        return "title_block_label", None
+    # **竖排被拆散的单字碎片**：实测「图/目/核/总/对/专/审…」各出现
+    # 360+ 次（≈ 图纸总数的 16%），是标题栏竖排文字逐字提取的产物。
+    # 归入同一类而非 `other` —— 它们标出的正是标题栏字段区域的位置。
+    if is_label_fragment(raw):
         return "title_block_label", None
 
     # 标高（数值形态，或"标高"字样后接数值）

@@ -45,10 +45,18 @@ def test_reclassifies_prefixed_floor_names_out_of_room_name():
 
 @pytest.mark.unit
 def test_single_character_noise_is_moved_out_of_room_name():
-    """图框会签栏被逐字拆开 —— 实测一张立面图 127 条。"""
+    """图框会签栏被逐字拆开 —— 实测一张立面图 127 条。
+
+    **归类口径已细化**：标题栏标签的用字（`校`/`设`/`计`/`单`/`位`）
+    归 `title_block_label`，其余（`合`/`作`）仍归 `other`。
+    两者都不是房间名 —— 本用例断言的是**移出 room_name**，
+    而 `title_block_label` 比 `other` 多保留了「这是标题栏区域」这条信息，
+    「图框字段区域记忆」正要靠它定位。
+    """
     plan = plan_reclassify([_row(i, ch, "room_name")
                             for i, ch in enumerate("校合作设计单位")])
-    assert all(p["category"] == "other" for p in plan)
+    assert all(p["category"] in ("other", "title_block_label") for p in plan)
+    assert all(p["category"] != "room_name" for p in plan)
     assert len(plan) == 7
 
 

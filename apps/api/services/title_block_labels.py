@@ -28,6 +28,11 @@ _LABELS_ZH = {
     "项目名称", "工程名称", "建设单位", "设计单位", "设计号", "图号",
     "图别", "比例", "日期", "专业", "审定", "审核", "校对", "制图",
     "设计", "工种", "会签", "版次", "页次", "共页", "第页", "签字",
+    # **会签栏的岗位名**（GB/T 10609.1 标题栏/会签栏）——
+    # 实测「总」「责」「负」三字以单字形式各出现 360+ 次，
+    # 正是「总工程师」「专业负责人」被竖排拆散的碎片。
+    "总工程师", "专业负责人", "项目负责人", "负责人", "总负责",
+    "技术负责人", "审定人", "设计人", "制图人", "校核",
 }
 
 #: 归一化：去首尾空白与标点、折叠内部空白、转小写。
@@ -50,3 +55,31 @@ def is_title_block_label(text: str | None) -> bool:
     # 中文标签不转小写比较（大小写无意义），用原串去尾标点后比
     raw = _TRIM_RE.sub("", str(text or "")).strip()
     return raw in _LABELS_ZH
+
+
+#: 标题栏中文标签的**用字集合** —— 由 `_LABELS_ZH` 拆出。
+#: 实测大歌剧院 other 类别里，这些字各以单字形式出现 360~378 次
+#: （≈ 图纸总数的 16%）：标题栏**竖排**文字被逐字提取，每字一条记录。
+_LABEL_CHARS = {ch for label in _LABELS_ZH for ch in label}
+
+#: **有意义的单字** —— 方位标记是真内容，不是碎片。
+_MEANINGFUL_SINGLE = set("东西南北上下左右内外前后高低大小")
+
+
+def is_label_fragment(text: str | None) -> bool:
+    """是否为标题栏标签被竖排拆散后的**单字碎片**。
+
+    只认「单个中文字 + 属于标签用字」：
+    - 多字文本是真内容（`审核` / `比例` 本身就是完整标签，由
+      `is_title_block_label` 处理）
+    - ASCII 单字符可能是**轴号**（`A` / `1`），绝不归碎片
+    - 方位字（东西南北）有意义，排除
+    """
+    body = str(text or "").strip()
+    if len(body) != 1:
+        return False
+    if body in _MEANINGFUL_SINGLE:
+        return False
+    if not ("\u4e00" <= body <= "\u9fff"):    # 非中文（ASCII 轴号等）
+        return False
+    return body in _LABEL_CHARS
