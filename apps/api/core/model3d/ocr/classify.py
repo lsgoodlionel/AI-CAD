@@ -107,6 +107,13 @@ def classify_text(text: str) -> tuple[TokenKind, float | None]:
     if parse_component_mark(raw) is not None:
         return "component_mark", None
 
+    # **构造做法层** —— 「20厚…」形态；放在 note/room 之前，
+    # 否则会被当成普通说明文字吞掉。
+    from core.model3d.construction_layer import parse_construction_layer
+
+    if parse_construction_layer(raw) is not None:
+        return "construction_layer", None
+
     # 标高（数值形态，或"标高"字样后接数值）
     if _RE_ELEVATION.match(raw):
         return "elevation", _parse_elevation(raw)
