@@ -281,3 +281,32 @@ def test_stripping_still_works_when_prefix_has_no_code():
 
     assert classify_by_layer("PLAN_F01$0$0S-BEAM-I") == "beam"
     assert classify_by_layer("COLS_F01$0$0S-COLS-HATCH") == "column"
+
+
+# ── 「钢筋混凝土」是材料名，不是钢筋图层（探测性验证抓出）────────
+
+@pytest.mark.unit
+def test_reinforced_concrete_is_a_material_not_a_rebar_layer():
+    """**探测边界时抓出的误杀**:图层名「**钢筋**混凝土墙」含「钢筋」,
+    被判成钢筋标注层 —— 而它是**材料名**,那是真真正正的墙。
+
+    误杀的代价是构件**凭空消失**,比放进几条钢筋线严重得多。
+
+    「钢筋混凝土」「钢筋砼」是国标材料术语（GB/T 50083），
+    必须先于「钢筋」子串判掉。
+    """
+    from core.model3d.layer_conventions import is_annotation_layer
+
+    for layer in ("钢筋混凝土墙", "钢筋混凝土柱", "钢筋混凝土梁",
+                  "RC钢筋混凝土板", "钢筋砼墙", "钢筋混凝土结构"):
+        assert not is_annotation_layer(layer), layer
+
+
+@pytest.mark.unit
+def test_rebar_layers_are_still_caught():
+    """**不得因此放过真钢筋层** —— 纵筋/箍筋/配筋照旧拦下。"""
+    from core.model3d.layer_conventions import is_annotation_layer
+
+    for layer in ("墙柱纵筋", "墙柱箍筋", "梁配筋", "板底钢筋",
+                  "S-COLS-REBAR", "拉筋"):
+        assert is_annotation_layer(layer), layer

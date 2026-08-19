@@ -211,6 +211,13 @@ _ANNOTATION_LAYER_RE = re.compile(
     re.IGNORECASE)
 
 
+#: **「钢筋混凝土」是材料名，不是钢筋图层**（GB/T 50083 材料术语）。
+#: 探测判据边界时抓出：`钢筋混凝土墙` 含「钢筋」被判成标注层，
+#: 而那是真真正正的墙 —— **误杀的代价是构件凭空消失**，
+#: 比放进几条钢筋线严重得多。必须先于「钢筋」子串判掉。
+_CONCRETE_MATERIAL_RE = re.compile(r"钢筋(?:混凝土|砼)")
+
+
 def is_annotation_layer(layer: str | None) -> bool:
     """该图层画的是标注而非构件本身。
 
@@ -219,7 +226,10 @@ def is_annotation_layer(layer: str | None) -> bool:
     （梁的文字标注不是梁）。我第一版把两者混为一谈，
     直接让 `classify_by_layer` 对标注层返回 None，打断了 4 个既有断言。
     """
-    return bool(_ANNOTATION_LAYER_RE.search(str(layer or "")))
+    text = str(layer or "")
+    # 「钢筋混凝土X」先摘掉，再判 —— 否则材料名里的「钢筋」会误杀真构件层
+    text = _CONCRETE_MATERIAL_RE.sub("", text)
+    return bool(_ANNOTATION_LAYER_RE.search(text))
 
 
 def normalize_layer_name(layer: str | None) -> str:
