@@ -364,3 +364,51 @@ def test_zone_prefix_extracted_from_labels():
     assert zone_of_scene(_scene(x={"1": 0.0, "2": 8.0})) is None   # 裸标签无分区
     # 混用时取多数
     assert zone_of_scene(_scene(x={"1-1": 0.0, "1-2": 8.0, "2-9": 99.0})) == "1"
+
+
+# ── 裸标签图的几何归组（绕开人工确认分区号）──────────────────
+
+@pytest.mark.unit
+def test_bare_label_drawings_join_zones_geometrically():
+    """**实测**:裸标签图(无分区前缀)可用几何归入分区 —— 3/5 张成功,
+    scale 0.988~1.000、内点 15~20。这是**绕开人工确认分区号**的路径。
+
+    判据靠 `pose_ransac` 的 `confident`(内点率**或** scale≈1 且内点够)。
+    """
+    from services.global_axis_consensus import solve_scene_consensus
+
+    # 分区 1 的两张（带前缀），与一张裸标签图几何一致
+    zoned = {f"1-{i}": float(i * 8) for i in range(1, 9)}
+    zoned_y = {f"1-{c}": float(i * 6) for i, c in enumerate("ABCDEFGH", 1)}
+    bare = {str(i): float(i * 8) for i in range(1, 9)}
+    bare_y = {c: float(i * 6) for i, c in enumerate("ABCDEFGH", 1)}
+
+    got = solve_scene_consensus([
+        ("z1", _scene(x=zoned, y=zoned_y)),
+        ("z2", _scene(x=zoned, y=zoned_y)),
+        ("bare", _scene(x=bare, y=bare_y)),
+    ])
+    # 裸标签图被采纳（归入分区 1 组一起求解），不是外点
+    assert "bare" in got.shifts
+    assert got.outliers == []
+
+
+@pytest.mark.unit
+def test_geometrically_inconsistent_bare_stays_separate():
+    """**几何对不上的不硬归** —— 它自成一组，不污染分区簇。"""
+    from services.global_axis_consensus import solve_scene_consensus
+
+    zoned = {f"1-{i}": float(i * 8) for i in range(1, 6)}
+    zoned_y = {f"1-{c}": float(i * 6) for i, c in enumerate("ABCDE", 1)}
+    far = {str(i): float(i * 77 + 5000) for i in range(1, 6)}
+
+    got = solve_scene_consensus([
+        ("z1", _scene(x=zoned, y=zoned_y)),
+        ("z2", _scene(x=zoned, y=zoned_y)),
+        ("far", _scene(x=far)),
+    ])
+    # 不该被强行并入分区 1 的轴网（标签互不污染）
+    zone_labels = {e[0] for e in got.axes["x"] if e[0].startswith("1-")}
+    assert zone_labels, "分区 1 的轴号应当存在"
+    assert not any(e[0].startswith("1-") and e[1] > 1000
+                   for e in got.axes["x"]), "远处的图不该混进分区 1"

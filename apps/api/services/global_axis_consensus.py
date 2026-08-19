@@ -209,6 +209,57 @@ def _solve_direction(dids: list[str], obs_d: dict[str, dict[str, float]],
     return solve_global_axes(aligned), shifts, members
 
 
+def _geometric_zone_assignment(
+    items: list[tuple[str, dict]], known: dict[str, str],
+) -> dict[str, str]:
+    """无分区前缀的图 → 用**几何**归入某个分区（归不了就不归）。
+
+    先按已知分区求各自的共识轴网，再对每张裸标签图解相似变换，
+    取 `confident` 且内点最多的那个分区。判据见 `pose_ransac`：
+    内点率够 **或**（scale≈1 且内点数够）—— 图纸等比绘制，
+    scale 是比内点率更强的信号。
+    """
+    from services.axis_pose_solver import intersections_of
+    from services.pose_ransac import solve_pose_ransac
+
+    by_zone: dict[str, list] = {}
+    for did, scene in items:
+        zone = known.get(did)
+        if zone:
+            by_zone.setdefault(zone, []).append((did, scene))
+    if not by_zone:
+        return {}
+
+    zone_points: dict[str, dict] = {}
+    for zone, members in by_zone.items():
+        try:
+            zone_points[zone] = intersections_of(
+                solve_scene_consensus(members).axes)
+        except Exception:  # noqa: BLE001 — 单区失败不拖垮归组
+            continue
+
+    assigned: dict[str, str] = {}
+    for did, scene in items:
+        if did in known:
+            continue
+        try:
+            local = intersections_of(scene)
+        except Exception:  # noqa: BLE001
+            continue
+        if not local:
+            continue                      # 单方向轴号构不出交点
+        best: tuple[str, int] | None = None
+        for zone, points in zone_points.items():
+            pose = solve_pose_ransac(local, points)
+            if pose is None or not pose.get("confident"):
+                continue
+            if best is None or pose["inliers"] > best[1]:
+                best = (zone, pose["inliers"])
+        if best is not None:
+            assigned[did] = best[0]
+    return assigned
+
+
 def solve_scene_consensus(
     candidates: list[tuple[str, dict]] | None,
     max_residual_m: float = MAX_CONSENSUS_RESIDUAL_M,
@@ -245,6 +296,12 @@ def solve_scene_consensus(
             zone = zone_of_scene(scene)
             if zone:
                 resolved_groups[did] = zone
+        # **裸标签图用几何归组** —— 绕开人工确认分区号的路径。
+        # 实测 5 张裸标签图里 3 张可归（scale 0.988~1.000、内点 15~20）；
+        # 归不了的自成一组，**不硬归**（几何对不上就是对不上）。
+        if resolved_groups and len(resolved_groups) < len(items):
+            resolved_groups.update(
+                _geometric_zone_assignment(items, resolved_groups))
     if resolved_groups and len(set(resolved_groups.values())) > 1:
         merged_axes: dict[str, list] = {"x": [], "y": []}
         merged_shifts: dict = {}
