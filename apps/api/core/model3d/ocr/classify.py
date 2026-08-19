@@ -85,6 +85,14 @@ def classify_text(text: str) -> tuple[TokenKind, float | None]:
     if not raw:
         return "other", None
 
+    # **标题栏字段标签优先** —— 它是确定集合（ISO 7200 / GB/T 10609.1），
+    # 不与任何值形态重叠；不先判掉的话「设计」「比例」会被后面的
+    # 房间/说明分支吃掉，混进 `other` 再也分不出来。
+    from services.title_block_labels import is_title_block_label
+
+    if is_title_block_label(raw):
+        return "title_block_label", None
+
     # 标高（数值形态，或"标高"字样后接数值）
     if _RE_ELEVATION.match(raw):
         return "elevation", _parse_elevation(raw)
