@@ -164,3 +164,36 @@ def test_real_wall_terms_still_match():
     for title in ("女儿墙大样图", "挡土墙配筋图", "剪力墙平面布置图",
                   "地下室外墙留洞图", "内隔墙平面图"):
         assert is_wall_drawing(title), title
+
+
+@pytest.mark.unit
+def test_wall_must_precede_both_column_and_beam():
+    """**判据要对称** —— 探测边界时抓出:
+
+        「梁墙节点」→ is_wall_drawing=True
+
+    「梁」明明在「墙」之前。原因是 `is_wall_drawing` 只比较「墙 vs 柱」，
+    而 `_title_asserts_beam` 比较了「梁 vs 墙」—— 两者不对称，
+    且前者先执行，直接否决了后者，`_title_asserts_beam` 根本没机会跑。
+
+    正确口径:**墙要在柱和梁都之前**，才算墙图。
+    """
+    # 梁在前 → 不是墙图
+    assert not is_wall_drawing("梁墙节点")
+    assert not is_wall_drawing("梁板墙配筋图")
+    # 墙在前 → 是墙图（哪怕后面有梁/柱）
+    assert is_wall_drawing("墙梁节点大样")
+    assert is_wall_drawing("挡土墙及压顶梁配筋图")
+    assert is_wall_drawing("墙柱配筋平面图")
+
+
+@pytest.mark.unit
+def test_beam_assertion_is_consistent_with_wall_check():
+    """两个方向合起来必须自洽 —— 同一图名不能既是墙图又是梁图。"""
+    from core.model3d.element_recognizer import is_beam_drawing_effective
+
+    for title in ("梁墙节点", "墙梁节点大样", "梁板墙配筋图",
+                  "挡土墙及压顶梁配筋图"):
+        wall = is_wall_drawing(title)
+        beam = is_beam_drawing_effective(beam_like=False, drawing_title=title)
+        assert not (wall and beam), f"{title} 同时判为墙图与梁图"

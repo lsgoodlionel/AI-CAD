@@ -584,8 +584,13 @@ def is_wall_drawing(title: str | None) -> bool:
     wall = _WALL_WORD_RE.search(text)      # 负向后顾已排除「幕墙」
     if not wall:
         return False
-    column = _COLUMN_WORD_RE.search(text)
-    return column is None or wall.start() < column.start()
+    # **墙要在柱和梁都之前** —— 只比柱不比梁会让「梁墙节点」判成墙图，
+    # 而 `_title_asserts_beam` 那边比的是梁与墙，两边不对称就会打架。
+    for other in (_COLUMN_WORD_RE, _BEAM_WORD_RE):
+        found = other.search(text)
+        if found is not None and found.start() < wall.start():
+            return False
+    return True
 
 
 def _is_beam_drawing(all_text: str, line_layers: list | None = None) -> bool:
