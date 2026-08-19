@@ -324,10 +324,14 @@ def collect_floor_axes(
     aggregated: dict | None = None
     for _did, scene_axes in group:
         aggregated = _merge_axes(aggregated, scene_axes, authoritative=True)
-    if len(group) < len(candidates):
-        logger.info("[ModelElements] 轴网聚合采纳 %d/%d 张（其余变换与主组不一致）",
-                    len(group), len(candidates))
-    return aggregated or {"x": [], "y": []}
+    result = aggregated or {"x": [], "y": []}
+    # **无条件报结果**：此前只在「有图被丢弃」时才打日志，
+    # 于是「全部采纳但合出空轴网」这一种情况**一行日志都没有** ——
+    # B1 层追到第 13 层才发现这个盲点。产出多少轴线要能直接看见。
+    logger.info("[ModelElements] 轴网聚合 %s：%d/%d 张 → x=%d y=%d",
+                floor_key, len(group), len(candidates),
+                len(result.get("x") or []), len(result.get("y") or []))
+    return result
 
 
 def _largest_consistent_group(
