@@ -303,6 +303,17 @@ def collect_floor_axes(
         except Exception as exc:  # noqa: BLE001 — 单图失败不拖垮整层
             logger.info("[ModelElements] 轴网聚合跳过 %s: %s", did, exc)
     if not candidates:
+        # **空集也要说话**：这条分支静默返回，是 B1 层「有 23 条已确认轴线
+        # 却无轴网」追查花掉 8 层的直接原因 —— 前七层排除的全是别的可能，
+        # 而真正的断点在这里连一行日志都没留。
+        logger.info(
+            "[ModelElements] 轴网聚合无可用图：本层 %d 张，"
+            "其中有变换 %d 张、有识别轴线 %d 张",
+            len(floor_drawings),
+            sum(1 for d in floor_drawings
+                if str(d.get("id") or "") in (transforms or {})),
+            sum(1 for d in floor_drawings
+                if (recognized or {}).get(str(d.get("id") or ""))))
         return {"x": [], "y": []}
 
     group = _largest_consistent_group(candidates)
