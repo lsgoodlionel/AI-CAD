@@ -134,3 +134,33 @@ def test_title_can_also_assert_a_beam_drawing():
     # 两不沾且几何判不出 → 不认定
     assert not is_beam_drawing_effective(
         beam_like=False, drawing_title="四层平面图")
+
+
+# ── 「幕墙」不是结构墙（第二工程实测暴露）──────────────────────
+
+@pytest.mark.unit
+def test_curtain_wall_is_not_a_wall_drawing():
+    """**第二工程实测暴露**:抽样 60 张里 20 张被判为「墙图」,
+    其中大半是**幕墙**:
+
+    - 幕墙-竣工图-C1-V49-C1玻璃**幕墙**竖剖节点详图
+    - 幕墙-竣工图-ST-M008-型材模具表
+    - 东立面图、西立面外**幕墙**窗框新增铝板立面图
+
+    「幕墙」(curtain wall)是独立的建筑术语 —— 围护结构,不是结构墙,
+    其构件是幕墙板块而非墙体。子串匹配「墙」把它一并吃了进来。
+
+    **这个缺陷在第一个工程上从未暴露**(大歌剧院幕墙图少),
+    是第二套图纸交叉验证抓出来的。
+    """
+    for title in ("C1玻璃幕墙竖剖节点详图", "幕墙-型材模具表",
+                  "西立面外幕墙窗框新增铝板立面图", "单元式幕墙平面图"):
+        assert not is_wall_drawing(title), title
+
+
+@pytest.mark.unit
+def test_real_wall_terms_still_match():
+    """**不得误伤真墙** —— 女儿墙/挡土墙/剪力墙/隔墙都是墙。"""
+    for title in ("女儿墙大样图", "挡土墙配筋图", "剪力墙平面布置图",
+                  "地下室外墙留洞图", "内隔墙平面图"):
+        assert is_wall_drawing(title), title

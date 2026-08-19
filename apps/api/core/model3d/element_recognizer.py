@@ -529,7 +529,12 @@ MIN_BEAM_LINES_FOR_BEAM_DRAWING = 100
 #: 墙图关键词。「墙」在「柱」之前出现即认为主语是墙 ——
 #: 「墙柱配筋平面图」是墙柱共同表达，「柱墙连接节点」以柱为主。
 #: 判据不完美，但**判错只影响归类、不丢构件**。
-_WALL_WORD_RE = re.compile(r"墙")
+#: **「幕墙」不是结构墙**。第二工程实测:抽样 60 张里 20 张被判为墙图，
+#: 大半是幕墙（`C1玻璃幕墙竖剖节点详图` / `型材模具表` / `外幕墙窗框铝板立面图`）。
+#: 幕墙（curtain wall）是围护结构，构件是幕墙板块而非墙体。
+#: **这个缺陷在第一个工程上从未暴露** —— 大歌剧院幕墙图少。
+_NOT_STRUCTURAL_WALL_RE = re.compile(r"幕墙")
+_WALL_WORD_RE = re.compile(r"(?<!幕)墙")
 _COLUMN_WORD_RE = re.compile(r"柱")
 _BEAM_WORD_RE = re.compile(r"梁")
 
@@ -576,7 +581,7 @@ def is_wall_drawing(title: str | None) -> bool:
     处置沿用同一条原则：**图种声明优先于几何猜测**。
     """
     text = str(title or "")
-    wall = _WALL_WORD_RE.search(text)
+    wall = _WALL_WORD_RE.search(text)      # 负向后顾已排除「幕墙」
     if not wall:
         return False
     column = _COLUMN_WORD_RE.search(text)
