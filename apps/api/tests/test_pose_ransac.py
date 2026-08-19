@@ -138,3 +138,60 @@ def test_high_inlier_ratio_is_confident():
     got = solve_pose_ransac(local, glob)
     assert got["inlier_ratio"] == pytest.approx(1.0)
     assert got["confident"]
+
+
+# ── scale 是比内点率更强的信号（裸标签图归组实测）──────────────
+
+@pytest.mark.unit
+def test_near_unit_scale_with_low_ratio_is_still_confident():
+    """**实测**:裸标签图归入分区 2,内点仅 **33%** 但 **scale=0.988**、
+    另一张 11% 而 **scale=1.000**;而此前的伪解 scale=**0.824**。
+
+    **图纸是等比绘制的** —— 同一工程的图之间 scale 应接近 1,
+    1~2% 是测量噪声级别。内点率低往往只说明**覆盖不全**
+    (这几张图只覆盖分区的一部分),不等于错配。
+
+    ⇒ 判据改为**组合**:scale 接近 1 且内点数够,即可信;
+    单看内点率会把真匹配误杀。
+    """
+    from services.pose_ransac import solve_pose_ransac
+
+    # 8 对一致（scale=1）+ 16 对噪声 → 内点率 33%
+    local = {(str(i), "A"): (float(i * 3), 0.0) for i in range(24)}
+    glob = {(str(i), "A"): (float(i * 3) + 5.0, 0.0) for i in range(8)}
+    glob.update({(str(i), "A"): (float(i * 41 % 97), float(i * 59 % 83))
+                 for i in range(8, 24)})
+    got = solve_pose_ransac(local, glob)
+    assert got["scale"] == pytest.approx(1.0, abs=0.02)
+    assert got["inlier_ratio"] < 0.5
+    assert got["confident"], "scale≈1 且内点数够，应判为可信"
+
+
+@pytest.mark.unit
+def test_off_scale_stays_unconfident_even_with_more_inliers():
+    """**比例明显偏离仍不可信** —— 那正是伪解的指纹(实测 0.824)。"""
+    from services.pose_ransac import solve_pose_ransac
+
+    # 内点率必须**不足**，才测得到 scale 判据（全一致会走内点率通道）
+    local = {(str(i), "A"): (float(i * 3), 0.0) for i in range(24)}
+    glob = {(str(i), "A"): (float(i * 3) * 0.82 + 5.0, 0.0) for i in range(10)}
+    glob.update({(str(i), "A"): (float(i * 41 % 97), float(i * 59 % 83))
+                 for i in range(10, 24)})
+    got = solve_pose_ransac(local, glob)
+    assert got["scale"] == pytest.approx(0.82, abs=0.01)
+    assert got["inlier_ratio"] < 0.5
+    assert not got["confident"], "比例偏离 18% 不该判为可信"
+
+
+@pytest.mark.unit
+def test_too_few_inliers_never_confident():
+    """**绝对数下限** —— 3 个点凑出的 scale≈1 不足为凭。"""
+    from services.pose_ransac import solve_pose_ransac
+
+    local = {(str(i), "A"): (float(i * 3), 0.0) for i in range(20)}
+    glob = {(str(i), "A"): (float(i * 3) + 5.0, 0.0) for i in range(3)}
+    glob.update({(str(i), "A"): (float(i * 41 % 97), float(i * 59 % 83))
+                 for i in range(3, 20)})
+    got = solve_pose_ransac(local, glob)
+    if got is not None:
+        assert not got["confident"]

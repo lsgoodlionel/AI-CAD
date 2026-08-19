@@ -37,6 +37,15 @@ MAX_ENUMERATION_POINTS = 200
 #: ⇒ 低于此值只报不采，让人判断（降级必须可见）。
 CONFIDENT_INLIER_RATIO = 0.5
 
+#: **scale 是比内点率更强的信号**。图纸等比绘制，同一工程的图之间
+#: scale 应接近 1，1~2% 是测量噪声级别；而伪解的指纹是明显偏离
+#: （实测跨分区伪解 **0.824**，真匹配 **0.988~1.000**）。
+#: 内点率低往往只说明**覆盖不全**（一张图只覆盖分区的一部分），不等于错配。
+NEAR_UNIT_SCALE_TOLERANCE = 0.05
+
+#: 靠 scale 判可信时，内点的**绝对数**下限 —— 3 个点凑出的 scale≈1 不足为凭。
+MIN_INLIERS_FOR_SCALE_TRUST = 8
+
 
 def _residuals(keys, local, glob, pose) -> list[float]:
     scale = pose["scale"]
@@ -111,6 +120,11 @@ def solve_pose_ransac(
         "inliers": len(best_inliers),
         "total": len(keys),
         "inlier_ratio": round(ratio, 4),
-        # **可信才可自动采纳**；否则只作诊断报出（见 CONFIDENT_INLIER_RATIO）
-        "confident": ratio >= CONFIDENT_INLIER_RATIO,
+        # **组合判据**：内点率够 **或**（scale 接近 1 且内点数够）。
+        # 单看内点率会把「覆盖不全的真匹配」误杀 —— 实测裸标签图
+        # 归入分区时内点仅 33% 而 scale=0.988，那是真匹配。
+        "confident": bool(
+            ratio >= CONFIDENT_INLIER_RATIO
+            or (abs(refined["scale"] - 1.0) <= NEAR_UNIT_SCALE_TOLERANCE
+                and len(best_inliers) >= MIN_INLIERS_FOR_SCALE_TRUST)),
     }
