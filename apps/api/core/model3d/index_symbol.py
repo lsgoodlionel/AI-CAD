@@ -13,6 +13,15 @@
 """
 from __future__ import annotations
 
+#: **索引符号的圆直径**（GB/T 50001 §5）：8~10mm。
+#: 实测逼出的判据 —— 栈桥详图上 13 个「索引符号」直径仅 **4.74mm**，
+#: 裁开一看圈内暗像素 0%（本来就没字），那是钢筋断面之类的小圆。
+#: 上限放到 12mm 容差；再大是**详图符号**（§5 直径 14mm 粗实线圆），
+#: 它标的是「我就是那张详图」而非「去看那张详图」，语义相反。
+INDEX_SYMBOL_DIAMETER_MM = (7.0, 12.0)
+
+_MM_PER_PT = 25.4 / 72.0
+
 #: 分割线长度至少要有直径的这个比例 —— 字符里的短横（`工`/`二`）远达不到。
 MIN_DIVIDER_LENGTH_RATIO = 0.7
 
@@ -32,6 +41,10 @@ def has_horizontal_divider(circle: dict, strokes: list) -> bool:
     except (KeyError, TypeError, ValueError):
         return False
     if diameter <= 0:
+        return False
+    # **直径必须落在 §5 规定的区间** —— 小圆是钢筋断面、大圆是详图符号
+    lo, hi = INDEX_SYMBOL_DIAMETER_MM
+    if not lo <= diameter * _MM_PER_PT <= hi:
         return False
 
     radius = diameter / 2.0
@@ -69,3 +82,71 @@ def split_index_symbols(circles: list, strokes: list) -> tuple[list, list]:
         else:
             axis_circles.append(circle)
     return index_symbols, axis_circles
+
+
+# ── 读出圈内编号：建立平面图 ↔ 详图的跳转 ──────────────────────
+
+import re
+from dataclasses import dataclass
+
+#: 半区相对圆的**内缩比例** —— 弧线本身会被 OCR 当成字符笔画。
+HALF_INSET_RATIO = 0.18
+
+#: 下半画一横 = 详图就在本张图上（§5）。
+#: 含制表横线 U+2500 —— OCR 把长横读成它是常见形态（实测）。
+_SAME_SHEET_RE = re.compile(r"^[-—－–_\u2500\u2501\uff0d]{1,4}$")
+
+#: 详图编号：一到两位数字，或单个大写字母（`A/15`）。
+_DETAIL_NO_RE = re.compile(r"^(?:\d{1,2}|[A-Z])$")
+
+#: 图纸编号：数字或「字母-数字」（`15` / `A-15` / `结施12`）。
+_SHEET_NO_RE = re.compile(r"^[A-Za-z\u4e00-\u9fff]{0,4}[-]?\d{1,3}[A-Za-z]?$")
+
+
+@dataclass(frozen=True)
+class IndexReference:
+    """一条「看某图某详图」的跳转引用。"""
+    detail_no: str          # 详图编号（上半）
+    sheet_no: str | None    # 图纸编号（下半）；本图时为 None
+    same_sheet: bool        # 下半是一横 → 详图在本张图上
+
+
+def index_symbol_halves(circle: dict) -> tuple[tuple, tuple]:
+    """索引符号 → (上半区, 下半区) 的裁剪矩形（PDF 点坐标）。
+
+    上半是详图编号、下半是图纸编号（§5）。两半各自**内缩**，
+    避开圆弧 —— 弧线会被 OCR 读成字符笔画。
+    """
+    cx = float(circle["cx"])
+    cy = float(circle["cy"])
+    radius = float(circle["diameter_pt"]) / 2.0
+    inset = radius * HALF_INSET_RATIO
+    half_w = radius - inset
+    return (
+        (cx - half_w, cy - radius + inset, cx + half_w, cy),
+        (cx - half_w, cy, cx + half_w, cy + radius - inset),
+    )
+
+
+def _first_clean(tokens: list) -> str:
+    for token in tokens or ():
+        text = str(token or "").strip()
+        if text:
+            return text
+    return ""
+
+
+def parse_index_reference(top_tokens: list,
+                          bottom_tokens: list) -> IndexReference | None:
+    """上下两半的 OCR 结果 → 一条跳转引用（**读不出就不猜**）。"""
+    detail = _first_clean(top_tokens).upper()
+    bottom = _first_clean(bottom_tokens)
+    if not detail or not _DETAIL_NO_RE.match(detail):
+        return None
+    if not bottom:
+        return None
+    if _SAME_SHEET_RE.match(bottom):
+        return IndexReference(detail_no=detail, sheet_no=None, same_sheet=True)
+    if not _SHEET_NO_RE.match(bottom):
+        return None
+    return IndexReference(detail_no=detail, sheet_no=bottom, same_sheet=False)

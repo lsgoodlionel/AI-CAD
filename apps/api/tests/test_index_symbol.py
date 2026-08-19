@@ -86,3 +86,37 @@ def test_split_separates_index_symbols_from_axis_circles():
 def test_empty_inputs():
     assert split_index_symbols([], []) == ([], [])
     assert not has_horizontal_divider(_circle(0, 0), [])
+
+
+# ── 直径判据（真实数据逼出）──────────────────────────────────
+
+@pytest.mark.unit
+def test_small_circles_are_not_index_symbols():
+    """**实测误判**:栈桥详图上 13 个「索引符号」直径仅 **4.74mm**,
+    裁开一看圈内暗像素 0% —— **本来就没字**。
+
+    GB/T 50001 §5：索引符号圆直径 **8~10mm**。
+    小圆是钢筋断面、圆点标记之类，与索引符号无关。
+    """
+    strokes = [(90.0, 100.0, 110.0, 100.0)]
+    small = {"cx": 100.0, "cy": 100.0, "diameter_pt": 13.45}   # 4.74mm
+    assert not has_horizontal_divider(small, strokes)
+
+
+@pytest.mark.unit
+def test_standard_diameter_circles_pass():
+    """8~10mm（22.7~28.3pt）照常识别，留一档容差。"""
+    strokes_at = lambda cy: [(80.0, cy, 120.0, cy)]
+    for d_mm in (8.0, 9.0, 10.0):
+        d_pt = d_mm * 72.0 / 25.4
+        circle = {"cx": 100.0, "cy": 100.0, "diameter_pt": d_pt}
+        assert has_horizontal_divider(circle, strokes_at(100.0)), d_mm
+
+
+@pytest.mark.unit
+def test_oversized_circles_are_rejected():
+    """详图符号（§5 直径 14mm 粗实线圆）不是索引符号 —— 它标的是
+    「我就是那张详图」，不是「去看那张详图」，语义相反。"""
+    d_pt = 20.0 * 72.0 / 25.4        # 20mm
+    circle = {"cx": 100.0, "cy": 100.0, "diameter_pt": d_pt}
+    assert not has_horizontal_divider(circle, [(60.0, 100.0, 140.0, 100.0)])
