@@ -64,6 +64,57 @@ async def project_recognition_summary(project_id: str, db=Depends(get_db),
     return {"success": True, "data": {"items": rows, "pending": pending}}
 
 
+@router.get("/projects/{project_id}/axis-recognition/confirm-priority")
+async def confirm_priority(project_id: str, db=Depends(get_db),
+                           _user=Depends(get_current_user)) -> dict:
+    """待确认分区，按**解锁的构件数**降序 —— 先确认最值钱的那几张。
+
+    实测大歌剧院 800+ 张待确认里，只有 **13 张**卡着 5 个楼层的 4064 根柱；
+    人自己翻是翻不出来的。
+    """
+    from services.axis_confirm_priority import (
+        pending_rows_from_scene, rank_pending_zones,
+    )
+
+    scene_row = await db.fetch_one(
+        "SELECT scene FROM project_models WHERE project_id = CAST(:p AS uuid)",
+        {"p": project_id})
+    scene = scene_row["scene"] if scene_row else None
+    if isinstance(scene, str):
+        import json
+        try:
+            scene = json.loads(scene)
+        except ValueError:          # 存坏了就当没有，不要 500
+            scene = None
+
+    zone_rows = await db.fetch_all(
+        "SELECT a.drawing_id, d.title, a.zones FROM axis_recognition a "
+        "JOIN drawings d ON d.id = a.drawing_id "
+        "WHERE a.project_id = CAST(:p AS uuid) AND a.zones IS NOT NULL",
+        {"p": project_id})
+    pending: dict[str, dict] = {}
+    for row in zone_rows:
+        zones = row["zones"] or []
+        if isinstance(zones, str):
+            import json
+            try:
+                zones = json.loads(zones)
+            except ValueError:
+                continue
+        waiting = [z for z in zones if isinstance(z, dict)
+                   and z.get("needs_confirmation")]
+        if waiting:
+            pending[str(row["drawing_id"])] = {
+                "title": row["title"], "zone_count": len(waiting)}
+
+    ranked = rank_pending_zones(pending_rows_from_scene(scene, pending))
+    return {"success": True, "data": {
+        "items": ranked[:50],
+        "total_pending_drawings": len(pending),
+        "total_unlocks": sum(r["unlocks"] for r in ranked),
+    }}
+
+
 @router.post("/drawings/{drawing_id}/axis-recognition", status_code=202)
 async def start_drawing_recognition(drawing_id: str, db=Depends(get_db),
                                     user=Depends(get_current_user)) -> dict:
