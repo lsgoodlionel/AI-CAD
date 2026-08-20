@@ -65,7 +65,12 @@ def _axes(*labels: str) -> list[dict]:
 
 @pytest.mark.unit
 def test_axes_come_from_more_drawings_than_the_element_cap():
-    """**核心用例**:轴网上限必须远大于构件选图上限(2)。"""
+    """**核心用例**:轴网上限必须远大于构件选图上限。
+
+    构件识别每图 10~40 秒，而轴网只是「坐标 + 标签」的纯计算。
+    所以两者不该共用一个数字——**构件配额加大时，轴网上限要跟着抬**，
+    否则「图越多共识越稳」这条好处会被一个固定数字锁死。
+    """
     from services.model_elements import _MAX_STRUCTURE_PLANS
 
     assert MAX_AXIS_SOURCE_PLANS > _MAX_STRUCTURE_PLANS * 2
