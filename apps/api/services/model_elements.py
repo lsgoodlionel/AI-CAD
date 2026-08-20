@@ -892,6 +892,8 @@ def _scale_override_of(transforms: dict | None, drawing_id: str) -> float | None
 
 
 #: 参与跨度统计的构件类别。
+MIN_SOURCES_FOR_OUTLIER = 4      # 与 scale_gate 同口径，同层样本下限
+
 _SPAN_ELEMENT_KINDS = ("columns", "walls", "beams", "slabs", "pipes", "equipment")
 
 
@@ -917,16 +919,8 @@ def scale_suspect_summary(floors: list[dict] | None, suspects: set | None) -> di
             "ratio": (flagged / total) if total else 0.0}
 
 
-def mark_scale_outliers(floors: list[dict] | None) -> set:
-    """标记尺度离群图纸的构件，返回被标记的图纸 id 集合。
-
-    **标记而不删除**：删了就看不见问题在哪，而项目的既有约束是
-    「降级必须可见」。标记后前端算场景包络时跳过它们，
-    相机才能框住真实内容——实测轨道交通的包络被 2 张图撑到 4.8 公里，
-    而中间 90% 的构件点只占 762 米。
-    """
-    from core.model3d.scale_gate import outlier_sources
-
+def _spans_of(floors: list[dict] | None) -> dict:
+    """{图纸 id: 跨度(米)}。两点就够算跨度——梁/管线的轮廓本就是两点线。"""
     points: dict[str, list] = {}
     for floor in floors or []:
         elements = floor.get("elements") or {}
@@ -938,20 +932,54 @@ def mark_scale_outliers(floors: list[dict] | None) -> set:
                 # **墙/梁/管线用 `path`，柱/板/设备用 `outline`**
                 # （前端 `elementsBounds` 就是这么读的）。只读 outline
                 # 会让墙梁管整类不参与统计——而它们最可能撑开包络。
-                for point in (element.get("outline")
-                              or element.get("path") or []):
+                for point in (element.get("outline") or element.get("path") or []):
                     if isinstance(point, (list, tuple)) and len(point) >= 2:
                         points.setdefault(src, []).append(
                             (float(point[0]), float(point[1])))
     spans = {}
     for src, pts in points.items():
-        # 两点就够算跨度——梁/管线的轮廓本就是两点线，要求三点会把
-        # 它们整类排除在统计之外。
         if len(pts) < 2:
             continue
         spans[src] = max(max(p[0] for p in pts) - min(p[0] for p in pts),
                          max(p[1] for p in pts) - min(p[1] for p in pts))
-    suspects = outlier_sources(spans)
+    return spans
+
+
+def mark_scale_outliers(floors: list[dict] | None) -> set:
+    """标记尺度离群图纸的构件，返回被标记的图纸 id 集合。
+
+    **按同层比较，不按全项目**：跨度本身分不清「大范围总图」与
+    「比例算错」——一张 1:500 的总平面图本来就该比 1:100 的平面图大
+    5 倍。但**同一楼层的图纸覆盖的是同一片物理范围**，
+    某张比同层伙伴大出数倍就是可疑的。
+
+    实测促因：每层配额从 9 张加到 24 张后，全项目口径下最大跨度
+    7.7 倍**恰好卡在 8 倍门槛下**没被拦住，视图集中度从 1.32 掉到 4.99。
+
+    一层图纸太少时同层比较没有意义 → 退回全项目口径，
+    而不是因为样本少就放弃判断。
+
+    **标记而不删除**（降级必须可见）：前端默认隐藏它们并在界面说明，
+    构件数与占比一并给出。
+    """
+    from core.model3d.scale_gate import outlier_sources
+
+    all_spans = _spans_of(floors)
+    suspects: set = set()
+    judged: set = set()
+    for floor in floors or []:
+        floor_spans = _spans_of([floor])
+        if len(floor_spans) < MIN_SOURCES_FOR_OUTLIER:
+            continue                      # 样本太少 → 交给全项目口径
+        judged |= set(floor_spans)
+        suspects |= outlier_sources(floor_spans)
+    # 没被任何一层判过的图（所在层样本太少）退回全项目口径
+    remaining = {k: v for k, v in all_spans.items() if k not in judged}
+    if remaining:
+        merged = dict(remaining)
+        merged.update({k: v for k, v in all_spans.items() if k in judged})
+        suspects |= {s for s in outlier_sources(merged) if s in remaining}
+
     if not suspects:
         return set()
     for floor in floors or []:

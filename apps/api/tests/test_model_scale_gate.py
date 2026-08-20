@@ -70,11 +70,24 @@ def test_outlier_span_is_flagged():
 
 @pytest.mark.unit
 def test_good_project_loses_nothing():
-    """大歌剧院实测分布 P100 = 中位的 7.51 倍 —— 不得误杀。"""
+    """健康工程**同层**分布不得被误杀。
+
+    判据换成同层口径后，标定数据也要换：实测大歌剧院各层
+    「最大/中位」中位 **2.56**、P75 3.27（观感可接受）；
+    而观感差的轨道交通是 中位 7.56、P75 10.16、最大 17.12。
+
+    旧断言用的是**全项目**口径的数字（P100=7.51 倍），
+    在同层口径下不再是「健康」的代表——换掉它不是迁就实现，
+    是标定数据本身换了口径。
+
+    真库模拟印证：新判据下大歌剧院隐藏 156/32652 = **0%**，
+    而轨道交通隐藏 28% 且包络从 1784 m 收到 645 m。
+    """
     from core.model3d.scale_gate import outlier_sources
 
+    # 大歌剧院 F5 实测：19 张图，中位 106.6 m，最大 348.0 m（3.27 倍）
     spans = {f"d{i}": v for i, v in enumerate(
-        [2.2, 5.3, 39.7, 76.4, 76.7, 123.6, 225.5, 254.5, 574.1])}
+        [45.0, 66.3, 76.7, 92.3, 102.2, 106.6, 130.6, 154.5, 241.4, 348.0])}
     assert outlier_sources(spans) == set()
 
 
@@ -258,3 +271,51 @@ def test_no_suspects_yields_zeroed_summary():
     summary = scale_suspect_summary([], set())
     assert summary == {"drawings": 0, "elements": 0,
                        "total_elements": 0, "ratio": 0.0}
+
+
+# ── 同层比较（取代全项目中位）─────────────────────────────────
+
+@pytest.mark.unit
+def test_outliers_are_judged_against_floormates_not_the_whole_project():
+    """**跨度本身分不清「大范围总图」和「比例算错」**——
+    一张 1:500 的总平面图本来就该比 1:100 的平面图大 5 倍。
+
+    但**同一楼层的图纸覆盖的是同一片物理范围**：F5 上一张跨 500 米、
+    其余都跨 70 米，那张就是可疑的，与全项目中位无关。
+
+    实测促因：配额从 9 张加到 24 张后，全项目口径下
+    最大跨度 7.7 倍**恰好卡在 8 倍门槛下**没被拦住，
+    视图集中度从 1.32 掉到 4.99。
+    """
+    from services.model_elements import mark_scale_outliers
+
+    def col(src, size):
+        return {"src": src, "outline": [[0, 0], [size, size]]}
+
+    floors = [
+        # F1：全是大图（比如总平面图层），彼此一致 → 不该判离群
+        {"key": "F1", "elements": {"columns": [
+            col("a1", 500.0), col("a2", 520.0), col("a3", 480.0), col("a4", 510.0)]}},
+        # F5：一张远大于同层伙伴 → 判离群
+        {"key": "F5", "elements": {"columns": [
+            col("b1", 70.0), col("b2", 72.0), col("b3", 68.0), col("b4", 71.0),
+            col("bad", 500.0)]}},
+    ]
+    assert mark_scale_outliers(floors) == {"bad"}
+
+
+@pytest.mark.unit
+def test_floor_with_too_few_sources_falls_back_to_project_scope():
+    """一层只有一两张图时同层比较没有意义——退回全项目口径，
+    而不是因为样本少就放弃判断。"""
+    from services.model_elements import mark_scale_outliers
+
+    def col(src, size):
+        return {"src": src, "outline": [[0, 0], [size, size]]}
+
+    floors = [
+        {"key": "F1", "elements": {"columns": [
+            col("a1", 70.0), col("a2", 72.0), col("a3", 68.0), col("a4", 71.0)]}},
+        {"key": "F2", "elements": {"columns": [col("lonely", 4000.0)]}},
+    ]
+    assert "lonely" in mark_scale_outliers(floors)
