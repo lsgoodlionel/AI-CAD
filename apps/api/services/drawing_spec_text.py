@@ -112,7 +112,14 @@ def _xy_of(location: Any) -> tuple[float, float] | None:
 #: 「设计说明7」的图，重建出的「正文」全是标题栏字段
 #: （DRAWING TITLE / 工程编号 / 图号…）。图名与说明标题文本上
 #: 无法区分，但标题栏的碎片本就不属于说明。
-EXCLUDED_CATEGORIES = frozenset({"title_block", "title_block_label"})
+#: 说明块在档案层的分类名。
+SPEC_CATEGORY = "spec_text"
+
+#: 还必须排除 `spec_text` 自身——重建读的是「这张图的全部档案行」，
+#: 其中包含上一轮写进去的说明块，于是正文被重复追加，
+#: **实测每跑一次翻一倍**。自产的输出不能再当输入。
+EXCLUDED_CATEGORIES = frozenset({"title_block", "title_block_label",
+                                 SPEC_CATEGORY})
 
 
 def tokens_from_archive(rows: list[Any] | None) -> list[dict]:
@@ -214,15 +221,17 @@ def assemble_spec_blocks(tokens: list[dict] | None) -> list[dict]:
 
 # ── 落库 ──────────────────────────────────────────────────────
 
-#: 说明块在档案层的分类名。
-SPEC_CATEGORY = "spec_text"
-
 #: 抽取器标识——与 OCR/矢量碎片区分开，便于回溯与重跑。
 SPEC_EXTRACTOR = "spec_assembler"
 
+#: **只删 auto**。删整个分类会把人工修正一并冲掉——实测 verify 写入后
+#: 重跑单图，verified 记录消失只剩 auto，需求「调整后直接参与后期模型
+#: 和审图」就此落空。
 _DELETE_SPEC_SQL = f"""
 DELETE FROM drawing_extracted_info
-WHERE drawing_id = CAST(:drawing_id AS uuid) AND category = '{SPEC_CATEGORY}'
+WHERE drawing_id = CAST(:drawing_id AS uuid)
+  AND category = '{SPEC_CATEGORY}'
+  AND (source_kind IS NULL OR source_kind = 'auto')
 """
 
 _INSERT_SPEC_SQL = """
@@ -254,6 +263,12 @@ def spec_entry_params(project_id: str, drawing_id: str, block: dict,
             "title": block.get("title"),
             "fragment_count": block.get("fragment_count"),
             "avg_line_chars": block.get("avg_line_chars"),
+            # **位置也放进 value_json**：`normalized_key` 只拿得到
+            # `(category, content, value_json)`，位置只存 location_json
+            # 时 auto 算出的 key 没有位置，与人审行配不上对——
+            # 实测重跑后 auto 复活，生效值变成 2 条。
+            "x": block.get("x"),
+            "y": block.get("y"),
         }, ensure_ascii=False),
         "location_json": json.dumps({"x": block.get("x"), "y": block.get("y")}),
         "extractor": SPEC_EXTRACTOR,
@@ -273,6 +288,9 @@ async def persist_spec_text(db: Any, *, project_id: str, drawing_id: str,
 
     没重建出说明时也要执行删除：否则判据改进后，被新判据否掉的
     旧说明会永远留在库里（E1.5 的 supersedes 教训）。
+
+    但**只删 auto**：人工修正必须活过重建，否则需求「调整后的信息
+    可以直接参与后期模型和审图」就落空了。
     """
     await db.execute(_DELETE_SPEC_SQL, {"drawing_id": drawing_id})
     for block in blocks or []:

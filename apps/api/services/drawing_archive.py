@@ -13,6 +13,22 @@ import json
 from typing import Any
 
 
+#: 说明块的档案分类（与 `services.drawing_spec_text.SPEC_CATEGORY` 一致）。
+SPEC_TEXT_CATEGORY = "spec_text"
+
+#: 说明块位置归一的栅格（pt）。重建的坐标会有零点几 pt 的漂移，
+#: 不容差就会因为漂移换了身份。
+SPEC_POSITION_SNAP_PT = 10.0
+
+
+def _snap(value: object) -> int | None:
+    """位置吸附到栅格；取不到就返回 None（不编造 0）。"""
+    try:
+        return int(round(float(value) / SPEC_POSITION_SNAP_PT))
+    except (TypeError, ValueError):
+        return None
+
+
 def normalized_key(category: str, content: str, value_json: dict | None) -> str:
     """同一语义信息的归一化 key(供择优去重)。
 
@@ -25,6 +41,16 @@ def normalized_key(category: str, content: str, value_json: dict | None) -> str:
             return f"dimension:{round(float(value_json['dim_mm']), 1)}"
         if category == "axis" and value_json.get("label"):
             return f"axis:{str(value_json['label']).strip()}"
+        if category == SPEC_TEXT_CATEGORY and value_json.get("title"):
+            # **说明块的稳定身份是「标题 + 位置」，不是正文** ——
+            # 人审改的正是正文，按 content 归一会让 auto 与 verified
+            # 永远配不上对，界面上「原文」和「修正后」并存；
+            # 重建时正文还会随判据/OCR 微变，`supersedes_key` 也会失配，
+            # 于是每次重跑多出一条僵尸记录。
+            title = str(value_json["title"]).strip()
+            x = _snap(value_json.get("x"))
+            y = _snap(value_json.get("y"))
+            return f"{SPEC_TEXT_CATEGORY}:{title}@{x},{y}"
     return f"{category}:{(content or '').strip()}"
 
 
