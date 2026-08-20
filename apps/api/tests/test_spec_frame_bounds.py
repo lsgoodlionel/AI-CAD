@@ -57,9 +57,18 @@ def test_tiny_frames_are_ignored():
 # ── 用边框切块 ────────────────────────────────────────────────
 
 @pytest.mark.unit
-def test_block_stops_at_the_frame_edge():
-    """框外的文字不属于这一块——**这比「间距超过 60pt」准**，
-    因为边框是制图者画出来的真实边界。"""
+def test_frame_never_truncates_below_the_gap_heuristic():
+    """**边框只能帮忙，不能截断。**
+
+    实测教训：图上有 67 个矢量框，「最小包围矩形」选中的是标题附近的
+    小框（表格单元之类）而非说明框，于是把正文切掉了——
+    「八，施工安装要求」1390 → **46 字**，切掉的是
+    「（2）承插连接的给水管…（3）综合管线…」这样的正文。
+    25 张图批量 A/B：字数 **-13%**，全是合法内容的损失。
+
+    改为：在包住标题的所有框里选能容纳**最长连续正文**的那个；
+    若仍不如间距启发式，就用间距启发式。
+    """
     from services.drawing_spec_text import assemble_spec_blocks, tokens_from_archive
 
     rows = [
@@ -69,10 +78,29 @@ def test_block_stops_at_the_frame_edge():
         # 框外、且间距不到 60pt —— 只有边框能把它挡在外面
         {"content": "图例说明另见附表A", "location_json": {"x": 130, "y": 640}},
     ]
+    # 小框只容得下一行 —— 不得据此把块截断到一行
+    blocks = assemble_spec_blocks(tokens_from_archive(rows),
+                                  frames=[_r(120, 250, 400, 290),
+                                          _r(120, 250, 400, 620)])
+    assert len(blocks) == 1
+    assert "材料代换" in blocks[0]["text"], "被小框截断了"
+    assert "图例" not in blocks[0]["text"]
+
+
+@pytest.mark.unit
+def test_frame_extends_a_block_across_a_wide_gap():
+    """边框的真正价值：跨过大间距把同一块连起来——
+    间距启发式在这里会误断，而边框知道它们同属一框。"""
+    from services.drawing_spec_text import assemble_spec_blocks, tokens_from_archive
+
+    rows = [
+        {"content": "说明：", "location_json": {"x": 130, "y": 260}},
+        {"content": "1. 未注明尺寸均以标注为准。", "location_json": {"x": 130, "y": 280}},
+        # 与上一行相隔 200pt（远超 60pt 的启发式阈值），但同在一个框内
+        {"content": "2. 材料代换须经设计确认。", "location_json": {"x": 130, "y": 480}},
+    ]
     blocks = assemble_spec_blocks(tokens_from_archive(rows),
                                   frames=[_r(120, 250, 400, 620)])
-    assert len(blocks) == 1
-    assert "图例" not in blocks[0]["text"]
     assert "材料代换" in blocks[0]["text"]
 
 

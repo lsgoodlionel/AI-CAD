@@ -27,6 +27,29 @@ def _sides(frame: dict) -> tuple[float, float, float, float] | None:
     return (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
 
 
+def enclosing_frames(frames: list[dict] | None,
+                     x: float, y: float) -> list[dict]:
+    """包住 (x, y) 的**所有**合格矩形，按面积从小到大。
+
+    **为什么不能只取最小的**：实测图上有 67 个矢量框，最小的那个往往是
+    标题附近的表格单元而非说明框——据它定界会把 1390 字的正文切到 46 字。
+    调用方要在候选里挑「能容纳最长连续正文」的那个。
+    """
+    out = []
+    for frame in frames or []:
+        sides = _sides(frame if isinstance(frame, dict) else {})
+        if sides is None:
+            continue
+        x0, y0, x1, y1 = sides
+        if (x1 - x0) < MIN_FRAME_SIDE_PT or (y1 - y0) < MIN_FRAME_SIDE_PT:
+            continue
+        if not (x0 <= x <= x1 and y0 <= y <= y1):
+            continue
+        out.append(({"x0": x0, "y0": y0, "x1": x1, "y1": y1},
+                    (x1 - x0) * (y1 - y0)))
+    return [f for f, _ in sorted(out, key=lambda t: t[1])]
+
+
 def enclosing_frame(frames: list[dict] | None,
                     x: float, y: float) -> dict | None:
     """包住 (x, y) 的**最小**矩形；没有就返回 None。

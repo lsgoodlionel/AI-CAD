@@ -19,7 +19,8 @@ import re
 from typing import Any
 
 from core.model3d.reading_order import detect_columns
-from core.model3d.spec_frame import contains, enclosing_frame
+from core.model3d.spec_frame import (contains, enclosing_frame,
+                                     enclosing_frames)
 
 #: 标题最长字数——超过就是正文而非标题。
 MAX_HEADING_CHARS = 16
@@ -170,24 +171,29 @@ def _blocks_in_column(column: list[dict],
             index += 1
             continue
         head = ordered[index]
-        # **边框优先于间距启发式**：边框是制图者画出来的真实边界，
-        # 而「间距超过 60pt」只是猜。没有边框时 `contains` 恒真，
-        # 退回原有行为。
-        frame = enclosing_frame(frames, head["x"], head["y"])
-        body: list[dict] = []
-        cursor = index + 1
-        previous_y = head["y"]
-        while cursor < len(ordered):
-            token = ordered[cursor]
-            if is_note_heading(token["text"]):
-                break
-            if not contains(frame, token["x"], token["y"]):
-                break
-            if frame is None and token["y"] - previous_y > MAX_LINE_GAP_PT:
-                break
-            body.append(token)
-            previous_y = token["y"]
-            cursor += 1
+        # **边框只能帮忙，不能截断。** 实测「最小包围矩形」常是标题附近的
+        # 表格单元而非说明框，据它定界会把 1390 字的正文切到 46 字
+        # （25 张图批量 A/B：字数 -13%，全是合法内容的损失）。
+        # 改为：候选框里挑能容纳最长连续正文的那个，
+        # 若仍不如间距启发式，就用间距启发式。
+        candidates = [None, *enclosing_frames(frames, head["x"], head["y"])]
+        body, cursor = [], index + 1
+        for frame in candidates:
+            run, pos, previous_y = [], index + 1, head["y"]
+            while pos < len(ordered):
+                token = ordered[pos]
+                if is_note_heading(token["text"]):
+                    break
+                if frame is None:
+                    if token["y"] - previous_y > MAX_LINE_GAP_PT:
+                        break
+                elif not contains(frame, token["x"], token["y"]):
+                    break
+                run.append(token)
+                previous_y = token["y"]
+                pos += 1
+            if len(run) > len(body):
+                body, cursor = run, pos
         if body:                      # 只有标题没正文的多半是误判
             lines = [t["text"] for t in body]
             avg_line_chars = round(
