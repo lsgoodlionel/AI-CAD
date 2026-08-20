@@ -660,6 +660,47 @@ def build_article_params(book_id: str, article: dict[str, Any],
 
 # ── AGE 图节点写入 ────────────────────────────────────────────
 
+def build_article_query(article_id: str) -> tuple[str, dict]:
+    """取条文用于建图 → (SQL, 参数字典)。
+
+    **为什么单独抽出来**：此前这里用 **asyncpg 风格**（`$1` + 位置参数），
+    与 `save_articles_to_db` 同源缺陷 —— 实测每条都报
+    `TextClause.bindparams() argument after ** must be a mapping`。
+
+    后果比条文入库更隐蔽：**KG 引擎（四引擎之一）依赖 AGE 里的 Article
+    节点做条件合规推理**，节点没写进去就等于该引擎空转，
+    而错误被 except 吞成 logger.error，导入照常报成功。
+    """
+    return (
+        "SELECT id, article_no, obligation_level, is_mandatory "
+        "FROM regulation_articles WHERE id = CAST(:article_id AS uuid)",
+        {"article_id": article_id},
+    )
+
+
+#: 可写入 regulation_books 的元数据字段（白名单，防 SQL 注入）。
+_BOOK_META_FIELDS = ("title", "std_no", "version", "discipline",
+                     "publisher", "effective_at")
+
+
+def build_book_update(book_id: str, fields: dict) -> tuple[str, dict] | None:
+    """书元数据更新 → (SQL, 参数字典)；无字段可更新返回 None。
+
+    **同源缺陷第三处**：此前用 `$1` + 位置参数，导致
+    **标准号、版本、生效日期全都没写进去** —— 而版本比对
+    （判断图纸引用的规范是否已失效）正依赖这些字段。
+    """
+    usable = {key: value for key, value in (fields or {}).items()
+              if key in _BOOK_META_FIELDS}
+    if not usable:
+        return None
+    sets = ", ".join(f"{key} = :{key}" for key in usable)
+    params = dict(usable)
+    params["book_id"] = book_id
+    return (f"UPDATE regulation_books SET {sets}, updated_at = now() "
+            f"WHERE id = CAST(:book_id AS uuid)", params)
+
+
 async def build_age_nodes(
     db: Any,
     book_id: str,
@@ -678,10 +719,8 @@ async def build_age_nodes(
 
     for article_id in article_ids:
         try:
-            art = await db.fetch_one(
-                "SELECT id, article_no, obligation_level, is_mandatory FROM regulation_articles WHERE id=$1",
-                article_id,
-            )
+            sql, params = build_article_query(article_id)
+            art = await db.fetch_one(sql, params)
             if not art:
                 continue
 
@@ -702,8 +741,9 @@ async def build_age_nodes(
             if result:
                 node_id = result[0]
                 await db.execute(
-                    "UPDATE regulation_articles SET age_node_id=$1 WHERE id=$2",
-                    node_id, article_id,
+                    "UPDATE regulation_articles SET age_node_id = :node_id "
+                    "WHERE id = CAST(:article_id AS uuid)",
+                    {"node_id": str(node_id), "article_id": article_id},
                 )
         except Exception as exc:
             logger.warning("AGE node for article %s failed: %s", article_id, exc)
@@ -761,8 +801,9 @@ async def vectorize_articles(
         collection.upsert(documents=docs, ids=ids, metadatas=metas)
         for article_id in ids:
             await db.execute(
-                "UPDATE regulation_articles SET vector_id=$1 WHERE id=$2",
-                article_id, article_id,
+                "UPDATE regulation_articles SET vector_id = :vector_id "
+                "WHERE id = CAST(:article_id AS uuid)",
+                {"vector_id": article_id, "article_id": article_id},
             )
         logger.info("vectorized %d articles", len(ids))
     except Exception as exc:
@@ -842,12 +883,11 @@ async def _update_book_metadata(db: Any, book_id: str, metadata: dict[str, Any])
         fields["effective_at"] = _parse_date(fields["effective_at"])
     if not fields:
         return
-    sets = ", ".join(f"{key}=${idx + 2}" for idx, key in enumerate(fields))
+    built = build_book_update(book_id, fields)
+    if built is None:
+        return
+    sql, params = built
     try:
-        await db.execute(
-            f"UPDATE regulation_books SET {sets}, updated_at=now() WHERE id=$1",
-            book_id,
-            *fields.values(),
-        )
+        await db.execute(sql, params)
     except Exception as exc:
         logger.warning("update regulation book metadata failed: %s", exc)
