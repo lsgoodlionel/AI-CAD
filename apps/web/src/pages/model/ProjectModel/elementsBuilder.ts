@@ -162,7 +162,11 @@ export function elementsBounds(
 ): { minX: number; maxX: number; minY: number; maxY: number } | null {
   const xs: number[] = []
   const ys: number[] = []
-  const push = (points: number[][] | undefined) => {
+  // 尺度离群的图纸**不参与包络**：实测轨道交通的场景被 2 张图撑到
+  // 4.8 公里，而中间 90% 的构件点只占 762 米——建筑于是缩成中间一小团。
+  // 构件本身照常渲染（降级必须可见），只是不让它决定相机取景。
+  const push = (points: number[][] | undefined, suspect?: boolean) => {
+    if (suspect) return
     for (const p of points ?? []) {
       if (p.length >= 2) {
         xs.push(p[0])
@@ -170,12 +174,12 @@ export function elementsBounds(
       }
     }
   }
-  for (const c of elements.columns) push(c.outline)
-  for (const w of elements.walls) push(w.path)
-  for (const b of elements.beams) push(b.path)
-  for (const s of elements.slabs) push(s.outline)
-  for (const p of elements.pipes) push(p.path)
-  for (const e of elements.equipment) push(e.outline)
+  for (const c of elements.columns) push(c.outline, c.scale_suspect)
+  for (const w of elements.walls) push(w.path, w.scale_suspect)
+  for (const b of elements.beams) push(b.path, b.scale_suspect)
+  for (const s of elements.slabs) push(s.outline, s.scale_suspect)
+  for (const p of elements.pipes) push(p.path, p.scale_suspect)
+  for (const e of elements.equipment) push(e.outline, e.scale_suspect)
   if (xs.length < 2) return null
   return {
     minX: Math.min(...xs), maxX: Math.max(...xs),

@@ -127,7 +127,14 @@ export type ElementPoint = number[]
 
 /** 柱：真实轮廓挤出 */
 /** 构件类型标签(C-下一步:档案 OCR 文字反哺,如 steel/curtain_wall/pile) */
-export interface ComponentTypeLabel {
+/** 尺度可疑标记：该图的构件跨度远超项目中位（实测有单图跨 4176 米），
+ *  多半是坐标变换算错了。**渲染照常，但不参与场景包络**——
+ *  否则相机会去框那 4.8 公里，真实建筑缩成中间一小团。 */
+export interface ScaleSuspectFlag {
+  scale_suspect?: boolean
+}
+
+export interface ComponentTypeLabel extends ScaleSuspectFlag {
   /** steel | curtain_wall | pile | diaphragm_wall | retaining_wall | exterior_wall */
   type_label?: string
   /** 原始 OCR 文本(如"钢立柱"/"幕墙") */
@@ -151,7 +158,7 @@ export interface ElementWall extends ComponentTypeLabel {
 }
 
 /** 梁：轴线 path + 截面 宽×高 */
-export interface ElementBeam {
+export interface ElementBeam extends ScaleSuspectFlag {
   path: ElementPoint[]
   width: number
   depth: number
@@ -159,14 +166,14 @@ export interface ElementBeam {
 }
 
 /** 板：外轮廓 + 板厚 */
-export interface ElementSlab {
+export interface ElementSlab extends ScaleSuspectFlag {
   outline: ElementPoint[]
   thickness: number
   src: string
 }
 
 /** 管线：折线 path + 管径 + 专业系统 */
-export interface ElementPipe {
+export interface ElementPipe extends ScaleSuspectFlag {
   path: ElementPoint[]
   dia: number
   system: string
@@ -174,7 +181,7 @@ export interface ElementPipe {
 }
 
 /** 设备：闭合块轮廓 + 高度 + 标注文本 */
-export interface ElementEquipment {
+export interface ElementEquipment extends ScaleSuspectFlag {
   outline: ElementPoint[]
   height: number
   label: string

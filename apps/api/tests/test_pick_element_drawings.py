@@ -118,7 +118,10 @@ def test_mep_and_beam_buckets_still_work():
 @pytest.mark.unit
 def test_empty_input_is_safe():
     picked = pick_element_drawings([], transforms={})
-    assert picked == {"structure": [], "beam": [], "mep": []}
+    # 契约变更：新增 `architecture` 桶（建筑/装修平面图此前被整张丢弃，
+    # 实测 81 张，而它们是墙与门窗的主要来源）。
+    assert picked == {"structure": [], "beam": [], "mep": [],
+                      "architecture": []}
 
 
 # ── 有世界坐标的图必须优先（v44 实测断点）────────────────────

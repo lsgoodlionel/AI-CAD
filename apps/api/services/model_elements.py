@@ -22,6 +22,15 @@ logger = logging.getLogger(__name__)
 _MAX_STRUCTURE_PLANS = 2
 _MAX_BEAM_PLANS = 2
 _MAX_MEP_PLANS = 3
+#: **建筑/装修平面图**的配额。此前这两类没有桶，整张丢弃——
+#: 实测轨道交通的平面图按专业分布为 mep 313 / architecture 49 /
+#: structure 49 / decoration 32，**81 张被完全排除在建模之外**，
+#: 而建筑平面图正是墙与门窗的主要来源。
+_MAX_ARCHITECTURE_PLANS = 2
+
+#: 只有**平面图**才进建筑桶。立面/剖面/详图/节点进来只会添噪声——
+#: 它们本就不产出楼层构件。
+_PLAN_TITLE_RE = re.compile(r"平面")
 #: 单图识别超时（秒）。
 #:
 #: **提高它几乎是纯收益**：`asyncio.wait_for` 取消不了 executor 里正在跑的
@@ -197,6 +206,7 @@ def pick_element_drawings(
     structure: list[dict] = []
     beams: list[dict] = []
     mep: list[dict] = []
+    architecture: list[dict] = []
     for drawing in floor_drawings:
         if not _same_unit(drawing, unit):
             continue                  # 跨单体不混取——这是错位几十米的根因
@@ -209,13 +219,17 @@ def pick_element_drawings(
         elif _STRUCTURE_TITLE_RE.search(title) or discipline == "structure":
             structure.append(drawing)
         elif _transform_rank(drawing, transforms, placements) < 0:
-            # **有世界坐标却进不了任何桶** —— 实测 19 张里有 3 张这样
-            # （屋顶花园排水组织图、隔声隔振平面图、夹层平面图，
-            # 都是 architecture 且标题无结构词）。它们的位置是**绝对可信**的
-            # （锚点求解、残差毫米级），整张丢弃太可惜；建筑平面图上
-            # 本就有墙、柱、门窗。**只对有世界坐标的图开这个口子** ——
-            # 位置不可信的图进来只会添噪声。
+            # 有世界坐标的图位置**绝对可信**（锚点求解、残差毫米级），
+            # 优先进结构桶。
             structure.append(drawing)
+        elif _PLAN_TITLE_RE.search(title):
+            # **建筑/装修平面图单独成桶**。此前它们进不了任何桶被整张丢弃，
+            # 理由是「位置不可信的图进来只会添噪声」——但实测
+            # `placed_drawings = 0`，**没有任何一张图有世界坐标**，
+            # 这条理由对结构/机电平面图同样成立，却只用来挡了建筑图。
+            # 判据不自洽的代价：实测 81 张平面图（architecture 49 +
+            # decoration 32）被排除，而它们正是墙与门窗的主要来源。
+            architecture.append(drawing)
 
     def by_quality(items: list[dict]) -> list[dict]:
         # 同等可靠度时按 drawing_id 定序 —— stable sort 保留的是**输入顺序**，
@@ -241,6 +255,7 @@ def pick_element_drawings(
         "structure": take(structure, _MAX_STRUCTURE_PLANS),
         "beam": take(beams, _MAX_BEAM_PLANS),
         "mep": take(mep, _MAX_MEP_PLANS),
+        "architecture": take(architecture, _MAX_ARCHITECTURE_PLANS),
     }
 
 
@@ -820,9 +835,75 @@ def _origin_override_of(transforms: dict | None,
 
 
 def _scale_override_of(transforms: dict | None, drawing_id: str) -> float | None:
-    """该图已落库的比例（m/pt），供识别器在自己算错时兜底。"""
+    """该图已落库的比例（m/pt），供识别器在自己算错时兜底。
+
+    **必须过门禁**：此前这里无条件返回落库比例，而 `drawing_transform`
+    里 633 张来自图幅推断的变换比例跨越三个数量级（0.001~1.707 m/pt）、
+    平均置信 0.02 —— 垃圾变换正是这样被当作权威交给识别器的，
+    结果单图跨度从 27 米到 4176 米不等，场景包络被撑到 4.8 公里。
+
+    不可信时返回 None 而非报错：识别器回退到按图纸自身内容估，
+    至少不会被钉死在错误尺度上。
+    """
+    from core.model3d.scale_gate import is_transform_trustworthy
+
     transform = (transforms or {}).get(drawing_id)
-    return getattr(transform, "scale_m_pt", None) if transform is not None else None
+    if transform is None:
+        return None
+    scale = getattr(transform, "scale_m_pt", None)
+    if not is_transform_trustworthy(scale, getattr(transform, "confidence", None)):
+        return None
+    return scale
+
+
+#: 参与跨度统计的构件类别。
+_SPAN_ELEMENT_KINDS = ("columns", "walls", "beams", "slabs", "pipes", "equipment")
+
+
+def mark_scale_outliers(floors: list[dict] | None) -> set:
+    """标记尺度离群图纸的构件，返回被标记的图纸 id 集合。
+
+    **标记而不删除**：删了就看不见问题在哪，而项目的既有约束是
+    「降级必须可见」。标记后前端算场景包络时跳过它们，
+    相机才能框住真实内容——实测轨道交通的包络被 2 张图撑到 4.8 公里，
+    而中间 90% 的构件点只占 762 米。
+    """
+    from core.model3d.scale_gate import outlier_sources
+
+    points: dict[str, list] = {}
+    for floor in floors or []:
+        elements = floor.get("elements") or {}
+        for kind in _SPAN_ELEMENT_KINDS:
+            for element in elements.get(kind) or []:
+                src = element.get("src")
+                if src is None:
+                    continue
+                # **墙/梁/管线用 `path`，柱/板/设备用 `outline`**
+                # （前端 `elementsBounds` 就是这么读的）。只读 outline
+                # 会让墙梁管整类不参与统计——而它们最可能撑开包络。
+                for point in (element.get("outline")
+                              or element.get("path") or []):
+                    if isinstance(point, (list, tuple)) and len(point) >= 2:
+                        points.setdefault(src, []).append(
+                            (float(point[0]), float(point[1])))
+    spans = {}
+    for src, pts in points.items():
+        # 两点就够算跨度——梁/管线的轮廓本就是两点线，要求三点会把
+        # 它们整类排除在统计之外。
+        if len(pts) < 2:
+            continue
+        spans[src] = max(max(p[0] for p in pts) - min(p[0] for p in pts),
+                         max(p[1] for p in pts) - min(p[1] for p in pts))
+    suspects = outlier_sources(spans)
+    if not suspects:
+        return set()
+    for floor in floors or []:
+        elements = floor.get("elements") or {}
+        for kind in _SPAN_ELEMENT_KINDS:
+            for element in elements.get(kind) or []:
+                if element.get("src") in suspects:
+                    element["scale_suspect"] = True
+    return suspects
 
 
 async def _recognize_one(
@@ -913,7 +994,8 @@ async def build_floor_elements(
     # 两组构件会落在相距数千米的两个坐标系里（实测 B1/F2/RF 虚报 6300+ 米）。
     # 无法自动统一到世界坐标 —— 工程坐标与图纸有 70.29° 旋转，而 scene 的
     # axes 是轴对齐结构，装不下斜轴线。**矛盾时整层退回局部，并出矛盾点**。
-    all_picked = [*picked["structure"], *picked["beam"], *picked["mep"]]
+    all_picked = [*picked["structure"], *picked["beam"], *picked["mep"],
+                  *picked["architecture"]]
     placed_ids = [str(d.get("id")) for d in all_picked
                   if (placements or {}).get(str(d.get("id")))]
     unplaced_ids = [str(d.get("id")) for d in all_picked
@@ -957,6 +1039,10 @@ async def build_floor_elements(
         *[(d, "structure", ("columns", "walls", "slabs")) for d in picked["structure"]],
         *[(d, "structure", ("beams",)) for d in picked["beam"]],
         *[(d, "mep", ("pipes", "equipment")) for d in picked["mep"]],
+        # 建筑/装修平面图产出墙、柱、板 —— 与结构同类，但**用建筑专业
+        # 送进识别器**，因为图层命名与构件表达都按建筑习惯来。
+        *[(d, "architecture", ("columns", "walls", "slabs"))
+          for d in picked["architecture"]],
     ]
 
     elements: dict[str, list] = empty

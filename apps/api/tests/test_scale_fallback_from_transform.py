@@ -80,12 +80,26 @@ def test_scale_override_reaches_the_context_through_recognize():
 
 @pytest.mark.unit
 def test_stored_scale_is_read_from_the_transform():
-    """从 `drawing_transform` 取比例供识别器兜底。"""
+    """从 `drawing_transform` 取比例供识别器兜底 —— **但要过门禁**。
+
+    契约变更（本次）：此前无条件返回落库比例，而实测 633 张来自图幅推断
+    的变换比例跨越三个数量级、平均置信 0.02，垃圾变换正是这样被当作
+    权威交给识别器的。现在只有可信的才覆盖，不可信时返回 None
+    让识别器按图纸自身内容估。
+
+    置信为空**不再视同可信**：那正是「没人评估过」的意思。
+    实测库中 0/2142 行为空，两条构造路径都会设置它，故不影响真实链路。
+    """
     from services.drawing_transform import DrawingTransform
     from services.model_elements import _scale_override_of
 
-    t = DrawingTransform(scale_m_pt=0.052917, origin_x=595.29, origin_y=706.47,
-                         page_h=2384.0)
-    assert _scale_override_of({"d1": t}, "d1") == pytest.approx(0.052917)
+    trusted = DrawingTransform(scale_m_pt=0.052917, origin_x=595.29,
+                               origin_y=706.47, page_h=2384.0, confidence=0.97)
+    assert _scale_override_of({"d1": trusted}, "d1") == pytest.approx(0.052917)
+
+    unrated = DrawingTransform(scale_m_pt=0.052917, origin_x=595.29,
+                               origin_y=706.47, page_h=2384.0)
+    assert _scale_override_of({"d1": unrated}, "d1") is None
+
     assert _scale_override_of({}, "d1") is None
     assert _scale_override_of(None, "d1") is None
