@@ -49,7 +49,8 @@ services:
       retries: 5
 
   chroma:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:0.5.12   # 必须与 requirements.txt 的客户端同版本：
+                                    # latest 漂到 1.0.0 后下线 v1 API，客户端直接连不上
     container_name: cad_chroma
     ports:
       - "8100:8000"

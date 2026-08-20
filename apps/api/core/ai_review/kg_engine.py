@@ -24,11 +24,13 @@ def build_kg_query(discipline: str) -> tuple[str, list]:
     占位符，查询每次都抛 `PostgresSyntaxError`，被 except 吞掉后
     静默走 SQL 降级——图谱推理从未真正执行过。
     AGE 的第三参数须是 agtype，故用 `$1::agtype` 传 JSON。
+    关系一律具名（`-[q:REQUIRES]->`）：本项目另一条路径走 SQLAlchemy，
+    匿名标签会被它的绑定参数正则吃掉，规则统一比按路径分叉安全。
     """
     sql = f"""
         SELECT * FROM cypher('{KG_GRAPH_NAME}', $$
-            MATCH (d:Discipline {{code: $discipline}})-[:REQUIRES]->(s:Standard)
-            OPTIONAL MATCH (s)-[:HAS_CLAUSE]->(c:Clause {{mandatory: true}})
+            MATCH (d:Discipline {{code: $discipline}})-[q:REQUIRES]->(s:Standard)
+            OPTIONAL MATCH (s)-[h:HAS_CLAUSE]->(c:Clause {{mandatory: true}})
             RETURN s.code AS std_code,
                    s.name AS std_name,
                    c.article_no AS article_no,

@@ -144,3 +144,111 @@ def test_reader_matches_what_writer_builds():
     for label in (":Discipline", ":Standard", ":Clause",
                   ":REQUIRES", ":HAS_CLAUSE"):
         assert label in sql and label in cypher, f"{label} 两端不一致"
+
+
+# ── 连接池 ────────────────────────────────────────────────────
+
+@pytest.mark.unit
+def test_cypher_calls_are_schema_qualified():
+    """**实测**：`databases` 走连接池，`LOAD 'age'` 和 `SET search_path`
+    设在一条连接上，后续语句落到另一条就失效，报
+    `function cypher(unknown, unknown) does not exist`。
+
+    限定 `ag_catalog.cypher` / `ag_catalog.agtype` 后不再依赖会话状态。
+    """
+    cypher = _joined()
+    assert "ag_catalog.cypher(" in cypher
+    assert "ag_catalog.agtype" in cypher
+
+
+@pytest.mark.unit
+def test_vectorize_fetch_uses_named_binding():
+    """**第四处同源缺陷**：向量化取数也是 `$1` + 位置参数。
+
+    后果：RAG 引擎（四引擎之三）的向量库**一条条文都没有**，
+    而错误被吞成 warning，导入照常报「条文 75/75」成功。
+    """
+    from services.regulation_importer import build_vectorize_fetch
+
+    sql, params = build_vectorize_fetch("a1")
+    assert "$1" not in sql
+    assert "CAST(:article_id AS uuid)" in sql
+    assert params == {"article_id": "a1"}
+
+
+@pytest.mark.asyncio
+async def test_graph_writes_run_inside_one_transaction():
+    """图写入必须钉在同一条连接上——否则 `LOAD 'age'` 白设。"""
+    from services.regulation_importer import build_age_nodes
+
+    class FakeTx:
+        def __init__(self, db): self.db = db
+        async def __aenter__(self): self.db.in_tx = True; return self
+        async def __aexit__(self, *exc): self.db.in_tx = False; return False
+
+    class FakeDB:
+        def __init__(self):
+            self.in_tx = False
+            self.cypher_outside_tx = []
+        def transaction(self): return FakeTx(self)
+        async def execute(self, sql, params=None):
+            self._check(sql)
+        async def fetch_one(self, sql, params=None):
+            self._check(sql)
+            if "regulation_books" in sql:
+                return {"id": "b1", "title": "T", "std_no": "GB 1",
+                        "discipline": "structure"}
+            if "regulation_articles WHERE id" in sql:
+                return {"id": "a1", "article_no": "1.1", "content": "c",
+                        "obligation_level": "MUST", "is_mandatory": True}
+            return {0: 123} if "cypher" in sql else None
+        def _check(self, sql):
+            if "cypher(" in sql and not self.in_tx:
+                self.cypher_outside_tx.append(sql)
+
+    db = FakeDB()
+    await build_age_nodes(db, "b1", ["a1"])
+    assert not db.cypher_outside_tx, "有 cypher 语句跑在事务外"
+
+
+@pytest.mark.unit
+def test_no_colon_follows_a_non_word_character():
+    """**SQLAlchemy 绑定参数正则要求 `:` 前不是词字符**——
+    于是 cypher 的匿名标签会被当成参数编译掉：
+
+    - `(s:Standard)` 冒号跟在 `s` 后 → 安全
+    - `-[:HAS_CLAUSE]->` 冒号跟在 `[` 后 → **被当成 `:HAS_CLAUSE` 参数**，
+      编译成 `$1`，AGE 解析器报 `unexpected character at or near "$"`
+    - `(:Standard)` 冒号跟在 `(` 后 → 同上
+
+    实测：匿名全失败、具名全成功。所以**每个模式都必须给变量名**，
+    哪怕这个变量后面根本不用。用 asyncpg 直连时不会暴露
+    （asyncpg 不解析 `:`）——本项目两条路径都有，容易踩。
+    """
+    import re
+
+    from core.ai_review.kg_engine import build_kg_query
+    from services.regulation_importer import build_clause_statements
+
+    sql, _ = build_kg_query("structure")
+    texts = [sql] + build_clause_statements(BOOK, ARTICLE)
+    for text in texts:
+        bad = re.findall(r"(?<![\w:])(:[A-Za-z_]\w*)", text)
+        assert not bad, f"冒号前不是词字符，会被当成绑定参数：{bad} in {text[:120]}"
+
+
+@pytest.mark.unit
+def test_age_node_id_is_coerced_to_int():
+    """`age_node_id` 列是 bigint，而 agtype 返回的是字符串。
+
+    直接回写会报 `invalid input for query argument $2:
+    'str' object cannot be interpreted as an integer` —— 图建对了、
+    条文与节点的关联却全丢。
+    """
+    from services.regulation_importer import coerce_age_node_id
+
+    assert coerce_age_node_id("1407374883553316") == 1407374883553316
+    assert coerce_age_node_id(123) == 123
+    assert coerce_age_node_id('"1407374883553316"') == 1407374883553316
+    assert coerce_age_node_id(None) is None
+    assert coerce_age_node_id("not-a-number") is None

@@ -725,6 +725,71 @@ def cypher_literal(value: object) -> str:
             .replace("'", "\\'"))
 
 
+#: 标题里出现即判为正文句子的标点——正文句子最容易被误抽成标题。
+_TITLE_PROSE_MARKS = "，。；、！？：,;!?"
+
+#: 规范标题的长度上限（含标准号前缀时也够用）。
+MAX_BOOK_TITLE_CHARS = 60
+
+
+def is_plausible_book_title(candidate: str | None) -> bool:
+    """判断一个候选串是否像规范标题。
+
+    实测有书名被抽成序言里的半句话（「为适应国际技术法规……2016年以来，」）。
+    后果直指需求：规范库要能被**总说明里的引用检索到**、要能**跨版本比对**，
+    一本叫做半句话的书两样都做不到。
+    """
+    text = (candidate or "").strip()
+    if not text or len(text) > MAX_BOOK_TITLE_CHARS:
+        return False
+    return not any(mark in text for mark in _TITLE_PROSE_MARKS)
+
+
+def resolve_book_title(filename_title: str, extracted: str | None) -> str:
+    """定标题：文件名里的《…》优先，其次是合格的抽取结果。
+
+    人工上传的文件名是**人写的**，比从正文里猜可靠。
+    抽取结果不合格时保留文件名——宁可粗糙，不写脏值。
+    """
+    if "《" in (filename_title or "") and "》" in (filename_title or ""):
+        return filename_title
+    return extracted if is_plausible_book_title(extracted) else filename_title
+
+
+#: 标准号前缀 → 归一后带一个空格。总说明写 `GB 55023-2022`，
+#: 抽取常得到 `GB55023-2022`，不归一化引用就永远匹配不上。
+_STD_NO_RE = re.compile(
+    r"^\s*(GB/T|GB/Z|GB|JGJ/T|JGJ|CJJ/T|CJJ|JTG|DL/T|DL|TB|CECS|T/[A-Z]+)"
+    r"\s*(\d[\d.\-]*)\s*$", re.IGNORECASE)
+
+
+def normalize_std_no(raw: str | None) -> str | None:
+    """标准号归一为「前缀 + 单空格 + 编号」；认不出的形状原样保留。"""
+    if raw is None:
+        return None
+    match = _STD_NO_RE.match(raw)
+    if not match:
+        return raw
+    return f"{match.group(1).upper()} {match.group(2)}"
+
+
+def coerce_age_node_id(value: object) -> int | None:
+    """agtype 节点 id → int；转不动返回 None（不写脏值）。
+
+    `age_node_id` 列是 bigint，而 agtype 回来的是带引号的字符串，
+    直接写会报 `'str' object cannot be interpreted as an integer` ——
+    图建对了、条文与节点的关联却全丢。
+    """
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    try:
+        return int(str(value).strip().strip('"'))
+    except (TypeError, ValueError):
+        return None
+
+
 def build_clause_statements(book: dict, article: dict) -> list[str]:
     """条文 → AGE 语句**列表**，建的是读取端 MATCH 的那套标签。
 
@@ -738,6 +803,11 @@ def build_clause_statements(book: dict, article: dict) -> list[str]:
     决定权在 MERGE 顺序而非赋值顺序。同一节点的多个属性则正常。
     这条只有对真库实跑才暴露：语句字符串完全合法，单测比不出来。
 
+    **关系必须具名** `-[h:HAS_CLAUSE]->`：SQLAlchemy 的绑定参数正则
+    要求 `:` 前不是词字符，匿名的 `-[:HAS_CLAUSE]->` 会被当成参数
+    `:HAS_CLAUSE` 编译成 `$1`，AGE 报 `unexpected character at or near "$"`。
+    用 asyncpg 直连时不暴露（不解析 `:`），本项目两条路径都有。
+
     没有专业字段时**不编造 Discipline 节点**：宁可这条走不到专业入口，
     也不能凭空造出一个错的专业归属。
     """
@@ -746,8 +816,11 @@ def build_clause_statements(book: dict, article: dict) -> list[str]:
     mandatory = "true" if article.get("is_mandatory") else "false"
 
     def wrap(body: str) -> str:
-        return (f"SELECT * FROM cypher('{GRAPH_NAME}', $$ {body} $$)"
-                " AS (result agtype)")
+        # **限定 ag_catalog**：`databases` 走连接池，`SET search_path`
+        # 设在一条连接上，后续语句落到另一条就报
+        # `function cypher(unknown, unknown) does not exist`。
+        return (f"SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$ {body} $$)"
+                " AS (result ag_catalog.agtype)")
 
     statements = [
         wrap(f"MERGE (s:Standard {{code: '{std_code}'}})"
@@ -757,18 +830,18 @@ def build_clause_statements(book: dict, article: dict) -> list[str]:
              f" c.content = '{cypher_literal(article.get('content'))}',"
              f" c.obligation_level = '{cypher_literal(article.get('obligation_level'))}',"
              f" c.mandatory = {mandatory} RETURN id(c)"),
-        wrap(f"MATCH (s:Standard {{code: '{std_code}'}}),"
-             f" (c:Clause {{id: '{clause_id}'}})"
-             " MERGE (s)-[:HAS_CLAUSE]->(c) RETURN id(c)"),
+        wrap(f"MERGE (s:Standard {{code: '{std_code}'}})"
+             f" MERGE (c:Clause {{id: '{clause_id}'}})"
+             " MERGE (s)-[h:HAS_CLAUSE]->(c) RETURN id(c)"),
     ]
     discipline = book.get("discipline")
     if discipline:
         code = cypher_literal(discipline)
         statements.append(wrap(f"MERGE (d:Discipline {{code: '{code}'}}) RETURN id(d)"))
         statements.append(
-            wrap(f"MATCH (d:Discipline {{code: '{code}'}}),"
-                 f" (s:Standard {{code: '{std_code}'}})"
-                 " MERGE (d)-[:REQUIRES]->(s) RETURN id(s)"))
+            wrap(f"MERGE (d:Discipline {{code: '{code}'}})"
+                 f" MERGE (s:Standard {{code: '{std_code}'}})"
+                 " MERGE (d)-[q:REQUIRES]->(s) RETURN id(s)"))
     return statements
 
 
@@ -781,13 +854,6 @@ async def build_age_nodes(
     在 Apache AGE 中为每篇条文创建图节点，并与规范文件建立 HAS_ARTICLE 关系。
     AGE 不可用时静默跳过。
     """
-    try:
-        await db.execute("LOAD 'age'")
-        await db.execute("SET search_path = ag_catalog, '$user', public")
-    except Exception:
-        logger.info("AGE 扩展不可用，跳过图节点写入")
-        return
-
     book = await db.fetch_one(
         "SELECT id, title, std_no, discipline FROM regulation_books "
         "WHERE id = CAST(:book_id AS uuid)", {"book_id": book_id})
@@ -796,32 +862,58 @@ async def build_age_nodes(
         return
     book_row = dict(book)
 
-    for article_id in article_ids:
-        try:
-            sql, params = build_article_query(article_id)
-            art = await db.fetch_one(sql, params)
-            if not art:
-                continue
+    # **必须钉在同一条连接上**：`LOAD 'age'` 是会话级的，
+    # 而 `databases` 每条语句都可能换连接。事务把连接固定住。
+    try:
+        async with db.transaction():
+            await db.execute("LOAD 'age'")
+            await db.execute("SET search_path = ag_catalog, '$user', public")
+            for article_id in article_ids:
+                try:
+                    sql, params = build_article_query(article_id)
+                    art = await db.fetch_one(sql, params)
+                    if not art:
+                        continue
 
-            node_id = None
-            for index, statement in enumerate(build_clause_statements(book_row, dict(art))):
-                row = await db.fetch_one(statement)
-                # 第 0 条返回 Standard 节点，条文节点是第 1 条 —— age_node_id
-                # 存的是条文，取错就把整本书的条文全指到同一个标准节点上。
-                if index == CLAUSE_STATEMENT_INDEX and row is not None:
-                    node_id = row[0]
-            result = node_id
-            if result:
-                await db.execute(
-                    "UPDATE regulation_articles SET age_node_id = :node_id "
-                    "WHERE id = CAST(:article_id AS uuid)",
-                    {"node_id": str(result[0]), "article_id": article_id},
-                )
-        except Exception as exc:
-            logger.warning("AGE node for article %s failed: %s", article_id, exc)
+                    node_id = None
+                    statements = build_clause_statements(book_row, dict(art))
+                    for index, statement in enumerate(statements):
+                        row = await db.fetch_one(statement)
+                        # 第 0 条返回 Standard 节点，条文节点是第 1 条 ——
+                        # age_node_id 存的是条文，取错就把整本书的条文
+                        # 全指到同一个标准节点上。
+                        if index == CLAUSE_STATEMENT_INDEX and row is not None:
+                            node_id = row[0]
+                    node_id = coerce_age_node_id(node_id)
+                    if node_id is not None:
+                        await db.execute(
+                            "UPDATE regulation_articles SET age_node_id = :node_id "
+                            "WHERE id = CAST(:article_id AS uuid)",
+                            {"node_id": node_id, "article_id": article_id},
+                        )
+                except Exception as exc:
+                    logger.warning("AGE node for article %s failed: %s",
+                                   article_id, exc)
+    except Exception as exc:
+        logger.warning("AGE 图写入整体失败（扩展不可用？）：%s", exc)
 
 
 # ── Chroma 向量化 ─────────────────────────────────────────────
+
+def build_vectorize_fetch(article_id: str) -> tuple[str, dict]:
+    """向量化取数 → (SQL, 参数字典)。
+
+    **第四处同源缺陷**：此前是 `$1` + 位置参数，每条都报
+    `TextClause.bindparams() argument after ** must be a mapping`，
+    被吞成 warning 后 **RAG 引擎（四引擎之三）的向量库一条都没有**，
+    而导入照常报「条文 75/75」成功。
+    """
+    return (
+        "SELECT id, article_no, content, obligation_level, is_mandatory, book_id "
+        "FROM regulation_articles WHERE id = CAST(:article_id AS uuid)",
+        {"article_id": article_id},
+    )
+
 
 async def vectorize_articles(
     db: Any,
@@ -848,11 +940,8 @@ async def vectorize_articles(
 
     for article_id in article_ids:
         try:
-            art = await db.fetch_one(
-                "SELECT id, article_no, content, obligation_level, is_mandatory, book_id "
-                "FROM regulation_articles WHERE id=$1",
-                article_id,
-            )
+            sql, params = build_vectorize_fetch(article_id)
+            art = await db.fetch_one(sql, params)
             if not art:
                 continue
             docs.append(art["content"][:2000])
@@ -899,7 +988,7 @@ async def import_regulation_file(
     """
     text = extract_text(file_bytes, filename)
     metadata = infer_book_metadata(text, filename)
-    await _update_book_metadata(db, book_id, metadata)
+    await _update_book_metadata(db, book_id, metadata, filename=filename)
 
     # **OCR 文本用专用切分**：`split_into_paragraphs` 的判据为有排版结构的
     # 文本层设计，对 OCR 出的连续文本失效（实测入库前几条全是目录碎片，
@@ -945,12 +1034,33 @@ async def import_regulation_file(
     }
 
 
-async def _update_book_metadata(db: Any, book_id: str, metadata: dict[str, Any]) -> None:
+async def _update_book_metadata(
+    db: Any,
+    book_id: str,
+    metadata: dict[str, Any],
+    filename: str = "",
+) -> None:
+    """把抽取到的元数据写回书行——**标题和标准号先过质量守卫**。
+
+    实测抽取会把序言里的半句话当成书名。规范库要能被总说明的引用
+    检索到、要能跨版本比对，所以这两个字段宁可保守也不能写脏。
+    """
     fields = {
         key: value
         for key, value in metadata.items()
         if value and key in {"title", "std_no", "version", "discipline", "publisher", "effective_at"}
     }
+    filename_title = (filename or "").rsplit("/", 1)[-1]
+    for suffix in (".pdf", ".PDF", ".docx", ".doc"):
+        if filename_title.endswith(suffix):
+            filename_title = filename_title[: -len(suffix)]
+    resolved = resolve_book_title(filename_title, fields.get("title"))
+    if resolved and resolved != filename_title:
+        fields["title"] = resolved
+    else:
+        fields.pop("title", None)      # 与文件名一致就不必回写
+    if "std_no" in fields:
+        fields["std_no"] = normalize_std_no(fields["std_no"])
     if "effective_at" in fields:
         fields["effective_at"] = _parse_date(fields["effective_at"])
     if not fields:
