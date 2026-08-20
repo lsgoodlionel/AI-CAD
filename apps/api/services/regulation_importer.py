@@ -283,6 +283,113 @@ def infer_book_metadata(text: str, filename: str = "") -> dict[str, Any]:
     }
 
 
+#: 义务词（GB/T 1.1 标准编写规则）——规范条文的核心标志。
+_OBLIGATION_WORDS = ("必须", "严禁", "不应", "不得", "不宜", "应", "宜", "可")
+
+#: 目录行的指纹：省略号引导页码，或整行只有短标题。
+_TOC_DOTS_RE = re.compile(r"[·.．]{3,}|[·.．]{2,}\s*\d+\s*$")
+
+#: 条文正文的最短长度（含义务词时可放宽）。
+MIN_ARTICLE_BODY_CHARS = 12
+
+
+def looks_like_article(text: str | None) -> bool:
+    """这段文字像**规范条文**吗（而非目录/页码/标题）。
+
+    判据（GB/T 1.1）：含**义务词**，或是**完整句子**（有句号且够长）。
+    纯页码、短标题一律不算 —— 实测 `11`、`12` 曾被当成条文号入库。
+    """
+    body = str(text or "").strip()
+    if len(body) < 6 or body.isdigit():
+        return False
+    stripped = re.sub(r"^[\d.．\s]+", "", body)
+    if len(stripped) < 4:
+        return False                       # 去掉编号后没剩什么 —— 是页码或序号
+    if any(word in stripped for word in _OBLIGATION_WORDS):
+        return True
+    return len(stripped) >= MIN_ARTICLE_BODY_CHARS and (
+        "。" in stripped or "；" in stripped)
+
+
+def is_toc_line(text: str | None) -> bool:
+    """这行是**目录**吗。
+
+    目录行是「短标题 + 页码」，没有义务词也不成句；
+    正文则相反。实测规范前几页全是目录，
+    而 `4.3 构造要求`、`5.1 个人防护` 形似条文号，会被切分器当成条文。
+    """
+    body = str(text or "").strip()
+    if not body:
+        return False
+    if _TOC_DOTS_RE.search(body):
+        return True                        # 省略号引导页码 —— 确凿的目录
+    return not looks_like_article(body)
+
+
+#: 三级条文号（GB/T 1.1）：`2.0.3` / `4.1.2`。**紧贴正文无空格**是
+#: OCR 文本的常态（`2.0.3混凝土结构…`），所以不能按空格切。
+_OCR_ARTICLE_NO_RE = re.compile(r"^(\d{1,2}\.\d{1,2}\.\d{1,2})\s*(.*)$")
+
+#: 页码行的上限位数 —— 规范不会有四位页码。
+MAX_PAGE_NUMBER_DIGITS = 3
+
+
+def is_page_number_line(line: str | None) -> bool:
+    """这行是**孤立的页码**吗。
+
+    实测 OCR 把页码单独成行，且**插在句子中间**：
+
+        2.0.4…强度设计值取值应符合
+        2                      ← 页码
+        下列规定：
+
+    不剔除的话，一条会被腰斩成两半。
+    """
+    body = str(line or "").strip()
+    return bool(body) and body.isdigit() and len(body) <= MAX_PAGE_NUMBER_DIGITS
+
+
+def split_ocr_articles(text: str | None) -> list[dict[str, str]]:
+    """OCR 全文 → 条文列表（按三级条文号切分）。
+
+    **为什么单独写**：`split_into_paragraphs` 的判据为**有排版结构的
+    文本层**设计，对 OCR 出的连续文本失效 —— 实测入库的前几条全是
+    目录碎片，页码还被当成了条文号。
+
+    三个实测形态：
+    - 条文号**紧贴正文无空格**（`2.0.3混凝土…`）
+    - **页码孤立成行插在句中** —— 剔除后句子才接得上
+    - **子项用裸数字编号**（`1结构混凝土…`）—— 属于上一条，不切
+    """
+    lines = [ln.strip() for ln in str(text or "").splitlines()]
+    articles: list[dict[str, str]] = []
+    current_no: str | None = None
+    buffer: list[str] = []
+
+    def _flush() -> None:
+        nonlocal current_no, buffer
+        if current_no is not None:
+            body = "".join(buffer).strip()
+            if looks_like_article(body):
+                articles.append({"index": len(articles),
+                                 "article_no": current_no,
+                                 "text": f"{current_no} {body}".strip()})
+        current_no, buffer = None, []
+
+    for line in lines:
+        if not line or is_page_number_line(line):
+            continue                       # 页码不打断条文
+        matched = _OCR_ARTICLE_NO_RE.match(line)
+        if matched:
+            _flush()
+            current_no = matched.group(1)
+            buffer = [matched.group(2)]
+        elif current_no is not None:
+            buffer.append(line)            # 断行接上（OCR 按视觉行输出）
+    _flush()
+    return articles
+
+
 def split_into_paragraphs(text: str) -> list[dict[str, str]]:
     """
     尝试按条文编号（4.2.3）分段，若无法识别则按 2 个换行分段。
@@ -294,7 +401,9 @@ def split_into_paragraphs(text: str) -> list[dict[str, str]]:
     if len(matches) >= 3:
         for m in matches:
             body = f"{m.group(1)} {m.group(2)}\n{m.group(3)}".strip()
-            if len(body) > 20:
+            # **目录不是条文**：实测规范前几页全是目录，
+            # `4.3 构造要求`、`5.1 个人防护` 形似条文号会被切进来。
+            if len(body) > 20 and looks_like_article(body):
                 paras.append({"index": len(paras), "text": body})
     else:
         current: list[str] = []
@@ -653,7 +762,12 @@ async def import_regulation_file(
     metadata = infer_book_metadata(text, filename)
     await _update_book_metadata(db, book_id, metadata)
 
-    paragraphs = split_into_paragraphs(text)
+    # **OCR 文本用专用切分**：`split_into_paragraphs` 的判据为有排版结构的
+    # 文本层设计，对 OCR 出的连续文本失效（实测入库前几条全是目录碎片，
+    # 页码还被当成条文号）。三级条文号切得出就用它，切不出再落回原路径。
+    paragraphs = split_ocr_articles(text)
+    if len(paragraphs) < 3:
+        paragraphs = split_into_paragraphs(text)
     logger.info("book %s: split %d paragraphs from %s", book_id, len(paragraphs), filename)
 
     classify_results = await classify_paragraphs(paragraphs, router, batch_size)
