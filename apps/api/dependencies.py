@@ -48,6 +48,15 @@ class DatabaseAdapter:
         query, values = self._normalize(query, args, kwargs)
         return await self._db.execute(query, values)
 
+    def transaction(self):
+        """透出底层事务——**把连接钉住**。
+
+        AGE 建图必须这样：`LOAD 'age'` 与 `SET search_path` 是会话级的，
+        而 databases 每条语句都可能换连接，设了等于白设
+        （报 `function cypher(unknown, unknown) does not exist`）。
+        """
+        return self._db.transaction()
+
 
 _database_adapter = DatabaseAdapter(database)
 
