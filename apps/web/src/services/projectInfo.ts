@@ -33,6 +33,7 @@ export const INFO_CATEGORY_LABEL: Record<string, string> = {
   title: '图名/标题',
   title_block: '图签信息',
   design_note: '设计说明',
+  spec_text: '图纸说明（成篇）',
   other: '其他',
 }
 

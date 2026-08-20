@@ -32,7 +32,7 @@ import AxisRecognitionPanel from './AxisRecognitionPanel'
 import OptimizationPanel from './OptimizationPanel'
 import ReviewHub from '@/components/ReviewHub'
 
-const { Text, Title } = Typography
+const { Text, Title, Paragraph } = Typography
 
 const DISCIPLINE_LABEL: Record<string, string> = {
   architecture: '建筑',
@@ -209,12 +209,35 @@ function InfoWorkspace({ projectId }: { projectId: string }) {
     ]
   }, [summary])
 
+  // 成篇说明动辄上万字,单行截断根本读不了 —— 单独渲染:
+  // 标题 + 字数 + 可展开全文,并把「平均行长」摆出来供人审分流
+  // (行长偏低的多半是被误收进来的图例表/图签字段格)。
+  const renderSpecText = (v: string, row: InfoItem) => {
+    const vj = (row.value_json ?? {}) as Record<string, unknown>
+    return (
+      <div>
+        <Text strong>{String(vj.title ?? '(无标题)')}</Text>
+        <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
+          {v.length} 字 · {String(vj.fragment_count ?? '?')} 片拼成 · 平均{' '}
+          {String(vj.avg_line_chars ?? '?')} 字/行
+        </Text>
+        <Paragraph
+          style={{ marginBottom: 0, whiteSpace: 'pre-wrap' }}
+          ellipsis={{ rows: 3, expandable: true, symbol: '展开全文' }}
+        >
+          {v}
+        </Paragraph>
+      </div>
+    )
+  }
+
   const columns = [
     {
       title: '内容',
       dataIndex: 'content',
       ellipsis: true,
-      render: (v: string, row: InfoItem) => (
+      render: (v: string, row: InfoItem) =>
+        row.category === 'spec_text' ? renderSpecText(v, row) : (
         <Tooltip title={v}>
           <Text>{v}</Text>
           {row.value_json ? (
@@ -431,7 +454,10 @@ function InfoWorkspace({ projectId }: { projectId: string }) {
             </Text>
             <div>
               <Text>原文</Text>
-              <Input
+              <Input.TextArea
+                // 成篇说明要能整段改 —— 单行 Input 改不了上万字
+                autoSize={{ minRows: editing?.category === 'spec_text' ? 12 : 1,
+                            maxRows: 24 }}
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
               />
