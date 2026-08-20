@@ -76,6 +76,37 @@ def _is_short_elevation_note(raw: str) -> bool:
     return len(residue) <= MAX_ELEV_RESIDUE
 
 
+#: 楼层名的最长字数。按实测长度分布定：2~3 字全是干净层名
+#: （`1F`/`B2`/`10F`/`2夹层`），4~5 字混合（`C区屋面` 对、`3m2层` 错），
+#: **7 字以上基本是句子片段或图名**（`0m夹层平面图`/`3一层防火分区图`）。
+#: 上限取 8：合法的带部位层名可以不短（实测 `大歌剧厅屋顶层` 7 字），
+#: 而 `0.200至二层底`(9)、电气做法长句都在其上。
+MAX_LEVEL_NAME_CHARS = 8
+
+#: 出现即判为句子的标点。**括号不算**——`6F（设备层）` 是合法层名，
+#: 把括号列进噪声会把这一类整片误杀。
+_LEVEL_NOISE_MARKS = "，。；、！？,;!?"
+
+#: 出现即判为图名而非楼层名的词。
+_NOT_A_LEVEL_RE = re.compile(r"平面图|剖面|立面|详图|分区图|大样|系统图")
+
+#: 出现即判为做法/尺寸描述而非楼层名。长度挡不住 `2层12mm厚不`(8 字)，
+#: 而「数字+单位混排」是它与真层名的实际分界。
+_LEVEL_UNIT_RE = re.compile(r"\d\s*(mm|cm|米|厚)|[~～]\d")
+
+
+def _looks_like_level_name(text: str) -> bool:
+    """噪声门槛：楼层名是**短标签**，不是句子也不是图名。"""
+    raw = (text or "").strip()
+    if not raw or len(raw) > MAX_LEVEL_NAME_CHARS:
+        return False
+    if any(mark in raw for mark in _LEVEL_NOISE_MARKS):
+        return False
+    if _LEVEL_UNIT_RE.search(raw):
+        return False
+    return not _NOT_A_LEVEL_RE.search(raw)
+
+
 def classify_text(text: str) -> tuple[TokenKind, float | None]:
     """返回 (kind, value)。value 仅对 elevation(米)/dimension(mm) 有意义，否则 None。
 
@@ -130,8 +161,15 @@ def classify_text(text: str) -> tuple[TokenKind, float | None]:
         return "elevation", (_parse_elevation(m.group()) if m else None)
 
     # 楼层名（中文写法 / 工程短标记 / 带部位前缀）
-    if (_RE_LEVEL.search(raw) or _RE_LEVEL_MARK.match(raw)
-            or _RE_PREFIXED_LEVEL.match(raw)):
+    #
+    # **必须先过噪声门槛**：这几个正则是 `search`，句中带「B3层」的
+    # 说明句子会整句命中。实测档案里 12475 条 `level_name` 有
+    # **8114 条超过 8 字**，最长的全是电气接地做法说明。
+    # 后果不是「多存几条」——`level_name` 喂给标高配对，
+    # 噪声会配出假楼层（实测冒出 `F101 101层`，1 张图 0 构件）。
+    if (_looks_like_level_name(raw)
+            and (_RE_LEVEL.search(raw) or _RE_LEVEL_MARK.match(raw)
+                 or _RE_PREFIXED_LEVEL.match(raw))):
         return "level_name", None
 
     # 轴号（短 alnum）
