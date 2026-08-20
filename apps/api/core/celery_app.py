@@ -17,6 +17,7 @@ celery_app = Celery(
         "tasks.pipeline",
         "tasks.partition_maintenance",
         "tasks.drawing_info_extract",
+        "tasks.drawing_spec_text",
         "tasks.axis_recognition",
         "tasks.title_block_apply",
     ],
@@ -50,6 +51,7 @@ celery_app.conf.update(
         "tasks.partition_maintenance.*": {"queue": "default"},
         # 工程信息抽取:逐图 OCR 较重但可断点重来,走 default 不抢 ai_review
         "tasks.drawing_info_extract.*": {"queue": "default"},
+        "tasks.drawing_spec_text.*": {"queue": "default"},
         "tasks.axis_recognition.*": {"queue": "default"},
     },
     # Celery beat 定时任务
