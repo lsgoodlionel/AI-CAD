@@ -3,6 +3,7 @@
 - 主路径：AGE Cypher → 图谱遍历（规范强制要求 + 关联检查）
 - 降级路径：若 AGE 不可用，直接查 regulation_articles 关系表
 """
+import json
 import logging
 import asyncpg
 
@@ -12,6 +13,34 @@ from .base import BaseEngine, DrawingContext, AIIssue, IssueSeverity
 logger = logging.getLogger(__name__)
 
 # 规范强条 — 发现缺失则升级为 critical
+#: KG 图名——**必须与 regulation_importer.GRAPH_NAME 一致**。
+KG_GRAPH_NAME = "regulation_graph"
+
+
+def build_kg_query(discipline: str) -> tuple[str, list]:
+    """按专业查强制条文 → (SQL, 位置参数)。
+
+    **此前 `cypher(…, $params)` 直接是语法错**：`$params` 不是 asyncpg
+    占位符，查询每次都抛 `PostgresSyntaxError`，被 except 吞掉后
+    静默走 SQL 降级——图谱推理从未真正执行过。
+    AGE 的第三参数须是 agtype，故用 `$1::agtype` 传 JSON。
+    """
+    sql = f"""
+        SELECT * FROM cypher('{KG_GRAPH_NAME}', $$
+            MATCH (d:Discipline {{code: $discipline}})-[:REQUIRES]->(s:Standard)
+            OPTIONAL MATCH (s)-[:HAS_CLAUSE]->(c:Clause {{mandatory: true}})
+            RETURN s.code AS std_code,
+                   s.name AS std_name,
+                   c.article_no AS article_no,
+                   c.content    AS content,
+                   c.mandatory  AS mandatory
+            LIMIT 20
+        $$, $1::agtype) AS t(std_code agtype, std_name agtype,
+                             article_no agtype, content agtype, mandatory agtype)
+    """
+    return sql, [json.dumps({"discipline": discipline})]
+
+
 _MANDATORY_REFS = {
     "GB50010-2010", "GB50011-2010", "GB50009-2012",
     "GB50016-2014", "GB50045-95",
@@ -46,22 +75,8 @@ class KGEngine(BaseEngine):
                 await conn.execute("LOAD 'age'")
                 await conn.execute("SET search_path = ag_catalog, \"$user\", public")
 
-                rows = await conn.fetch(
-                    """
-                    SELECT * FROM cypher('regulation_graph', $$
-                        MATCH (d:Discipline {code: $discipline})-[:REQUIRES]->(s:Standard)
-                        OPTIONAL MATCH (s)-[:HAS_CLAUSE]->(c:Clause {mandatory: true})
-                        RETURN s.code AS std_code,
-                               s.name AS std_name,
-                               c.article_no AS article_no,
-                               c.content    AS content,
-                               c.mandatory  AS mandatory
-                        LIMIT 20
-                    $$, $params) AS t(std_code agtype, std_name agtype,
-                                       article_no agtype, content agtype, mandatory agtype)
-                    """,
-                    {"discipline": ctx.discipline},
-                )
+                sql, params = build_kg_query(ctx.discipline)
+                rows = await conn.fetch(sql, *params)
             finally:
                 await conn.close()
 

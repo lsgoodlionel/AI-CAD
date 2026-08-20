@@ -672,7 +672,7 @@ def build_article_query(article_id: str) -> tuple[str, dict]:
     而错误被 except 吞成 logger.error，导入照常报成功。
     """
     return (
-        "SELECT id, article_no, obligation_level, is_mandatory "
+        "SELECT id, article_no, content, obligation_level, is_mandatory "
         "FROM regulation_articles WHERE id = CAST(:article_id AS uuid)",
         {"article_id": article_id},
     )
@@ -701,6 +701,77 @@ def build_book_update(book_id: str, fields: dict) -> tuple[str, dict] | None:
             f"WHERE id = CAST(:book_id AS uuid)", params)
 
 
+#: KG 图名——**必须与 kg_engine.KG_GRAPH_NAME 一致**。
+#: 此前写入端用 `cad_graph`、读取端用 `regulation_graph`，两边永不相交。
+GRAPH_NAME = "regulation_graph"
+
+#: `build_clause_statements` 里条文节点语句的下标（第 0 条是 Standard）。
+CLAUSE_STATEMENT_INDEX = 1
+
+
+def cypher_literal(value: object) -> str:
+    """转义成 cypher 单引号字面量。
+
+    规范标题含书名号、条文含引号是常态；不转义会把语句打断，
+    甚至让条文内容里的 `RETURN` 变成可执行片段。
+
+    **注意用的是 cypher 的转义规约（反斜杠）而非 SQL 的（双写单引号）**：
+    语句整体包在 `$$ … $$` 里，双写单引号会原样传进 cypher 解析器并报
+    `syntax error at or near "'C25'"` —— 单测只比字符串形状，抓不到这个，
+    是对真库的端到端探测暴露的。
+    """
+    return (str(value if value is not None else "")
+            .replace("\\", "\\\\")
+            .replace("'", "\\'"))
+
+
+def build_clause_statements(book: dict, article: dict) -> list[str]:
+    """条文 → AGE 语句**列表**，建的是读取端 MATCH 的那套标签。
+
+    读取端查 `(d:Discipline)-[:REQUIRES]->(s:Standard)-[:HAS_CLAUSE]->(c:Clause)`，
+    而此前写入端只建扁平的 `(a:Article)`，且写进另一张图 `cad_graph` ——
+    图名和标签双双对不上，等于 KG 引擎的图谱推理从未生效。
+
+    **为什么必须拆成多条**——实测 AGE 1.5.0 的行为：
+    一条语句里**只有第一个 MERGE 绑定的变量能被 SET**，其余节点的
+    属性赋值被**静默丢弃**（不报错、不警告）。把赋值项换序也没用，
+    决定权在 MERGE 顺序而非赋值顺序。同一节点的多个属性则正常。
+    这条只有对真库实跑才暴露：语句字符串完全合法，单测比不出来。
+
+    没有专业字段时**不编造 Discipline 节点**：宁可这条走不到专业入口，
+    也不能凭空造出一个错的专业归属。
+    """
+    std_code = cypher_literal(book.get("std_no") or book.get("id"))
+    clause_id = cypher_literal(article.get("id"))
+    mandatory = "true" if article.get("is_mandatory") else "false"
+
+    def wrap(body: str) -> str:
+        return (f"SELECT * FROM cypher('{GRAPH_NAME}', $$ {body} $$)"
+                " AS (result agtype)")
+
+    statements = [
+        wrap(f"MERGE (s:Standard {{code: '{std_code}'}})"
+             f" SET s.name = '{cypher_literal(book.get('title'))}' RETURN id(s)"),
+        wrap(f"MERGE (c:Clause {{id: '{clause_id}'}})"
+             f" SET c.article_no = '{cypher_literal(article.get('article_no'))}',"
+             f" c.content = '{cypher_literal(article.get('content'))}',"
+             f" c.obligation_level = '{cypher_literal(article.get('obligation_level'))}',"
+             f" c.mandatory = {mandatory} RETURN id(c)"),
+        wrap(f"MATCH (s:Standard {{code: '{std_code}'}}),"
+             f" (c:Clause {{id: '{clause_id}'}})"
+             " MERGE (s)-[:HAS_CLAUSE]->(c) RETURN id(c)"),
+    ]
+    discipline = book.get("discipline")
+    if discipline:
+        code = cypher_literal(discipline)
+        statements.append(wrap(f"MERGE (d:Discipline {{code: '{code}'}}) RETURN id(d)"))
+        statements.append(
+            wrap(f"MATCH (d:Discipline {{code: '{code}'}}),"
+                 f" (s:Standard {{code: '{std_code}'}})"
+                 " MERGE (d)-[:REQUIRES]->(s) RETURN id(s)"))
+    return statements
+
+
 async def build_age_nodes(
     db: Any,
     book_id: str,
@@ -717,6 +788,14 @@ async def build_age_nodes(
         logger.info("AGE 扩展不可用，跳过图节点写入")
         return
 
+    book = await db.fetch_one(
+        "SELECT id, title, std_no, discipline FROM regulation_books "
+        "WHERE id = CAST(:book_id AS uuid)", {"book_id": book_id})
+    if not book:
+        logger.warning("建图跳过：规范书 %s 不存在", book_id)
+        return
+    book_row = dict(book)
+
     for article_id in article_ids:
         try:
             sql, params = build_article_query(article_id)
@@ -724,26 +803,19 @@ async def build_age_nodes(
             if not art:
                 continue
 
-            cypher = (
-                "SELECT * FROM cypher('cad_graph', $$"
-                " MERGE (a:Article {id: '%s'})"
-                " SET a.article_no='%s', a.obligation_level='%s', a.is_mandatory=%s"
-                " RETURN id(a)"
-                "$$) AS (node_id agtype)"
-            ) % (
-                article_id,
-                str(art["article_no"]).replace("'", "''"),
-                art["obligation_level"],
-                "true" if art["is_mandatory"] else "false",
-            )
-
-            result = await db.fetch_one(cypher)
+            node_id = None
+            for index, statement in enumerate(build_clause_statements(book_row, dict(art))):
+                row = await db.fetch_one(statement)
+                # 第 0 条返回 Standard 节点，条文节点是第 1 条 —— age_node_id
+                # 存的是条文，取错就把整本书的条文全指到同一个标准节点上。
+                if index == CLAUSE_STATEMENT_INDEX and row is not None:
+                    node_id = row[0]
+            result = node_id
             if result:
-                node_id = result[0]
                 await db.execute(
                     "UPDATE regulation_articles SET age_node_id = :node_id "
                     "WHERE id = CAST(:article_id AS uuid)",
-                    {"node_id": str(node_id), "article_id": article_id},
+                    {"node_id": str(result[0]), "article_id": article_id},
                 )
         except Exception as exc:
             logger.warning("AGE node for article %s failed: %s", article_id, exc)
