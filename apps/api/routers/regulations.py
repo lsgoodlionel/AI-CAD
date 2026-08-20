@@ -625,3 +625,102 @@ async def trigger_api_source_sync(
     task = sync_single_source_task.apply_async(kwargs={"source_id": source_id})
     return {"task_id": task.id, "status": "queued"}
 
+
+
+@router.get("/books/{book_id}/preview")
+async def preview_regulation_book(
+    book_id: str,
+    db=Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """第①层：可阅读的 PDF 原件（前端 iframe 内嵌）。
+
+    与图纸预览同一范式：返回短时效 presigned URL，不代理文件流。
+    没有原件时**明确说没有**，而不是返回一个打不开的链接——
+    31 本旧数据的 `file_key` 全为 NULL（导入脚本从本地直读没上传）。
+    """
+    from core.storage import presigned_get_url
+
+    book = await db.fetch_one(
+        "SELECT file_key, title FROM regulation_books WHERE id=$1", book_id)
+    if not book:
+        raise HTTPException(404, "规范不存在")
+    file_key = book["file_key"]
+    if not file_key:
+        return {"kind": "none", "url": None, "title": book["title"],
+                "reason": "该规范未保存原件，重新导入即可生成"}
+    return {"kind": "pdf", "title": book["title"],
+            "url": presigned_get_url(file_key, expires_seconds=300)}
+
+
+@router.get("/books/{book_id}/text")
+async def get_regulation_book_text(
+    book_id: str,
+    offset: int = 0,
+    limit: int = 20000,
+    db=Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """第②层：识别出的文字版本全文，供人工核对识别质量。
+
+    **必须带上来路**（`extract_method`）：OCR 出来的和 PDF 文本层直取的
+    可信度完全不同，不知道来路就没法判断该信到什么程度。
+
+    分段返回：整本规范全文可达数十万字，一次性塞给浏览器不合适。
+    """
+    book = await db.fetch_one(
+        "SELECT title, std_no, full_text, text_chars, page_count, "
+        "extract_method FROM regulation_books WHERE id=$1", book_id)
+    if not book:
+        raise HTTPException(404, "规范不存在")
+    text = book["full_text"] or ""
+    start = max(0, int(offset))
+    end = start + max(1, min(int(limit), 200000))
+    return {
+        "title": book["title"],
+        "std_no": book["std_no"],
+        "extract_method": book["extract_method"],
+        "page_count": book["page_count"],
+        "text_chars": book["text_chars"] or 0,
+        "offset": start,
+        "text": text[start:end],
+        "has_more": end < len(text),
+    }
+
+
+@router.get("/books/{book_id}/layers")
+async def get_regulation_book_layers(
+    book_id: str,
+    db=Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """同一本规范的三种读法各自是否就绪。
+
+    ①PDF 原件（人看原版排版）②识别全文（人核对识别质量）
+    ③单条条文（系统消费：审图/图谱/向量）。
+    **哪一层缺就说缺**——此前 31 本只有第③层，而界面上看不出来。
+    """
+    book = await db.fetch_one(
+        "SELECT title, std_no, file_key, text_chars, page_count, "
+        "extract_method FROM regulation_books WHERE id=$1", book_id)
+    if not book:
+        raise HTTPException(404, "规范不存在")
+    counts = await db.fetch_one(
+        "SELECT count(*) AS total, count(age_node_id) AS graphed, "
+        "count(vector_id) AS vectored, "
+        "count(*) FILTER (WHERE is_mandatory) AS mandatory "
+        "FROM regulation_articles WHERE book_id=$1", book_id)
+    return {
+        "title": book["title"],
+        "std_no": book["std_no"],
+        "pdf": {"ready": bool(book["file_key"]),
+                "page_count": book["page_count"]},
+        "full_text": {"ready": bool(book["text_chars"]),
+                      "chars": book["text_chars"] or 0,
+                      "method": book["extract_method"]},
+        "articles": {"ready": bool(counts["total"]),
+                     "total": counts["total"],
+                     "mandatory": counts["mandatory"],
+                     "graphed": counts["graphed"],
+                     "vectored": counts["vectored"]},
+    }

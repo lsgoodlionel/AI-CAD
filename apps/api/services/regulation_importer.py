@@ -109,9 +109,22 @@ def extract_text_from_pdf(file_bytes: bytes, filename: str = "") -> str:
     docling 缺失或转换失败时 `extract_with_docling` 返回 None，无声落回
     pymupdf4llm→pymupdf 原路径——不改变既有默认行为。
     """
+    return extract_text_with_provenance(file_bytes, filename)[0]
+
+
+def extract_text_with_provenance(
+    file_bytes: bytes, filename: str,
+) -> tuple[str, str, int]:
+    """→ (文本, 来路, 页数)。
+
+    **来路必须传出去**：第②层（全文留存）是给人核对识别质量的，
+    而 OCR 出来的和 PDF 文本层直取的可信度完全不同——
+    不知道来路就没法判断该信到什么程度。
+    """
     docling_text = extract_with_docling(file_bytes, filename)
     if docling_text:
-        return strip_watermark(docling_text)
+        _, page_count = _extract_text_layer(file_bytes)
+        return strip_watermark(docling_text), "docling", page_count
 
     text, page_count = _extract_text_layer(file_bytes)
     # **扫描件转 OCR**：实测住建部强制性通用规范全是扫描件 ——
@@ -124,8 +137,8 @@ def extract_text_from_pdf(file_bytes: bytes, filename: str = "") -> str:
             logger.warning("规范 OCR 失败，退回文本层: %s", exc)
         else:
             if recognized and len(recognized) > len(text):
-                return strip_watermark(recognized)
-    return strip_watermark(text)
+                return strip_watermark(recognized), "ocr", page_count
+    return strip_watermark(text), "text_layer", page_count
 
 
 def _extract_text_layer(file_bytes: bytes) -> tuple[str, int]:
@@ -762,6 +775,45 @@ def is_plausible_book_title(candidate: str | None) -> bool:
     return not any(mark in text for mark in _TITLE_PROSE_MARKS)
 
 
+#: 规范原件在对象存储里的前缀。**与图纸分开**：同一桶里混着两类资产，
+#: 权限与清理策略都没法分开做。
+BOOK_OBJECT_PREFIX = "regulations"
+
+
+def book_file_key(book_id: str, filename: str) -> str:
+    """规范原件的对象键。
+
+    书名号、空格、斜杠都要能安全落进对象键——`GB/T 50001` 里的斜杠
+    尤其危险，会在存储里凭空多出一级目录。
+    """
+    base = strip_file_extension(filename)
+    suffix = filename[len(base):].lower() or ".pdf"
+    safe = re.sub(r"[^0-9A-Za-z\u4e00-\u9fa5._-]+", "_", base).strip("_") or "book"
+    return f"{BOOK_OBJECT_PREFIX}/{book_id}/{safe}{suffix}"
+
+
+def build_full_text_params(book_id: str, text: str | None,
+                           method: str | None, page_count: int | None) -> dict:
+    """全文留存参数（第②层）。
+
+    **必须记下这份文字怎么来的**（`extract_method`）：OCR 出来的和
+    PDF 文本层直取的可信度完全不同，人工核对时要先知道这一点。
+
+    一个字都没识别出来时存 NULL 而非空串——「没识别」和「识别出空白」
+    是两回事，界面要能区分。**换行保留**：那是版面信息，
+    压平了人就没法把文字与 PDF 对照着看。
+    """
+    body = text or ""
+    stripped = body.strip()
+    return {
+        "book_id": book_id,
+        "full_text": body if stripped else None,
+        "text_chars": len(stripped),
+        "extract_method": method,
+        "page_count": page_count,
+    }
+
+
 def strip_file_extension(name: str) -> str:
     """去掉路径与扩展名，得到文件名标题。"""
     base = (name or "").rsplit("/", 1)[-1]
@@ -1042,6 +1094,44 @@ async def vectorize_articles(
 
 # ── 主入口 ────────────────────────────────────────────────────
 
+_STORE_READABLE_SQL = """
+UPDATE regulation_books
+SET file_key = coalesce(:file_key, file_key),
+    full_text = :full_text,
+    text_chars = :text_chars,
+    page_count = :page_count,
+    extract_method = :extract_method,
+    updated_at = now()
+WHERE id = CAST(:book_id AS uuid)
+"""
+
+
+async def _store_readable_layers(db: Any, book_id: str, file_bytes: bytes,
+                                 filename: str, text: str,
+                                 method: str, page_count: int) -> None:
+    """落第①②层：PDF 原件进对象存储、识别全文进库。
+
+    上传失败**不阻断导入**——第③层（条文）才是系统消费的关键路径，
+    但失败要记下来，否则界面上「看不到 PDF」会变成一个无解的谜。
+    """
+    params = build_full_text_params(book_id, text, method, page_count)
+    file_key = None
+    try:
+        from core.storage import upload_file
+
+        file_key = book_file_key(book_id, filename)
+        upload_file(file_bytes, file_key, content_type="application/pdf")
+    except Exception as exc:  # noqa: BLE001 — 存原件失败不阻断条文入库
+        file_key = None
+        logger.warning("规范原件上传失败 book=%s：%s —— 界面将无法预览原版",
+                       book_id, exc)
+    params["file_key"] = file_key
+    try:
+        await db.execute(_STORE_READABLE_SQL, params)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("规范全文留存失败 book=%s：%s", book_id, exc)
+
+
 async def import_regulation_file(
     db: Any,
     router: Any,
@@ -1055,8 +1145,11 @@ async def import_regulation_file(
     完整的规范文件导入流水线。
     返回 {"total": N, "saved": M, "skipped": K, "article_ids": [...]}
     """
-    text = extract_text(file_bytes, filename)
+    text, extract_method, page_count = extract_text_with_provenance(
+        file_bytes, filename)
     metadata = infer_book_metadata(text, filename)
+    await _store_readable_layers(db, book_id, file_bytes, filename,
+                                 text, extract_method, page_count)
     # **书名先定下来再往下传**：强条判定、图节点、引用检索全依赖它。
     resolved_title = resolve_book_title(
         strip_file_extension(filename), metadata.get("title"))
