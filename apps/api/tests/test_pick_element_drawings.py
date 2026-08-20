@@ -197,20 +197,31 @@ def test_placed_drawings_do_not_consume_the_regular_quota():
 
 @pytest.mark.unit
 def test_regular_quota_still_caps_unplaced_drawings():
-    """没有摆放的图仍受上限约束 —— 构建时长要可控。"""
-    drawings = [_d(f"n{i}", f"一层结构平面图N{i}") for i in range(6)]
+    """没有摆放的图仍受上限约束 —— 构建时长要可控。
+
+    **断言配额本身而非某个数字**：配额是运维参数（可用
+    `CAD_MAX_STRUCTURE_PLANS` 覆盖），写死数字的话每次调参
+    都会假报失败，而这条用例真正要守的是「上限确实生效」。
+    """
+    from services.model_elements import _MAX_STRUCTURE_PLANS
+
+    over = _MAX_STRUCTURE_PLANS + 3
+    drawings = [_d(f"n{i}", f"一层结构平面图N{i}") for i in range(over)]
     picked = pick_element_drawings(drawings, transforms={}, placements={})
-    assert len(picked["structure"]) == 2
+    assert len(picked["structure"]) == _MAX_STRUCTURE_PLANS
 
 
 @pytest.mark.unit
 def test_suspect_placements_do_not_get_extra_quota():
     """存疑的摆放不享受额外配额 —— 它的绝对坐标本就不可信。"""
-    drawings = [_d(f"b{i}", f"一层结构平面图B{i}") for i in range(5)]
+    from services.model_elements import _MAX_STRUCTURE_PLANS
+
+    over = _MAX_STRUCTURE_PLANS + 3
+    drawings = [_d(f"b{i}", f"一层结构平面图B{i}") for i in range(over)]
     picked = pick_element_drawings(
         drawings, transforms={},
-        placements={f"b{i}": {"suspect": True} for i in range(5)})
-    assert len(picked["structure"]) == 2
+        placements={f"b{i}": {"suspect": True} for i in range(over)})
+    assert len(picked["structure"]) == _MAX_STRUCTURE_PLANS
 
 
 # ── 有世界坐标却进不了任何桶（J1 任务 2,v49 实测）──────────────
