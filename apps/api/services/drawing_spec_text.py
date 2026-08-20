@@ -19,6 +19,7 @@ import re
 from typing import Any
 
 from core.model3d.reading_order import detect_columns
+from core.model3d.spec_frame import contains, enclosing_frame
 
 #: 标题最长字数——超过就是正文而非标题。
 MAX_HEADING_CHARS = 16
@@ -153,7 +154,8 @@ MIN_AVG_LINE_CHARS = 6.0
 MAX_LINE_GAP_PT = 60.0
 
 
-def _blocks_in_column(column: list[dict]) -> list[dict]:
+def _blocks_in_column(column: list[dict],
+                      frames: list[dict] | None = None) -> list[dict]:
     """一栏 → 若干说明块。
 
     **标题在栏内任意位置**：真实图纸一栏有上千碎片，
@@ -168,6 +170,10 @@ def _blocks_in_column(column: list[dict]) -> list[dict]:
             index += 1
             continue
         head = ordered[index]
+        # **边框优先于间距启发式**：边框是制图者画出来的真实边界，
+        # 而「间距超过 60pt」只是猜。没有边框时 `contains` 恒真，
+        # 退回原有行为。
+        frame = enclosing_frame(frames, head["x"], head["y"])
         body: list[dict] = []
         cursor = index + 1
         previous_y = head["y"]
@@ -175,7 +181,9 @@ def _blocks_in_column(column: list[dict]) -> list[dict]:
             token = ordered[cursor]
             if is_note_heading(token["text"]):
                 break
-            if token["y"] - previous_y > MAX_LINE_GAP_PT:
+            if not contains(frame, token["x"], token["y"]):
+                break
+            if frame is None and token["y"] - previous_y > MAX_LINE_GAP_PT:
                 break
             body.append(token)
             previous_y = token["y"]
@@ -202,7 +210,8 @@ def _blocks_in_column(column: list[dict]) -> list[dict]:
     return blocks
 
 
-def assemble_spec_blocks(tokens: list[dict] | None) -> list[dict]:
+def assemble_spec_blocks(tokens: list[dict] | None,
+                         frames: list[dict] | None = None) -> list[dict]:
     """带坐标的 token → 说明块列表。
 
     **必须先分栏**：图纸说明常排成多栏，不分栏会把左右栏交替串成乱码。
@@ -215,7 +224,7 @@ def assemble_spec_blocks(tokens: list[dict] | None) -> list[dict]:
     columns = detect_columns(items) or [items]
     blocks: list[dict] = []
     for column in columns:
-        blocks.extend(_blocks_in_column(column))
+        blocks.extend(_blocks_in_column(column, frames))
     return sorted(blocks, key=lambda b: (b["x"], b["y"]))
 
 
@@ -297,3 +306,30 @@ async def persist_spec_text(db: Any, *, project_id: str, drawing_id: str,
         await db.execute(_INSERT_SPEC_SQL,
                          spec_entry_params(project_id, drawing_id, block, version))
     return len(blocks or [])
+
+
+def frames_from_drawings(drawings: list | None) -> list[dict]:
+    """PyMuPDF 的矢量图形 → 能当说明框的矩形。
+
+    **只读几何、不渲染**，所以整项目跑一遍的代价可控
+    （对比：OCR 每张图 10~40 秒）。
+
+    线段（零宽/零高）与字号大小的小方框都排除——
+    前者不是框，后者是表格单元或符号，用它定边界会把块碎成几十片。
+    """
+    from core.model3d.spec_frame import MIN_FRAME_SIDE_PT
+
+    frames: list[dict] = []
+    for item in drawings or []:
+        rect = item.get("rect") if isinstance(item, dict) else getattr(item, "rect", None)
+        if rect is None:
+            continue
+        try:
+            x0, y0 = float(rect.x0), float(rect.y0)
+            x1, y1 = float(rect.x1), float(rect.y1)
+        except (AttributeError, TypeError, ValueError):
+            continue
+        if (x1 - x0) < MIN_FRAME_SIDE_PT or (y1 - y0) < MIN_FRAME_SIDE_PT:
+            continue
+        frames.append({"x0": x0, "y0": y0, "x1": x1, "y1": y1})
+    return frames

@@ -15,15 +15,16 @@ import databases
 
 from core.celery_app import celery_app
 from core.config import settings
-from services.drawing_spec_text import (assemble_spec_blocks, persist_spec_text,
-                                        tokens_from_archive)
+from services.drawing_spec_text import (assemble_spec_blocks,
+                                        frames_from_drawings,
+                                        persist_spec_text, tokens_from_archive)
 
 logger = logging.getLogger(__name__)
 
 _SELECT_PROJECT_DRAWINGS = """
-SELECT DISTINCT drawing_id, project_id
-FROM drawing_extracted_info
-WHERE project_id = :project_id AND is_active
+SELECT DISTINCT e.drawing_id, e.project_id, d.file_key
+FROM drawing_extracted_info e JOIN drawings d ON d.id = e.drawing_id
+WHERE e.project_id = :project_id AND e.is_active
 """
 
 _SELECT_DRAWING_ROWS = """
@@ -39,9 +40,28 @@ def _task_db() -> databases.Database:
     return databases.Database(settings.database_url, min_size=1, max_size=2)
 
 
-async def rebuild_one(db, project_id: str, drawing_id: str) -> int:
+def _frames_of(file_key: str | None) -> list[dict]:
+    """取该图的矢量矩形。**只读几何不渲染**；任何失败都退回无边框
+    （原有启发式仍然工作），不因为拿不到边框就跳过整张图。"""
+    if not file_key:
+        return []
+    try:
+        import fitz
+
+        from core.storage import get_file_bytes
+
+        doc = fitz.open(stream=get_file_bytes(file_key), filetype="pdf")
+        return frames_from_drawings(doc[0].get_drawings())
+    except Exception as exc:  # noqa: BLE001
+        logger.info("取矢量边框失败 %s：%s —— 退回间距启发式", file_key, exc)
+        return []
+
+
+async def rebuild_one(db, project_id: str, drawing_id: str,
+                      file_key: str | None = None) -> int:
     rows = await db.fetch_all(_SELECT_DRAWING_ROWS, {"drawing_id": drawing_id})
-    blocks = assemble_spec_blocks(tokens_from_archive(rows))
+    blocks = assemble_spec_blocks(tokens_from_archive(rows),
+                                  frames=_frames_of(file_key))
     return await persist_spec_text(db, project_id=project_id,
                                    drawing_id=drawing_id, blocks=blocks)
 
@@ -57,7 +77,8 @@ async def _rebuild_project(project_id: str) -> dict:
             drawings += 1
             try:
                 blocks += await rebuild_one(db, str(row["project_id"]),
-                                            str(row["drawing_id"]))
+                                            str(row["drawing_id"]),
+                                            row["file_key"])
             except Exception as exc:      # 单图失败不拖垮整批
                 failed += 1
                 logger.warning("说明重建失败 drawing=%s: %s",
