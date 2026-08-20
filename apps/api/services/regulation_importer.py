@@ -466,15 +466,15 @@ async def save_articles_to_db(
     saved_ids: list[str] = []
 
     for art in articles:
-        article_no = art.get("article_no") or f"AUTO-{uuid.uuid4().hex[:8]}"
-        content = art.get("raw_text", "")
-        if not content:
+        params = build_article_params(book_id, art)
+        if params is None:
             continue
-
+        article_no = params["article_no"]
         try:
             existing = await db.fetch_val(
-                "SELECT id FROM regulation_articles WHERE book_id=$1 AND article_no=$2",
-                book_id, article_no,
+                "SELECT id FROM regulation_articles "
+                "WHERE book_id = CAST(:book_id AS uuid) AND article_no = :article_no",
+                {"book_id": book_id, "article_no": article_no},
             )
             if existing:
                 saved_ids.append(str(existing))
@@ -485,22 +485,42 @@ async def save_articles_to_db(
                 INSERT INTO regulation_articles
                     (book_id, article_no, title, content, obligation_level,
                      is_mandatory, conditions)
-                VALUES ($1,$2,$3,$4,$5,$6,$7)
+                VALUES (CAST(:book_id AS uuid), :article_no, :title, :content,
+                        :obligation_level, :is_mandatory,
+                        CAST(:conditions AS jsonb))
                 RETURNING id
                 """,
-                book_id,
-                article_no,
-                art.get("title"),
-                content,
-                art.get("obligation_level", "SHOULD"),
-                bool(art.get("is_mandatory", False)),
-                json.dumps(art.get("conditions", []), ensure_ascii=False),
+                params,
             )
             saved_ids.append(str(row["id"]))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — 单条失败不中断整本
             logger.error("save_article %s failed: %s", article_no, exc)
 
     return saved_ids
+
+
+def build_article_params(book_id: str, article: dict[str, Any]) -> dict | None:
+    """条文 → 入库参数（**databases 风格的字典**）；空正文返回 None。
+
+    **为什么单独抽出来**：此前这段用 **asyncpg 风格**（`$1` 占位 + 位置参数），
+    而本项目用 databases + SQLAlchemy（`:name` + 字典）—— 每条都报
+    `bindparams() argument after ** must be a mapping`，
+    而错误被 except 吞成 logger.error，导入仍报「成功」。
+    **这条路径从未被真正执行过**（规范库一直是空的），所以没人发现。
+    """
+    content = (article or {}).get("raw_text") or ""
+    if not content:
+        return None
+    return {
+        "book_id": book_id,
+        "article_no": article.get("article_no") or f"AUTO-{uuid.uuid4().hex[:8]}",
+        "title": article.get("title"),
+        "content": content,
+        "obligation_level": article.get("obligation_level", "SHOULD"),
+        "is_mandatory": bool(article.get("is_mandatory", False)),
+        "conditions": json.dumps(article.get("conditions", []),
+                                 ensure_ascii=False),
+    }
 
 
 # ── AGE 图节点写入 ────────────────────────────────────────────
