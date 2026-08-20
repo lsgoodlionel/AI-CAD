@@ -180,6 +180,14 @@ WHERE project_id = CAST(:project_id AS uuid)
   AND category = 'spec_text' AND is_active
 """
 
+#: 带坐标的原始碎片——列级配对要靠位置，成篇说明里没有位置。
+_POSITIONED_SQL = """
+SELECT content, location_json FROM drawing_extracted_info
+WHERE project_id = CAST(:project_id AS uuid) AND is_active
+  AND category IN ('note', 'other', 'title')
+  AND content LIKE '%《%'
+"""
+
 _LIBRARY_SQL = """
 SELECT std_no, title FROM regulation_books
 WHERE std_no IS NOT NULL AND status = 'active'
@@ -201,6 +209,18 @@ async def project_regulation_coverage(db: Any, project_id: str) -> dict:
             else:
                 slot["count"] += ref["count"]
                 slot["title"] = slot["title"] or ref["title"]
+    # **列级配对补书名**：成篇说明丢了位置，而规范引用常排成两栏对照表
+    # （左栏书名、右栏编号）。用带坐标的原始碎片按行对齐配对，
+    # 把「同一行取不到书名」时留空的那些补回来。
+    from services.drawing_spec_text import tokens_from_archive
+
+    positioned = tokens_from_archive(
+        await db.fetch_all(_POSITIONED_SQL, {"project_id": project_id}))
+    for ref in pair_references_by_column(positioned):
+        slot = merged.get(ref["std_no"])
+        if slot is not None and not slot.get("title") and ref.get("title"):
+            slot["title"] = ref["title"]
+
     references = consolidate_references(list(merged.values()))
     library = [dict(b) for b in await db.fetch_all(_LIBRARY_SQL)]
     result = match_against_library(references, library)
@@ -214,3 +234,48 @@ async def project_regulation_coverage(db: Any, project_id: str) -> dict:
         "version_mismatch": len(result["version_mismatch"]),
     }
     return result
+
+
+#: 两栏配对时允许的行基线偏差（pt）。两栏不会像素级对齐，
+#: 但差得太远就不是同一行——**宁可不配对，也不要配错**：
+#: 补库清单上挂错书名会让人去下错的规范。
+MAX_ROW_OFFSET_PT = 12.0
+
+#: 书名号里的规范名称（不限位置，供列级配对用）。
+_TITLE_ANY_RE = re.compile(r"《([^《》\n]{2,40})》")
+
+
+def pair_references_by_column(tokens: list[dict] | None) -> list[dict]:
+    """带坐标的文本 → 规范引用（书名与编号**按行对齐**配对）。
+
+    **为什么不能按阅读顺序**：规范引用常排成两栏对照表，
+    左栏书名、右栏编号。按栏重建会把两列串成一列，
+    「最近的书名」于是跨了行——实测 `GB 50010-2010` 被贴上
+    上一行的《地基处理技术规范》（实为《混凝土结构设计规范》）。
+
+    这里改用**位置**：编号 token 找 y 最接近的书名 token。
+    差得超过 `MAX_ROW_OFFSET_PT` 就留空——有书名没编号的行不产出，
+    也不为没配上的编号凭空造书名。
+    """
+    items = [t for t in (tokens or [])
+             if isinstance(t, dict) and t.get("x") is not None
+             and t.get("y") is not None and str(t.get("text") or "").strip()]
+    titles = [(float(t["y"]), float(t["x"]), m.group(1))
+              for t in items
+              for m in [_TITLE_ANY_RE.search(str(t["text"]))] if m]
+
+    out: list[dict] = []
+    for token in items:
+        text = str(token["text"])
+        same_line = _TITLE_ANY_RE.search(text)
+        for ref in extract_references(text):
+            title = ref.get("title")
+            if title is None and same_line:
+                title = same_line.group(1)
+            if title is None and titles:
+                y = float(token["y"])
+                best = min(titles, key=lambda t: abs(t[0] - y))
+                if abs(best[0] - y) <= MAX_ROW_OFFSET_PT:
+                    title = best[2]
+            out.append({**ref, "title": title})
+    return out
