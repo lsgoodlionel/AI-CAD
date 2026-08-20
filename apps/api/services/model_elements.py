@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
 from dataclasses import replace
 from functools import lru_cache
@@ -18,15 +19,45 @@ from services.model_story import detect_building_unit
 
 logger = logging.getLogger(__name__)
 
-# 每楼层每类参与识别的图纸上限（控制构建时长）
-_MAX_STRUCTURE_PLANS = 2
-_MAX_BEAM_PLANS = 2
-_MAX_MEP_PLANS = 3
-#: **建筑/装修平面图**的配额。此前这两类没有桶，整张丢弃——
-#: 实测轨道交通的平面图按专业分布为 mep 313 / architecture 49 /
-#: structure 49 / decoration 32，**81 张被完全排除在建模之外**，
-#: 而建筑平面图正是墙与门窗的主要来源。
-_MAX_ARCHITECTURE_PLANS = 2
+def _quota(name: str, default: int) -> int:
+    """每层每类的图纸配额，可用环境变量覆盖。
+
+    **配额是运维参数，不是业务常量**：它衡量的是「构建时长与覆盖面
+    怎么取舍」，随机器、随项目规模而变。写死成魔数的话，
+    调一次就要改代码、重跑测试、重新部署。
+
+    写错或写成非正数时**退回默认值并记警告**——配额 0 会让整层
+    没有构件，那多半是误配不是意图；而静默接受的话，
+    「我明明配了」会变成一个查不出的谜。
+    """
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        logger.warning("%s=%r 不是整数，退回默认值 %d", name, raw, default)
+        return default
+    if value < 1:
+        logger.warning("%s=%d 不是正数，退回默认值 %d", name, value, default)
+        return default
+    return value
+
+
+#: 每楼层每类参与识别的图纸上限。
+#:
+#: **实测**：轨道交通全项目 443 张平面图只用了 77 张（17%）——
+#: 每层有 21~40 张平面图，而旧配额只让进 9 张
+#: （structure 2 + beam 2 + mep 3 + architecture 2）。
+#:
+#: 新默认值按实测的专业分布定：mep 最多（全项目 313 张），
+#: architecture / structure 各 49、decoration 32。
+#: 代价是构建时长——线程池 `max_workers=2`、单图识别 10~40 秒，
+#: 所以留了环境变量供按机器调。
+_MAX_STRUCTURE_PLANS = _quota("CAD_MAX_STRUCTURE_PLANS", 6)
+_MAX_BEAM_PLANS = _quota("CAD_MAX_BEAM_PLANS", 4)
+_MAX_MEP_PLANS = _quota("CAD_MAX_MEP_PLANS", 8)
+_MAX_ARCHITECTURE_PLANS = _quota("CAD_MAX_ARCHITECTURE_PLANS", 6)
 
 #: 只有**平面图**才进建筑桶。立面/剖面/详图/节点进来只会添噪声——
 #: 它们本就不产出楼层构件。
