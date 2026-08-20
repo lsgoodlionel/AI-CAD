@@ -207,7 +207,12 @@ _ARTICLE_PATTERN = re.compile(
 _ARTICLE_LINE_PATTERN = re.compile(r"^\s*\d+(?:\.\d+){1,4}\s+")
 
 _STD_NO_PATTERN = re.compile(
-    r"\b((?:GB|GB/T|JGJ|CJJ|CECS|DBJ|T/CECS)\s*[\dA-Z./-]+(?:\s*[-—]\s*\d{4})?)\b",
+    # 编号部分**只收数字**：原来的 `[\dA-Z./-]+` 在忽略大小写下会把
+    # `.pdf` 一起吞掉（实测 `《…》GB55015-2021.pdf` 抽出
+    # `GB55015-2021.pdf`），于是说明里的 `GB 55015-2021` 与库里对不上，
+    # 「哪些规范还没入库」这张清单就是错的。
+    r"\b((?:GB/T|GB/Z|GB|JGJ/T|JGJ|CJJ/T|CJJ|CECS|DBJ|T/CECS)"
+    r"\s*\d{1,6}(?:\.\d+)?(?:\s*[-—]\s*\d{4})?)(?![\dA-Za-z])",
     re.IGNORECASE,
 )
 

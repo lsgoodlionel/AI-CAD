@@ -624,3 +624,4 @@ async def trigger_api_source_sync(
         raise HTTPException(404, "数据源不存在")
     task = sync_single_source_task.apply_async(kwargs={"source_id": source_id})
     return {"task_id": task.id, "status": "queued"}
+

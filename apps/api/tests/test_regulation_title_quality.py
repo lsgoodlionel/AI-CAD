@@ -127,3 +127,19 @@ def test_mandatory_check_uses_resolved_title_not_raw_extraction():
     assert not is_mandatory_standard(raw_extraction)          # 认不出
     assert is_mandatory_standard(
         resolve_book_title(filename_title, raw_extraction))   # 解析后认得出
+
+
+@pytest.mark.unit
+def test_std_no_does_not_swallow_the_file_extension():
+    """**实测**：文件名把标准号写在末尾时（`《…》GB55015-2021.pdf`），
+    抽出的标准号是 `GB55015-2021.pdf`。
+
+    后果直指需求 4：说明里引用的 `GB 55015-2021` 与库里的
+    `GB55015-2021.pdf` 对不上，本该命中的被算成「版本不一致」，
+    「哪些规范还没入库」这张清单就是错的。
+    """
+    from services.regulation_importer import infer_book_metadata
+
+    meta = infer_book_metadata(
+        "", "《建筑节能与可再生能源利用通用规范》GB55015-2021.pdf")
+    assert meta["std_no"] == "GB55015-2021"

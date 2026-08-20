@@ -1484,3 +1484,21 @@ async def component_marks(project_id: str, mark: str | None = None,
         "cross_drawing_marks": sum(
             1 for e in index.values() if len(e["drawings"]) > 1),
     }}
+
+
+@router.get("/{project_id}/regulations/coverage")
+async def get_project_regulation_coverage(
+    project_id: str,
+    db=Depends(get_db),
+    _user: dict = Depends(get_current_user),
+):
+    """本项目图纸说明引用的规范 × 规范库覆盖情况。
+
+    `missing` 就是需求要的**「必须下载到本地」清单**，按被引用次数排序；
+    `version_mismatch` 是「实时对比更新最新版本」的入口——
+    库里有同一本但年份不同，既非命中也非缺失，合并到任何一边
+    都会让人做错决定。
+    """
+    from services.regulation_reference import project_regulation_coverage
+
+    return await project_regulation_coverage(db, project_id)
