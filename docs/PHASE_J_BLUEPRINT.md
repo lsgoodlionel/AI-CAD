@@ -1934,9 +1934,33 @@ Chroma 向量**三处各自的实际条数后，第一本书立刻报
 | 5 | 向量化取数同样 `$1` | RAG 引擎（四引擎之三）向量库空 | 同上 |
 | 6 | `route()` 没有 `system` 参数而调用方在传 | 规范 NLP 的分类与深度抽取**从未执行过** | 同上 |
 
-项目统一用 **databases 库**（`:name` + 字典），而这五处用的是
-**asyncpg 风格**。同一目录下 `drawing_trace.py` 用的是正确写法——
-对比更说明这是遗留而非约定。
+> **⚠ 本节曾对上表 1~5 条误诊，此处更正。**
+>
+> 我当时判定「项目统一用 databases（`:name` + 字典），这五处的 `$1`
+> 是遗留缺陷」。**错了。** 项目有 `DatabaseAdapter`（`dependencies.py`），
+> 把 `$1` + 位置参数归一成 databases 风格；生产路径
+> `tasks/regulation_import.py:33` 传的正是 `DatabaseAdapter(raw_db)`。
+> **`$1` 是既有约定，全仓 180 余处都靠它工作。**
+> 真正的根因是**我的一次性导入脚本传了裸 `database`**，绕过了适配器。
+>
+> 发现方式值得记：我想加一条「仓库级守卫」把这类缺陷一次挡住，
+> 测试跑出 **180 余处违规**，遍布 drawings / incentive / 三审路由——
+> 而这些功能明明是正常的。**数量本身就是判据错了的信号。**
+>
+> **判据写错时，错误不会喊出来——它只会给出一个自洽的、指向别处的解释。**
+> 这与 §8.25「度量方式决定结论，而错误的度量不会报错」是同一件事，
+> 只是这次错在「约定」而非「几何」。
+>
+> **误诊的实际代价**：`DatabaseAdapter` 没有 `transaction()`，
+> 而我新写的 AGE 建图代码在用它（`LOAD 'age'` 是会话级的，必须钉住连接）。
+> 走生产路径会在建图整块抛 AttributeError，被 except 包着后
+> 表现为「图节点缺 N」而非报错。已补上并按生产路径实测（条文 10 → 建图 10）。
+>
+> **保留 `:name` 写法的理由**：适配器对单个 dict 参数直接透传，
+> 两种调用方式下都安全，而 `regulation_importer` 恰好两种都被用到。
+> 它是「更保险」，不是「修缺陷」。
+>
+> 上表第 6 条（`route()` 没有 `system` 参数）与本更正无关，仍然成立。
 
 #### KG 引擎：图谱推理从未执行过一次
 
@@ -2033,8 +2057,9 @@ Chroma 首次调用会现场下载嵌入模型（79MB），容器内约 30KB/s�
    容器内没有 sentence-transformers / transformers（只有 onnxruntime），
    暂时没有零安装的中文嵌入选项。
 
-#### 待清理：仓内其余同源缺陷
+#### 无需清理：仓内其余 `$1` 是正常写法
 
-同样的 asyncpg 风格绑定还在四处，本轮未动（不在规范模块内）：
-`services/finding_service.py:268,701`、`services/model_semantics.py:439`、
-`tasks/proposal_notice.py:42`。
+先前记为「待清理的同源缺陷」的四处
+（`finding_service.py`、`model_semantics.py`、`proposal_notice.py`），
+经上面的更正后确认**不是缺陷**——它们都从 `Depends(get_db)`
+拿到适配器，`$1` 正是该走的写法。已撤销该待办。
