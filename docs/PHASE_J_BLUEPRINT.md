@@ -1866,3 +1866,41 @@ B1 层恰好多是这类图。离线那 9 张里能归组的 3 张双向都有�
 ⇒ 换 PaddleOCR-VL 的价值**不在识别精度**，而在它自带的
 **版面分析（PP-StructureV3）** —— 那正是结构问题的解药。
 若要投，应按「版面能力」而非「识别精度」来评估收益。
+
+### 8.32 PaddleOCR-VL 探测：aarch64 上 SIGSEGV 依然成立（阶段 A 受阻）
+
+§8.31 判定「换 VL 的价值在**版面分析**而非识别精度」，据此实测探路：
+
+| 步骤 | 结果 |
+|---|---|
+| `paddlepaddle 3.2.2` 安装 | ✅ 成功 |
+| `paddle` 基础张量运算 | ✅ 矩阵乘法正常 |
+| `paddleocr 3.7.0` + `PPStructureV3` 类 | ✅ 可导入 |
+| `paddlex[ocr]` 依赖组 | ✅ 装齐 |
+| **`PPStructureV3(device="cpu")` 构造** | ❌ **SIGSEGV** |
+
+    FatalError: `Segmentation fault` is detected by the operating system.
+    SIGSEGV (@0x20) received by PID 1771 (TID 0xffffb80a04c0)
+
+#### 一个必须纠正的推断
+
+看到基础张量运算跑通后，我推断「SIGSEGV 是旧版本问题、3.2.2 已修复」——
+**那个推断错了**。基础运算能跑**不等于**推理引擎能跑：
+崩溃发生在模型加载/推理图构建阶段，与算子内核实现有关。
+
+CLAUDE.md 记载的 `CAD_OCR_DISABLE_PADDLE=1` + RapidOCR 回退**依然是对的**。
+
+#### 结论
+
+**阶段 A（OCR 技术升级）在当前环境受阻**，不是选型问题而是平台限制：
+
+- 本机是 **linux/aarch64**（Apple Silicon 上的容器）
+- paddle 系推理在该平台不稳定，已两次实测证实
+- 环境已还原（卸载 paddle 系，RapidOCR 正常）
+
+**可行的替代路径**（未实施，供决策）：
+1. **x86_64 环境**跑 VL —— 需要另配机器或云实例
+2. **ONNX 版版面模型** —— RapidOCR 生态有 `rapid_layout`，与现役 onnxruntime 同栈，不引入 paddle
+3. **接受现状** —— §8.31 已证识别精度不是瓶颈，版面问题改用规则+人工复核兜住
+
+第 2 条最贴合当前环境，代价也最小。
