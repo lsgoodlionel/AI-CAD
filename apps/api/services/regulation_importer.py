@@ -512,10 +512,10 @@ async def classify_paragraphs(
             resp = await router.route(
                 "regulation_classifier",
                 [
+                    {"role": "system", "content": _CLASSIFY_SYSTEM},
                     {"role": "user", "content": f"请对以下条文段落分类：\n\n{numbered}"},
                 ],
                 task_type="batch",
-                system=_CLASSIFY_SYSTEM,
             )
             parsed = json.loads(resp.content)
             for item in parsed.get("results", []):
@@ -552,10 +552,10 @@ async def extract_article(
         resp = await router.route(
             "regulation_extractor",
             [
+                {"role": "system", "content": _EXTRACT_SYSTEM},
                 {"role": "user", "content": f"请提取以下条文的结构化信息：\n\n{text[:2000]}"},
             ],
             task_type="primary",
-            system=_EXTRACT_SYSTEM,
         )
         parsed = json.loads(resp.content)
         parsed.setdefault("article_type", article_type)
@@ -630,6 +630,10 @@ async def save_articles_to_db(
     return saved_ids
 
 
+#: 已经表达强制的义务等级——抬升时保持原样，不把「严禁」弱化成「必须」。
+_MANDATORY_LEVELS = ("MUST", "MUST_NOT")
+
+
 def build_article_params(book_id: str, article: dict[str, Any],
                          book_title: str | None = None) -> dict | None:
     """条文 → 入库参数（**databases 风格的字典**）；空正文返回 None。
@@ -643,16 +647,23 @@ def build_article_params(book_id: str, article: dict[str, Any],
     content = (article or {}).get("raw_text") or ""
     if not content:
         return None
+    # **通用规范全文强制**（见 `is_mandatory_standard`）：
+    # 强制性由规范类型决定，不能只看义务词。
+    mandatory = (bool(article.get("is_mandatory", False))
+                 or is_mandatory_standard(book_title))
+    level = article.get("obligation_level") or "SHOULD"
+    if mandatory and level not in _MANDATORY_LEVELS:
+        # 两个字段不能自相矛盾：强制为真却写 SHOULD，下游按不同字段
+        # 会得出不同结论（审图报告看等级、图谱按 mandatory 过滤）。
+        # `MUST_NOT`（严禁）比 `MUST` 更强，抬升时不得反被弱化。
+        level = "MUST"
     return {
         "book_id": book_id,
         "article_no": article.get("article_no") or f"AUTO-{uuid.uuid4().hex[:8]}",
         "title": article.get("title"),
         "content": content,
-        "obligation_level": article.get("obligation_level", "SHOULD"),
-        # **通用规范全文强制**（见 `is_mandatory_standard`）：
-        # 强制性由规范类型决定，不能只看义务词。
-        "is_mandatory": bool(article.get("is_mandatory", False))
-                        or is_mandatory_standard(book_title),
+        "obligation_level": level,
+        "is_mandatory": mandatory,
         "conditions": json.dumps(article.get("conditions", []),
                                  ensure_ascii=False),
     }
@@ -743,6 +754,15 @@ def is_plausible_book_title(candidate: str | None) -> bool:
     if not text or len(text) > MAX_BOOK_TITLE_CHARS:
         return False
     return not any(mark in text for mark in _TITLE_PROSE_MARKS)
+
+
+def strip_file_extension(name: str) -> str:
+    """去掉路径与扩展名，得到文件名标题。"""
+    base = (name or "").rsplit("/", 1)[-1]
+    for suffix in (".pdf", ".docx", ".doc", ".txt"):
+        if base.lower().endswith(suffix):
+            return base[: -len(suffix)]
+    return base
 
 
 def resolve_book_title(filename_title: str, extracted: str | None) -> str:
@@ -988,6 +1008,9 @@ async def import_regulation_file(
     """
     text = extract_text(file_bytes, filename)
     metadata = infer_book_metadata(text, filename)
+    # **书名先定下来再往下传**：强条判定、图节点、引用检索全依赖它。
+    resolved_title = resolve_book_title(
+        strip_file_extension(filename), metadata.get("title"))
     await _update_book_metadata(db, book_id, metadata, filename=filename)
 
     # **OCR 文本用专用切分**：`split_into_paragraphs` 的判据为有排版结构的
@@ -1020,7 +1043,7 @@ async def import_regulation_file(
 
     # **书名要传下去**：通用规范全文强制，这个判定只能从书名得出
     article_ids = await save_articles_to_db(
-        db, book_id, articles, book_title=metadata.get("title") or filename)
+        db, book_id, articles, book_title=resolved_title)
     await build_age_nodes(db, book_id, article_ids)
     await vectorize_articles(db, article_ids)
 
@@ -1050,10 +1073,7 @@ async def _update_book_metadata(
         for key, value in metadata.items()
         if value and key in {"title", "std_no", "version", "discipline", "publisher", "effective_at"}
     }
-    filename_title = (filename or "").rsplit("/", 1)[-1]
-    for suffix in (".pdf", ".PDF", ".docx", ".doc"):
-        if filename_title.endswith(suffix):
-            filename_title = filename_title[: -len(suffix)]
+    filename_title = strip_file_extension(filename)
     resolved = resolve_book_title(filename_title, fields.get("title"))
     if resolved and resolved != filename_title:
         fields["title"] = resolved

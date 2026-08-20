@@ -1,6 +1,7 @@
 import time
 import anthropic
-from .base import LLMProvider, LLMResponse, ModelParams
+from .base import (LLMProvider, LLMResponse, ModelParams,
+                   split_system_messages)
 from . import vision
 
 
@@ -15,14 +16,19 @@ class AnthropicProvider(LLMProvider):
         # 仅当含图像块时才走多模态转换，text-only 保持零差异
         if vision.messages_have_images(messages):
             messages = vision.to_anthropic_messages(messages)
+        # Messages API 拒绝 `role: system` 的消息，必须走独立字段
+        system, messages = split_system_messages(messages)
         start = time.monotonic()
-        response = await self.client.messages.create(
-            model=params.model_id,
-            max_tokens=params.max_tokens,
-            temperature=params.temperature,
-            top_p=params.top_p,
-            messages=messages,
-        )
+        kwargs = {
+            "model": params.model_id,
+            "max_tokens": params.max_tokens,
+            "temperature": params.temperature,
+            "top_p": params.top_p,
+            "messages": messages,
+        }
+        if system:
+            kwargs["system"] = system
+        response = await self.client.messages.create(**kwargs)
         latency = int((time.monotonic() - start) * 1000)
         return LLMResponse(
             content=response.content[0].text,

@@ -98,3 +98,32 @@ def test_std_no_unknown_shape_kept_as_is():
 
     assert normalize_std_no("企业标准 Q/ABC 001") == "企业标准 Q/ABC 001"
     assert normalize_std_no(None) is None
+
+
+@pytest.mark.unit
+def test_strip_file_extension():
+    from services.regulation_importer import strip_file_extension
+
+    assert strip_file_extension("GB 55023-2022《施工脚手架通用规范》.pdf") \
+        == "GB 55023-2022《施工脚手架通用规范》"
+    assert strip_file_extension("/tmp/regs/a.PDF") == "a"
+    assert strip_file_extension("noext") == "noext"
+
+
+@pytest.mark.unit
+def test_mandatory_check_uses_resolved_title_not_raw_extraction():
+    """强条判定只能从**书名**得出，而书名要用解析后的那个。
+
+    实测：抽取把序言半句话当书名，`is_mandatory_standard()` 认不出，
+    GB 55023 通用规范 75 条里 52 条被判成非强条——
+    而这本书按定义全文强制。文件名里明明写着《施工脚手架通用规范》。
+    """
+    from services.regulation_importer import (
+        is_mandatory_standard, resolve_book_title, strip_file_extension)
+
+    filename_title = strip_file_extension("GB 55023-2022《施工脚手架通用规范》.pdf")
+    raw_extraction = "为适应国际技术法规与技术标准通行规则，2016年以来，"
+
+    assert not is_mandatory_standard(raw_extraction)          # 认不出
+    assert is_mandatory_standard(
+        resolve_book_title(filename_title, raw_extraction))   # 解析后认得出
