@@ -62,6 +62,43 @@ def extract_with_docling(file_bytes: bytes, filename: str = "") -> str | None:
     return _extract(file_bytes, filename or "regulation.pdf")
 
 
+#: 每页文本字数低于此值即判为**扫描件**（正文是图像，没有文本层）。
+#: 实测住建部强制性通用规范 GB55008-2021：26 页共 1246 字 = **48 字/页**，
+#: 且 100% 是「住房城乡建设部信息公开 浏览专用」水印，正文 0 条。
+#: 正常排版的规范每页数百到两千字，取 200 作界，离两边都远。
+MIN_TEXT_CHARS_PER_PAGE = 200
+
+#: 规范扫描页的 OCR 渲染 dpi。实测 200 已达置信 0.997，
+#: 300 反而顺序错乱且慢 4 倍 —— 规范正文是印刷体、版面规整。
+REGULATION_OCR_DPI = 200
+
+#: 官方 PDF 的水印行。**只剥已知水印，不做模糊匹配** —— 误删正文的代价
+#: 远大于漏掉一行水印。
+_WATERMARK_LINES = ("住房城乡建设部信息公开", "浏览专用", "住房和城乡建设部信息公开")
+
+
+def is_scanned_pdf(text_chars: int, page_count: int) -> bool:
+    """文本层产出过少 → 判为扫描件（应转 OCR）。
+
+    **必须按页算**：一本 500 页的规范总字数再多，每页只有水印仍是扫描件。
+    页数为 0 不判扫描件 —— 那是解析失败，不该触发 OCR 重试。
+    """
+    if page_count <= 0:
+        return False
+    return text_chars / page_count < MIN_TEXT_CHARS_PER_PAGE
+
+
+def strip_watermark(text: str | None) -> str:
+    """剥掉官方 PDF 的水印行（逐行精确匹配）。"""
+    if not text:
+        return ""
+    kept = [
+        line for line in str(text).splitlines()
+        if not any(mark in line for mark in _WATERMARK_LINES)
+    ]
+    return "\n".join(kept)
+
+
 def extract_text_from_pdf(file_bytes: bytes, filename: str = "") -> str:
     """PDF → Markdown 文本。
 
@@ -73,25 +110,71 @@ def extract_text_from_pdf(file_bytes: bytes, filename: str = "") -> str:
     """
     docling_text = extract_with_docling(file_bytes, filename)
     if docling_text:
-        return docling_text
+        return strip_watermark(docling_text)
+
+    text, page_count = _extract_text_layer(file_bytes)
+    # **扫描件转 OCR**：实测住建部强制性通用规范全是扫描件 ——
+    # 每页 48 字且 100% 是水印，正文 0 条。文本层链（docling/pymupdf4llm/
+    # pymupdf）对它们全部落空，不转 OCR 就等于把水印当正文交出去。
+    if is_scanned_pdf(len(text), page_count):
+        try:
+            recognized = ocr_pdf_text(file_bytes)
+        except Exception as exc:  # noqa: BLE001 — OCR 失败不阻断导入
+            logger.warning("规范 OCR 失败，退回文本层: %s", exc)
+        else:
+            if recognized and len(recognized) > len(text):
+                return strip_watermark(recognized)
+    return strip_watermark(text)
+
+
+def _extract_text_layer(file_bytes: bytes) -> tuple[str, int]:
+    """PDF 文本层 → (文本, 页数)。页数用于判断是否扫描件。"""
+    try:
+        import fitz
+
+        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        page_count = doc.page_count
+    except Exception as exc:
+        raise RuntimeError(f"PDF 解析失败：{exc}") from exc
 
     try:
         import pymupdf4llm  # type: ignore
-        import fitz
-        doc = fitz.open(stream=file_bytes, filetype="pdf")
-        return pymupdf4llm.to_markdown(doc)
+
+        return pymupdf4llm.to_markdown(doc), page_count
     except ImportError:
         pass
+    return "\n\n".join(page.get_text() for page in doc), page_count
 
-    try:
-        import fitz
-        doc = fitz.open(stream=file_bytes, filetype="pdf")
-        pages = []
-        for page in doc:
-            pages.append(page.get_text())
-        return "\n\n".join(pages)
-    except Exception as exc:
-        raise RuntimeError(f"PDF 解析失败：{exc}") from exc
+
+def ocr_pdf_text(file_bytes: bytes, dpi: int = REGULATION_OCR_DPI) -> str:
+    """扫描件规范 → OCR 全文（逐页，按阅读顺序拼接）。
+
+    **dpi 取 200 而非更高**：实测 GB55008 扫描页在 200 dpi 下
+    31 token、均置信 **0.997**、3 秒；300 dpi 反而顺序错乱且慢 4 倍。
+    规范正文是印刷体、版面规整，200 已足够。
+    """
+    import fitz
+    import numpy as np
+    from PIL import Image
+
+    from core.model3d.ocr.service import _recognize_tiled, _select_backend
+
+    backend = _select_backend([])
+    if backend is None or not backend.is_available():
+        raise RuntimeError("OCR 后端不可用")
+
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
+    pages: list[str] = []
+    for page in doc:
+        pix = page.get_pixmap(dpi=dpi)
+        image = Image.fromarray(
+            np.frombuffer(pix.samples, dtype=np.uint8)
+            .reshape(pix.height, pix.width, pix.n)[:, :, :3])
+        tokens = _recognize_tiled(backend, image, [])
+        # 按阅读顺序：先上后下、同行左到右
+        ordered = sorted(tokens, key=lambda t: (round(t[1][1] / 10), t[1][0]))
+        pages.append("\n".join(text for text, _bbox, _conf in ordered if text))
+    return "\n\n".join(pages)
 
 
 def extract_text_from_word(file_bytes: bytes) -> str:
