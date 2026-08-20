@@ -15,6 +15,7 @@ import json
 import logging
 import re
 import uuid
+from pathlib import Path
 from datetime import date
 from typing import Any
 
@@ -935,6 +936,50 @@ def build_vectorize_fetch(article_id: str) -> tuple[str, dict]:
     )
 
 
+#: Chroma 默认嵌入模型的本地缓存目录。
+DEFAULT_EMBEDDING_CACHE = Path.home() / ".cache" / "chroma" / "onnx_models"
+
+#: Chroma 默认嵌入模型名。**注意它是英文模型**——用它给中文规范条文
+#: 做向量检索质量有限，而引擎参数里配的是 bge-m3。容器内没有
+#: sentence-transformers/transformers，暂时只有这一个零安装选项，
+#: 已记入 `docs/PHASE_J_BLUEPRINT.md` 待办。
+DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+
+#: 判定模型已解包就绪的最小体积——下到一半的目录比没有更危险。
+_MIN_ONNX_BYTES = 512
+
+
+def embedding_model_ready(
+    cache_dir: Path | None = None,
+    model_name: str = DEFAULT_EMBEDDING_MODEL,
+) -> bool:
+    """本地是否已有**解包完成**的嵌入模型。
+
+    **为什么要判**：Chroma 首次调用会现场下载模型（79MB），
+    实测容器内 2 分 20 秒只到 6%，整批规范全被这一个下载卡住。
+    按项目的设计约束（缺失不得阻断、降级必须可见），
+    没就绪就跳过向量化，导入照常完成，向量另行回填。
+    """
+    root = Path(cache_dir) if cache_dir else DEFAULT_EMBEDDING_CACHE
+    model_dir = root / model_name / "onnx"
+    if not model_dir.is_dir():
+        return False
+    onnx = model_dir / "model.onnx"
+    return (onnx.is_file() and onnx.stat().st_size >= _MIN_ONNX_BYTES
+            and (model_dir / "tokenizer.json").is_file())
+
+
+def _chroma_collection():
+    """连 Chroma 并取集合——**调用它可能触发模型下载**，
+    所以务必先过 `embedding_model_ready`。"""
+    import chromadb  # type: ignore
+    from core.config import settings
+
+    client = chromadb.HttpClient(host=settings.chroma_host,
+                                 port=settings.chroma_port)
+    return client.get_or_create_collection("regulation_articles")
+
+
 async def vectorize_articles(
     db: Any,
     article_ids: list[str],
@@ -943,17 +988,16 @@ async def vectorize_articles(
     将条文内容写入 Chroma 向量库，失败时静默跳过（不影响主流程）。
     collection 名称：regulation_articles
     """
+    if not embedding_model_ready():
+        logger.warning(
+            "嵌入模型未就绪（%s），**跳过向量化**——导入不因此阻断，"
+            "条文的 vector_id 会留空，可另行回填。",
+            DEFAULT_EMBEDDING_CACHE / DEFAULT_EMBEDDING_MODEL)
+        return
     try:
-        import chromadb  # type: ignore
-        from core.config import settings
-
-        client = chromadb.HttpClient(
-            host=settings.chroma_host,
-            port=settings.chroma_port,
-        )
-        collection = client.get_or_create_collection("regulation_articles")
+        collection = _chroma_collection()
     except Exception as exc:
-        logger.info("Chroma 不可用，跳过向量化：%s", exc)
+        logger.warning("Chroma 不可用，跳过向量化：%s", exc)
         return
 
     docs, ids, metas = [], [], []
