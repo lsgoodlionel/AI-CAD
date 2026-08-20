@@ -14,6 +14,7 @@ import { useEffect, useState } from 'react'
 import { Alert, Descriptions, Empty, Modal, Skeleton, Space, Tabs, Tag, Typography } from 'antd'
 
 import { getBookLayers, getBookText, previewBook } from '@/services/regulations'
+import ArticleList from './ArticleList'
 import type { BookLayers } from '@/services/regulations'
 
 const { Paragraph, Text } = Typography
@@ -176,6 +177,22 @@ export default function BookReader({
                 ) : (
                   <Empty description="该规范未保留识别全文，重新导入即可生成" />
                 ),
+              },
+              {
+                key: 'articles',
+                label: '③ 识别出的条文',
+                children: bookId ? (
+                  <div style={{ maxHeight: '66vh', overflow: 'auto' }}>
+                    <Alert
+                      type="info"
+                      showIcon
+                      style={{ marginBottom: 8 }}
+                      message="这一层是从上一页的识别全文切分出来的"
+                      description="系统消费的就是它：审图规则匹配、知识图谱推理、向量检索。发现条文有误时，回到「② 识别全文」与「① PDF 原件」逐段对照即可定位是切分问题还是识别问题。"
+                    />
+                    <ArticleList bookId={bookId} />
+                  </div>
+                ) : null,
               },
             ]}
           />

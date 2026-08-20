@@ -143,3 +143,62 @@ def test_std_no_does_not_swallow_the_file_extension():
     meta = infer_book_metadata(
         "", "《建筑节能与可再生能源利用通用规范》GB55015-2021.pdf")
     assert meta["std_no"] == "GB55015-2021"
+
+
+@pytest.mark.unit
+def test_resolved_title_is_always_written_back():
+    """**我的短路写错了**：原逻辑「解析结果与文件名一致就不回写」，
+    假设了书行的现有标题本来就是文件名。
+
+    但 `create_book_from_pdf` 建档时用的是**抽取出的标题**——
+    端到端实测那正是序言里的一句话。于是解析结果 == 文件名 → 不回写 →
+    书名永远停在那句话上。
+
+    结论：解析出的标题**一律回写**，不做这种「看起来省一次更新」的短路。
+    """
+    from services.regulation_importer import build_title_update_fields
+
+    fields = build_title_update_fields(
+        {"title": "为适应国际技术法规与技术标准通行规则，2016年以来，"},
+        filename="端到端测试规范GB55010-2021.pdf")
+    assert fields["title"] == "端到端测试规范GB55010-2021"
+
+
+@pytest.mark.unit
+def test_bracketed_filename_still_wins():
+    from services.regulation_importer import build_title_update_fields
+
+    fields = build_title_update_fields(
+        {"title": "正文里的一句话，很长很长"},
+        filename="GB 55023-2022《施工脚手架通用规范》.pdf")
+    assert fields["title"] == "GB 55023-2022《施工脚手架通用规范》"
+
+
+@pytest.mark.unit
+def test_no_filename_keeps_a_plausible_extraction():
+    from services.regulation_importer import build_title_update_fields
+
+    fields = build_title_update_fields({"title": "施工脚手架通用规范"}, filename="")
+    assert fields["title"] == "施工脚手架通用规范"
+
+
+@pytest.mark.unit
+def test_upload_endpoint_applies_the_same_title_guard():
+    """**同一条判据不能只在流水线里生效**。
+
+    端到端实测：上传接口用 `infer_book_metadata` 的原始标题建档，
+    得到「为适应国际技术法规与技术标准通行规则，2016年以来，」。
+    流水线随后虽会更正，但接口的即时响应是错的，
+    流水线失败时书名也就永久停在那句话上。
+
+    这与模型侧那条「只给有世界坐标的建筑图开口子」是同一种病：
+    **一条只对部分对象生效的判据，多半不是判据，是历史。**
+    """
+    import inspect
+
+    import routers.regulations as reg
+
+    source = inspect.getsource(reg.create_book_from_pdf)
+    assert "resolve_book_title" in source or "build_title_update_fields" in source, \
+        "建档路径没有应用标题守卫"
+    assert "normalize_std_no" in source, "建档路径没有归一化标准号"

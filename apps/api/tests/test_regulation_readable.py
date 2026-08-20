@@ -93,6 +93,8 @@ async def test_readable_layers_persist_original_and_full_text(monkeypatch):
     captured = {}
 
     class DB:
+        async def fetch_one(self, sql, params=None):
+            return {"file_key": None}      # 尚无原件 → 由流水线上传
         async def execute(self, sql, params=None):
             captured.update(params or {})
 
@@ -119,9 +121,39 @@ async def test_upload_failure_does_not_block_article_import(monkeypatch):
     captured = {}
 
     class DB:
+        async def fetch_one(self, sql, params=None):
+            return {"file_key": None}
         async def execute(self, sql, params=None):
             captured.update(params or {})
 
     await _store_readable_layers(DB(), "b1", b"x", "a.pdf", "正文", "ocr", 1)
     assert captured["file_key"] is None
     assert captured["full_text"] == "正文"
+
+
+@pytest.mark.asyncio
+async def test_existing_file_key_is_not_re_uploaded(monkeypatch):
+    """**上传端点已经把文件存好了**（`/books/{id}/import` 写的是
+    `regulations/{book_id}/{uuid}.{ext}`），流水线不该再传一份——
+    否则同一本书在对象存储里留下两个副本，`file_key` 还会被改指到新的那个，
+    旧对象成为永远清不掉的孤儿。
+    """
+    import core.storage as storage
+    from services.regulation_importer import _store_readable_layers
+
+    uploads = []
+    monkeypatch.setattr(storage, "upload_file",
+                        lambda data, key, content_type=None: uploads.append(key) or key)
+
+    captured = {}
+
+    class DB:
+        async def fetch_one(self, sql, params=None):
+            return {"file_key": "regulations/b1/existing.pdf"}
+        async def execute(self, sql, params=None):
+            captured.update(params or {})
+
+    await _store_readable_layers(DB(), "b1", b"x", "a.pdf", "正文", "ocr", 3)
+    assert uploads == [], f"重复上传了：{uploads}"
+    assert captured["file_key"] is None, "不该改写已有的 file_key"
+    assert captured["full_text"] == "正文", "全文仍要落库"

@@ -1106,6 +1106,10 @@ WHERE id = CAST(:book_id AS uuid)
 """
 
 
+class _AlreadyStored(Exception):
+    """原件已由调用方存好，无需重传（内部信号，不外泄）。"""
+
+
 async def _store_readable_layers(db: Any, book_id: str, file_bytes: bytes,
                                  filename: str, text: str,
                                  method: str, page_count: int) -> None:
@@ -1119,8 +1123,20 @@ async def _store_readable_layers(db: Any, book_id: str, file_bytes: bytes,
     try:
         from core.storage import upload_file
 
+        # **上传端点可能已经存好了**（`/books/{id}/import` 写的是
+        # `regulations/{book_id}/{uuid}.{ext}`）。再传一份会让同一本书
+        # 在对象存储里留下两个副本，`file_key` 还会被改指到新的那个，
+        # 旧对象成为永远清不掉的孤儿。
+        existing = await db.fetch_one(
+            "SELECT file_key FROM regulation_books WHERE id = CAST(:b AS uuid)",
+            {"b": book_id})
+        if existing is not None and dict(existing).get("file_key"):
+            raise _AlreadyStored
+
         file_key = book_file_key(book_id, filename)
         upload_file(file_bytes, file_key, content_type="application/pdf")
+    except _AlreadyStored:
+        file_key = None          # 保留调用方存好的那个 key
     except Exception as exc:  # noqa: BLE001 — 存原件失败不阻断条文入库
         file_key = None
         logger.warning("规范原件上传失败 book=%s：%s —— 界面将无法预览原版",
@@ -1199,6 +1215,19 @@ async def import_regulation_file(
     }
 
 
+def build_title_update_fields(fields: dict, filename: str) -> dict:
+    """定出要回写的标题字段。
+
+    **一律回写，不做「与文件名一致就跳过」的短路**：那个短路假设了
+    书行的现有标题本来就是文件名，而 `create_book_from_pdf` 建档时
+    用的是**抽取出的标题**——端到端实测那正是序言里的一句话。
+    于是「解析结果 == 文件名 → 不回写」，书名永远停在那句话上。
+    """
+    resolved = resolve_book_title(strip_file_extension(filename),
+                                  fields.get("title"))
+    return {"title": resolved} if resolved else {}
+
+
 async def _update_book_metadata(
     db: Any,
     book_id: str,
@@ -1215,12 +1244,7 @@ async def _update_book_metadata(
         for key, value in metadata.items()
         if value and key in {"title", "std_no", "version", "discipline", "publisher", "effective_at"}
     }
-    filename_title = strip_file_extension(filename)
-    resolved = resolve_book_title(filename_title, fields.get("title"))
-    if resolved and resolved != filename_title:
-        fields["title"] = resolved
-    else:
-        fields.pop("title", None)      # 与文件名一致就不必回写
+    fields.update(build_title_update_fields(fields, filename))
     if "std_no" in fields:
         fields["std_no"] = normalize_std_no(fields["std_no"])
     if "effective_at" in fields:

@@ -140,6 +140,15 @@ async def create_book_from_pdf(
             "effective_at": None,
         }
 
+    # **同一条判据必须在建档时也生效**：只在流水线里守，接口的即时响应
+    # 就是错的，流水线失败时书名会永久停在抽取出的那句正文上
+    # （端到端实测得到「为适应国际技术法规……2016年以来，」）。
+    from services.regulation_importer import normalize_std_no, resolve_book_title, strip_file_extension
+
+    metadata["title"] = resolve_book_title(
+        strip_file_extension(file.filename or ""), metadata.get("title"))
+    metadata["std_no"] = normalize_std_no(metadata.get("std_no"))
+
     std_no = metadata.get("std_no")
     if std_no:
         existing_book_id = await db.fetch_val(
