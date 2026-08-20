@@ -19,6 +19,7 @@ import {
   publishBook, unpublishBook, importBookFile, createBookFromPdf,
 } from '@/services/regulations'
 import ArticleList from './ArticleList'
+import BookReader from './BookReader'
 
 type Book = {
   id: string
@@ -57,6 +58,8 @@ export default function BookList() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Book | null>(null)
   const [importTarget, setImportTarget] = useState<Book | null>(null)
+  // 「阅读」入口：三层（PDF 原件 / 识别全文 / 单条条文）一处看全。
+  const [readingId, setReadingId] = useState<string | null>(null)
   const [drawerBook, setDrawerBook] = useState<Book | null>(null)
   const [saving, setSaving] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -193,6 +196,9 @@ export default function BookList() {
       search: false,
       render: (_, row) => (
         <Space size={4}>
+          <Button size="small" type="link" onClick={() => setReadingId(row.id)}>
+            阅读
+          </Button>
           <Button size="small" onClick={() => openEdit(row)}>编辑</Button>
           <Button
             size="small"
@@ -334,6 +340,11 @@ export default function BookList() {
       >
         {drawerBook && <ArticleList bookId={drawerBook.id} />}
       </Drawer>
+      <BookReader
+        bookId={readingId}
+        open={readingId !== null}
+        onClose={() => setReadingId(null)}
+      />
     </>
   )
 }

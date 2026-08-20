@@ -114,3 +114,40 @@ export const searchRegulations = (params: {
   discipline?: string
   limit?: number
 }) => request(`${BASE}/search`, { params })
+
+/** 规范的三种读法各自是否就绪（①PDF 原件 ②识别全文 ③单条条文） */
+export interface BookLayers {
+  title: string
+  std_no: string | null
+  pdf: { ready: boolean; page_count: number | null }
+  full_text: { ready: boolean; chars: number; method: string | null }
+  articles: {
+    ready: boolean
+    total: number
+    mandatory: number
+    graphed: number
+    vectored: number
+  }
+}
+
+export const getBookLayers = (id: string) =>
+  request<BookLayers>(`/api/v1/regulations/books/${id}/layers`)
+
+/** 第①层：PDF 原件（presigned，前端 iframe 内嵌） */
+export const previewBook = (id: string) =>
+  request<{ kind: 'pdf' | 'none'; url: string | null; title: string; reason?: string }>(
+    `/api/v1/regulations/books/${id}/preview`,
+  )
+
+/** 第②层：识别出的文字全文（分段，必带来路 extract_method） */
+export const getBookText = (id: string, offset = 0, limit = 20000) =>
+  request<{
+    title: string
+    std_no: string | null
+    extract_method: string | null
+    page_count: number | null
+    text_chars: number
+    offset: number
+    text: string
+    has_more: boolean
+  }>(`/api/v1/regulations/books/${id}/text`, { params: { offset, limit } })
