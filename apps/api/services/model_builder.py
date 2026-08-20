@@ -1873,14 +1873,20 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     # **尺度离群标记**：实测轨道交通的场景包络被 2 张图撑到 4.8 公里，
     # 而中间 90% 的构件点只占 762 米——建筑于是缩成中间一小团。
     # 标记而不删除（降级必须可见），前端算包络时跳过它们。
-    from services.model_elements import mark_scale_outliers
+    from services.model_elements import (mark_scale_outliers,
+                                         scale_suspect_summary)
     scale_suspects = mark_scale_outliers(floors)
+    scale_suspect_stats = scale_suspect_summary(floors, scale_suspects)
     if scale_suspects:
         logger.warning("尺度离群图纸 %d 张，已标记不参与场景包络：%s",
                        len(scale_suspects), sorted(scale_suspects)[:5])
     _strip_private_lod_fields(floors, buildings)
 
     stats["scale_suspect_drawings"] = len(scale_suspects)
+    # **隐藏了就必须在别处说清楚**：实测这些图产出的构件占全部的 20%，
+    # 前端默认不渲染它们，否则错误尺寸的几何会散落在数公里外；
+    # 而不说明的话「构件少了 20%」又会成为新的谜。
+    stats["scale_suspect"] = scale_suspect_stats
 
     scene = {
         "schema_version": 2,

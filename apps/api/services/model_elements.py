@@ -860,6 +860,28 @@ def _scale_override_of(transforms: dict | None, drawing_id: str) -> float | None
 _SPAN_ELEMENT_KINDS = ("columns", "walls", "beams", "slabs", "pipes", "equipment")
 
 
+def scale_suspect_summary(floors: list[dict] | None, suspects: set | None) -> dict:
+    """离群图纸的影响面——**要摆到质量面板上**。
+
+    只让它们不参与包络还不够：实测 11 张离群图产出 6411 个构件，
+    占全部 32512 的 **20%**，以错误尺寸散落在 4 公里范围内。
+    照常渲染的话用户看到的依然是「失真」，所以前端默认隐藏；
+    而隐藏了就必须在别处说清楚，否则「构件少了 20%」又成了新的谜。
+    """
+    suspect_ids = set(suspects or ())
+    total = flagged = 0
+    for floor in floors or []:
+        elements = floor.get("elements") or {}
+        for kind in _SPAN_ELEMENT_KINDS:
+            for element in elements.get(kind) or []:
+                total += 1
+                if element.get("src") in suspect_ids:
+                    flagged += 1
+    return {"drawings": len(suspect_ids), "elements": flagged,
+            "total_elements": total,
+            "ratio": (flagged / total) if total else 0.0}
+
+
 def mark_scale_outliers(floors: list[dict] | None) -> set:
     """标记尺度离群图纸的构件，返回被标记的图纸 id 集合。
 

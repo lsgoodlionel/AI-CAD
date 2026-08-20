@@ -303,6 +303,16 @@ export interface SceneStats {
   reconstruction?: 'elements' | 'texture' | 'mixed'
   buildings?: number
   yolo_equipment?: number
+  /** 尺度可疑图纸数（构件已从视图隐藏，见 `scale_suspect`） */
+  scale_suspect_drawings?: number
+  /** 被隐藏的影响面。**隐藏了就必须说清楚**——否则「构件少了 20%」
+   *  会变成一个无解的谜。 */
+  scale_suspect?: {
+    drawings: number
+    elements: number
+    total_elements: number
+    ratio: number
+  }
 }
 
 /** 建模能力档位。`partial` = **能出结果但是降级的**，不可按 full 处理。 */

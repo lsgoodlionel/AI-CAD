@@ -164,7 +164,6 @@ export function elementsBounds(
   const ys: number[] = []
   // 尺度离群的图纸**不参与包络**：实测轨道交通的场景被 2 张图撑到
   // 4.8 公里，而中间 90% 的构件点只占 762 米——建筑于是缩成中间一小团。
-  // 构件本身照常渲染（降级必须可见），只是不让它决定相机取景。
   const push = (points: number[][] | undefined, suspect?: boolean) => {
     if (suspect) return
     for (const p of points ?? []) {
@@ -338,13 +337,35 @@ function triangleCount(meshes: THREE.Mesh[]): number {
  * 构建单楼层构件网格集合。
  * 返回 null = 该层无可渲染构件（调用方回退贴图）；超三角形预算同样返回 null。
  */
+/** 滤掉尺度可疑图纸的构件。
+ *
+ *  **只不参与包络还不够**：实测那 11 张离群图产出 6411 个构件，
+ *  占全部 32512 的 **20%**，它们以错误尺寸散落在 4 公里范围内——
+ *  照常渲染的话用户看到的依然是「失真」。
+ *
+ *  隐藏了就必须在别处说清楚：`stats.scale_suspect` 带着图纸数、
+ *  构件数与占比，质量面板据此提示，否则「构件少了 20%」又成新的谜。 */
+function withoutScaleSuspects(elements: SceneFloorElements): SceneFloorElements {
+  const keep = <T extends { scale_suspect?: boolean }>(items: T[]) =>
+    items.filter((it) => !it.scale_suspect)
+  return {
+    columns: keep(elements.columns),
+    walls: keep(elements.walls),
+    beams: keep(elements.beams),
+    slabs: keep(elements.slabs),
+    pipes: keep(elements.pipes),
+    equipment: keep(elements.equipment),
+  }
+}
+
 export function buildFloorElementMeshes(
-  elements: SceneFloorElements,
+  rawElements: SceneFloorElements,
   floorY: number,
   floorKey: string,
   buildingKey: string,
   real?: RealPlanOptions,
 ): THREE.Mesh[] | null {
+  const elements = withoutScaleSuspects(rawElements)
   const t = real ? realTransform(real.center) : normalizedTransform(elements)
   if (!t) return null
   const baseY = floorY

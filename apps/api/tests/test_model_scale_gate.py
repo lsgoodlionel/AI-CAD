@@ -224,3 +224,37 @@ def test_architecture_bucket_is_actually_consumed():
     # 建筑平面图产出的是墙/柱/板，与结构同类
     plan = source.split('all_picked = ')[1][:900]
     assert '"architecture"' in plan
+
+
+@pytest.mark.unit
+def test_suspect_elements_are_reported_as_a_quality_issue():
+    """**只不参与包络还不够**：实测那 11 张离群图产出了 6411 个构件，
+    占全部 32512 的 **20%** —— 它们以错误尺寸散落在 4 公里范围内，
+    照常渲染的话用户看到的依然是「失真」。
+
+    所以要既**隐藏**（不污染视图）又**可见**（质量面板明说），
+    而不是二选一。
+    """
+    from services.model_elements import scale_suspect_summary
+
+    floors = [{"elements": {
+        "columns": [{"src": "ok", "outline": [[0, 0], [1, 1]]},
+                    {"src": "bad", "outline": [[0, 0], [1, 1]],
+                     "scale_suspect": True}],
+        "walls": [{"src": "bad", "path": [[0, 0], [1, 1]], "scale_suspect": True}],
+    }}]
+    summary = scale_suspect_summary(floors, {"bad"})
+    assert summary["drawings"] == 1
+    assert summary["elements"] == 2
+    assert summary["total_elements"] == 3
+    assert summary["ratio"] == pytest.approx(2 / 3)
+
+
+@pytest.mark.unit
+def test_no_suspects_yields_zeroed_summary():
+    """没有离群时也要给出结构，别让前端判 undefined。"""
+    from services.model_elements import scale_suspect_summary
+
+    summary = scale_suspect_summary([], set())
+    assert summary == {"drawings": 0, "elements": 0,
+                       "total_elements": 0, "ratio": 0.0}

@@ -80,6 +80,22 @@ export default function ModelHeaderBar({
               <Text>问题 {scene.stats.total_issues} 个</Text>
               <Text>楼层 {scene.stats.floors} 层</Text>
               {pendingManualCount > 0 ? <Tag color="gold">待人工识别 {pendingManualCount}</Tag> : null}
+              {scene.stats.scale_suspect && scene.stats.scale_suspect.drawings > 0 ? (
+                // **隐藏了就必须说清楚**：这些图纸的比例算错了（跨度远超
+                // 项目中位），构件以错误尺寸散落在数公里外，照常渲染的话
+                // 用户看到的依然是「失真」。所以默认隐藏——
+                // 但不说明的话「构件少了两成」又会变成一个无解的谜。
+                <Tooltip
+                  title={`${scene.stats.scale_suspect.drawings} 张图纸的比例与全项目中位相差 8 倍以上，`
+                    + `多半是坐标变换算错。其 ${scene.stats.scale_suspect.elements} 个构件`
+                    + `（占 ${Math.round(scene.stats.scale_suspect.ratio * 100)}%）已从视图隐藏，`
+                    + '以免错误尺寸的几何撑爆场景包络。修正这些图的坐标变换后重建即可恢复。'}
+                >
+                  <Tag color="orange">
+                    尺度可疑 {scene.stats.scale_suspect.drawings} 张已隐藏
+                  </Tag>
+                </Tooltip>
+              ) : null}
               {scene.stats.reconstruction ? (
                 <Tooltip title="构件级重建、贴图级与混合模式保持可用；LOD 入口单独控制审图骨架/建筑体量/实景近似。">
                   <Tag color={scene.stats.reconstruction === 'texture' ? 'default' : 'geekblue'}>
