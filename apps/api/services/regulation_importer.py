@@ -293,6 +293,27 @@ _TOC_DOTS_RE = re.compile(r"[·.．]{3,}|[·.．]{2,}\s*\d+\s*$")
 MIN_ARTICLE_BODY_CHARS = 12
 
 
+#: 工程建设**强制性国家标准**（GB 55001~55037「通用规范」系列）。
+#: 住建部规定其**全部条文必须严格执行** —— 强制性由**规范类型**决定，
+#: 而义务词（应/不应/宜）区分的是**要求的严格程度**，两者是不同维度。
+#: 实测防水通用规范 159 条只有 72 条被标强条，正是把两者混为一谈。
+_MANDATORY_STD_NO_RE = re.compile(r"GB\s?550\d{2}")
+_MANDATORY_NAME_RE = re.compile(r"通用规范")
+
+
+def is_mandatory_standard(title: str | None) -> bool:
+    """该规范是否**全文强制**（GB 55xxx 通用规范系列）。
+
+    编号或名称任一命中即可 —— 实测文件名格式不统一。
+    **判不出就不标强条**：误标会让审图误报。
+    """
+    text = str(title or "")
+    if not text.strip():
+        return False
+    return bool(_MANDATORY_STD_NO_RE.search(text.replace("　", " "))
+                or _MANDATORY_NAME_RE.search(text))
+
+
 def looks_like_article(text: str | None) -> bool:
     """这段文字像**规范条文**吗（而非目录/页码/标题）。
 
@@ -567,6 +588,7 @@ async def save_articles_to_db(
     db: Any,
     book_id: str,
     articles: list[dict[str, Any]],
+    book_title: str | None = None,
 ) -> list[str]:
     """
     批量写入 regulation_articles 表，已存在（book_id + article_no）则跳过。
@@ -575,7 +597,7 @@ async def save_articles_to_db(
     saved_ids: list[str] = []
 
     for art in articles:
-        params = build_article_params(book_id, art)
+        params = build_article_params(book_id, art, book_title)
         if params is None:
             continue
         article_no = params["article_no"]
@@ -608,7 +630,8 @@ async def save_articles_to_db(
     return saved_ids
 
 
-def build_article_params(book_id: str, article: dict[str, Any]) -> dict | None:
+def build_article_params(book_id: str, article: dict[str, Any],
+                         book_title: str | None = None) -> dict | None:
     """条文 → 入库参数（**databases 风格的字典**）；空正文返回 None。
 
     **为什么单独抽出来**：此前这段用 **asyncpg 风格**（`$1` 占位 + 位置参数），
@@ -626,7 +649,10 @@ def build_article_params(book_id: str, article: dict[str, Any]) -> dict | None:
         "title": article.get("title"),
         "content": content,
         "obligation_level": article.get("obligation_level", "SHOULD"),
-        "is_mandatory": bool(article.get("is_mandatory", False)),
+        # **通用规范全文强制**（见 `is_mandatory_standard`）：
+        # 强制性由规范类型决定，不能只看义务词。
+        "is_mandatory": bool(article.get("is_mandatory", False))
+                        or is_mandatory_standard(book_title),
         "conditions": json.dumps(article.get("conditions", []),
                                  ensure_ascii=False),
     }
@@ -790,7 +816,9 @@ async def import_regulation_file(
         art = await extract_article(para, cls_result, router)
         articles.append(art)
 
-    article_ids = await save_articles_to_db(db, book_id, articles)
+    # **书名要传下去**：通用规范全文强制，这个判定只能从书名得出
+    article_ids = await save_articles_to_db(
+        db, book_id, articles, book_title=metadata.get("title") or filename)
     await build_age_nodes(db, book_id, article_ids)
     await vectorize_articles(db, article_ids)
 
