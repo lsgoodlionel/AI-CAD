@@ -113,6 +113,55 @@ def _pick_seed(remaining: dict) -> str:
         -len(remaining[d]), d))
 
 
+def _grow_joint(usable: dict) -> tuple[dict, dict]:
+    """联合生长：一个池子，**两个方向同时校验**。
+
+    **帧是二维的，不是两个独立的一维系统。** 实测按方向分别聚类时，
+    x 与 y 各选各的种子、各自成团，再要求一张图两方向都符合才进帧——
+    最大的分组（399 张）因此**一帧都建不出来**，
+    连种子自己在 y 方向的残差都有 2.99 米（它符合 x 的那一团，
+    却属于 y 的另一团）。
+    """
+    remaining = dict(usable)
+    if not remaining:
+        return {"x": {}, "y": {}}, {}
+    seed = _pick_seed({d: o["x"] or o["y"] for d, o in remaining.items()})
+    pool = {seed: remaining.pop(seed)}
+    offsets = {seed: {"x": 0.0, "y": 0.0}}
+    consensus = {d: solve_global_axes({k: v[d] for k, v in pool.items()})
+                 for d in ("x", "y")}
+
+    progressed = True
+    while remaining and progressed:
+        progressed = False
+        for did in list(remaining):
+            obs = remaining[did]
+            offs, ok = {}, True
+            for d in ("x", "y"):
+                if not obs[d]:
+                    offs[d] = 0.0
+                    continue
+                off = align_offset(obs[d], consensus[d])
+                if off is None:          # 无共有轴号 —— 没有对照就不猜
+                    ok = False
+                    break
+                shifted = {k: v + off for k, v in obs[d].items()}
+                if alignment_residual(shifted, consensus[d]) > MAX_FRAME_RESIDUAL_M:
+                    ok = False           # 一个方向不合就整张不收
+                    break
+                offs[d] = off
+            if not ok:
+                continue
+            remaining.pop(did)
+            pool[did] = {d: {k: v + offs[d] for k, v in obs[d].items()}
+                         for d in ("x", "y")}
+            offsets[did] = offs
+            consensus = {d: solve_global_axes({k: v[d] for k, v in pool.items()})
+                         for d in ("x", "y")}
+            progressed = True
+    return consensus, offsets
+
+
 def _grow_consensus(normalized: dict, direction: str) -> tuple[dict, dict]:
     """增量对齐：从轴号最多的图起，靠**共有轴号**把其余图并进来。
 
@@ -176,13 +225,12 @@ def build_axis_frame(observations: dict | None) -> AxisFrame:
     if not usable:
         return frame
 
-    consensus, offsets = {}, {}
-    for direction in ("x", "y"):
-        consensus[direction], offsets[direction] = _grow_consensus(usable, direction)
+    consensus, offsets = _grow_joint(usable)
     consensus = _shift_to_origin(consensus)
 
     for did, obs in usable.items():
-        shifted = {d: {k: v + offsets[d].get(did, 0.0)
+        off = offsets.get(did, {"x": 0.0, "y": 0.0})
+        shifted = {d: {k: v + off.get(d, 0.0)
                        for k, v in (obs.get(d) or {}).items()}
                    for d in ("x", "y")}
         residual = max(
@@ -200,9 +248,7 @@ def build_axis_frame(observations: dict | None) -> AxisFrame:
     if frame.rejected and frame.members:
         # 剔除离群图后重算 —— 否则离群图仍留在共识里带偏结果
         kept = {k: usable[k] for k in frame.members}
-        consensus = {}
-        for direction in ("x", "y"):
-            consensus[direction], _ = _grow_consensus(kept, direction)
+        consensus, _ = _grow_joint(kept)
         consensus = _shift_to_origin(consensus)
     frame.axes = consensus
     frame.members.sort()

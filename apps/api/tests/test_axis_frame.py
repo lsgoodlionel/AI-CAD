@@ -194,3 +194,29 @@ def test_seed_follows_the_majority_spacing_not_the_alphabet():
     })
     assert sorted(frame.members) == ["d1", "d2"]
     assert frame.axes["x"]["2"] == pytest.approx(8.0)
+
+
+@pytest.mark.unit
+def test_clustering_is_joint_across_both_directions():
+    """**帧是二维的，不是两个独立的一维系统。**
+
+    实测：x 与 y 分别独立聚类时，两个方向各选各的种子、各自成团，
+    再要求一张图两方向都符合才进帧——于是最大的分组（399 张）
+    **一帧都建不出来**，连种子自己在 y 方向的残差都有 2.99 米
+    （它符合 x 的那一团，却属于 y 的另一团）。
+
+    正确做法：候选必须**同时**在两个方向与同一个池子相容才并入。
+    """
+    from services.axis_frame import build_axis_frame
+
+    frame = build_axis_frame({
+        # A 组：x 轴距 8、y 轴距 6
+        "a1": {"x": {"1": 0.0, "2": 8.0}, "y": {"A": 0.0, "B": 6.0}},
+        "a2": {"x": {"1": 20.0, "2": 28.0}, "y": {"A": 10.0, "B": 16.0}},
+        # B 组：x 轴距**相同**（8），但 y 轴距 40 —— x 像、y 不像
+        "b1": {"x": {"1": 0.0, "2": 8.0}, "y": {"A": 0.0, "B": 40.0}},
+        "b2": {"x": {"1": 20.0, "2": 28.0}, "y": {"A": 10.0, "B": 50.0}},
+    })
+    # 只按 x 聚类会把四张都收进来；联合聚类必须把 B 组挡在外面
+    assert sorted(frame.members) == ["a1", "a2"]
+    assert "b1" in frame.rejected and "b2" in frame.rejected
