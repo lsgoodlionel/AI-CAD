@@ -242,8 +242,15 @@ def build_axis_frame(observations: dict | None) -> AxisFrame:
             frame.rejected[did] = "residual_too_large"
             continue
         frame.members.append(did)
-        frame.offsets[did] = {
-            d: align_offset(shifted[d], consensus[d]) for d in ("x", "y")}
+        # **总平移量 = 生长时的对齐平移 + 归零后的残余修正**。
+        # 只存后者会丢掉大的那一半——实测轨道交通换到帧内后
+        # 包络/核心比从 3.05 涨到 15.74，因为每张图只挪了一点点、
+        # 仍散在各自的原位。契约是「原坐标 + offset = 帧内坐标」。
+        frame.offsets[did] = {}
+        for d in ("x", "y"):
+            correction = align_offset(shifted[d], consensus[d])
+            frame.offsets[did][d] = (
+                off.get(d, 0.0) + correction if correction is not None else None)
 
     if frame.rejected and frame.members:
         # 剔除离群图后重算 —— 否则离群图仍留在共识里带偏结果
@@ -284,3 +291,61 @@ def build_axis_frames(observations: dict | None) -> list[AxisFrame]:
             break
     frames.sort(key=lambda f: (-len(f.members), f.members[:1]))
     return frames
+
+
+def register_frames(frames: list | None) -> list:
+    """帧间配准：每个帧相对**锚帧**的整体平移量。
+
+    **帧内部干净不等于帧之间对齐。** 每个帧以「本帧最小轴号 = 0」
+    为原点，321 个帧就是 321 个互不相干的原点。实测把构件换到帧内后
+    包络/核心比不降反升（大歌剧院 3.99→4.85、轨道交通 3.05→8.42）。
+
+    帧之间同样靠**共有轴号**配准——把每个帧的轴网当作一次观测，
+    用同一套共识算法再上一层。
+
+    **成员最多的帧当锚**：它的证据最多，让它去迁就小帧没有道理。
+    与任何已配准帧都没有共有轴号的返回 `None`——
+    偏移 0 会被下游当成「已配准到原点」，而它其实是「没配准」。
+    """
+    items = list(frames or [])
+    if not items:
+        return []
+    order = sorted(range(len(items)), key=lambda i: -len(items[i].members))
+    anchor = order[0]
+    result: list = [None] * len(items)
+    result[anchor] = {"x": 0.0, "y": 0.0}
+    pool = {d: dict(items[anchor].axes.get(d) or {}) for d in ("x", "y")}
+
+    progressed = True
+    pending = [i for i in order[1:]]
+    while pending and progressed:
+        progressed = False
+        for index in list(pending):
+            axes = items[index].axes or {}
+            offs, ok = {}, False
+            for d in ("x", "y"):
+                own = axes.get(d) or {}
+                off = align_offset(own, pool[d]) if own else None
+                if off is None:
+                    offs[d] = 0.0
+                    continue
+                shifted = {k: v + off for k, v in own.items()}
+                # **配准也要校验残差**：只看「有没有共有轴号」就收，
+                # 错配的帧会污染池子、后续帧跟着错
+                # （实测大歌剧院包络 833→1079 米）。
+                # 这个坑第三次出现了——前两次在 `_grow_consensus`
+                # 与分方向聚类。
+                if alignment_residual(shifted, pool[d]) > MAX_FRAME_RESIDUAL_M:
+                    ok = False
+                    break
+                offs[d] = off
+                ok = True           # 至少一个方向对上才算配准
+            if not ok:
+                continue
+            pending.remove(index)
+            result[index] = offs
+            for d in ("x", "y"):
+                for label, value in (axes.get(d) or {}).items():
+                    pool[d].setdefault(label, value + offs[d])
+            progressed = True
+    return result

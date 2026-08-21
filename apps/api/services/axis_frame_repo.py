@@ -120,13 +120,26 @@ async def persist_frames(db: Any, project_id: str,
     """
     await db.execute(_DELETE_FRAMES_SQL, {"project_id": project_id})
     frames_written = placed = with_constraint = 0
+    # **帧间配准**：每个帧以「本帧最小轴号 = 0」为原点，
+    # 不配准的话 N 个帧就是 N 个互不相干的原点——实测构件换到帧内后
+    # 包络/核心比不降反升（大歌剧院 3.99→4.85、轨道交通 3.05→8.42）。
+    from services.axis_frame import register_frames
+
+    all_frames = [f for frames in (grouped or {}).values() for f in (frames or [])]
+    registration = dict(zip(map(id, all_frames), register_frames(all_frames)))
+
     for (story_key, unit), frames in (grouped or {}).items():
         ordered = sorted(frames or [], key=lambda f: -len(f.members))
         rows = build_frame_rows(project_id, story_key, unit, ordered)
         for row, frame in zip(rows, ordered):
             record = await db.fetch_one(_INSERT_FRAME_SQL, row)
             frames_written += 1
+            world = registration.get(id(frame))
+            if world is None:
+                continue          # 未配准的帧不落摆放——判不出就说判不出
             for placement in build_placement_rows(str(record["id"]), frame):
+                placement["offset_x"] += float(world.get("x") or 0.0)
+                placement["offset_y"] += float(world.get("y") or 0.0)
                 await db.execute(_INSERT_PLACEMENT_SQL, placement)
                 placed += 1
                 if placement["frame_size"] >= 2:

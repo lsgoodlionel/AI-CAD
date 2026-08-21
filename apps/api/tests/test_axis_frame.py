@@ -220,3 +220,116 @@ def test_clustering_is_joint_across_both_directions():
     # 只按 x 聚类会把四张都收进来；联合聚类必须把 B 组挡在外面
     assert sorted(frame.members) == ["a1", "a2"]
     assert "b1" in frame.rejected and "b2" in frame.rejected
+
+
+@pytest.mark.unit
+def test_offset_is_the_total_shift_not_just_the_residual_correction():
+    """**存的平移量必须是「加上去就落进帧」的总量。**
+
+    实测教训：生长时先算了一个大的对齐平移把图挪到共识坐标系，
+    最后又算了一次归零后的残余修正，而只把后者存了下来——
+    大的那一半丢了。只读对照立刻暴露：轨道交通换到帧内后
+    包络/核心比从 3.05 涨到 **15.74**，因为每张图只挪了一点点、
+    仍散在各自的原位。
+
+    契约：`原坐标 + offset` 必须等于帧内坐标。
+    """
+    from services.axis_frame import build_axis_frame
+
+    frame = build_axis_frame({
+        "d1": {"x": {"1": 0.0, "2": 8.0}, "y": {"A": 0.0, "B": 6.0}},
+        # 页面原点偏了 500 米 —— 平移量必须包含这 500
+        "d2": {"x": {"1": 500.0, "2": 508.0}, "y": {"A": 300.0, "B": 306.0}},
+    })
+    assert sorted(frame.members) == ["d1", "d2"]
+    for did, obs in (("d1", {"x": 0.0, "y": 0.0}),
+                     ("d2", {"x": 500.0, "y": 300.0})):
+        off = frame.offsets[did]
+        # 轴号 1 / A 在帧内是 0 —— 加上 offset 后必须落在 0
+        assert obs["x"] + off["x"] == pytest.approx(0.0, abs=1e-6)
+        assert obs["y"] + off["y"] == pytest.approx(0.0, abs=1e-6)
+
+
+# ── 帧间配准 ──────────────────────────────────────────────────
+
+@pytest.mark.unit
+def test_frames_are_registered_to_each_other_by_shared_labels():
+    """**帧内部干净不等于帧之间对齐。**
+
+    每个帧以「本帧最小轴号 = 0」为原点，321 / 246 个帧就是
+    321 / 246 个互不相干的原点。实测把构件换到帧内后
+    包络/核心比不降反升（大歌剧院 3.99→4.85、轨道交通 3.05→8.42）——
+    帧是散的。
+
+    帧之间同样靠**共有轴号**配准：把每个帧的轴网当作一次观测，
+    用同一套共识算法再上一层。
+    """
+    from services.axis_frame import AxisFrame, register_frames
+
+    frames = [
+        AxisFrame(axes={"x": {"1": 0.0, "2": 8.0, "3": 16.0},
+                        "y": {"A": 0.0, "B": 6.0}}, members=["a"]),
+        # 同一片轴网的另一个帧：只见到 2/3，自己归零后 2=0
+        AxisFrame(axes={"x": {"2": 0.0, "3": 8.0},
+                        "y": {"A": 0.0, "B": 6.0}}, members=["b"]),
+    ]
+    offsets = register_frames(frames)
+    # 第二个帧要整体右移 8 米才与第一个帧的 2/3 对上
+    assert offsets[1]["x"] == pytest.approx(8.0)
+    assert offsets[1]["y"] == pytest.approx(0.0)
+    assert offsets[0]["x"] == pytest.approx(0.0)
+
+
+@pytest.mark.unit
+def test_unregisterable_frame_gets_none_not_zero():
+    """与任何帧都没有共有轴号时返回 None ——
+    **偏移 0 会被下游当成「已配准到原点」**，而它其实是「没配准」。"""
+    from services.axis_frame import AxisFrame, register_frames
+
+    offsets = register_frames([
+        AxisFrame(axes={"x": {"1": 0.0, "2": 8.0}, "y": {"A": 0.0}}, members=["a"]),
+        AxisFrame(axes={"x": {"88": 0.0, "99": 5.0}, "y": {"Z": 0.0}}, members=["b"]),
+    ])
+    assert offsets[0] == {"x": 0.0, "y": 0.0}
+    assert offsets[1] is None
+
+
+@pytest.mark.unit
+def test_largest_frame_anchors_the_registration():
+    """成员最多的帧当锚——它的证据最多，让它去迁就小帧没有道理。"""
+    from services.axis_frame import AxisFrame, register_frames
+
+    offsets = register_frames([
+        AxisFrame(axes={"x": {"1": 0.0, "2": 8.0}, "y": {"A": 0.0}}, members=["a"]),
+        AxisFrame(axes={"x": {"1": 0.0, "2": 8.0}, "y": {"A": 0.0}},
+                  members=["b", "c", "d"]),
+    ])
+    assert offsets[1] == {"x": 0.0, "y": 0.0}      # 大帧不动
+    assert offsets[0]["x"] == pytest.approx(0.0)
+
+
+@pytest.mark.unit
+def test_misregistered_frame_does_not_pollute_the_pool():
+    """**「来者不拒」这个坑第三次出现了。**
+
+    前两次：`_grow_consensus` 只看有没有共有轴号就并入（混两套轴网时
+    返回 0 帧）；`_grow_joint` 分方向各自成团。
+    这一次是帧间配准——每个配准过的帧的轴号都进池子却不校验残差，
+    错配的帧污染池子后，后续帧跟着错（大歌剧院包络 833→1079 米）。
+
+    规则：配准也要校验残差，不达标的不进池、不给偏移。
+    """
+    from services.axis_frame import AxisFrame, register_frames
+
+    frames = [
+        AxisFrame(axes={"x": {"1": 0.0, "2": 8.0, "3": 16.0}, "y": {"A": 0.0}},
+                  members=["a", "b", "c"]),
+        # 轴距完全不同 —— 不是同一片轴网，配不上
+        AxisFrame(axes={"x": {"1": 0.0, "2": 40.0, "3": 80.0}, "y": {"A": 0.0}},
+                  members=["x"]),
+        # 与锚帧一致，应当配准成功
+        AxisFrame(axes={"x": {"2": 0.0, "3": 8.0}, "y": {"A": 0.0}}, members=["y"]),
+    ]
+    offsets = register_frames(frames)
+    assert offsets[1] is None, "轴距不符的帧不该被配准"
+    assert offsets[2] is not None and offsets[2]["x"] == pytest.approx(8.0)
