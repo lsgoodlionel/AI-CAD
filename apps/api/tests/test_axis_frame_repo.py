@@ -96,3 +96,27 @@ def test_without_a_placement_points_are_returned_unchanged():
     from services.axis_frame_repo import to_frame_coords
 
     assert to_frame_coords([[1.0, 2.0]], None) == [[1.0, 2.0]]
+
+
+@pytest.mark.unit
+def test_unregistered_frames_still_get_placements():
+    """**帧内一致性与帧间配准是两件事，不能一起丢。**
+
+    K-1 实测帧内残差毫米级、覆盖 86%；K-3 帧间配准实测只有 12% 的图
+    落在已配准的帧里。此前对未配准的帧直接不落摆放——
+    **把 K-1 的成果也丢了**（落库摆放 1394 → 171）。
+
+    正确做法：都落库，用 `registered` 标出分界。
+    帧内一致可用于同帧构件的相对关系；帧间未配准则不能跨帧摆放。
+    """
+    from services.axis_frame_repo import build_placement_rows
+    from services.axis_frame import AxisFrame
+
+    frame = AxisFrame(members=["d1"], offsets={"d1": {"x": 1.0, "y": 2.0}},
+                      residuals={"d1": 0.001})
+    rows = build_placement_rows("f1", frame, registered=False)
+    assert rows[0]["registered"] is False
+    assert rows[0]["offset_x"] == 1.0
+
+    rows = build_placement_rows("f1", frame, registered=True)
+    assert rows[0]["registered"] is True

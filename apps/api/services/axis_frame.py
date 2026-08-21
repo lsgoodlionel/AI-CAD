@@ -349,3 +349,37 @@ def register_frames(frames: list | None) -> list:
                     pool[d].setdefault(label, value + offs[d])
             progressed = True
     return result
+
+
+def register_frames_by_structure(keyed_frames: list | None) -> list:
+    """按**结构关系**决定谁能与谁配准。
+
+    `keyed_frames`: `[((story_key, unit, frame_index), AxisFrame), …]`
+
+    两条规则来自建筑本身，不是调参：
+    - **同一单体的不同楼层共用一套轴网**（建筑垂直对齐）→ 可配准
+    - **同一楼层的不同分区是不同轴网**（GB/T 50001 §8.0.5 一图三套）
+      → 不可配准，它们共用轴号名却不共用轴网
+    - 跨单体不可配准（南区北区各有各的原点，配准会把两栋楼摞在一起）
+
+    实测过强行让所有帧互相配准的代价：宽松则污染
+    （大歌剧院包络 833→1079 米），严格则归零（落库摆放 1394→157）。
+    所以**按结构关系先分好谁跟谁有资格比**，再谈残差。
+
+    只有每层的**主帧**（frame_index=0，成员最多）参与跨层配准；
+    同层的次帧是分区帧，各自独立、不给偏移。
+    """
+    items = list(keyed_frames or [])
+    result: list = [None] * len(items)
+    lanes: dict = {}
+    for index, (key, frame) in enumerate(items):
+        story, unit, frame_index = key
+        if frame_index != 0:
+            continue                    # 分区帧：不参与跨层配准
+        lanes.setdefault(unit, []).append((index, frame))
+
+    for _unit, members in lanes.items():
+        offsets = register_frames([f for _i, f in members])
+        for (index, _f), offset in zip(members, offsets):
+            result[index] = offset
+    return result

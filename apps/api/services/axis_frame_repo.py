@@ -37,7 +37,8 @@ def build_frame_rows(project_id: str, story_key: str, building_unit: str,
     ]
 
 
-def build_placement_rows(frame_id: str, frame: AxisFrame | None) -> list[dict]:
+def build_placement_rows(frame_id: str, frame: AxisFrame | None,
+                         registered: bool = False) -> list[dict]:
     """帧 → `drawing_frame_placements` 入库行。
 
     **没算出平移量的图不落库**：偏移 0 会被下游当成「已对齐」，
@@ -63,6 +64,11 @@ def build_placement_rows(frame_id: str, frame: AxisFrame | None) -> list[dict]:
             "offset_y": float(offset["y"]),
             "residual_m": (frame.residuals or {}).get(did),
             "frame_size": size,
+            # **帧内一致 ≠ 帧间已配准**：K-1 的帧内残差毫米级、覆盖 86%，
+            # 而 K-3 的帧间配准只覆盖 12%。两者必须能分开——
+            # 此前对未配准的帧直接不落摆放，把 K-1 的成果一起丢了
+            # （落库摆放 1394 → 171）。
+            "registered": bool(registered),
         })
     return rows
 
@@ -100,13 +106,15 @@ RETURNING id
 
 _INSERT_PLACEMENT_SQL = """
 INSERT INTO drawing_frame_placements
-  (drawing_id, frame_id, offset_x, offset_y, residual_m, frame_size, updated_at)
+  (drawing_id, frame_id, offset_x, offset_y, residual_m, frame_size,
+   registered, updated_at)
 VALUES (CAST(:drawing_id AS uuid), CAST(:frame_id AS uuid),
-        :offset_x, :offset_y, :residual_m, :frame_size, now())
+        :offset_x, :offset_y, :residual_m, :frame_size, :registered, now())
 ON CONFLICT (drawing_id) DO UPDATE SET
   frame_id = EXCLUDED.frame_id, offset_x = EXCLUDED.offset_x,
   offset_y = EXCLUDED.offset_y, residual_m = EXCLUDED.residual_m,
-  frame_size = EXCLUDED.frame_size, updated_at = now()
+  frame_size = EXCLUDED.frame_size, registered = EXCLUDED.registered,
+  updated_at = now()
 """
 
 
@@ -119,14 +127,19 @@ async def persist_frames(db: Any, project_id: str,
     （E1.5 的 supersedes 教训）。
     """
     await db.execute(_DELETE_FRAMES_SQL, {"project_id": project_id})
-    frames_written = placed = with_constraint = 0
+    frames_written = placed = with_constraint = registered_count = 0
     # **帧间配准**：每个帧以「本帧最小轴号 = 0」为原点，
     # 不配准的话 N 个帧就是 N 个互不相干的原点——实测构件换到帧内后
     # 包络/核心比不降反升（大歌剧院 3.99→4.85、轨道交通 3.05→8.42）。
-    from services.axis_frame import register_frames
+    from services.axis_frame import register_frames_by_structure
 
-    all_frames = [f for frames in (grouped or {}).values() for f in (frames or [])]
-    registration = dict(zip(map(id, all_frames), register_frames(all_frames)))
+    keyed = []
+    for (story_key, unit), frames in (grouped or {}).items():
+        for index, frame in enumerate(sorted(frames or [],
+                                             key=lambda f: -len(f.members))):
+            keyed.append(((story_key, unit or "-", index), frame))
+    registration = dict(zip((id(f) for _k, f in keyed),
+                            register_frames_by_structure(keyed)))
 
     for (story_key, unit), frames in (grouped or {}).items():
         ordered = sorted(frames or [], key=lambda f: -len(f.members))
@@ -135,15 +148,20 @@ async def persist_frames(db: Any, project_id: str,
             record = await db.fetch_one(_INSERT_FRAME_SQL, row)
             frames_written += 1
             world = registration.get(id(frame))
-            if world is None:
-                continue          # 未配准的帧不落摆放——判不出就说判不出
-            for placement in build_placement_rows(str(record["id"]), frame):
-                placement["offset_x"] += float(world.get("x") or 0.0)
-                placement["offset_y"] += float(world.get("y") or 0.0)
+            # 未配准的帧**照样落摆放**，只是标记 registered=false：
+            # 帧内一致性（K-1，毫米级）与帧间配准（K-3）是两件事。
+            for placement in build_placement_rows(
+                    str(record["id"]), frame, registered=world is not None):
+                placement["offset_x"] += float((world or {}).get("x") or 0.0)
+                placement["offset_y"] += float((world or {}).get("y") or 0.0)
                 await db.execute(_INSERT_PLACEMENT_SQL, placement)
                 placed += 1
                 if placement["frame_size"] >= 2:
                     with_constraint += 1
+                if placement["registered"]:
+                    registered_count += 1
     return {"frames": frames_written, "placed": placed,
             # **主口径是「有交叉约束的」**：单成员帧残差恒 0 却不构成证据
-            "with_constraint": with_constraint}
+            "with_constraint": with_constraint,
+            # 帧间已配准的——K-1 与 K-3 的分界，两者不可混为一谈
+            "registered": registered_count}

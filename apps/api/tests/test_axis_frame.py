@@ -333,3 +333,68 @@ def test_misregistered_frame_does_not_pollute_the_pool():
     offsets = register_frames(frames)
     assert offsets[1] is None, "轴距不符的帧不该被配准"
     assert offsets[2] is not None and offsets[2]["x"] == pytest.approx(8.0)
+
+
+# ── K-3 重做：按结构关系决定谁能配准 ──────────────────────────
+
+@pytest.mark.unit
+def test_frames_across_stories_of_one_unit_register():
+    """**同一单体的不同楼层本就共用一套轴网**——建筑是垂直对齐的，
+    这类帧之间的配准是合法的。"""
+    from services.axis_frame import AxisFrame, register_frames_by_structure
+
+    frames = [
+        (("F1", "main", 0), AxisFrame(axes={"x": {"1": 0.0, "2": 8.0},
+                                            "y": {"A": 0.0}}, members=["a", "b"])),
+        (("F2", "main", 0), AxisFrame(axes={"x": {"1": 0.0, "2": 8.0},
+                                            "y": {"A": 0.0}}, members=["c", "d"])),
+    ]
+    offsets = register_frames_by_structure(frames)
+    assert offsets[0] is not None and offsets[1] is not None
+
+
+@pytest.mark.unit
+def test_zone_frames_within_one_story_do_not_register():
+    """**同一楼层的不同分区是不同轴网**（GB/T 50001 §8.0.5：
+    一图三套轴网），共用轴号名却不共用轴网。
+
+    强行配准的代价实测过：宽松则污染（包络 833→1079 米），
+    严格则归零（落库摆放 1394→157）。所以按结构关系直接排除。
+    """
+    from services.axis_frame import AxisFrame, register_frames_by_structure
+
+    frames = [
+        (("F1", "main", 0), AxisFrame(axes={"x": {"1": 0.0, "2": 8.0},
+                                            "y": {"A": 0.0}}, members=["a", "b"])),
+        # 同层第二套轴网 = 另一个分区
+        (("F1", "main", 1), AxisFrame(axes={"x": {"1": 0.0, "2": 8.0},
+                                            "y": {"A": 0.0}}, members=["c"])),
+    ]
+    offsets = register_frames_by_structure(frames)
+    assert offsets[0] is not None
+    assert offsets[1] is None, "同层分区帧不该被配准"
+
+
+@pytest.mark.unit
+def test_different_units_do_not_register():
+    """南区与北区各有各的原点——跨单体配准会把两栋楼摞在一起。"""
+    from services.axis_frame import AxisFrame, register_frames_by_structure
+
+    frames = [
+        (("F1", "south", 0), AxisFrame(axes={"x": {"1": 0.0}, "y": {"A": 0.0}},
+                                       members=["a", "b"])),
+        (("F1", "north", 0), AxisFrame(axes={"x": {"1": 0.0}, "y": {"A": 0.0}},
+                                       members=["c", "d"])),
+    ]
+    offsets = register_frames_by_structure(frames)
+    # 各自成锚，互不配准
+    assert offsets[0] == {"x": 0.0, "y": 0.0}
+    assert offsets[1] == {"x": 0.0, "y": 0.0}
+
+
+@pytest.mark.unit
+def test_empty_input_is_safe():
+    from services.axis_frame import register_frames_by_structure
+
+    assert register_frames_by_structure([]) == []
+    assert register_frames_by_structure(None) == []
