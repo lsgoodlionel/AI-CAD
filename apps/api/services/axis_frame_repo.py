@@ -132,14 +132,38 @@ async def persist_frames(db: Any, project_id: str,
     # 不配准的话 N 个帧就是 N 个互不相干的原点——实测构件换到帧内后
     # 包络/核心比不降反升（大歌剧院 3.99→4.85、轨道交通 3.05→8.42）。
     from services.axis_frame import register_frames_by_structure
+    from services.frame_world_anchor import solve_frame_world_offset
+
+    # **第一级：世界锚点**（强证据，Phase I 实测 RMSE 5.7 毫米）。
+    # 实测 `axis_intersections` 全部带世界坐标，覆盖大歌剧院 76 张图、
+    # 36 个帧，能钉住 445 张图（32%）——比纯靠帧间共有轴号的 12% 高一倍多。
+    anchor_rows = await db.fetch_all(
+        "SELECT drawing_id, label_x, label_y, world_x, world_y "
+        "FROM axis_intersections WHERE project_id = CAST(:p AS uuid) "
+        "AND world_x IS NOT NULL", {"p": project_id})
+    anchors_by_drawing: dict = {}
+    for row in anchor_rows:
+        anchors_by_drawing.setdefault(str(row["drawing_id"]), []).append(dict(row))
 
     keyed = []
     for (story_key, unit), frames in (grouped or {}).items():
         for index, frame in enumerate(sorted(frames or [],
                                              key=lambda f: -len(f.members))):
             keyed.append(((story_key, unit or "-", index), frame))
-    registration = dict(zip((id(f) for _k, f in keyed),
-                            register_frames_by_structure(keyed)))
+    # 第一级：锚点钉住的帧
+    pinned_by_index = {}
+    for index, (_key, frame) in enumerate(keyed):
+        pinned = solve_frame_world_offset(
+            frame.axes,
+            [a for m in frame.members for a in anchors_by_drawing.get(m, [])])
+        if pinned and pinned.get("x") is not None and pinned.get("y") is not None:
+            pinned_by_index[index] = pinned
+    anchored = len(pinned_by_index)
+
+    # 第二级：其余帧向**已钉住的帧**对齐（不是另起一个 0 点，
+    # 否则两级配准落在不同参照系里，内容被隔开几公里）
+    by_labels = register_frames_by_structure(keyed, seeds=pinned_by_index)
+    registration = {id(f): by_labels[i] for i, (_k, f) in enumerate(keyed)}
 
     for (story_key, unit), frames in (grouped or {}).items():
         ordered = sorted(frames or [], key=lambda f: -len(f.members))
@@ -161,6 +185,7 @@ async def persist_frames(db: Any, project_id: str,
                 if placement["registered"]:
                     registered_count += 1
     return {"frames": frames_written, "placed": placed,
+            "anchored_frames": anchored,
             # **主口径是「有交叉约束的」**：单成员帧残差恒 0 却不构成证据
             "with_constraint": with_constraint,
             # 帧间已配准的——K-1 与 K-3 的分界，两者不可混为一谈

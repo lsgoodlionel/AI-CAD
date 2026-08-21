@@ -293,7 +293,7 @@ def build_axis_frames(observations: dict | None) -> list[AxisFrame]:
     return frames
 
 
-def register_frames(frames: list | None) -> list:
+def register_frames(frames: list | None, seeds: dict | None = None) -> list:
     """帧间配准：每个帧相对**锚帧**的整体平移量。
 
     **帧内部干净不等于帧之间对齐。** 每个帧以「本帧最小轴号 = 0」
@@ -310,14 +310,32 @@ def register_frames(frames: list | None) -> list:
     items = list(frames or [])
     if not items:
         return []
-    order = sorted(range(len(items)), key=lambda i: -len(items[i].members))
-    anchor = order[0]
     result: list = [None] * len(items)
-    result[anchor] = {"x": 0.0, "y": 0.0}
-    pool = {d: dict(items[anchor].axes.get(d) or {}) for d in ("x", "y")}
+    pool = {"x": {}, "y": {}}
+
+    # **已钉住的帧当锚**：两级配准必须落在同一个参照系里。
+    # 实测锚点给的是测量坐标（几十万米量级），轴号配准另起 0 点给的是
+    # 帧内局部坐标，混进同一场景内容被隔开几公里
+    # （大歌剧院包络 6563 米，而建筑实际约 200 米）。
+    fixed = dict(seeds or {})
+    if fixed:
+        anchors = sorted(fixed, key=lambda i: -len(items[i].members))
+        for index in anchors:
+            result[index] = dict(fixed[index])
+            for d in ("x", "y"):
+                for label, value in (items[index].axes.get(d) or {}).items():
+                    pool[d].setdefault(label, value + float(fixed[index][d]))
+        pending = [i for i in sorted(range(len(items)),
+                                     key=lambda i: -len(items[i].members))
+                   if i not in fixed]
+    else:
+        order = sorted(range(len(items)), key=lambda i: -len(items[i].members))
+        anchor = order[0]
+        result[anchor] = {"x": 0.0, "y": 0.0}
+        pool = {d: dict(items[anchor].axes.get(d) or {}) for d in ("x", "y")}
+        pending = [i for i in order[1:]]
 
     progressed = True
-    pending = [i for i in order[1:]]
     while pending and progressed:
         progressed = False
         for index in list(pending):
@@ -351,7 +369,8 @@ def register_frames(frames: list | None) -> list:
     return result
 
 
-def register_frames_by_structure(keyed_frames: list | None) -> list:
+def register_frames_by_structure(keyed_frames: list | None,
+                                 seeds: dict | None = None) -> list:
     """按**结构关系**决定谁能与谁配准。
 
     `keyed_frames`: `[((story_key, unit, frame_index), AxisFrame), …]`
@@ -379,7 +398,10 @@ def register_frames_by_structure(keyed_frames: list | None) -> list:
         lanes.setdefault(unit, []).append((index, frame))
 
     for _unit, members in lanes.items():
-        offsets = register_frames([f for _i, f in members])
+        local_seeds = {pos: (seeds or {})[index]
+                       for pos, (index, _f) in enumerate(members)
+                       if index in (seeds or {})}
+        offsets = register_frames([f for _i, f in members], seeds=local_seeds)
         for (index, _f), offset in zip(members, offsets):
             result[index] = offset
     return result

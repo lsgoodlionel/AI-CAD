@@ -398,3 +398,27 @@ def test_empty_input_is_safe():
 
     assert register_frames_by_structure([]) == []
     assert register_frames_by_structure(None) == []
+
+
+@pytest.mark.unit
+def test_label_registration_seeds_from_already_pinned_frames():
+    """**两级配准必须落在同一个参照系里。**
+
+    实测教训：锚点给的是测量坐标（几十万米量级），
+    轴号配准另起一个 0 点给的是帧内局部坐标——两者混进同一个场景，
+    内容被隔开几公里（大歌剧院包络 6563 米，而建筑实际约 200 米）。
+
+    所以轴号配准要**以已钉住的帧为锚**，而不是自己挑一个最大的帧当 0 点。
+    """
+    from services.axis_frame import AxisFrame, register_frames
+
+    frames = [
+        # 已被世界锚点钉住：轴号 1 在世界坐标 1000
+        AxisFrame(axes={"x": {"1": 0.0, "2": 8.0}, "y": {"A": 0.0}}, members=["a"]),
+        AxisFrame(axes={"x": {"2": 0.0, "3": 8.0}, "y": {"A": 0.0}},
+                  members=["b", "c", "d"]),   # 成员更多，但不该当锚
+    ]
+    offsets = register_frames(frames, seeds={0: {"x": 1000.0, "y": 500.0}})
+    assert offsets[0] == {"x": 1000.0, "y": 500.0}
+    # 第二个帧的轴号 2 对应第一个帧的 x=8 → 世界 1008
+    assert offsets[1]["x"] == pytest.approx(1008.0)
