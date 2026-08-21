@@ -48,6 +48,14 @@ class DrawingGeometry:
 class FloorElements:
     """一张平面图识别出的构件集合（米坐标）。"""
     scale: float = 0.0                 # 米/点 换算系数
+    #: 识别器**自己算的**轴网原点（页面点）与页幅高。
+    #:
+    #: **构件坐标不走 `drawing_transform`**——`_Ctx` 用的是这一组。
+    #: 本轮实测：修好 S-0-20-102.04C 的 drawing_transform 后构件坐标
+    #: 纹丝不动。所以要把米坐标反算回页面（导出训练集、叠框核验都需要），
+    #: 必须用这一组参数，用那张表会整体错位。
+    origin_pt: tuple = (0.0, 0.0)
+    page_h: float = 0.0
     axes: dict = field(default_factory=dict)   # {"x":[(label,pos_m)], "y":[...], 可含 truncated}
     columns: list[dict] = field(default_factory=list)
     walls: list[dict] = field(default_factory=list)

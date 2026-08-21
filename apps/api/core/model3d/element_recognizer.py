@@ -205,6 +205,8 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
             rects, rect_layers, rect_blocks, polys, poly_layers, poly_blocks, geom.texts, ctx
         )
         _clip_to_axes(result)
+        result.origin_pt = tuple(ctx.origin)
+        result.page_h = ctx.page_h
         return result
 
     # **墙图上的填充截面是墙不是柱**（实测 1404 根假柱）。
@@ -234,6 +236,8 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
         result.walls = pairs[:_CAPS["walls"]]
     result.slabs = _find_slabs(polys, poly_layers, poly_blocks, axis_x, axis_y, ctx, result.columns)
     _clip_to_axes(result)
+    result.origin_pt = tuple(ctx.origin)
+    result.page_h = ctx.page_h
     return result
 
 
