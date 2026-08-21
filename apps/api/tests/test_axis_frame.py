@@ -110,3 +110,87 @@ def test_empty_and_degenerate_inputs_are_safe():
     assert build_axis_frame({}).members == []
     assert build_axis_frame(None).axes == {"x": {}, "y": {}}
     assert build_axis_frame({"d": {"x": {"1": 0.0}, "y": {"A": 0.0}}}).members == ["d"]
+
+
+# ── 多帧聚类 ──────────────────────────────────────────────────
+
+@pytest.mark.unit
+def test_incompatible_grids_become_separate_frames():
+    """**一个分组里可能本就有多套轴网**，要聚类而不是强行合一。
+
+    实测依据：按楼层+单体分组后，残差 **P25 = 0.007 米（7 毫米）**
+    而中位 2.8 米——四分之一的图对齐到毫米级，方法本身没问题；
+    排除法已否掉图种、专业、重复轴号、比例、方向五个假设，
+    剩下的解释就是**分组里混着互不相容的轴网**。
+
+    强行合一的代价：多数图被判「残差过大」而整批丢弃，
+    而它们其实各自内部是自洽的。
+    """
+    from services.axis_frame import build_axis_frames
+
+    frames = build_axis_frames({
+        # 一套：轴距 8 米
+        "a1": {"x": {"1": 0.0, "2": 8.0, "3": 16.0}, "y": {"A": 0.0, "B": 6.0}},
+        "a2": {"x": {"1": 50.0, "2": 58.0, "3": 66.0}, "y": {"A": 20.0, "B": 26.0}},
+        # 另一套：同样的轴号，轴距 30 米 —— 不是同一片轴网
+        "b1": {"x": {"1": 0.0, "2": 30.0, "3": 60.0}, "y": {"A": 0.0, "B": 20.0}},
+        "b2": {"x": {"1": 5.0, "2": 35.0, "3": 65.0}, "y": {"A": 3.0, "B": 23.0}},
+    })
+    assert len(frames) == 2
+    groups = sorted(sorted(f.members) for f in frames)
+    assert groups == [["a1", "a2"], ["b1", "b2"]]
+
+
+@pytest.mark.unit
+def test_frames_are_ordered_by_membership():
+    """主轴网（成员最多的那套）排第一——下游默认取它。"""
+    from services.axis_frame import build_axis_frames
+
+    frames = build_axis_frames({
+        "a1": {"x": {"1": 0.0, "2": 8.0}, "y": {"A": 0.0, "B": 6.0}},
+        "a2": {"x": {"1": 0.0, "2": 8.0}, "y": {"A": 0.0, "B": 6.0}},
+        "a3": {"x": {"1": 0.0, "2": 8.0}, "y": {"A": 0.0, "B": 6.0}},
+        "b1": {"x": {"1": 0.0, "2": 40.0}, "y": {"A": 0.0, "B": 30.0}},
+    })
+    assert len(frames[0].members) >= len(frames[-1].members)
+    assert frames[0].members == ["a1", "a2", "a3"]
+
+
+@pytest.mark.unit
+def test_single_consistent_group_yields_one_frame():
+    """本来就自洽的分组不该被拆开。"""
+    from services.axis_frame import build_axis_frames
+
+    frames = build_axis_frames({
+        "d1": {"x": {"1": 0.0, "2": 8.0}, "y": {"A": 0.0, "B": 6.0}},
+        "d2": {"x": {"1": 10.0, "2": 18.0}, "y": {"A": 5.0, "B": 11.0}},
+    })
+    assert len(frames) == 1 and sorted(frames[0].members) == ["d1", "d2"]
+
+
+@pytest.mark.unit
+def test_empty_input_yields_no_frames():
+    from services.axis_frame import build_axis_frames
+
+    assert build_axis_frames({}) == []
+    assert build_axis_frames(None) == []
+
+
+@pytest.mark.unit
+def test_seed_follows_the_majority_spacing_not_the_alphabet():
+    """**种子不该由字母序决定**：三张图标签数相同时，
+    实测按字母序选中了那张轴距 30 米的错图，
+    帧围绕错图形成、把两张正确的图判成离群。
+
+    改用多数派轴距选种子——正确的图总是多数，这是可测的事实，
+    而字母序不携带任何信息。
+    """
+    from services.axis_frame import build_axis_frame
+
+    frame = build_axis_frame({
+        "bad": {"x": {"1": 0.0, "2": 30.0, "3": 60.0}, "y": {"A": 0.0, "B": 20.0}},
+        "d1": {"x": {"1": 0.0, "2": 8.0, "3": 16.0}, "y": {"A": 0.0, "B": 6.0}},
+        "d2": {"x": {"1": 0.0, "2": 8.0, "3": 16.0}, "y": {"A": 0.0, "B": 6.0}},
+    })
+    assert sorted(frame.members) == ["d1", "d2"]
+    assert frame.axes["x"]["2"] == pytest.approx(8.0)

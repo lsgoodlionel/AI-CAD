@@ -86,6 +86,33 @@ def _usable(observation: dict) -> bool:
     return all(len((observation or {}).get(d) or {}) >= 1 for d in ("x", "y"))
 
 
+def _median_spacing(positions: dict) -> float | None:
+    """该图相邻轴线间距的中位数——**轴网的指纹**。"""
+    values = sorted(float(v) for v in (positions or {}).values())
+    gaps = [b - a for a, b in zip(values, values[1:]) if b - a > 1e-6]
+    if not gaps:
+        return None
+    gaps.sort()
+    return gaps[len(gaps) // 2]
+
+
+def _pick_seed(remaining: dict) -> str:
+    """选种子：**轴距最接近多数派的那张**。
+
+    **不能按字母序或标签数**：实测三张图标签数相同时按字母序
+    选中了轴距 30 米的错图，帧围绕错图形成、把两张正确的图判成离群。
+    正确的图总是多数，多数派轴距是可测的事实；字母序不携带任何信息。
+    """
+    spacings = {d: _median_spacing(p) for d, p in remaining.items()}
+    known = sorted(v for v in spacings.values() if v is not None)
+    if not known:
+        return min(remaining, key=lambda d: (-len(remaining[d]), d))
+    typical = known[len(known) // 2]
+    return min(remaining, key=lambda d: (
+        abs((spacings[d] if spacings[d] is not None else typical * 10) - typical),
+        -len(remaining[d]), d))
+
+
 def _grow_consensus(normalized: dict, direction: str) -> tuple[dict, dict]:
     """增量对齐：从轴号最多的图起，靠**共有轴号**把其余图并进来。
 
@@ -100,7 +127,7 @@ def _grow_consensus(normalized: dict, direction: str) -> tuple[dict, dict]:
                  if obs.get(direction)}
     if not remaining:
         return {}, {}
-    seed = min(remaining, key=lambda d: (-len(remaining[d]), d))
+    seed = _pick_seed(remaining)
     # **保留全部已对齐的观测**再取中位：只用「当前共识 + 新图」两者
     # 取中位会丢掉累积的观测数，后进的图能把共识整体拉走
     # （实测三张图里那张轴距 30/60 的错图没被剔除，因为它把共识拉过去了）。
@@ -115,7 +142,14 @@ def _grow_consensus(normalized: dict, direction: str) -> tuple[dict, dict]:
             offset = align_offset(remaining[did], consensus)
             if offset is None:          # 无共有轴号 —— 没有对照就不猜
                 continue
-            pool[did] = {k: v + offset for k, v in remaining.pop(did).items()}
+            shifted = {k: v + offset for k, v in remaining[did].items()}
+            # **生长时就要校验，不能来者不拒**：只看「有没有共有轴号」
+            # 会把轴距不同的图也并进来，污染共识后全军覆没
+            # （实测混着两套轴网时返回 0 帧）。对齐后残差不达标的留给下一帧。
+            if alignment_residual(shifted, consensus) > MAX_FRAME_RESIDUAL_M:
+                continue
+            remaining.pop(did)
+            pool[did] = shifted
             aligned[did] = offset
             consensus = solve_global_axes(pool)
             progressed = True
@@ -173,3 +207,34 @@ def build_axis_frame(observations: dict | None) -> AxisFrame:
     frame.axes = consensus
     frame.members.sort()
     return frame
+
+
+def build_axis_frames(observations: dict | None) -> list[AxisFrame]:
+    """多图轴号观测 → **若干**互相自洽的轴网帧。
+
+    **为什么是复数**：一个分组（哪怕同层同单体）里可能本就有多套轴网。
+    实测按楼层+单体分组后，残差 **P25 = 0.007 米（7 毫米）**而中位 2.8 米——
+    四分之一的图对齐到毫米级，说明解算没问题；排除法否掉了图种、专业、
+    重复轴号、比例、方向五个假设，剩下的解释就是**分组里混着互不相容的
+    轴网**（分区工程一图三套，§8.33 已记）。
+
+    强行合一的代价是多数图被判「残差过大」整批丢弃，
+    而它们各自内部其实是自洽的。所以改为**聚类**：
+    反复建帧，把进帧的取走，对剩下的再建，直到没有新帧能成。
+
+    返回按成员数降序——主轴网排第一，下游默认取它。
+    """
+    remaining = dict(observations or {})
+    frames: list[AxisFrame] = []
+    while len(remaining) >= 1:
+        frame = build_axis_frame(remaining)
+        if not frame.members:
+            break
+        frames.append(frame)
+        for did in frame.members:
+            remaining.pop(did, None)
+        # 只剩单向图之类无法定帧的，收工
+        if not any(_usable(o) for o in remaining.values()):
+            break
+    frames.sort(key=lambda f: (-len(f.members), f.members[:1]))
+    return frames
