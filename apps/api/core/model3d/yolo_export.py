@@ -83,3 +83,69 @@ def meters_to_page(x_m: float, y_m: float, scale_m_pt: float,
     x_pt = x_m / scale_m_pt + ox
     y_pt = page_h - (y_m / scale_m_pt + oy)
     return (x_pt, y_pt)
+
+
+#: 切片边长与重叠（像素）。
+#:
+#: **为什么必须切片**：实测整图训练时框的中位尺寸在 1024px 下只有
+#: **3.7 × 4.8 像素**、P10 是 1.7 × 0.9 像素。YOLO 最小可检测目标约
+#: 8~10 像素，而这些框在 P3 特征层（1/8 下采样）上只剩 0.46 像素，
+#: **根本训不出来**。切片后构件在块内的相对尺寸放大约 7 倍。
+TILE_PX = 640
+TILE_OVERLAP_PX = 64
+
+#: 框中心必须落在块内，且块内保留面积不低于此比例——
+#: 跨在切线上只剩一丝的框是噪声。
+MIN_TILE_BOX_KEEP = 0.5
+
+
+def tile_grid(width: int, height: int, tile: int = TILE_PX,
+              overlap: int = TILE_OVERLAP_PX) -> list[tuple]:
+    """整图 → 切片窗口列表 `(x0, y0, x1, y1)`。
+
+    **重叠是必须的**：构件跨在切线上时两块各留一部分，
+    不重叠就两边都不完整。
+    """
+    step = max(1, tile - overlap)
+    out = []
+    y = 0
+    while y < height:
+        x = 0
+        while x < width:
+            out.append((x, y, min(x + tile, width), min(y + tile, height)))
+            if x + tile >= width:
+                break
+            x += step
+        if y + tile >= height:
+            break
+        y += step
+    return out
+
+
+def boxes_in_tile(boxes: list, page_w: int, page_h: int,
+                  tile: tuple) -> list[tuple]:
+    """整图归一化框 → 该切片内的归一化框。
+
+    中心在块外的丢弃；跨块的裁到块内，保留面积不足一半的也丢弃——
+    **宁可少一个样本，不要一个残框**。
+    """
+    x0, y0, x1, y1 = tile
+    tw, th = x1 - x0, y1 - y0
+    if tw <= 0 or th <= 0:
+        return []
+    out = []
+    for cls, cx, cy, w, h in boxes or []:
+        px, py = cx * page_w, cy * page_h
+        pw, ph = w * page_w, h * page_h
+        if not (x0 <= px <= x1 and y0 <= py <= y1):
+            continue
+        bx0, by0 = max(px - pw / 2, x0), max(py - ph / 2, y0)
+        bx1, by1 = min(px + pw / 2, x1), min(py + ph / 2, y1)
+        if bx1 <= bx0 or by1 <= by0:
+            continue
+        if (bx1 - bx0) * (by1 - by0) < MIN_TILE_BOX_KEEP * max(pw * ph, 1e-9):
+            continue
+        out.append((cls, ((bx0 + bx1) / 2 - x0) / tw,
+                    ((by0 + by1) / 2 - y0) / th,
+                    (bx1 - bx0) / tw, (by1 - by0) / th))
+    return out
