@@ -393,7 +393,11 @@ def register_frames_by_structure(keyed_frames: list | None,
     lanes: dict = {}
     for index, (key, frame) in enumerate(items):
         story, unit, frame_index = key
-        if frame_index != 0:
+        # **被锚点钉住的帧一律参与**：锚点带着实测世界坐标
+        # （Phase I 实测 RMSE 5.7 毫米），它是不是本组最大的帧
+        # 跟它的位置对不对毫无关系。因为排名把它排除掉，
+        # 等于把最硬的证据扔了。
+        if frame_index != 0 and index not in (seeds or {}):
             continue                    # 分区帧：不参与跨层配准
         lanes.setdefault(unit, []).append((index, frame))
 

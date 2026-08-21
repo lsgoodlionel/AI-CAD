@@ -422,3 +422,26 @@ def test_label_registration_seeds_from_already_pinned_frames():
     assert offsets[0] == {"x": 1000.0, "y": 500.0}
     # 第二个帧的轴号 2 对应第一个帧的 x=8 → 世界 1008
     assert offsets[1]["x"] == pytest.approx(1008.0)
+
+
+@pytest.mark.unit
+def test_anchored_frames_participate_regardless_of_index():
+    """**锚点是最强的证据，不该因为帧的排名被丢掉。**
+
+    `register_frames_by_structure` 原本只让每组的主帧（index=0）
+    参与跨层配准，理由是「同层次帧是分区帧」。
+    但被世界锚点钉住的帧带着实测坐标（Phase I 实测 RMSE 5.7 毫米），
+    它是不是本组最大跟它的位置对不对毫无关系——
+    因为排名把它排除掉，等于把最硬的证据扔了。
+    """
+    from services.axis_frame import AxisFrame, register_frames_by_structure
+
+    frames = [
+        (("F1", "main", 0), AxisFrame(axes={"x": {"1": 0.0}, "y": {"A": 0.0}},
+                                      members=["a", "b", "c"])),
+        # 次帧，但被锚点钉住
+        (("F1", "main", 2), AxisFrame(axes={"x": {"5": 0.0}, "y": {"K": 0.0}},
+                                      members=["z"])),
+    ]
+    offsets = register_frames_by_structure(frames, seeds={1: {"x": 700.0, "y": 400.0}})
+    assert offsets[1] == {"x": 700.0, "y": 400.0}, "锚点帧被排名挡住了"
