@@ -159,3 +159,48 @@ def test_pipe_system_from_layer():
     geom.texts.append((60.0, 40.0, "1:100"))
     result = recognize(geom, "mep", "d9")
     assert any(p["system"] == "消防" for p in result.pipes)
+
+
+# --- 图层名是「是什么类型」的证据，不是「是不是真构件」的证据 -----------
+
+def _plan_with_hatch_on_column_layer(side_m: float) -> DrawingGeometry:
+    """柱图层上混入 side_m 见方的碎多边形（剖面填充线 / 钢筋的常见表达）。"""
+    geom = _plan_unfilled_columns("S-COLU")
+    s = side_m * PT_PER_M
+    for k in range(6):
+        x = 150.0 + k * 20.0
+        geom.polys.append([(x, 200.0), (x + s, 200.0),
+                               (x + s, 200.0 + s), (x, 200.0 + s)])
+        geom.poly_layers.append("S-COLU")
+        geom.poly_blocks.append("")
+    return geom
+
+
+@pytest.mark.unit
+def test_millimetre_polys_on_column_layer_are_not_columns():
+    """1 毫米的多边形落在柱图层上也不是柱。
+
+    实测柱框边长**最小 0.001m**、10 分位仅 0.05m —— 多边形分支上
+    图层一判为柱就全盘接收、不设尺寸下限，填充线与钢筋因而变成「柱」。
+    """
+    result = recognize(_plan_with_hatch_on_column_layer(0.001), "structure", "d1")
+    assert len(result.columns) == 4          # 只剩 4 根真柱，6 个碎片被拒
+
+
+@pytest.mark.unit
+def test_undersized_but_plausible_poly_on_column_layer_still_kept():
+    """0.25m 的小柱仍收 —— 底线是排除物理荒谬，不是收紧到典型值。"""
+    result = recognize(_plan_with_hatch_on_column_layer(0.25), "structure", "d1")
+    assert len(result.columns) == 10         # 4 根柱 + 6 个合理尺寸多边形
+
+
+@pytest.mark.unit
+def test_oversized_poly_on_column_layer_is_not_a_column():
+    """7 米见方的东西落在柱图层上也不是柱。
+
+    实测柱图层上有 64 个（大歌剧院）/ 17 个（轨道交通）超过 3m 的「柱」，
+    最大 **7.0m**。它们本身是误检，更要命的是**去重时会把内部的真柱
+    一口吞掉**——实测最严重的一个输出框吞掉了 33 个输入框。
+    """
+    result = recognize(_plan_with_hatch_on_column_layer(7.0), "structure", "d1")
+    assert len(result.columns) == 4

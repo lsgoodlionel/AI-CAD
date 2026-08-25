@@ -166,6 +166,30 @@ def _box_iou(a: tuple, b: tuple) -> float:
     return inter / union if union > 0 else 0.0
 
 
+CONTAINED_FRACTION = 0.9      # 小框有九成面积落在大框内即视为同一构件
+
+
+def _mostly_contained(a: tuple, b: tuple,
+                      fraction: float = CONTAINED_FRACTION) -> bool:
+    """小框是否实质落在大框内——**IoU 去重的盲区**。
+
+    IoU = 交/并，小框套在大框内时 IoU ≈ 小/大，可以远低于阈值而逃脱。
+    实测柱框有 14%（大歌剧院）~20%（轨道交通）被更大的框实质包含，
+    最严重一图 **95%**（381/400）；这正是「53 个框零重叠却只有 13 根柱」
+    的来源——它们不是不重叠，是重叠得**太彻底**以致 IoU 判不出来。
+    """
+    ax0, ay0, ax1, ay1 = a
+    bx0, by0, bx1, by1 = b
+    area_a = max(0.0, ax1 - ax0) * max(0.0, ay1 - ay0)
+    area_b = max(0.0, bx1 - bx0) * max(0.0, by1 - by0)
+    small = min(area_a, area_b)
+    if small <= 0:
+        return False
+    overlap = (max(0.0, min(ax1, bx1) - max(ax0, bx0))
+               * max(0.0, min(ay1, by1) - max(ay0, by0)))
+    return overlap >= small * fraction
+
+
 def merge_duplicate_boxes(boxes: list | None,
                           iou_threshold: float = DUPLICATE_IOU) -> list:
     """合并重叠的同类框——**规则引擎对同一根柱吐多个框**。
@@ -194,7 +218,8 @@ def merge_duplicate_boxes(boxes: list | None,
         for j in range(i + 1, n):
             if corners[i][0] != corners[j][0]:
                 continue                      # 不同类别不合并
-            if _box_iou(corners[i][1:], corners[j][1:]) > iou_threshold:
+            if (_box_iou(corners[i][1:], corners[j][1:]) > iou_threshold
+                    or _mostly_contained(corners[i][1:], corners[j][1:])):
                 a, b = find(i), find(j)
                 if a != b:
                     parent[a] = b

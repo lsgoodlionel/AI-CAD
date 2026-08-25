@@ -199,3 +199,38 @@ def test_different_classes_are_never_merged():
         (3, 0.10, 0.10, 0.04, 0.04),
     ])
     assert len(out) == 2
+
+
+# --- 包含式重复：IoU 去重的盲区 ---------------------------------------
+
+def test_merge_absorbs_small_box_contained_in_large_one():
+    """小框套在大框里时 IoU 很低，却是同一根柱的重复输出。
+
+    实测：柱框中 14~20% 被更大的框实质包含，最严重一图 95%（381/400）。
+    IoU=小/大，套在大框里的小框 IoU 可低于 0.1 而逃过 IoU 去重。
+    """
+    from core.model3d.yolo_export import merge_duplicate_boxes, _box_iou
+
+    big = (0, 0.5, 0.5, 0.40, 0.40)
+    small = (0, 0.5, 0.5, 0.08, 0.08)          # 完全在 big 内部
+    assert _box_iou((0.30, 0.30, 0.70, 0.70),
+                                (0.46, 0.46, 0.54, 0.54)) < 0.1
+    assert len(merge_duplicate_boxes([big, small])) == 1
+
+
+def test_merge_keeps_contained_box_of_different_class():
+    """柱站在板上是常态——包含关系不跨类别合并。"""
+    from core.model3d.yolo_export import merge_duplicate_boxes
+
+    slab = (3, 0.5, 0.5, 0.90, 0.90)
+    column = (0, 0.5, 0.5, 0.05, 0.05)
+    assert len(merge_duplicate_boxes([slab, column])) == 2
+
+
+def test_merge_keeps_adjacent_boxes_that_merely_touch():
+    """相邻但互不包含的两根柱不能被合并掉。"""
+    from core.model3d.yolo_export import merge_duplicate_boxes
+
+    a = (0, 0.30, 0.5, 0.10, 0.10)
+    b = (0, 0.41, 0.5, 0.10, 0.10)
+    assert len(merge_duplicate_boxes([a, b])) == 2

@@ -31,6 +31,12 @@ _SCALE_RE = re.compile(r"1[:：]\s*(50|100|150|200|500)")
 # 构件尺寸阈值（米）
 _COLUMN_SIZE = (0.2, 1.5)
 _COLUMN_MAX_ASPECT = 4.0
+# 图层判定为柱时放宽到的**物理荒谬下限**：低于此值的截面不可能是柱，
+# 只可能是填充线 / 钢筋 / 标注碎片。取典型下限 0.2m 的一半，宁松勿紧。
+_COLUMN_ABSURD_MIN_M = 0.1
+# 上限取启发式 1.5m 的两倍——大型公建的巨柱可到 3m，再大只可能是墙段/房间。
+_COLUMN_ABSURD_MAX_M = 3.0
+_COLUMN_LAYER_MAX_ASPECT = 8.0
 _WALL_GAP = (0.1, 0.4)
 _BEAM_GAP = (0.15, 0.5)
 # 图层已确认为墙时放宽间距上限：地下室外墙/挡土墙/人防墙常达 0.3~0.8m（甚至更厚），
@@ -421,9 +427,13 @@ def _find_columns(
         # 图层/块名明确为柱时，即使未填充也识别（修复「柱必须 filled 才识别」漏检）
         if not filled and not is_column_layer:
             continue
-        if is_column_layer or (not layer_only
-                               and _is_column_size(ctx.len_m(w), ctx.len_m(h))):
-            columns.append(_rect_element(x, y, w, h, ctx))
+        w_m, h_m = ctx.len_m(w), ctx.len_m(h)
+        if is_column_layer:
+            if not _is_plausible_column(w_m, h_m):
+                continue
+        elif layer_only or not _is_column_size(w_m, h_m):
+            continue
+        columns.append(_rect_element(x, y, w, h, ctx))
         if len(columns) >= _CAPS["columns"]:
             return columns
     for i, poly in enumerate(polys):
@@ -435,12 +445,34 @@ def _find_columns(
         is_column_layer = (not is_annotation_layer(_pl)
                            and classify_by_layer(
                                _pl, _at(poly_blocks, i)) == "column")
-        if is_column_layer or (not layer_only
-                               and _is_column_size(ctx.len_m(w), ctx.len_m(h))):
-            columns.append({"outline": [ctx.to_m(px, py) for px, py in poly[:8]], "src": ctx.src})
+        w_m, h_m = ctx.len_m(w), ctx.len_m(h)
+        if is_column_layer:
+            if not _is_plausible_column(w_m, h_m):
+                continue
+        elif layer_only or not _is_column_size(w_m, h_m):
+            continue
+        columns.append({"outline": [ctx.to_m(px, py) for px, py in poly[:8]], "src": ctx.src})
         if len(columns) >= _CAPS["columns"]:
             break
     return columns
+
+
+def _is_plausible_column(w_m: float, h_m: float) -> bool:
+    """图层已判为柱时的**兜底几何体检**。
+
+    图层名是「是什么类型」的证据，不是「是不是真构件」的证据 ——
+    这与本文件既有的「标注图层不产出构件」是同一条纪律。
+    实测柱框边长**最小 0.001m**、10 分位仅 0.05m：多边形分支上
+    图层一判为柱就全盘接收、不设任何尺寸下限，柱图层里混着的
+    剖面填充线与钢筋因而全部变成了「柱」。
+
+    比 `_is_column_size` 宽松（下限减半、上限加倍、长宽比放宽一倍）——
+    图层证据强，这里只排除物理荒谬，不收紧到典型值。
+    """
+    if not (_COLUMN_ABSURD_MIN_M <= w_m <= _COLUMN_ABSURD_MAX_M
+            and _COLUMN_ABSURD_MIN_M <= h_m <= _COLUMN_ABSURD_MAX_M):
+        return False
+    return max(w_m, h_m) / max(min(w_m, h_m), 1e-6) < _COLUMN_LAYER_MAX_ASPECT
 
 
 def _is_column_size(w_m: float, h_m: float) -> bool:
