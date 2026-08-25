@@ -204,3 +204,45 @@ def test_oversized_poly_on_column_layer_is_not_a_column():
     """
     result = recognize(_plan_with_hatch_on_column_layer(7.0), "structure", "d1")
     assert len(result.columns) == 4
+
+
+# --- 存进模型的轮廓必须保住构件的真实范围 -----------------------------
+
+def _plan_with_many_point_columns() -> DrawingGeometry:
+    """柱画成 40 点的近似圆（真实图纸里 51% 的多边形超过 8 个点）。"""
+    import math
+
+    geom = DrawingGeometry(page_w=PAGE_W, page_h=PAGE_H)
+    for x in (120.0, 360.0):
+        geom.lines.append((x, 30.0, x, PAGE_H - 30.0))
+        geom.line_layers.append("AXIS")
+    for y in (120.0, 360.0):
+        geom.lines.append((30.0, y, PAGE_W - 30.0, y))
+        geom.line_layers.append("AXIS")
+    r = 0.3 * PT_PER_M                       # 直径 0.6m 的圆柱
+    ring = [(200.0 + r * math.cos(2 * math.pi * k / 40),
+             200.0 + r * math.sin(2 * math.pi * k / 40)) for k in range(40)]
+    geom.polys.append(ring)
+    geom.poly_layers.append("S-COLU")
+    geom.poly_blocks.append("")
+    geom.texts.append((60.0, 40.0, "1:100"))
+    geom.texts.append((400.0, 20.0, "一层柱结构平面图"))
+    return geom
+
+
+@pytest.mark.unit
+def test_many_point_column_keeps_its_full_extent():
+    """多点多边形存进模型时不得被砍成碎条。
+
+    实测缺陷：尺寸检查用的是**完整多边形**的包围盒（通过），
+    存进 outline 的却是 `poly[:8]`——**前 8 个点**。某图 728 根柱里
+    124 根因此变成 0.718×0.068m 这样的碎条，而它们的 outline
+    点数**恰好都是 8**。3D 渲染与算量吃的都是这些碎条。
+    """
+    result = recognize(_plan_with_many_point_columns(), "structure", "d1")
+    assert len(result.columns) == 1
+    outline = result.columns[0]["outline"]
+    width = max(p[0] for p in outline) - min(p[0] for p in outline)
+    height = max(p[1] for p in outline) - min(p[1] for p in outline)
+    assert width == pytest.approx(0.6, abs=0.05)
+    assert height == pytest.approx(0.6, abs=0.05)

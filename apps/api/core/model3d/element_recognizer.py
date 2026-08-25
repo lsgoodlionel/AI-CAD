@@ -407,6 +407,33 @@ def _axes_dict(
     return axes
 
 
+def _downsample_ring(poly: list, limit: int) -> list:
+    """多边形降点到 `limit` 个，**保住真实范围**。
+
+    原写法 `poly[:limit]` 是直接砍前 N 个点。实测图纸里 **51% 的多边形
+    超过 8 个点**，某图 728 根柱有 124 根因此被存成 0.718×0.068m 的碎条
+    （它们的 outline 点数恰好都是 8）——而尺寸检查用的是**完整多边形**
+    的包围盒，所以碎条能一路通过检查进到模型里，3D 渲染与算量吃的都是它。
+
+    做法：均匀取点保形状，并**强制保留四个极值点**保范围。
+    """
+    count = len(poly)
+    if count <= limit:
+        return list(poly)
+    xs = [p[0] for p in poly]
+    ys = [p[1] for p in poly]
+    keep = {xs.index(min(xs)), xs.index(max(xs)),
+            ys.index(min(ys)), ys.index(max(ys))}
+    remaining = limit - len(keep)
+    if remaining > 0:
+        step = count / float(remaining)
+        cursor = 0.0
+        while len(keep) < limit and cursor < count:
+            keep.add(int(cursor))
+            cursor += step
+    return [poly[i] for i in sorted(keep)[:limit]]
+
+
 def _find_columns(
     rects: list, rect_layers: list, rect_blocks: list,
     polys: list, poly_layers: list, poly_blocks: list, ctx: _Ctx,
@@ -451,7 +478,7 @@ def _find_columns(
                 continue
         elif layer_only or not _is_column_size(w_m, h_m):
             continue
-        columns.append({"outline": [ctx.to_m(px, py) for px, py in poly[:8]], "src": ctx.src})
+        columns.append({"outline": [ctx.to_m(px, py) for px, py in _downsample_ring(poly, 8)], "src": ctx.src})
         if len(columns) >= _CAPS["columns"]:
             break
     return columns
@@ -865,7 +892,7 @@ def _find_equipment(
             continue
         label = _text_inside(texts, x, y, w, h)
         equipment.append({
-            "outline": [ctx.to_m(px, py) for px, py in poly[:12]],
+            "outline": [ctx.to_m(px, py) for px, py in _downsample_ring(poly, 12)],
             "height": 1.5, "label": label, "src": ctx.src,
         })
         if len(equipment) >= _CAPS["equipment"]:
