@@ -185,6 +185,7 @@ def resolve_detection_frame(
     scale_override: float | None = None,
     origin_override: tuple[float | None, float | None] | None = None,
     page_w_pt: float | None = None,
+    detected_is_guess: bool = False,
 ) -> tuple[float, tuple[float | None, float | None]]:
     """圆检测的比例/原点，与识别器**同口径**。
 
@@ -198,7 +199,8 @@ def resolve_detection_frame(
     """
     from .element_recognizer import resolve_scale
 
-    scale = resolve_scale(detected_scale, scale_override, page_w_pt)
+    scale = resolve_scale(detected_scale, scale_override, page_w_pt,
+                          detected_is_guess=detected_is_guess)
     override = origin_override or (None, None)
     origin = (
         detected_origin[0] if detected_origin[0] is not None else override[0],
@@ -232,10 +234,13 @@ def detect_pile_columns(
         all_text = " ".join(t[2] for t in geom.texts)
         # **与识别器同口径**（见 resolve_detection_frame）：不然同一张图的
         # 柱与桩会落在两个坐标系，柱包络横跨两者（实测 6362 米）。
+        detected, is_guess = _detect_scale(
+            all_text, geom.page_w, axis_x, axis_y)
         scale, origin = resolve_detection_frame(
-            _detect_scale(all_text, geom.page_w, axis_x, axis_y),
+            detected,
             _origin_pt(axis_x, axis_y, geom.page_h),
             scale_override, origin_override, geom.page_w,
+            detected_is_guess=is_guess,
         )
         if scale <= 0:
             return []

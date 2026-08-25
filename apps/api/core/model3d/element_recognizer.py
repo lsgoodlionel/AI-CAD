@@ -128,9 +128,19 @@ def extract_elevations(all_text: str) -> list[float]:
 #: 比单纯的比例区间更贴近现实。
 MAX_DRAWING_EXTENT_M = 3000.0
 
+#: 一张**平面图**换算后合理的图宽区间（米）。用于在「轴距猜出来的比例」
+#: 与「落库比例」之间裁决——两者都可能错，而 §8 抽样 60 张平面图里
+#: **只有 1 张**能读到明文比例，没有第三方真值可仲裁。
+#:
+#: 下限 10 米：再小就不是平面图而是详图。
+#: 上限 500 米：1:500 的 A0 图（3370pt）换算是 595 米，已是总平面图量级；
+#: 实测三例中错的两个换算出 1189 米与 3370 米，都在其外。
+PLAN_EXTENT_RANGE_M = (10.0, 500.0)
+
 
 def resolve_scale(detected: float, scale_override: float | None = None,
-                  page_w_pt: float | None = None) -> float:
+                  page_w_pt: float | None = None,
+                  detected_is_guess: bool = False) -> float:
     """识别出的比例过 §6.0.4 门禁；不合理且有落库比例时改用后者。
 
     **实测**（`S-0-20-102.04C`，图幅 3370×2384pt）：识别器算出 **1:4222**
@@ -141,6 +151,15 @@ def resolve_scale(detected: float, scale_override: float | None = None,
     **唯独漏了识别器这条唯一决定构件坐标的路径**。
 
     没有可借比例时保持原状：强行归零会让整张图坍缩到一点，比放着更糟。
+
+    **`detected_is_guess`：门禁挡不住的那一档。** 图上没有比例文字时，
+    比例是按「轴线间距 = 8.4m」倒推出来的**猜测**，而门禁只问
+    「值合不合理」，问不出「这个值是怎么来的」。实测 `1fc56cbf`
+    基础分区平面图猜出 1:412（换算图宽 490 米），在 `is_scale_plausible`
+    的 1:5000 余量内、也在 `MAX_DRAWING_EXTENT_M` 之内，两道闸全部放行，
+    而真值 1:50 就躺在 `drawing_transform` 里没被用。
+
+    优先级：**明文比例 > 可信落库值 > 轴距猜测**。
     """
     from services.drawing_transform import is_scale_plausible
 
@@ -150,10 +169,19 @@ def resolve_scale(detected: float, scale_override: float | None = None,
         # 图幅换算出的实际尺寸也要说得通（见 MAX_DRAWING_EXTENT_M）
         return not (page_w_pt and page_w_pt * value > MAX_DRAWING_EXTENT_M)
 
-    if usable(detected):
+    if usable(detected) and not detected_is_guess:
         return detected
-    if usable(scale_override or 0.0):
-        return float(scale_override)
+    stored = float(scale_override) if usable(scale_override or 0.0) else None
+    if detected_is_guess and stored is not None and usable(detected):
+        # 两个候选都「合理」，靠图幅换算裁决（见 PLAN_EXTENT_RANGE_M）
+        lo, hi = PLAN_EXTENT_RANGE_M
+        sane = lambda v: (page_w_pt is None
+                          or lo <= page_w_pt * v <= hi)
+        if sane(detected) and not sane(stored):
+            return detected
+        return stored
+    if stored is not None:
+        return stored
     return detected
 
 
@@ -194,9 +222,9 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     axis_x, axis_y, axis_lines = _detect_axes(
         lines, geom.page_w, geom.page_h, geom.texts
     )
-    scale = resolve_scale(
-        _detect_scale(all_text, geom.page_w, axis_x, axis_y),
-        scale_override, geom.page_w)
+    detected, is_guess = _detect_scale(all_text, geom.page_w, axis_x, axis_y)
+    scale = resolve_scale(detected, scale_override, geom.page_w,
+                          detected_is_guess=is_guess)
     origin = _origin_pt(axis_x, axis_y, geom.page_h)
 
     ctx = _Ctx(geom.page_h, scale, origin, drawing_id,
@@ -284,16 +312,21 @@ class _Ctx:
 def _detect_scale(
     all_text: str, page_w: float,
     axis_x: list[float], axis_y: list[float],
-) -> float:
+) -> tuple[float, bool]:
+    """→ (比例, 是不是猜的)。
+
+    只有图上明写的比例和 DXF 毫米模型空间算「读到的」；按轴距倒推
+    和缺省值都是**猜的**，下游据此决定要不要让位给落库比例。
+    """
     match = _SCALE_RE.search(all_text)
     if match:
-        return int(match.group(1)) * 0.000352778
+        return int(match.group(1)) * 0.000352778, False
     if page_w > _DXF_MODEL_SPACE_THRESHOLD:
-        return 0.001  # DXF 毫米模型空间
+        return 0.001, False  # DXF 毫米模型空间
     spacing = _median_spacing(axis_x) or _median_spacing(axis_y)
     if spacing:
-        return _STANDARD_AXIS_SPACING_M / spacing
-    return _DEFAULT_SCALE
+        return _STANDARD_AXIS_SPACING_M / spacing, True
+    return _DEFAULT_SCALE, True
 
 
 def _median_spacing(axes: list[tuple[str, float]]) -> float | None:

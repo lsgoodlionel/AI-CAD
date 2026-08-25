@@ -141,7 +141,8 @@ def transform_from_geometry(geom: Any) -> DrawingTransform | None:
         if total == 0:
             return None
         all_text = " ".join(t[2] for t in geom.texts)
-        scale = _detect_scale(all_text, geom.page_w, axis_x, axis_y)
+        scale, _scale_is_guess = _detect_scale(
+            all_text, geom.page_w, axis_x, axis_y)
         # **比例尺合理性门禁**（§6.0.4）——超出国标区间就不落变换。
         # 旧实现只查 `scale <= 0`，放进了 35 张离谱变换（最大 1:335 万）。
         if not is_scale_plausible(scale):

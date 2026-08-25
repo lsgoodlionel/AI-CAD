@@ -116,7 +116,7 @@ def test_absurd_scale_yields_no_transform(monkeypatch):
         lambda *a, **k: ([("1", 100.0)], [("A", 200.0)], None))
     monkeypatch.setattr(
         "core.model3d.element_recognizer._detect_scale",
-        lambda *a, **k: 40.91)                      # 实测 S-1-20-002C 的值
+        lambda *a, **k: (40.91, False))                      # 实测 S-1-20-002C 的值
     monkeypatch.setattr(
         "core.model3d.element_recognizer._origin_pt", lambda *a, **k: (0.0, 0.0))
     assert dt.transform_from_geometry(_FakeGeom()) is None
@@ -131,7 +131,7 @@ def test_plausible_scale_still_yields_a_transform(monkeypatch):
         lambda *a, **k: ([("1", 100.0)], [("A", 200.0)], None))
     monkeypatch.setattr(
         "core.model3d.element_recognizer._detect_scale",
-        lambda *a, **k: 0.05292)                    # 约 1:150
+        lambda *a, **k: (0.05292, False))                    # 约 1:150
     monkeypatch.setattr(
         "core.model3d.element_recognizer._origin_pt", lambda *a, **k: (10.0, 20.0))
     got = dt.transform_from_geometry(_FakeGeom())
@@ -156,14 +156,14 @@ def test_confidence_reflects_scale_standardness_not_just_labels(monkeypatch):
         "core.model3d.element_recognizer._origin_pt", lambda *a, **k: (0.0, 0.0))
 
     monkeypatch.setattr("core.model3d.element_recognizer._detect_scale",
-                        lambda *a, **k: 150 * PT_TO_MM / 1000.0)
+                        lambda *a, **k: (150 * PT_TO_MM / 1000.0, False))
     standard = dt.transform_from_geometry(_FakeGeom())
 
     # **必须选一个不会被吸附的分母**:137 距 150 只有 8.7%，会被吸附成标准值,
     # 那就测不出非标准的 confidence 了。120 距 100 与距 150 都是 20%，
     # 超出 10% 吸附容差,会原样保留。
     monkeypatch.setattr("core.model3d.element_recognizer._detect_scale",
-                        lambda *a, **k: 120 * PT_TO_MM / 1000.0)
+                        lambda *a, **k: (120 * PT_TO_MM / 1000.0, False))
     odd = dt.transform_from_geometry(_FakeGeom())
 
     assert standard is not None and odd is not None
@@ -246,7 +246,7 @@ def test_transform_from_geometry_snaps(monkeypatch):
         lambda *a, **k: ([("1", 100.0)], [("A", 200.0)], None))
     monkeypatch.setattr(
         "core.model3d.element_recognizer._detect_scale",
-        lambda *a, **k: 45.6 * PT_TO_MM / 1000.0)
+        lambda *a, **k: (45.6 * PT_TO_MM / 1000.0, False))
     monkeypatch.setattr(
         "core.model3d.element_recognizer._origin_pt", lambda *a, **k: (0.0, 0.0))
     got = dt.transform_from_geometry(_FakeGeom())

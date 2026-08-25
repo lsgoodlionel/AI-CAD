@@ -103,3 +103,52 @@ def test_stored_scale_is_read_from_the_transform():
 
     assert _scale_override_of({}, "d1") is None
     assert _scale_override_of(None, "d1") is None
+
+
+# --- 门禁挡不住的一档：值本身「合理」，但它是猜出来的 -------------------
+#
+# **实测三例**（大歌剧院竣工图，图幅均 3370pt，图上**都没有比例文字**
+# 因而都走轴距兜底）。抽样 60 张平面图里**只有 1 张**能读到明文比例
+# ——图框有「审定人/日期」这些字段名，却没有比例栏——所以 98% 的图
+# 只能在「猜的」和「库里的」之间二选一，而两者都可能错：
+#
+# | 图 | 轴距猜测 → 图宽 | 落库 → 图宽 | 真值 |
+# |---|---|---|---|
+# | `1fc56cbf` 基础分区平面图 | 1:412 → 490m | **1:50 → 59m** | 落库对 |
+# | `864853a6` 隔声隔振平面图 | 1:2835 → 3370m | **1:50 → 59m** | 落库对 |
+# | `8657c221` 地下一层平面图 | **1:100 → 119m** | 1:1000 → 1189m | **猜测对** |
+#
+# 所以「猜的一律让位给库里的」是错的规则——第三例会被它害了。
+# 裁决判据用**图幅换算出的实际宽度是否说得通**，这是本文件已有的判断
+# （`MAX_DRAWING_EXTENT_M`），只是从「阈值」改成「两个候选相比」。
+
+@pytest.mark.unit
+def test_guess_yields_to_stored_when_its_own_extent_is_absurd():
+    """轴距猜测换算出 490 米的基础平面图，让位给落库的 1:50（59 米）。"""
+    assert resolve_scale(0.145379, 0.017639, 3370.0,
+                         detected_is_guess=True) == pytest.approx(0.017639)
+
+
+@pytest.mark.unit
+def test_stored_scale_rejected_when_it_is_the_absurd_one():
+    """反过来也要成立：落库值换算 1189 米时，保留猜出来的 1:100。
+
+    这一条是三例里唯一「猜测对、落库错」的，没有它这条规则会害了它。
+    """
+    guess_1_100 = 0.0352778
+    assert resolve_scale(guess_1_100, 0.352778, 3370.0,
+                         detected_is_guess=True) == pytest.approx(guess_1_100)
+
+
+@pytest.mark.unit
+def test_scale_read_from_the_drawing_wins_over_stored():
+    """图上明写比例时不让位——明文是最强证据（尽管只占 2% 的图）。"""
+    assert resolve_scale(0.0352778, 0.017639, 3370.0,
+                         detected_is_guess=False) == pytest.approx(0.0352778)
+
+
+@pytest.mark.unit
+def test_guess_kept_when_nothing_trustworthy_to_fall_back_on():
+    """没有可借的落库比例时保持原状——归零会让整张图坍缩到一点。"""
+    assert resolve_scale(0.145379, None, 3370.0,
+                         detected_is_guess=True) == pytest.approx(0.145379)
