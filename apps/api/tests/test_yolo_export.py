@@ -151,3 +151,51 @@ def test_tiny_slivers_at_the_edge_are_dropped():
     got = boxes_in_tile([(0, 0.505, 0.5, 0.02, 0.02)], 1000, 1000,
                         (0, 0, 500, 500))
     assert got == []
+
+
+@pytest.mark.unit
+def test_duplicate_boxes_are_merged():
+    """**规则引擎对同一根柱吐多个重叠框。**
+
+    实测（三方独立核对）：N8 切片 24 个原始框，合并重叠后 **6 个**，
+    而 GPT 数 6、我自己数也是 6——三方吻合。
+    6 块抽样里有 3 块去重后与 GPT 计数完全对上（比值 0.88~1.10）。
+
+    重复框对训练是有害的：它教模型输出重复，并让那些区域的损失被重复计算。
+    """
+    from core.model3d.yolo_export import merge_duplicate_boxes
+
+    boxes = [
+        (0, 0.10, 0.10, 0.04, 0.04),
+        (0, 0.105, 0.102, 0.042, 0.04),   # 与上一个高度重叠
+        (0, 0.50, 0.50, 0.04, 0.04),      # 独立
+    ]
+    out = merge_duplicate_boxes(boxes)
+    assert len(out) == 2
+
+
+@pytest.mark.unit
+def test_merged_box_covers_the_union():
+    """合并后的框取并集——**不能只留其中一个**，
+    那会丢掉柱的真实轮廓范围。"""
+    from core.model3d.yolo_export import merge_duplicate_boxes
+
+    out = merge_duplicate_boxes([
+        (0, 0.10, 0.10, 0.04, 0.04),
+        (0, 0.12, 0.10, 0.04, 0.04),
+    ])
+    assert len(out) == 1
+    _cls, cx, cy, w, h = out[0]
+    assert w > 0.04, "并集应比单个框宽"
+
+
+@pytest.mark.unit
+def test_different_classes_are_never_merged():
+    """柱与板重叠是常态（柱站在板上）——不同类别不能合并。"""
+    from core.model3d.yolo_export import merge_duplicate_boxes
+
+    out = merge_duplicate_boxes([
+        (0, 0.10, 0.10, 0.04, 0.04),
+        (3, 0.10, 0.10, 0.04, 0.04),
+    ])
+    assert len(out) == 2
