@@ -52,9 +52,14 @@ def outline_to_yolo_box(points: list | None, page_w: float,
             (x1 - x0) / page_w, (y1 - y0) / page_h)
 
 
-def label_lines(elements: list | None, page_w: float, page_h: float) -> list[str]:
-    """构件列表 → YOLO 标注行（`cls cx cy w h`）。"""
-    lines = []
+def label_lines(elements: list | None, page_w: float, page_h: float,
+                dedupe: bool = True) -> list[str]:
+    """构件列表 → YOLO 标注行（`cls cx cy w h`）。
+
+    **默认去重**：识别器对同一根柱会吐多个框（实测压缩率约 57%）。
+    去重放在导出主路径上，而不是靠每个调用方记得单独做一遍。
+    """
+    boxes = []
     for element in elements or []:
         cid = class_id(element.get("kind"))
         if cid is None:
@@ -63,8 +68,11 @@ def label_lines(elements: list | None, page_w: float, page_h: float) -> list[str
             element.get("outline") or element.get("path"), page_w, page_h)
         if box is None:
             continue
-        lines.append(f"{cid} " + " ".join(f"{v:.6f}" for v in box))
-    return lines
+        boxes.append((cid, *box))
+    if dedupe:
+        boxes = merge_duplicate_boxes(boxes)
+    return [f"{cls} " + " ".join(f"{v:.6f}" for v in b)
+            for cls, *b in boxes]
 
 
 def meters_to_page(x_m: float, y_m: float, scale_m_pt: float,

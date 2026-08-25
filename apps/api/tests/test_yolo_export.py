@@ -234,3 +234,14 @@ def test_merge_keeps_adjacent_boxes_that_merely_touch():
     a = (0, 0.30, 0.5, 0.10, 0.10)
     b = (0, 0.41, 0.5, 0.10, 0.10)
     assert len(merge_duplicate_boxes([a, b])) == 2
+
+
+def test_label_lines_dedups_by_default():
+    """去重必须在导出主路径上，而不是靠调用方每次记得做一遍。"""
+    from core.model3d.yolo_export import label_lines
+
+    big = {"kind": "columns", "outline": [[10.0, 10.0], [50.0, 50.0]]}
+    inside = {"kind": "columns", "outline": [[28.0, 28.0], [32.0, 32.0]]}
+    assert len(label_lines([big, inside], page_w=100.0, page_h=100.0)) == 1
+    assert len(label_lines([big, inside], page_w=100.0, page_h=100.0,
+                           dedupe=False)) == 2
