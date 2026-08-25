@@ -6,7 +6,8 @@ import json
 import re
 from typing import Any
 
-from services.floor_parser import parse_floor
+from services.floor_parser import (
+    FOUNDATION_FLOOR, HIGH_ROOF_FLOOR, ROOF_FLOOR, parse_floor)
 
 MIN_STORY_SPACING_M = 2.8
 #: 楼层**标高**的来源。与 `height_source`（层高来源）是两回事——
@@ -201,13 +202,25 @@ def _resolve_story_height(
 # 数字常是轴号/图号/尺寸,不能凭空造出可信范围外的楼层(实测会造出 52 层/98 层
 # 等幻影层,把模型标高冲到 ±400m)。弱来源仅可确认已由可信来源建立的楼层范围。
 _TRUSTED_STORY_SOURCES = frozenset({"title", "drawing_no"})
-_FOUNDATION_SENTINEL_MAX = -90   # order ≤ 此值为基础/桩基哨兵(非线性楼层)
-_ROOF_SENTINEL_MIN = 99          # order ≥ 此值为屋面哨兵
+# 以下两个阈值只用于**标高换算**（基础/屋面不做 order×层高 的线性外推），
+# 不再兼任「这层可不可信」的判据——那是 `_SENTINEL_ORDERS` 的事。
+_FOUNDATION_SENTINEL_MAX = -90
+_ROOF_SENTINEL_MIN = 99
+
+#: 真正的楼层哨兵**只有这三个取值**，回指 `floor_parser` 的单一来源。
+#:
+#: **不能写成 `order >= 99` 这样的开区间**：实测轨道交通模型出现
+#: `F101 101层`，站在屋面（55.5m）之上、带着 334 个构件 —— 它就是
+#: 落在那个开区间里，于是 `_order_in_trusted_band` 对它跳过了可信区间
+#: 检查，而那道检查本来就是用来挡这种伪楼层的。开区间放行的是 99~120
+#: 整段（`floor_parser._MAX_ABOVE_GROUND_FLOORS` 的上限）。
+_SENTINEL_ORDERS = frozenset(
+    {FOUNDATION_FLOOR[2], ROOF_FLOOR[2], HIGH_ROOF_FLOOR[2]})
 
 
 def _is_story_sentinel(order: int) -> bool:
     """基础/屋面哨兵:由关键词命中,可信,不参与数值范围约束与线性标高。"""
-    return order <= _FOUNDATION_SENTINEL_MAX or order >= _ROOF_SENTINEL_MIN
+    return order in _SENTINEL_ORDERS
 
 
 def _order_in_trusted_band(order: int, band: tuple[int, int] | None) -> bool:

@@ -86,3 +86,36 @@ def test_normalize_story_table_keeps_units_independent_and_queues_unclassified()
     assert issue.building_unit_key == "south"
     assert issue.story_key == "F2"
     assert issue.payload["detected_spacing_m"] < MIN_STORY_SPACING_M
+
+
+# --- 哨兵判据不能写成开区间 -------------------------------------------
+
+@pytest.mark.unit
+def test_only_the_three_real_sentinels_bypass_the_trusted_band():
+    """合法哨兵只有三个取值，`order >= 99` 会把伪楼层一起放行。
+
+    **实测**（轨道交通模型）：`F101 101层` 站在屋面（55.5m）之上，
+    带着 334 个构件——它落在 `_ROOF_SENTINEL_MIN = 99` 的开区间里，
+    于是 `_order_in_trusted_band` 对它**跳过了可信区间检查**，
+    而那道检查本来就是用来挡这种伪楼层的。
+
+    真正的哨兵只有 `FD(-98)` / `RF(99)` / `RF_HIGH(100)` 三个。
+    """
+    from services.floor_parser import FOUNDATION_FLOOR, HIGH_ROOF_FLOOR, ROOF_FLOOR
+    from services.model_story import _is_story_sentinel
+
+    for sentinel in (FOUNDATION_FLOOR, ROOF_FLOOR, HIGH_ROOF_FLOOR):
+        assert _is_story_sentinel(sentinel[2]), sentinel
+    for bogus in (101, 120, -95, 999):
+        assert not _is_story_sentinel(bogus), bogus
+
+
+@pytest.mark.unit
+def test_bogus_high_floor_is_rejected_by_the_trusted_band():
+    """101 层在一栋只有 1~10 层的楼里必须被区间挡下。"""
+    from services.model_story import _order_in_trusted_band
+
+    band = (-4, 10)
+    assert _order_in_trusted_band(99, band)        # 屋面：哨兵，放行
+    assert _order_in_trusted_band(100, band)       # 台塔屋面：哨兵，放行
+    assert not _order_in_trusted_band(101, band)   # 伪楼层：挡下
