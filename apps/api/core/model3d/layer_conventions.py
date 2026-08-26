@@ -207,7 +207,10 @@ _XREF_BOUND_RE = re.compile(r"^.*\$\d+\$\d*")
 _ANNOTATION_LAYER_RE = re.compile(
     r"标注|文字|说明|编号|尺寸标|标高标|注释|图例"
     r"|纵筋|箍筋|配筋|钢筋|拉筋|分布筋"
-    r"|-(?:TEXT|DIMS?|NOTE|IDEN|ANNO|TAG|LABEL|REBAR|REIN)(?:-|$)",
+    # **前后都可以是边界**：旧写法要求前导横线，裸图层名 `TEXT` 因此漏网
+    # （实测「屋顶设备层埋件平面布置图」的 TEXT 层造出 21 个「柱」）。
+    # 收尾仍用 `(?:-|$)`，`TEXTURE` 不会被误伤。
+    r"|(?:^|-)(?:TEXT|DIMS?|NOTE|IDEN|ANNO|TAG|LABEL|REBAR|REIN)(?:-|$)",
     re.IGNORECASE)
 
 

@@ -246,3 +246,73 @@ def test_many_point_column_keeps_its_full_extent():
     height = max(p[1] for p in outline) - min(p[1] for p in outline)
     assert width == pytest.approx(0.6, abs=0.05)
     assert height == pytest.approx(0.6, abs=0.05)
+
+
+# --- 标注图层不产出构件：这道闸此前只挡住了一半路径 -------------------
+
+@pytest.mark.unit
+def test_bare_text_layer_is_recognised_as_annotation():
+    """裸图层名 `TEXT` 也是标注层。
+
+    实测「屋顶设备层埋件平面布置图」：`TEXT` 图层上有 21 个多边形
+    落在柱的尺寸区间——那是文字的轮廓。旧正则写作
+    `-(?:TEXT|...)`，**要求前导横线**，于是裸 `TEXT` 漏网。
+    """
+    from core.model3d.layer_conventions import is_annotation_layer
+
+    assert is_annotation_layer("TEXT")
+    assert is_annotation_layer("DIM")
+    assert is_annotation_layer("S-COLU-TEXT")
+    assert not is_annotation_layer("TEXTURE")     # 不能误伤
+
+
+def _plan_with_polys_on(layer: str, side_m: float = 0.6,
+                        count: int = 5) -> DrawingGeometry:
+    geom = _plan_unfilled_columns("S-COLU")
+    s = side_m * PT_PER_M
+    for k in range(count):
+        x = 150.0 + k * 60.0
+        geom.polys.append([(x, 250.0), (x + s, 250.0),
+                           (x + s, 250.0 + s), (x, 250.0 + s)])
+        geom.poly_layers.append(layer)
+        geom.poly_blocks.append("")
+    return geom
+
+
+@pytest.mark.unit
+def test_annotation_layer_blocked_on_the_size_guess_path_too():
+    """标注层上**尺寸正好像柱**的多边形也不算柱。
+
+    这是本文件里写了三遍的纪律「标注图层不产出构件」，但实现只把它
+    接在 `is_column_layer` 上 —— 标注层的多边形照样能从
+    `_is_column_size` 这条**猜测路径**混进来。注释说的是一回事，
+    代码做的是另一回事。
+    """
+    result = recognize(_plan_with_polys_on("TEXT"), "structure", "d1")
+    assert len(result.columns) == 4          # 只剩 4 根真柱
+
+
+@pytest.mark.unit
+def test_ordinary_layer_still_reaches_the_size_guess_path():
+    """非标注层不受影响——零回归对照。"""
+    result = recognize(_plan_with_polys_on("0"), "structure", "d1")
+    assert len(result.columns) == 9          # 4 根真柱 + 5 个尺寸像柱的
+
+
+@pytest.mark.unit
+def test_embedded_part_layout_is_not_a_column_source():
+    """埋件布置图上不按尺寸猜柱——方形预埋件正好落在柱的尺寸区间。
+
+    实测「屋顶设备层埋件平面布置图」造出 93 根假柱。图上没有任何
+    图层被判为柱，552 个多边形**全靠尺寸猜**。
+
+    只收「埋件」一个词：实测「设备」命中的是**楼层名**（四层夹层
+    （设备层）隔声隔振）、「标高」命中的是「—8.200 标高地下二层夹层
+    **结构**平面图」、「布置图」命中的是「地下一层**换撑**平面布置图」
+    ——都是正经结构图，排除它们等于误杀。
+    """
+    geom = _plan_with_polys_on("0")
+    geom.texts.append((400.0, 60.0, "屋顶设备层埋件平面布置图"))
+    result = recognize(geom, "structure", "d1",
+                       drawing_title="屋顶设备层埋件平面布置图")
+    assert len(result.columns) == 4          # 图层明确的 4 根柱仍在，猜的 5 个没了

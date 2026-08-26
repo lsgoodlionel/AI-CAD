@@ -247,7 +247,7 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     # **墙图上的填充截面是墙不是柱**（实测 1404 根假柱）。
     # 仍保留「图层明确为柱」的路径 —— 那是设计师的明确标注，
     # 比图名更强（墙图上确实可能画几根柱）。
-    wall_drawing = is_wall_drawing(drawing_title)
+    wall_drawing = is_wall_drawing(drawing_title) or _is_embedded_part_plan(drawing_title)
     result.columns = _find_columns(
         rects, rect_layers, rect_blocks, polys, poly_layers, poly_blocks, ctx,
         layer_only=wall_drawing,
@@ -475,6 +475,21 @@ def _downsample_ring(poly: list, limit: int) -> list:
 _DEDUPE_KINDS = ("columns", "equipment")
 
 
+#: 埋件布置图：图上画的是预埋钢板，方形预埋件正好落在柱的尺寸区间。
+#: 实测「屋顶设备层埋件平面布置图」造出 93 根假柱，而该图**没有任何
+#: 图层被判为柱**，552 个多边形全靠尺寸猜。
+#:
+#: **只收「埋件」一个词**——其余候选实测全部会误杀正经结构图：
+#: 「设备」命中的是楼层名（四层夹层（设备层）隔声隔振），
+#: 「标高」命中的是「—8.200 标高地下二层夹层**结构**平面图」，
+#: 「布置图」命中的是「地下一层**换撑**平面布置图」。
+_EMBEDDED_PART_RE = re.compile(r"埋件")
+
+
+def _is_embedded_part_plan(drawing_title: str | None) -> bool:
+    return bool(_EMBEDDED_PART_RE.search(str(drawing_title or "")))
+
+
 def _drop_duplicate_elements(result: "FloorElements") -> None:
     """同一个构件被吐出多次时只留一个——**重复会直接虚增算量**。
 
@@ -503,7 +518,8 @@ def _find_columns(
     for i, (x, y, w, h, filled) in enumerate(rects):
         # **标注图层不产出构件**：实测「立柱桩标注」一层造出 3410 根假柱。
         _layer = _at(rect_layers, i)
-        is_column_layer = (not is_annotation_layer(_layer)
+        annotation = is_annotation_layer(_layer)
+        is_column_layer = (not annotation
                            and classify_by_layer(
                                _layer, _at(rect_blocks, i)) == "column")
         # 图层/块名明确为柱时，即使未填充也识别（修复「柱必须 filled 才识别」漏检）
@@ -513,7 +529,7 @@ def _find_columns(
         if is_column_layer:
             if not _is_plausible_column(w_m, h_m):
                 continue
-        elif layer_only or not _is_column_size(w_m, h_m):
+        elif annotation or layer_only or not _is_column_size(w_m, h_m):
             continue
         columns.append(_rect_element(x, y, w, h, ctx))
         if len(columns) >= _CAPS["columns"]:
@@ -524,14 +540,19 @@ def _find_columns(
         # 我第一版只在矩形分支加了这道闸，而实测那 711 根假柱
         # 全部来自**多边形**（`墙柱纵筋` 图层），修了一半等于没修。
         _pl = _at(poly_layers, i)
-        is_column_layer = (not is_annotation_layer(_pl)
+        # **闸要接在两条路径上**：此前只接在 `is_column_layer` 上，
+        # 于是标注层的多边形照样能从 `_is_column_size` 这条**猜测路径**
+        # 混进来 —— 注释说的是「标注图层不产出构件」，代码做的是
+        # 「标注图层不走图层路径」。
+        annotation = is_annotation_layer(_pl)
+        is_column_layer = (not annotation
                            and classify_by_layer(
                                _pl, _at(poly_blocks, i)) == "column")
         w_m, h_m = ctx.len_m(w), ctx.len_m(h)
         if is_column_layer:
             if not _is_plausible_column(w_m, h_m):
                 continue
-        elif layer_only or not _is_column_size(w_m, h_m):
+        elif annotation or layer_only or not _is_column_size(w_m, h_m):
             continue
         columns.append({"outline": [ctx.to_m(px, py) for px, py in _downsample_ring(poly, 8)], "src": ctx.src})
         if len(columns) >= _CAPS["columns"]:
