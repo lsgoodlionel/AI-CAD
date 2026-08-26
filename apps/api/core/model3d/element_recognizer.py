@@ -238,6 +238,7 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
         result.equipment = _find_equipment(
             rects, rect_layers, rect_blocks, polys, poly_layers, poly_blocks, geom.texts, ctx
         )
+        _drop_duplicate_elements(result)
         _clip_to_axes(result)
         result.origin_pt = tuple(ctx.origin)
         result.page_h = ctx.page_h
@@ -269,6 +270,7 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     else:
         result.walls = pairs[:_CAPS["walls"]]
     result.slabs = _find_slabs(polys, poly_layers, poly_blocks, axis_x, axis_y, ctx, result.columns)
+    _drop_duplicate_elements(result)
     _clip_to_axes(result)
     result.origin_pt = tuple(ctx.origin)
     result.page_h = ctx.page_h
@@ -465,6 +467,26 @@ def _downsample_ring(poly: list, limit: int) -> list:
             keep.add(int(cursor))
             cursor += step
     return [poly[i] for i in sorted(keep)[:limit]]
+
+
+#: 做去重的类别。**板不在其内**：`_slab_from_columns` 造的包络板本就
+#: 套着真实板，那是合理嵌套。实测重复率——柱 44%/32%、设备 38%/43%、
+#: 板 19%/14%（大歌剧院/轨道交通），只对有证据的两类动手。
+_DEDUPE_KINDS = ("columns", "equipment")
+
+
+def _drop_duplicate_elements(result: "FloorElements") -> None:
+    """同一个构件被吐出多次时只留一个——**重复会直接虚增算量**。
+
+    `services/model_qto.py` 是 `for column in columns` 逐个累加体积的，
+    同一根柱出现 N 次，混凝土量与模板面积就乘 N，而算量喂给创效提案。
+    """
+    from .dedupe import merge_overlapping
+
+    for kind in _DEDUPE_KINDS:
+        items = getattr(result, kind, None)
+        if items:
+            setattr(result, kind, merge_overlapping(items))
 
 
 def _find_columns(
