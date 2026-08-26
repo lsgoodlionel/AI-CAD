@@ -236,7 +236,12 @@ def is_annotation_layer(layer: str | None) -> bool:
     （梁的文字标注不是梁）。我第一版把两者混为一谈，
     直接让 `classify_by_layer` 对标注层返回 None，打断了 4 个既有断言。
     """
-    text = str(layer or "")
+    # **只看图层自己的名字**：外参前缀是**来源图纸**的名字，不是图层语义。
+    # 实测 `S-南区-PLAN-1F - 板配筋(-3.5~0.0)$0$0S-COLS-HATCH` ——
+    # `S-COLS` 是 AIA 标准的结构柱层，却因前缀里的「配筋」被整体判成标注，
+    # 该图 658 个柱候选全被丢弃（金标准 12 根 → 识别 0）。
+    # 剥离后仍含标注词的（`...$0$墙柱纵筋`）照旧判出，那才是图层自己的语义。
+    text = normalize_layer_name(layer)
     # 「钢筋混凝土X」先摘掉，再判 —— 否则材料名里的「钢筋」会误杀真构件层
     text = _CONCRETE_MATERIAL_RE.sub("", text)
     return bool(_ANNOTATION_LAYER_RE.search(text))

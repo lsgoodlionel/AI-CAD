@@ -133,9 +133,12 @@ MAX_DRAWING_EXTENT_M = 3000.0
 #: **只有 1 张**能读到明文比例，没有第三方真值可仲裁。
 #:
 #: 下限 10 米：再小就不是平面图而是详图。
-#: 上限 500 米：1:500 的 A0 图（3370pt）换算是 595 米，已是总平面图量级；
-#: 实测三例中错的两个换算出 1189 米与 3370 米，都在其外。
-PLAN_EXTENT_RANGE_M = (10.0, 500.0)
+#: 上限 300 米：A0 图（3370pt）在 1:200 下换算 238 米仍在其内；
+#: 实测错的几个换算出 490 米 / 1189 米 / 3370 米，都在其外。
+#:
+#: **只用来判「猜出来的那个值说不说得通」**，不用来在两个候选间挑 ——
+#: 后者被金标准证伪过（见 `resolve_scale`）。
+PLAN_EXTENT_RANGE_M = (10.0, 300.0)
 
 
 def resolve_scale(detected: float, scale_override: float | None = None,
@@ -173,11 +176,15 @@ def resolve_scale(detected: float, scale_override: float | None = None,
         return detected
     stored = float(scale_override) if usable(scale_override or 0.0) else None
     if detected_is_guess and stored is not None and usable(detected):
-        # 两个候选都「合理」，靠图幅换算裁决（见 PLAN_EXTENT_RANGE_M）
+        # **猜测值换算说得通就用它**，只在它说不通时才借落库值。
+        #
+        # 我上一版写的是「两者都合理时优先落库」，被金标准当场证伪：
+        # 大歌剧院「一层结构平面图」识别值 1:100（图宽 119 米）、
+        # 落库值 **1:15**（图宽 18 米），两者都在区间内于是选了落库，
+        # 结果尺寸判据下候选从 658 个塌到 3 个，整块柱归零。
+        # 1:15 在标准比例表里，标准性判不出来 —— 能判出来的是**图幅**。
         lo, hi = PLAN_EXTENT_RANGE_M
-        sane = lambda v: (page_w_pt is None
-                          or lo <= page_w_pt * v <= hi)
-        if sane(detected) and not sane(stored):
+        if page_w_pt is None or lo <= page_w_pt * detected <= hi:
             return detected
         return stored
     if stored is not None:

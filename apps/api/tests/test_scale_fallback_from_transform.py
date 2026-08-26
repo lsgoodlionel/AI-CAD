@@ -152,3 +152,24 @@ def test_guess_kept_when_nothing_trustworthy_to_fall_back_on():
     """没有可借的落库比例时保持原状——归零会让整张图坍缩到一点。"""
     assert resolve_scale(0.145379, None, 3370.0,
                          detected_is_guess=True) == pytest.approx(0.145379)
+
+
+@pytest.mark.unit
+def test_a_plausible_guess_is_not_displaced_by_a_stored_value():
+    """猜测值换算说得通时不让位——上一版「都合理就优先落库」已被证伪。
+
+    **实测**（大歌剧院「南区一层结构平面图（四）」，图幅 3370pt）：
+
+    | | 比例 | 图宽换算 | 是标准比例 |
+    |---|---|---|---|
+    | 识别（轴距猜） | 1:100 | 119 米 | 是 |
+    | 落库 | **1:15** | **18 米** | **也是** |
+
+    两者都在标准比例表里、都过了旧区间，旧规则选了落库的 1:15，
+    于是尺寸判据下的候选从 658 个塌到 **3** 个，整块柱归零
+    （金标准 12 → 识别 0）。标准性判不出来，**图幅换算判得出来**。
+    """
+    guess_1_100 = 0.0352778
+    stored_1_15 = 15 * 0.000352778
+    assert resolve_scale(guess_1_100, stored_1_15, 3370.0,
+                         detected_is_guess=True) == pytest.approx(guess_1_100)

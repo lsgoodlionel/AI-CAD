@@ -221,3 +221,28 @@ def test_bound_xref_form_is_unaffected():
     layer = "S-S-WALL-1F$0$墙柱纵筋"
     assert classify_by_layer(layer, "") == "column"
     assert is_annotation_layer(layer)          # 组合后不产出柱
+
+
+@pytest.mark.unit
+def test_annotation_marker_in_the_xref_prefix_does_not_condemn_the_layer():
+    """外参前缀里的「配筋」是**来源图纸的名字**，不是这个图层的语义。
+
+    **实测**（大歌剧院「南区一层结构平面图（四）」）：
+
+        S-南区-PLAN-1F - 板配筋(-3.5~0.0)$0$0S-COLS-HATCH
+        └────────── 外参（来源图）名 ──────────┘└─ 真正的图层 ─┘
+
+    `S-COLS` 是 AIA 标准的**结构柱**图层，却因为前缀里有「配筋」
+    被整体判成标注层 —— 该图 **658 个柱候选全被丢弃**，金标准 12
+    根柱识别成 0。
+
+    判据是**只看图层自己的名字**：剥离后 `S-COLS-HATCH` 不含标注词，
+    而 `S-S-WALL-1F$0$墙柱纵筋` 剥离后仍是「墙柱纵筋」，照旧判为标注层
+    —— 后者的标注词在**子层名**里，那才是图层自己的语义。
+    """
+    from core.model3d.layer_conventions import is_annotation_layer
+
+    assert not is_annotation_layer(
+        "S-南区-PLAN-1F - 板配筋(-3.5~0.0)$0$0S-COLS-HATCH")
+    assert is_annotation_layer("S-S-WALL-1F$0$墙柱纵筋")
+    assert is_annotation_layer("立柱桩标注")          # 无前缀时不受影响
