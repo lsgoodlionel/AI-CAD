@@ -519,9 +519,9 @@ def _find_columns(
         # **标注图层不产出构件**：实测「立柱桩标注」一层造出 3410 根假柱。
         _layer = _at(rect_layers, i)
         annotation = is_annotation_layer(_layer)
-        is_column_layer = (not annotation
-                           and classify_by_layer(
-                               _layer, _at(rect_blocks, i)) == "column")
+        _kind = classify_by_layer(_layer, _at(rect_blocks, i))
+        is_column_layer = not annotation and _kind == "column"
+        other_kind = _kind is not None and _kind != "column"
         # 图层/块名明确为柱时，即使未填充也识别（修复「柱必须 filled 才识别」漏检）
         if not filled and not is_column_layer:
             continue
@@ -529,7 +529,8 @@ def _find_columns(
         if is_column_layer:
             if not _is_plausible_column(w_m, h_m):
                 continue
-        elif annotation or layer_only or not _is_column_size(w_m, h_m):
+        elif (annotation or other_kind or layer_only
+              or not _is_column_size(w_m, h_m)):
             continue
         columns.append(_rect_element(x, y, w, h, ctx))
         if len(columns) >= _CAPS["columns"]:
@@ -545,14 +546,18 @@ def _find_columns(
         # 混进来 —— 注释说的是「标注图层不产出构件」，代码做的是
         # 「标注图层不走图层路径」。
         annotation = is_annotation_layer(_pl)
-        is_column_layer = (not annotation
-                           and classify_by_layer(
-                               _pl, _at(poly_blocks, i)) == "column")
+        _kind = classify_by_layer(_pl, _at(poly_blocks, i))
+        is_column_layer = not annotation and _kind == "column"
+        # **图层已明说是别的构件就不再猜**：实测装修/景观图上的「柱」
+        # 落在 `A—门窗`(door)/`A-GLAZ`(window)/`A—设备管丼`(pipe)/
+        # `景-平面-红线`(slab) 上——分类器答得出，识别器却不听。
+        other_kind = _kind is not None and _kind != "column"
         w_m, h_m = ctx.len_m(w), ctx.len_m(h)
         if is_column_layer:
             if not _is_plausible_column(w_m, h_m):
                 continue
-        elif annotation or layer_only or not _is_column_size(w_m, h_m):
+        elif (annotation or other_kind or layer_only
+              or not _is_column_size(w_m, h_m)):
             continue
         columns.append({"outline": [ctx.to_m(px, py) for px, py in _downsample_ring(poly, 8)], "src": ctx.src})
         if len(columns) >= _CAPS["columns"]:

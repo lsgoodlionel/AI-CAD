@@ -316,3 +316,26 @@ def test_embedded_part_layout_is_not_a_column_source():
     result = recognize(geom, "structure", "d1",
                        drawing_title="屋顶设备层埋件平面布置图")
     assert len(result.columns) == 4          # 图层明确的 4 根柱仍在，猜的 5 个没了
+
+
+@pytest.mark.unit
+def test_a_layer_that_says_door_never_becomes_a_column():
+    """图层已明说是门，就不能再按尺寸猜成柱。
+
+    **实测**（轨道交通装修/景观图）：这些「柱」落在
+    `A—门窗`(door) / `I—平面—门`(door) / `A-GLAZ`(window) /
+    `A—设备管丼、主管符号`(pipe) / `景-平面-红线`(slab) 上 ——
+    分类器**答得出**它们是什么，识别器却仍从尺寸猜测路径把它们收成柱。
+
+    金标准上这两块（G19 金标准 0、G23 金标准 2）合计贡献了修复后
+    残余误差的 **69%**：框住的是文字字形、标高符号的黑三角、门扇符号。
+    """
+    result = recognize(_plan_with_polys_on("A—门窗"), "structure", "d1")
+    assert len(result.columns) == 4
+
+
+@pytest.mark.unit
+def test_an_unclassifiable_layer_still_reaches_the_size_guess():
+    """判不出类型的图层照旧走尺寸猜测——不因这道闸而漏检。"""
+    result = recognize(_plan_with_polys_on("XYZ-999"), "structure", "d1")
+    assert len(result.columns) == 9

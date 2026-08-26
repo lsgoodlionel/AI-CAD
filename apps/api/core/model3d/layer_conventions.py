@@ -193,6 +193,13 @@ def _match_substring_or_pattern(name: str, rules: tuple[_KindRule, ...]) -> str 
 #: 实测该图 4240 个梁图元**零命中**。这是 AutoCAD 的通用约定，非工程特有。
 _XREF_BOUND_RE = re.compile(r"^.*\$\d+\$\d*")
 
+#: **外部参照（未绑定）图层**：AutoCAD 用 `外参名|图层名` 命名，
+#: `|` 是保留字符（手工建的图层不能含它），所以剥到最后一个 `|` 是安全的。
+#: 既有实现只处理了 `$N$` 的**绑定**形式，于是实测装修/景观图里
+#: `建筑底板|S-COLU` 被前缀里的「底板」判成 slab、
+#: `建筑底板|A-DOOR` 同样判成 slab（真实身份是门）。
+_XREF_ATTACHED_RE = re.compile(r"^.*\|")
+
 
 #: **标注/文字图层不是构件图层**。实测大歌剧院一张
 #: 「1区立柱桩及钢立柱平面布置图」贡献 3410 根「柱」，
@@ -237,7 +244,7 @@ def is_annotation_layer(layer: str | None) -> bool:
 
 def normalize_layer_name(layer: str | None) -> str:
     """剥离 AutoCAD xref 绑定前缀，得到原始图层名。无前缀时原样返回。"""
-    name = str(layer or "")
+    name = _XREF_ATTACHED_RE.sub("", str(layer or ""))
     return _XREF_BOUND_RE.sub("", name)
 
 
@@ -263,7 +270,7 @@ def classify_by_layer(layer: str | None, block: str = "") -> str | None:
     # **完整名优先于剥离名**：xref 前缀里的 AIA 代码是设计师在原图里的
     # 标注，比子层名可靠。实测 `S-S-WALL-1F$0$墙柱纵筋` 剥离后只剩
     # 「墙柱纵筋」，含「柱」被判成柱 —— 而主层名 S-WALL 明说是墙。
-    full_n = _norm(layer)
+    full_n = _norm(_XREF_ATTACHED_RE.sub("", str(layer or "")))
     layer_n = _norm(normalize_layer_name(layer))
     block_n = _norm(block)
 

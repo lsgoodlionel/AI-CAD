@@ -184,3 +184,40 @@ def test_non_mapping_root_degrades_to_empty(monkeypatch, tmp_path):
     monkeypatch.setattr(lc, "_CONVENTIONS_FILE", bad)
     lc.load_conventions.cache_clear()
     assert lc.load_conventions().kind_rules == ()
+
+
+# --- 外部参照图层：`外参名|图层名` 是 AutoCAD 通用命名 -------------------
+
+@pytest.mark.unit
+def test_xref_attached_prefix_is_stripped_before_classifying():
+    """`建筑底板|S-COLU` 是外参 `建筑底板` 里的 `S-COLU` 图层，那是柱。
+
+    AutoCAD 用 `|` 分隔外部参照名与图层名（`|` 是保留字符，手工建的
+    图层不能含它），既有实现只剥离了 `$N$` 的**绑定**形式。
+
+    实测后果（轨道交通装修/景观图）：
+      `建筑底板|S-COLU` → slab（前缀里的「底板」赢了）
+      `建筑底板|A-DOOR` → slab（同上，真实身份是门）
+    """
+    from core.model3d.layer_conventions import classify_by_layer
+
+    assert classify_by_layer("建筑底板|S-COLU", "") == "column"
+    assert classify_by_layer("建筑底板|A-DOOR", "") == "door"
+    assert classify_by_layer("01-1F平面底图|S-COLU", "") == "column"
+
+
+@pytest.mark.unit
+def test_bound_xref_form_is_unaffected():
+    """`$N$` 绑定形式的既有行为不变。
+
+    `墙柱纵筋` 因含「柱」被 `classify_by_layer` 判成 column，而
+    `is_annotation_layer` 判出它是钢筋标注层 —— **两者是两个问题**，
+    由调用方组合（`not is_annotation_layer(l) and classify_by_layer(l)`）。
+    这条护栏钉住的正是这个组合契约。
+    """
+    from core.model3d.layer_conventions import (
+        classify_by_layer, is_annotation_layer)
+
+    layer = "S-S-WALL-1F$0$墙柱纵筋"
+    assert classify_by_layer(layer, "") == "column"
+    assert is_annotation_layer(layer)          # 组合后不产出柱
