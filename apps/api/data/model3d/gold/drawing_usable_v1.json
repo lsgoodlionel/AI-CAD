@@ -1,0 +1,872 @@
+{
+ "version": 1,
+ "object_classes": [
+  "drawing_usable"
+ ],
+ "units": [
+  {
+   "unit": "DU-sgoh-5385c1be",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "5385c1be",
+    "discipline": "structure",
+    "patch": "U1-1"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "plan",
+      "usable": "true"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-16b8585e",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "16b8585e",
+    "discipline": "mep",
+    "patch": "U1-2"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "plan",
+      "usable": "true"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-0345b2dd",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0345b2dd",
+    "discipline": "mep",
+    "patch": "U1-3"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "notice",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-metro-38abd953",
+   "source": {
+    "project": "metro",
+    "drawing_id": "38abd953",
+    "discipline": "architecture",
+    "patch": "U1-4"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "detail",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-metro-5e3d6dd7",
+   "source": {
+    "project": "metro",
+    "drawing_id": "5e3d6dd7",
+    "discipline": "decoration",
+    "patch": "U1-5"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "schedule",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-metro-1e8512bc",
+   "source": {
+    "project": "metro",
+    "drawing_id": "1e8512bc",
+    "discipline": "mep",
+    "patch": "U1-6"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "notice",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-metro-25f4c066",
+   "source": {
+    "project": "metro",
+    "drawing_id": "25f4c066",
+    "discipline": "architecture",
+    "patch": "U2-1"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "section",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-b8185bac",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "b8185bac",
+    "discipline": "mep",
+    "patch": "U2-2"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "plan",
+      "usable": "true"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-7ef916eb",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "7ef916eb",
+    "discipline": "mep",
+    "patch": "U2-3"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "plan",
+      "usable": "true"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-b403f6f8",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "b403f6f8",
+    "discipline": "mep",
+    "patch": "U2-4"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "plan",
+      "usable": "true"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-030d89f2",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "030d89f2",
+    "discipline": "mep",
+    "patch": "U2-5"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "plan",
+      "usable": "true"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-8891323f",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "8891323f",
+    "discipline": "mep",
+    "patch": "U2-6"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "notice",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-c38159c8",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "c38159c8",
+    "discipline": "mep",
+    "patch": "U3-1"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "plan",
+      "usable": "true"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-metro-cbdd1bdd",
+   "source": {
+    "project": "metro",
+    "drawing_id": "cbdd1bdd",
+    "discipline": "mep",
+    "patch": "U3-2"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "schedule",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-bdaa4987",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "bdaa4987",
+    "discipline": "architecture",
+    "patch": "U3-3"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "detail",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-342bcafc",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "342bcafc",
+    "discipline": "mep",
+    "patch": "U3-4"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "plan",
+      "usable": "true"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-55ee3020",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "55ee3020",
+    "discipline": "architecture",
+    "patch": "U3-5"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "detail",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-metro-3328306e",
+   "source": {
+    "project": "metro",
+    "drawing_id": "3328306e",
+    "discipline": "architecture",
+    "patch": "U3-6"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "text",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-6233ac97",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "6233ac97",
+    "discipline": "architecture",
+    "patch": "U4-1"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "schedule",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-metro-6a4b116e",
+   "source": {
+    "project": "metro",
+    "drawing_id": "6a4b116e",
+    "discipline": "structure",
+    "patch": "U4-2"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "text",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-metro-4af88ce9",
+   "source": {
+    "project": "metro",
+    "drawing_id": "4af88ce9",
+    "discipline": "structure",
+    "patch": "U4-3"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "plan",
+      "usable": "true"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-metro-20da8be0",
+   "source": {
+    "project": "metro",
+    "drawing_id": "20da8be0",
+    "discipline": "decoration",
+    "patch": "U4-4"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "detail",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-3fbd1818",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "3fbd1818",
+    "discipline": "architecture",
+    "patch": "U4-5"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "detail",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-metro-7e1e7aef",
+   "source": {
+    "project": "metro",
+    "drawing_id": "7e1e7aef",
+    "discipline": "architecture",
+    "patch": "U4-6"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "text",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-94b3eb65",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "94b3eb65",
+    "discipline": "mep",
+    "patch": "U5-1"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "schedule",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-metro-12f95d4c",
+   "source": {
+    "project": "metro",
+    "drawing_id": "12f95d4c",
+    "discipline": "structure",
+    "patch": "U5-2"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "detail",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-metro-0c3ab272",
+   "source": {
+    "project": "metro",
+    "drawing_id": "0c3ab272",
+    "discipline": "architecture",
+    "patch": "U5-3"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "section",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-metro-a75d36e2",
+   "source": {
+    "project": "metro",
+    "drawing_id": "a75d36e2",
+    "discipline": "architecture",
+    "patch": "U5-4"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "text",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-25150c71",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "25150c71",
+    "discipline": "mep",
+    "patch": "U5-5"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "plan",
+      "usable": "true"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-94637e6c",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "94637e6c",
+    "discipline": "structure",
+    "patch": "U5-6"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "schedule",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-82a91543",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "82a91543",
+    "discipline": "architecture",
+    "patch": "U6-1"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "plan",
+      "usable": "true"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-c5dce02c",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "c5dce02c",
+    "discipline": "structure",
+    "patch": "U6-2"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "plan",
+      "usable": "true"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-metro-a2a73418",
+   "source": {
+    "project": "metro",
+    "drawing_id": "a2a73418",
+    "discipline": "architecture",
+    "patch": "U6-3"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "detail",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-7c80f396",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "7c80f396",
+    "discipline": "mep",
+    "patch": "U6-4"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "plan",
+      "usable": "true"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-metro-89052a8e",
+   "source": {
+    "project": "metro",
+    "drawing_id": "89052a8e",
+    "discipline": "decoration",
+    "patch": "U6-5"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "section",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  },
+  {
+   "unit": "DU-sgoh-6cb0bf49",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "6cb0bf49",
+    "discipline": "architecture",
+    "patch": "U6-6"
+   },
+   "classes": {
+    "drawing_usable": {
+     "method": "fields",
+     "fields": {
+      "kind": "text",
+      "usable": "false"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "整图缩略判图种 + 能否提取三维构件。人工复核 U1 全部 6 格与判读一致。与系统 drawing_role 一致率 89%（32/36），4 处不一致**全部是图名与图面内容不符**。"
+    }
+   }
+  }
+ ]
+}
