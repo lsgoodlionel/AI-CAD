@@ -1,0 +1,1436 @@
+{
+ "version": 1,
+ "object_classes": [
+  "columns"
+ ],
+ "units": [
+  {
+   "unit": "G01",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2124af82",
+    "tile_index": 1,
+    "band": "中等"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 3,
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G02",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2124af82",
+    "tile_index": 2,
+    "band": "中等"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 2,
+     "confidence": 0.88,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "左侧和底边切到的灰块露出不足一半未计"
+    }
+   }
+  },
+  {
+   "unit": "G03",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2124af82",
+    "tile_index": 12,
+    "band": "中等"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 6,
+     "confidence": 0.93,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "中部竖向长条为墙状构件未计"
+    }
+   }
+  },
+  {
+   "unit": "G04",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2124af82",
+    "tile_index": 13,
+    "band": "中等"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 4,
+     "confidence": 0.78,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "上边缘和右边缘切到的灰块露出不足一半未计"
+    }
+   }
+  },
+  {
+   "unit": "G05",
+   "source": {
+    "project": "metro",
+    "drawing_id": "27bc32e6",
+    "tile_index": 8,
+    "band": "中等"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 3,
+     "confidence": 0.86,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "右边缘切到的灰块露出不足一半未计"
+    }
+   }
+  },
+  {
+   "unit": "G06",
+   "source": {
+    "project": "metro",
+    "drawing_id": "33037081",
+    "tile_index": 8,
+    "band": "中等"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 3,
+     "confidence": 0.86,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "右边缘切到的灰块露出不足一半未计"
+    }
+   }
+  },
+  {
+   "unit": "G07",
+   "source": {
+    "project": "metro",
+    "drawing_id": "7411241d",
+    "tile_index": 18,
+    "band": "中等"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 0,
+     "confidence": 0.98,
+     "verified_by": [
+      "gpt"
+     ],
+     "excluded": "非平面图",
+     "note": "标题文字为主"
+    }
+   }
+  },
+  {
+   "unit": "G08",
+   "source": {
+    "project": "metro",
+    "drawing_id": "7c73545a",
+    "tile_index": 13,
+    "band": "中等"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 2,
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G09",
+   "source": {
+    "project": "metro",
+    "drawing_id": "8f977527",
+    "tile_index": 4,
+    "band": "中等"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 2,
+     "confidence": 0.82,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G10",
+   "source": {
+    "project": "metro",
+    "drawing_id": "8f977527",
+    "tile_index": 10,
+    "band": "中等"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 5,
+     "confidence": 0.82,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G11",
+   "source": {
+    "project": "metro",
+    "drawing_id": "b44593a0",
+    "tile_index": 20,
+    "band": "中等"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 0,
+     "confidence": 0.88,
+     "verified_by": [
+      "gpt"
+     ],
+     "excluded": "非平面图",
+     "note": "剖面/立面"
+    }
+   }
+  },
+  {
+   "unit": "G12",
+   "source": {
+    "project": "metro",
+    "drawing_id": "d1cc9d5e",
+    "tile_index": 8,
+    "band": "中等"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 3,
+     "confidence": 0.88,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G13",
+   "source": {
+    "project": "metro",
+    "drawing_id": "194f877d",
+    "tile_index": 18,
+    "band": "密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 5,
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G14",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2124af82",
+    "tile_index": 9,
+    "band": "密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 10,
+     "confidence": 0.72,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G15",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2124af82",
+    "tile_index": 21,
+    "band": "密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 5,
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G16",
+   "source": {
+    "project": "metro",
+    "drawing_id": "27bc32e6",
+    "tile_index": 12,
+    "band": "密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 6,
+     "confidence": 0.92,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G17",
+   "source": {
+    "project": "metro",
+    "drawing_id": "307e4142",
+    "tile_index": 1,
+    "band": "密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 0,
+     "confidence": 0.8,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "excluded": "埋件图",
+     "note": "GPT 判非平面图被人工推翻：轴号俱全，只是顶部叠竣工章"
+    }
+   }
+  },
+  {
+   "unit": "G18",
+   "source": {
+    "project": "metro",
+    "drawing_id": "33037081",
+    "tile_index": 9,
+    "band": "密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 10,
+     "confidence": 0.74,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G19",
+   "source": {
+    "project": "metro",
+    "drawing_id": "3cda3e4f",
+    "tile_index": 2,
+    "band": "密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 0,
+     "confidence": 0.82,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G20",
+   "source": {
+    "project": "metro",
+    "drawing_id": "7c73545a",
+    "tile_index": 15,
+    "band": "密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 8,
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G21",
+   "source": {
+    "project": "metro",
+    "drawing_id": "8f977527",
+    "tile_index": 8,
+    "band": "密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 3,
+     "confidence": 0.84,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G22",
+   "source": {
+    "project": "metro",
+    "drawing_id": "8f977527",
+    "tile_index": 18,
+    "band": "密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 5,
+     "confidence": 0.82,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G23",
+   "source": {
+    "project": "metro",
+    "drawing_id": "daa18df0",
+    "tile_index": 7,
+    "band": "密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 2,
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G24",
+   "source": {
+    "project": "metro",
+    "drawing_id": "dfcad15d",
+    "tile_index": 21,
+    "band": "密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 5,
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G25",
+   "source": {
+    "project": "metro",
+    "drawing_id": "1902f697",
+    "tile_index": 10,
+    "band": "稀疏"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 0,
+     "confidence": 0.98,
+     "verified_by": [
+      "gpt"
+     ],
+     "excluded": "非平面图",
+     "note": "标题文字"
+    }
+   }
+  },
+  {
+   "unit": "G26",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2124af82",
+    "tile_index": 3,
+    "band": "稀疏"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 2,
+     "confidence": 0.86,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G27",
+   "source": {
+    "project": "metro",
+    "drawing_id": "33037081",
+    "tile_index": 0,
+    "band": "稀疏"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 1,
+     "confidence": 0.82,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G28",
+   "source": {
+    "project": "metro",
+    "drawing_id": "33037081",
+    "tile_index": 4,
+    "band": "稀疏"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 3,
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G29",
+   "source": {
+    "project": "metro",
+    "drawing_id": "3cda3e4f",
+    "tile_index": 14,
+    "band": "稀疏"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 0,
+     "confidence": 0.82,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G30",
+   "source": {
+    "project": "metro",
+    "drawing_id": "45f3497d",
+    "tile_index": 3,
+    "band": "稀疏"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 0,
+     "confidence": 0.92,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "excluded": "埋件图",
+     "note": "剖面大样"
+    }
+   }
+  },
+  {
+   "unit": "G31",
+   "source": {
+    "project": "metro",
+    "drawing_id": "66899823",
+    "tile_index": 12,
+    "band": "稀疏"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 2,
+     "confidence": 0.82,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G32",
+   "source": {
+    "project": "metro",
+    "drawing_id": "6ea40b15",
+    "tile_index": 23,
+    "band": "稀疏"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 0,
+     "confidence": 0.98,
+     "verified_by": [
+      "gpt"
+     ],
+     "excluded": "非平面图",
+     "note": "图签栏"
+    }
+   }
+  },
+  {
+   "unit": "G33",
+   "source": {
+    "project": "metro",
+    "drawing_id": "7c73545a",
+    "tile_index": 5,
+    "band": "稀疏"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 0,
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt"
+     ],
+     "excluded": "非平面图",
+     "note": "图框红章"
+    }
+   }
+  },
+  {
+   "unit": "G34",
+   "source": {
+    "project": "metro",
+    "drawing_id": "b44593a0",
+    "tile_index": 17,
+    "band": "稀疏"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 0,
+     "confidence": 0.78,
+     "verified_by": [
+      "gpt"
+     ],
+     "excluded": "非平面图",
+     "note": "屋面构造"
+    }
+   }
+  },
+  {
+   "unit": "G35",
+   "source": {
+    "project": "metro",
+    "drawing_id": "b5804bdd",
+    "tile_index": 16,
+    "band": "稀疏"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 0,
+     "confidence": 0.82,
+     "verified_by": [
+      "gpt"
+     ],
+     "excluded": "非平面图",
+     "note": "局部构造详图"
+    }
+   }
+  },
+  {
+   "unit": "G36",
+   "source": {
+    "project": "metro",
+    "drawing_id": "dfcad15d",
+    "tile_index": 14,
+    "band": "稀疏"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 2,
+     "confidence": 0.88,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G37",
+   "source": {
+    "project": "metro",
+    "drawing_id": "194f877d",
+    "tile_index": 9,
+    "band": "地铁-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 5,
+     "confidence": 0.78,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "底边露出不足一半的灰块未计"
+    }
+   }
+  },
+  {
+   "unit": "G38",
+   "source": {
+    "project": "metro",
+    "drawing_id": "194f877d",
+    "tile_index": 21,
+    "band": "地铁-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 5,
+     "confidence": 0.82,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "带叉方块按柱计"
+    }
+   }
+  },
+  {
+   "unit": "G39",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2124af82",
+    "tile_index": 20,
+    "band": "地铁-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 5,
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G40",
+   "source": {
+    "project": "metro",
+    "drawing_id": "27bc32e6",
+    "tile_index": 19,
+    "band": "地铁-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 6,
+     "confidence": 0.86,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G41",
+   "source": {
+    "project": "metro",
+    "drawing_id": "307e4142",
+    "tile_index": 0,
+    "band": "地铁-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 4,
+     "confidence": 0.72,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "excluded": "埋件图",
+     "note": "图上确有 4 个轴线交点方块，但来源是『屋顶设备层埋件平面布置图』——那是预埋钢板不是柱。按『该给模型贡献几根柱』的口径应为 0，故排除出误差统计。分格 C2:2 与实测(B3:2)不符。"
+    }
+   }
+  },
+  {
+   "unit": "G42",
+   "source": {
+    "project": "metro",
+    "drawing_id": "307e4142",
+    "tile_index": 4,
+    "band": "地铁-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 0,
+     "confidence": 0.82,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "excluded": "埋件图",
+     "note": "剖面大样和技术说明为主"
+    }
+   }
+  },
+  {
+   "unit": "G43",
+   "source": {
+    "project": "metro",
+    "drawing_id": "6ea40b15",
+    "tile_index": 10,
+    "band": "地铁-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 0,
+     "confidence": 0.98,
+     "verified_by": [
+      "gpt"
+     ],
+     "excluded": "非平面图",
+     "note": "标题文字为主"
+    }
+   }
+  },
+  {
+   "unit": "G44",
+   "source": {
+    "project": "metro",
+    "drawing_id": "7c73545a",
+    "tile_index": 12,
+    "band": "地铁-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 13,
+     "confidence": 0.95,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "A1左侧轴线附近13个尺寸相近的实心方柱；粗长条为墙"
+    }
+   }
+  },
+  {
+   "unit": "G45",
+   "source": {
+    "project": "metro",
+    "drawing_id": "7c73545a",
+    "tile_index": 16,
+    "band": "地铁-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 13,
+     "confidence": 0.72,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "右侧斜向黑色近方形块列按柱计"
+    }
+   }
+  },
+  {
+   "unit": "G46",
+   "source": {
+    "project": "metro",
+    "drawing_id": "8f977527",
+    "tile_index": 19,
+    "band": "地铁-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 5,
+     "confidence": 0.88,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G47",
+   "source": {
+    "project": "metro",
+    "drawing_id": "d1cc9d5e",
+    "tile_index": 9,
+    "band": "地铁-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 9,
+     "confidence": 0.74,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G48",
+   "source": {
+    "project": "metro",
+    "drawing_id": "d1cc9d5e",
+    "tile_index": 12,
+    "band": "地铁-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 6,
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G49",
+   "source": {
+    "project": "metro",
+    "drawing_id": "d1cc9d5e",
+    "tile_index": 18,
+    "band": "地铁-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 5,
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G50",
+   "source": {
+    "project": "metro",
+    "drawing_id": "d1cc9d5e",
+    "tile_index": 21,
+    "band": "地铁-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 5,
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G51",
+   "source": {
+    "project": "metro",
+    "drawing_id": "daa18df0",
+    "tile_index": 8,
+    "band": "地铁-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 3,
+     "confidence": 0.72,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "黑色长条墙段和标高三角未计"
+    }
+   }
+  },
+  {
+   "unit": "G52",
+   "source": {
+    "project": "metro",
+    "drawing_id": "dc35e129",
+    "tile_index": 4,
+    "band": "地铁-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 14,
+     "confidence": 0.45,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "excluded": "不可判定",
+     "note": "平面只占顶部一条窄带，构件在 2 倍放大下仍只有十几像素。GPT 自述『估计』、把握 0.45；人工数出 10~20，不确定度大于数值本身。"
+    }
+   }
+  },
+  {
+   "unit": "G53",
+   "source": {
+    "project": "metro",
+    "drawing_id": "dfcad15d",
+    "tile_index": 12,
+    "band": "地铁-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 6,
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G54",
+   "source": {
+    "project": "metro",
+    "drawing_id": "dfcad15d",
+    "tile_index": 20,
+    "band": "地铁-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 5,
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G55",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0b7b66c5",
+    "tile_index": 61,
+    "band": "歌剧院-中等"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 4,
+     "confidence": 0.72,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "excluded": "三方不一致",
+     "note": "GPT 数 4(A1/A3/B2/B3)，人工数 6(A1 三个/B3/C1/C2)。GPT 的 A3 很可能是 GKZ10 柱配筋详图(断面大样非平面柱)，且漏了底部两个。总数与定位均不一致，判为不可判定。"
+    }
+   }
+  },
+  {
+   "unit": "G56",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "22afffe1",
+    "tile_index": 38,
+    "band": "歌剧院-中等"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 0,
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "人工独立确认：全块无实心方块，仅空心方框与『上空 16.100』挑空标注；识别器 4 根为凭空过检"
+    }
+   }
+  },
+  {
+   "unit": "G57",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "22afffe1",
+    "tile_index": 39,
+    "band": "歌剧院-中等"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 1,
+     "confidence": 0.7,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G58",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "3ffbda35",
+    "tile_index": 49,
+    "band": "歌剧院-中等"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 1,
+     "confidence": 0.58,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "右上局部构件复杂"
+    }
+   }
+  },
+  {
+   "unit": "G59",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "663fc8b3",
+    "tile_index": 11,
+    "band": "歌剧院-中等"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 0,
+     "confidence": 0.75,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G60",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "8657c221",
+    "tile_index": 50,
+    "band": "歌剧院-中等"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 4,
+     "confidence": 0.72,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "总数 4 与人工独立计数一致；但分格 B3:4 与实测位置(B1:1 B2:2 B3:1)不符，定位不采信"
+    }
+   }
+  },
+  {
+   "unit": "G61",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "030f8193",
+    "tile_index": 41,
+    "band": "歌剧院-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 4,
+     "confidence": 0.88,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G62",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0b7b66c5",
+    "tile_index": 18,
+    "band": "歌剧院-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 5,
+     "confidence": 0.62,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "excluded": "三方不一致",
+     "note": "GPT 数 5，人工数 7(B1 两个/B2 一个/C2 三个/C3 一个)。GPT 的 A1 处人工看到的是斜向填充纹非实心块。旋转的密集平面图，两方数不到一起。"
+    }
+   }
+  },
+  {
+   "unit": "G63",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0b7b66c5",
+    "tile_index": 20,
+    "band": "歌剧院-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 6,
+     "confidence": 0.55,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "图线杂乱"
+    }
+   }
+  },
+  {
+   "unit": "G64",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "23cf0d4f",
+    "tile_index": 10,
+    "band": "歌剧院-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 12,
+     "confidence": 0.82,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G65",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "23cf0d4f",
+    "tile_index": 20,
+    "band": "歌剧院-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 7,
+     "confidence": 0.68,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G66",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "522b2314",
+    "tile_index": 27,
+    "band": "歌剧院-密集"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 11,
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "11个近方形灰柱，细长墙带/标高三角/菱形符号未计"
+    }
+   }
+  },
+  {
+   "unit": "G67",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0b7b66c5",
+    "tile_index": 2,
+    "band": "歌剧院-稀疏"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 1,
+     "confidence": 0.62,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G68",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0b7b66c5",
+    "tile_index": 75,
+    "band": "歌剧院-稀疏"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 5,
+     "confidence": 0.86,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G69",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "13b8e272",
+    "tile_index": 31,
+    "band": "歌剧院-稀疏"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 0,
+     "confidence": 0.78,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G70",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "63a7ee69",
+    "tile_index": 25,
+    "band": "歌剧院-稀疏"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 0,
+     "confidence": 0.82,
+     "verified_by": [
+      "gpt"
+     ],
+     "excluded": "非平面图",
+     "note": "楼梯/构造说明为主"
+    }
+   }
+  },
+  {
+   "unit": "G71",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "8657c221",
+    "tile_index": 33,
+    "band": "歌剧院-稀疏"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 1,
+     "confidence": 0.6,
+     "verified_by": [
+      "gpt"
+     ]
+    }
+   }
+  },
+  {
+   "unit": "G72",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "c10919d7",
+    "tile_index": 31,
+    "band": "歌剧院-稀疏"
+   },
+   "classes": {
+    "columns": {
+     "method": "count",
+     "count": 0,
+     "confidence": 0.72,
+     "verified_by": [
+      "gpt"
+     ],
+     "excluded": "非平面图",
+     "note": "窄条构造和详图表格为主"
+    }
+   }
+  }
+ ]
+}
