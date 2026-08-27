@@ -200,6 +200,9 @@ def recognize(circles: list[dict], *, strokes: list[tuple],
         result["violations"].extend(
             _zone_violations(index, axes))
 
+    # §8.0.2 两端各注一个轴号 → 同一条轴线不能算两条
+    labelled = merge_both_end_labels(labelled)
+
     # 一图多视图的分幅：各区**只单向**标注轴号（立面/剖面是投影图）。
     # §8.0.5 的分区在平面上两个方向都标轴号 —— 单向就是分幅的指纹。
     # 分幅没有分区号可确认，不该要人工给。
@@ -249,6 +252,51 @@ def recognize(circles: list[dict], *, strokes: list[tuple],
                 "但不进入 3D 场景与世界锚点,待人工确认")
     result["warnings"] = warnings
     return result
+
+
+#: 判定「同一条轴线」时偏移量的容差（图纸点）。两端的轴号圈由同一条轴线
+#: 引出，位置误差只来自圈心测量，实测在 1pt 以内。
+BOTH_END_OFFSET_TOL_PT = 2.0
+
+
+def merge_both_end_labels(axes: list[dict]) -> list[dict]:
+    """合并「同一条轴线两端各注一个轴号」造成的重复。
+
+    **GB/T 50001 §8.0.2 允许轴号注写在轴线两端**，而识别器把两端的轴号带
+    切成了两个分区，于是同一批轴线被数了两遍。实测（首层框架梁平面整体
+    配筋图）：
+
+        区0 轴号: 1@-542 2@-697 … 12@-2522   (图上边 y=227)
+        区1 轴号: 1@-542 2@-697 … 12@-2522   (图下边 y=1275)
+                       ↑ 偏移量完全相同
+
+    该图识别 38 条、真实 22 条。整体重复率：大歌剧院 4%、轨道交通 **18%**，
+    受影响图纸 17% / **40%**。
+
+    **判据同时要三样**：标签相同、方向相同、偏移量几乎相同。
+    §8.0.5 的真分区里 `1-1` 与 `2-1` 位置不同，不会被误合；
+    互相垂直的两条轴线可能偏移量相同，靠方向分开。
+    """
+    kept: list[dict] = []
+    for axis in axes or []:
+        label = axis.get("label")
+        kind = axis.get("label_kind")
+        angle = round(float(axis.get("angle_deg") or 0.0), 1)
+        offset = float(axis.get("offset_pt") or 0.0)
+        twin = next(
+            (k for k in kept
+             if k.get("label") == label and k.get("label_kind") == kind
+             and round(float(k.get("angle_deg") or 0.0), 1) == angle
+             and abs(float(k.get("offset_pt") or 0.0) - offset)
+             <= BOTH_END_OFFSET_TOL_PT),
+            None)
+        if twin is None:
+            kept.append(dict(axis))
+            continue
+        # 两端的圈都属于这一条轴线
+        twin["circle_count"] = (twin.get("circle_count") or 1) + (
+            axis.get("circle_count") or 1)
+    return kept
 
 
 def _median_axis_gap_m(axes: list | None,

@@ -520,3 +520,58 @@ def test_unknown_gap_falls_back_to_bands():
     from services.axis_recognition import is_suspect_symbol_field
 
     assert is_suspect_symbol_field(30, gap_m=None) is False
+
+
+# --- §8.0.2 轴线两端可各注一个轴号 -----------------------------------
+
+def _axis(label, offset, zone, kind="numeric", angle=90.0):
+    return {"label": label, "offset_pt": offset, "zone_index": zone,
+            "label_kind": kind, "angle_deg": angle, "circle_count": 1}
+
+
+@pytest.mark.unit
+def test_an_axis_labelled_at_both_ends_counts_once():
+    """同一条轴线在上下两端各注一个轴号，是一条轴线不是两条。
+
+    GB/T 50001 §8.0.2 允许轴号注写在轴线**两端**。识别器把两端的轴号带
+    切成了两个分区，于是同一批轴线被数了两遍。
+
+    **实测**（首层框架梁平面整体配筋图）：
+
+        区0 轴号: 1@-542 2@-697 … 12@-2522   (图上边 y=227)
+        区1 轴号: 1@-542 2@-697 … 12@-2522   (图下边 y=1275)
+                       ↑ 偏移量完全相同
+
+    该图识别 38 条，真实 22 条。整体重复率：大歌剧院 4%、轨道交通 **18%**，
+    受影响图纸 17% / **40%**。
+    """
+    from services.axis_recognition import merge_both_end_labels
+
+    axes = [_axis("1", -542.0, 0), _axis("2", -697.0, 0),
+            _axis("1", -542.0, 1), _axis("2", -697.0, 1)]
+    merged = merge_both_end_labels(axes)
+    assert len(merged) == 2
+    assert {a["label"] for a in merged} == {"1", "2"}
+    assert merged[0]["circle_count"] == 2      # 两端的圈都记在这条轴线上
+
+
+@pytest.mark.unit
+def test_real_zones_with_the_same_label_are_not_merged():
+    """真分区里两个「1 轴」在**不同位置**，不能合并。
+
+    §8.0.5 的分区图上 `1-1` 与 `2-1` 是两条轴线 —— 偏移量不同即为证据。
+    """
+    from services.axis_recognition import merge_both_end_labels
+
+    axes = [_axis("1", -542.0, 0), _axis("1", -1593.0, 1)]
+    assert len(merge_both_end_labels(axes)) == 2
+
+
+@pytest.mark.unit
+def test_same_offset_but_different_direction_is_not_merged():
+    """偏移量相同但方向不同，是两条互相垂直的轴线。"""
+    from services.axis_recognition import merge_both_end_labels
+
+    axes = [_axis("1", 525.0, 0, angle=90.0),
+            _axis("A", 525.0, 1, kind="alpha", angle=0.0)]
+    assert len(merge_both_end_labels(axes)) == 2
