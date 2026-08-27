@@ -143,3 +143,59 @@ def test_detection_scales_with_circle_diameter():
     rad = math.radians(70.0)
     dx, dy = math.cos(rad) * length / 2, math.sin(rad) * length / 2
     assert has_fraction_label([_stroke(-dx, dy, dx, -dy)], small)
+
+
+# --- 字母 A 的两条斜画不是分数线 --------------------------------------
+
+def _abs_stroke(x0, y0, x1, y1):
+    return (x0, y0, x1, y1)
+
+
+@pytest.mark.unit
+def test_the_two_diagonals_of_letter_A_are_not_a_fraction_slash():
+    """字母 A 的斜画成**镜像一对**；§8.0.6 的分数线只有一个方向。
+
+    **实测**（轨道交通「首层框架梁平面整体配筋图」右侧字母带）：
+
+        y=1094  比值 **0.522**（超过 0.44 阈值）  陡斜方向 **−75° 与 +76°**
+        其余四圈 比值 0.05~0.07
+
+    那是字母 A，却被判成附加轴线而排除出主序列 —— 该带 5 条主轴线只剩 4 条，
+    轴号整体错位。尺寸链证明它是主轴线：实测间距比
+    65:154:155:195 = 1:2.37:2.38:3.0，与真值 3900:9300:9300:11700 吻合。
+
+    原判据只看「最长陡斜笔画 ÷ 圈径」，而实测空白带只有
+    0.42（字母斜画）vs 0.47（分数线），**margin 极窄且是在另一个工程上标定的**。
+    """
+    from core.model3d.axis_label_glyph import has_fraction_label
+
+    circle = {"cx": 100.0, "cy": 100.0, "diameter_pt": 20.0}
+    letter_a = [_abs_stroke(97.0, 105.0, 100.0, 96.0),      # 左斜
+                _abs_stroke(100.0, 96.0, 103.0, 105.0)]     # 右斜（镜像，等长）
+    assert not has_fraction_label(letter_a, circle)
+
+
+@pytest.mark.unit
+def test_a_lone_slash_is_still_a_fraction():
+    """单向长斜线仍判为分数式——不能把这条能力改没了。"""
+    from core.model3d.axis_label_glyph import has_fraction_label
+
+    circle = {"cx": 100.0, "cy": 100.0, "diameter_pt": 20.0}
+    slash = [_abs_stroke(95.0, 105.0, 105.0, 95.0)]
+    assert has_fraction_label(slash, circle)
+
+
+@pytest.mark.unit
+def test_a_slash_next_to_letter_A_is_still_a_fraction():
+    """`1/A` 这类分数式里既有斜线也有字母 A —— 仍要判出分数式。
+
+    判据落在**最长**那条上：分数线最长且**无镜像伙伴**，
+    A 的两条斜画虽成对但更短。
+    """
+    from core.model3d.axis_label_glyph import has_fraction_label
+
+    circle = {"cx": 100.0, "cy": 100.0, "diameter_pt": 20.0}
+    strokes = [_abs_stroke(95.0, 105.0, 105.0, 95.0),       # 分数线，最长
+               _abs_stroke(98.0, 103.0, 100.0, 99.0),       # A 左斜，短
+               _abs_stroke(100.0, 99.0, 102.0, 103.0)]      # A 右斜，短
+    assert has_fraction_label(strokes, circle)

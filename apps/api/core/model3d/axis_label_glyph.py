@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import math
 
+
 #: 取圈内 80% 半径,避开圆周本身与外接的短划
 GLYPH_INSET_RATIO = 0.80
 
@@ -38,6 +39,12 @@ STEEP_MAX_DEG = 88.0
 
 #: 判为分数式的「最长陡斜笔画 ÷ 圈径」下限。落在实测空白带 0.43~0.46 内
 FRACTION_RATIO_THRESHOLD = 0.44
+
+#: 两条陡斜笔画互为**镜像**的角度容差(度)。字母 A/M/N/W/K 的斜画成对出现
+#: (一升一降),§8.0.6 的分数线只有一个方向。
+MIRROR_ANGLE_TOLERANCE_DEG = 20.0
+#: 互为镜像的两笔长度需相当的比值下限 —— 长度悬殊说明不是同一个字形的两画。
+MIRROR_LENGTH_RATIO = 0.6
 
 
 def strokes_inside(strokes: list[tuple], circle: dict,
@@ -62,6 +69,52 @@ def longest_steep_ratio(strokes: list[tuple], diameter_pt: float) -> float:
     return round(longest / diameter_pt, 4)
 
 
+def _steep_strokes(inside: list[tuple]) -> list[tuple]:
+    """圈内的陡斜笔画 → [(有向角度, 长度, 笔画)]，按长度降序。"""
+    out = []
+    for stroke in inside:
+        x0, y0, x1, y1 = stroke[:4]
+        dx, dy = x1 - x0, y1 - y0
+        length = math.hypot(dx, dy)
+        if length <= 0:
+            continue
+        angle = math.degrees(math.atan2(dy, dx))
+        folded = abs(angle)
+        folded = folded if folded <= 90 else 180 - folded
+        if STEEP_MIN_DEG <= folded <= STEEP_MAX_DEG:
+            out.append((angle, length, stroke))
+    return sorted(out, key=lambda item: -item[1])
+
+
+def longest_is_part_of_a_letter(inside: list[tuple]) -> bool:
+    """最长的陡斜笔画是否只是**字母的一条斜画**。
+
+    字母 A/M/N/W/K 的斜画**成镜像出现**（一升一降、长度相当），
+    而 §8.0.6 的分数线只有一个方向。
+
+    **实测**（轨道交通某图右侧字母带）：装着字母 A 的那个圈，
+    最长陡斜笔画 ÷ 圈径 = **0.522**，远超 0.44 阈值，于是被判成附加轴线
+    排除出主序列 —— 该带 5 条主轴线只剩 4 条，其后轴号整体错位。
+    而它的两条斜画方向是 **−75° 与 +76°**，镜像特征一目了然。
+
+    判据落在**最长**那条上：`1/A` 这类分数式里分数线最长且无镜像伙伴，
+    A 的两条斜画虽成对却更短，因此仍能判出分数式。
+    """
+    steep = _steep_strokes(inside)
+    if len(steep) < 2:
+        return False
+    angle, length, _ = steep[0]
+    for other_angle, other_length, _ in steep[1:]:
+        if other_length < length * MIRROR_LENGTH_RATIO:
+            continue
+        # 镜像：角度之和接近 0 或 ±180（一升一降）
+        total = abs(angle + other_angle)
+        if (total <= MIRROR_ANGLE_TOLERANCE_DEG
+                or abs(total - 180.0) <= MIRROR_ANGLE_TOLERANCE_DEG):
+            return True
+    return False
+
+
 def has_fraction_label(strokes: list[tuple], circle: dict,
                        threshold: float = FRACTION_RATIO_THRESHOLD) -> bool:
     """该圈内是否为 §8.0.6 的分数式轴号(即这是一条附加轴线)。
@@ -69,7 +122,10 @@ def has_fraction_label(strokes: list[tuple], circle: dict,
     入参 strokes 可以是整页笔画——内部会先筛出落在圈内的。
     """
     inside = strokes_inside(strokes, circle)
-    return longest_steep_ratio(inside, circle["diameter_pt"]) >= threshold
+    if longest_steep_ratio(inside, circle["diameter_pt"]) < threshold:
+        return False
+    # 最长那条若有镜像伙伴，它是字母的斜画而非分数线
+    return not longest_is_part_of_a_letter(inside)
 
 
 def mark_fraction_circles(strokes: list[tuple], circles: list[dict],
