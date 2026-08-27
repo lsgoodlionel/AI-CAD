@@ -1,0 +1,580 @@
+{
+ "version": 1,
+ "object_classes": [
+  "beams"
+ ],
+ "units": [
+  {
+   "unit": "VB-044bd525",
+   "source": {
+    "project": "metro",
+    "drawing_id": "044bd525"
+   },
+   "classes": {
+    "beams": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "B1-11",
+       "ok": false,
+       "what": "unsure",
+       "note": "截面 0.287x0.06"
+      },
+      {
+       "ref": "B1-12",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "截面 0.457x0.06"
+      },
+      {
+       "ref": "B1-13",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "截面 0.437x0.06"
+      },
+      {
+       "ref": "B1-14",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "截面 0.287x0.06"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
+    }
+   }
+  },
+  {
+   "unit": "VB-0e57204d",
+   "source": {
+    "project": "metro",
+    "drawing_id": "0e57204d"
+   },
+   "classes": {
+    "beams": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "B3-02",
+       "ok": true,
+       "note": "截面 0.274x0.06"
+      },
+      {
+       "ref": "B3-03",
+       "ok": true,
+       "note": "截面 0.15x0.06"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
+    }
+   }
+  },
+  {
+   "unit": "VB-19424243",
+   "source": {
+    "project": "metro",
+    "drawing_id": "19424243"
+   },
+   "classes": {
+    "beams": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "B2-10",
+       "ok": true,
+       "note": "截面 0.47x0.06"
+      },
+      {
+       "ref": "B2-11",
+       "ok": true,
+       "note": "截面 0.292x0.06"
+      },
+      {
+       "ref": "B2-12",
+       "ok": true,
+       "note": "截面 0.413x0.06｜梁号 KL-117c(2)"
+      },
+      {
+       "ref": "B2-13",
+       "ok": true,
+       "note": "截面 0.178x0.06"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
+    }
+   }
+  },
+  {
+   "unit": "VB-1d475497",
+   "source": {
+    "project": "metro",
+    "drawing_id": "1d475497"
+   },
+   "classes": {
+    "beams": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "B3-08",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "截面 0.451x0.06"
+      },
+      {
+       "ref": "B3-09",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "截面 0.451x0.06"
+      },
+      {
+       "ref": "B3-10",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "截面 0.444x0.06"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
+    }
+   }
+  },
+  {
+   "unit": "VB-1d5f093d",
+   "source": {
+    "project": "metro",
+    "drawing_id": "1d5f093d"
+   },
+   "classes": {
+    "beams": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "B2-18",
+       "ok": false,
+       "what": "unsure",
+       "note": "截面 0.436x0.06"
+      },
+      {
+       "ref": "B2-19",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "截面 0.437x0.06"
+      },
+      {
+       "ref": "B2-20",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "截面 0.445x0.06"
+      },
+      {
+       "ref": "B3-01",
+       "ok": false,
+       "what": "轴线",
+       "note": "截面 0.325x0.06"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
+    }
+   }
+  },
+  {
+   "unit": "VB-2bc0ccaf",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2bc0ccaf"
+   },
+   "classes": {
+    "beams": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "B2-14",
+       "ok": true,
+       "note": "截面 0.197x0.06｜梁号 L-429(1) 300x850"
+      },
+      {
+       "ref": "B2-15",
+       "ok": true,
+       "note": "截面 0.337x0.06"
+      },
+      {
+       "ref": "B2-16",
+       "ok": true,
+       "note": "截面 0.464x0.06"
+      },
+      {
+       "ref": "B2-17",
+       "ok": true,
+       "note": "截面 0.267x0.06"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
+    }
+   }
+  },
+  {
+   "unit": "VB-38548af9",
+   "source": {
+    "project": "metro",
+    "drawing_id": "38548af9"
+   },
+   "classes": {
+    "beams": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "B1-05",
+       "ok": false,
+       "what": "缩略图",
+       "note": "截面 0.256x0.06"
+      },
+      {
+       "ref": "B1-06",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "截面 0.274x0.06"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
+    }
+   }
+  },
+  {
+   "unit": "VB-3ba224c3",
+   "source": {
+    "project": "metro",
+    "drawing_id": "3ba224c3"
+   },
+   "classes": {
+    "beams": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "B1-07",
+       "ok": true,
+       "note": "截面 0.369x0.06"
+      },
+      {
+       "ref": "B1-08",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "截面 0.195x0.06"
+      },
+      {
+       "ref": "B1-09",
+       "ok": true,
+       "note": "截面 0.248x0.06"
+      },
+      {
+       "ref": "B1-10",
+       "ok": true,
+       "note": "截面 0.409x0.06"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
+    }
+   }
+  },
+  {
+   "unit": "VB-4678d2fd",
+   "source": {
+    "project": "metro",
+    "drawing_id": "4678d2fd"
+   },
+   "classes": {
+    "beams": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "B1-15",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "截面 0.217x0.06"
+      },
+      {
+       "ref": "B1-16",
+       "ok": false,
+       "what": "unsure",
+       "note": "截面 0.445x0.06"
+      },
+      {
+       "ref": "B1-17",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "截面 0.164x0.06"
+      },
+      {
+       "ref": "B1-18",
+       "ok": false,
+       "what": "unsure",
+       "note": "截面 0.405x0.06"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
+    }
+   }
+  },
+  {
+   "unit": "VB-4c4bc06f",
+   "source": {
+    "project": "metro",
+    "drawing_id": "4c4bc06f"
+   },
+   "classes": {
+    "beams": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "B2-03",
+       "ok": true,
+       "note": "截面 0.445x0.06"
+      },
+      {
+       "ref": "B2-04",
+       "ok": true,
+       "note": "截面 0.446x0.06"
+      },
+      {
+       "ref": "B2-05",
+       "ok": true,
+       "note": "截面 0.435x0.06"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
+    }
+   }
+  },
+  {
+   "unit": "VB-75ffa1ff",
+   "source": {
+    "project": "metro",
+    "drawing_id": "75ffa1ff"
+   },
+   "classes": {
+    "beams": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "B1-19",
+       "ok": true,
+       "note": "截面 0.406x0.06｜梁号 L-B107c(1)"
+      },
+      {
+       "ref": "B1-20",
+       "ok": true,
+       "note": "截面 0.235x0.06｜梁号 L-B107c(1)"
+      },
+      {
+       "ref": "B2-01",
+       "ok": true,
+       "note": "截面 0.229x0.06"
+      },
+      {
+       "ref": "B2-02",
+       "ok": true,
+       "note": "截面 0.406x0.06｜梁号 L-B119(1)"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
+    }
+   }
+  },
+  {
+   "unit": "VB-8e3e3e01",
+   "source": {
+    "project": "metro",
+    "drawing_id": "8e3e3e01"
+   },
+   "classes": {
+    "beams": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "B1-01",
+       "ok": true,
+       "note": "截面 0.229x0.06"
+      },
+      {
+       "ref": "B1-02",
+       "ok": true,
+       "note": "截面 0.235x0.06"
+      },
+      {
+       "ref": "B1-03",
+       "ok": true,
+       "note": "截面 0.235x0.06"
+      },
+      {
+       "ref": "B1-04",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "截面 0.229x0.06"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
+    }
+   }
+  },
+  {
+   "unit": "VB-b2b99ba4",
+   "source": {
+    "project": "metro",
+    "drawing_id": "b2b99ba4"
+   },
+   "classes": {
+    "beams": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "B3-04",
+       "ok": true,
+       "note": "截面 0.47x0.06｜梁号 KL-418(1A) 500x900"
+      },
+      {
+       "ref": "B3-05",
+       "ok": true,
+       "note": "截面 0.267x0.06"
+      },
+      {
+       "ref": "B3-06",
+       "ok": true,
+       "note": "截面 0.235x0.06"
+      },
+      {
+       "ref": "B3-07",
+       "ok": true,
+       "note": "截面 0.267x0.06"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
+    }
+   }
+  },
+  {
+   "unit": "VB-dfe5faf7",
+   "source": {
+    "project": "metro",
+    "drawing_id": "dfe5faf7"
+   },
+   "classes": {
+    "beams": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "B2-07",
+       "ok": true,
+       "note": "截面 0.19x0.06"
+      },
+      {
+       "ref": "B2-08",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "截面 0.152x0.06"
+      },
+      {
+       "ref": "B2-09",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "截面 0.265x0.06"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
+    }
+   }
+  },
+  {
+   "unit": "VB-fcccf366",
+   "source": {
+    "project": "metro",
+    "drawing_id": "fcccf366"
+   },
+   "classes": {
+    "beams": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "B2-06",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "截面 0.15x0.06"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
+    }
+   }
+  }
+ ]
+}
