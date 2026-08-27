@@ -127,3 +127,34 @@ def test_order_is_preserved():
 def test_degenerate_diameter_does_not_divide_by_zero():
     got = filter_circles_near_axes([_circle(100, 100, 0.0)], [(100.0, 100.0)])
     assert isinstance(got, list)
+
+
+@pytest.mark.unit
+def test_a_line_passing_through_the_circle_also_counts_as_adjacent():
+    """轴线**穿过**圈而不在圈处终止时，圈也该保留。
+
+    §8.0.2 说的是「圆心应在定位轴线的**延长线**上」——判据是圆心到
+    **轴线**的距离，而实现只查到**线段端点**的距离。轴线若穿过圈继续
+    向外延伸，圈附近就没有端点，于是真轴号圈被当成孤立圆丢掉。
+
+    **实测**（首层框架梁平面整体配筋图）：数字带原始候选 14 个圈
+    （x = 542…2522，直径全为 20.0pt），过此闸后只剩 12 个 ——
+    丢的正是 ⑦（x=1470）与 ⑪（x=2088），而它们身上恰好有轴线穿过。
+    后果不止漏两条：轴号按顺序推导，⑦ 一丢，其后编号**整体偏移**。
+    """
+    from core.model3d.axis_label_circle import filter_circles_near_axes
+
+    circle = {"cx": 1470.0, "cy": 227.0, "diameter_pt": 20.0}
+    # 一条竖直轴线从圈上方穿到图纸深处，端点都离圈很远
+    endpoints = [(1470.0, 60.0), (1470.0, 1600.0)]
+    assert len(filter_circles_near_axes([circle], endpoints)) == 1
+
+
+@pytest.mark.unit
+def test_an_isolated_circle_far_from_any_line_is_still_dropped():
+    """孤立的圆（桩、钢立柱）照旧丢掉——放宽判据不能把这条护栏冲掉。"""
+    from core.model3d.axis_label_circle import filter_circles_near_axes
+
+    circle = {"cx": 1470.0, "cy": 227.0, "diameter_pt": 20.0}
+    endpoints = [(300.0, 900.0), (400.0, 900.0)]
+    assert filter_circles_near_axes([circle], endpoints) == []

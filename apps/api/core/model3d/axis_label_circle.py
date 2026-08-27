@@ -62,6 +62,10 @@ STANDARD_DIAMETER_MM = LABEL_CIRCLE_DIAMETER_MM
 #: 而真正的轴网定位图只有 108 个。
 AXIS_PROXIMITY_MAX_RATIO = 0.30
 
+#: 单条线段最多采样点数。长尺寸线可以横跨整幅图，不设上限会把哈希撑爆；
+#: 轴线短、采样密，长线只需稀疏采样即可命中。
+MAX_SEGMENT_SAMPLES = 400
+
 #: 圈心到轴线的最大法向距离(pt)。实测最小轴距 4500mm ≈ 26pt(1:350),
 #: 容差必须远小于它,否则会把圈串到相邻轴线上
 CIRCLE_TO_AXIS_TOLERANCE_PT = 3.0
@@ -135,6 +139,13 @@ INDEX_LINE_FLATNESS_PT = 1.5
 INDEX_LINE_CENTER_RATIO = 0.18
 #: 线段横向必须贯通圆的此比例以上 —— 分数式附加轴线的分数线只占小半。
 INDEX_LINE_SPAN_RATIO = 1.2
+#: 线段长度上限（直径的倍数）。§6 索引符号的直径线是圆的**内接**线段，
+#: 长度就等于直径；尺寸线与引线则远远伸出圆外。
+#:
+#: **没有这条上限的代价实测过**：只判「水平 + 过圈心 + 贯通全圆」时，
+#: 这道闸挡掉 11 个圈，其中 ⑦ 与 ⑪ 是**真轴号圈**——它们身上恰好
+#: 横穿着尺寸线与引线，于是被当成了索引符号。
+INDEX_LINE_MAX_LENGTH_RATIO = 1.6
 
 
 def drop_index_symbol_circles(circles: list[dict] | None,
@@ -148,10 +159,12 @@ def drop_index_symbol_circles(circles: list[dict] | None,
     **实测**（轨道交通「首层框架梁平面整体配筋图」）：一整排索引符号被
     读成了「1~6 轴」，构成该图轴号识别的全部误检（精确率 72.7%）。
 
-    判据要同时满足三样，少一样都会误伤：
+    判据要同时满足四样，少一样都会误伤：
       * 线段**近水平** —— 否则 §8.0.2 引到圈心的轴线会被当成直径；
       * 高度**过圈心** —— 否则圈外的尺寸线会命中；
-      * 横向**贯通全圆** —— 否则 §8.0.6 分数式附加轴线的分数线会命中。
+      * 横向**贯通全圆** —— 否则 §8.0.6 分数式附加轴线的分数线会命中；
+      * 长度**不超过直径太多** —— 否则横穿而过的尺寸线/引线会命中，
+        实测这一条缺失时误杀了 ⑦、⑪ 两个真轴号圈。
 
     **取不到线段时原样返回**：判不出就不判，不能把整张图清空。
     """
@@ -174,6 +187,8 @@ def drop_index_symbol_circles(circles: list[dict] | None,
             abs((y0 + y1) / 2.0 - cy) <= radius * INDEX_LINE_CENTER_RATIO
             and min(x0, x1) <= cx - radius * (INDEX_LINE_SPAN_RATIO / 2)
             and max(x0, x1) >= cx + radius * (INDEX_LINE_SPAN_RATIO / 2)
+            # 直径线起止于圆周；横穿的尺寸线/引线远远伸出圆外
+            and abs(x1 - x0) <= radius * 2 * INDEX_LINE_MAX_LENGTH_RATIO
             for (x0, y0), (x1, y1) in flat)
         if not crossed:
             kept.append(circle)
@@ -305,8 +320,24 @@ def filter_circles_near_axes(
 
     # 空间哈希：862 圈 × 96 万端点直接两两算不现实。
     cell = max(1.0, max(float(c.get("diameter_pt") or 0) for c in circles))
+
+    # **线段按步长采样后一并入哈希**：§8.0.2 的判据是圆心到**轴线**的距离，
+    # 只查端点时，穿过圈而不在此终止的轴线会让真轴号圈被当成孤立圆丢掉
+    # （实测某图 ⑦、⑪ 两个圈因此消失，且轴号顺序推导使其后编号整体偏移）。
+    # 采样把「点到线段」化归为「点到最近采样点」，误差不超过半个步长。
+    step = cell / 2.0
+    points: list[tuple[float, float]] = []
+    pairs = zip(line_endpoints[0::2], line_endpoints[1::2])
+    for (x0, y0), (x1, y1) in pairs:
+        span = max(abs(x1 - x0), abs(y1 - y0))
+        n = min(int(span / step), MAX_SEGMENT_SAMPLES)
+        for k in range(1, n):
+            t = k / n
+            points.append((x0 + (x1 - x0) * t, y0 + (y1 - y0) * t))
+    points.extend(line_endpoints)
+
     grid: dict[tuple[int, int], list[tuple[float, float]]] = {}
-    for x, y in line_endpoints:
+    for x, y in points:
         grid.setdefault((int(x // cell), int(y // cell)), []).append((x, y))
 
     kept: list[dict] = []

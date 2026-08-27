@@ -235,3 +235,21 @@ def test_no_segments_means_no_filtering():
 
     circles = [_idx_circle(100.0, 100.0)]
     assert len(drop_index_symbol_circles(circles, [])) == 1
+
+
+@pytest.mark.unit
+def test_a_dimension_line_passing_through_is_not_a_diameter():
+    """横穿而过的尺寸线/引线不是直径线——直径**起止于圆周**。
+
+    **实测**（首层框架梁平面整体配筋图）：只判「水平 + 过圈心 + 贯通全圆」
+    时，我这道闸挡掉了 11 个圈，其中包括 ⑦ 与 ⑪ 两个**真轴号圈**
+    ——它们身上恰好横穿着尺寸线与引线。
+
+    §6 索引符号的水平直径是圆的**内接**线段，长度就等于直径；
+    尺寸线、引线则远远伸出圆外。长度上限是这两者的分界。
+    """
+    from core.model3d.axis_label_circle import drop_index_symbol_circles
+
+    circles = [_idx_circle(1470.0, 227.0, d=20.0)]
+    long_line = [((542.0, 227.0), (2522.0, 227.0))]     # 贯通全图的尺寸线
+    assert len(drop_index_symbol_circles(circles, long_line)) == 1
