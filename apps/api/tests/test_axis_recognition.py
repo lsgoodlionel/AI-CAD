@@ -661,3 +661,43 @@ def test_without_circle_offsets_confirmation_is_unknown():
     flags = suspect_missing_axis_gaps(
         _band([542, 697, 851, 1006, 1161, 1315, 1624, 1779, 1934]))
     assert flags[0]["confirmed"] is None
+
+
+@pytest.mark.unit
+def test_a_confirmed_gap_circle_is_put_back_before_labelling():
+    """缺口处确有圈时**补回**再编号——否则其后轴号整体偏移。
+
+    证据强度足够：那个圈恰好落在已确认轴线构成的模数网格上，
+    这比任何一道闸的判断都硬（闸是按局部几何判的，网格是全局规律）。
+
+    **实测**（metro 首层框架梁配筋图）：⑦、⑪ 的圈被邻近判据挡掉，
+    余下 12 个圈被标成 1~12，物理位置却是 ①②③④⑤⑥⑧⑨⑩⑫⑬⑭。
+    """
+    from services.axis_recognition import recover_gap_axes
+
+    axes = _band([542, 697, 851, 1006, 1161, 1315, 1624, 1779, 1934])
+    for a in axes:
+        a.pop("label", None)                       # 补回发生在编号之前
+    out = recover_gap_axes(axes, circle_offsets=[-1470.0])
+    assert len(out) == 10
+    offs = sorted(-float(a["offset_pt"]) for a in out)
+    assert 1470.0 in offs
+    assert any(a.get("recovered") for a in out)    # 补回的要留痕
+
+
+@pytest.mark.unit
+def test_nothing_is_invented_when_the_gap_has_no_circle():
+    """缺口处无圈就不补——那多半是设计上的不等跨。"""
+    from services.axis_recognition import recover_gap_axes
+
+    axes = _band([542, 697, 851, 1006, 1161, 1315, 1624, 1779, 1934])
+    assert len(recover_gap_axes(axes, circle_offsets=[])) == len(axes)
+
+
+@pytest.mark.unit
+def test_recovery_is_skipped_without_candidates():
+    """没给候选时原样返回——判不出就不判。"""
+    from services.axis_recognition import recover_gap_axes
+
+    axes = _band([100, 255, 410, 720])
+    assert recover_gap_axes(axes, circle_offsets=None) == axes

@@ -182,8 +182,14 @@ def recognize(circles: list[dict], *, strokes: list[tuple],
     zone_records: list[dict] = []
     for index, zone in enumerate(zones):
         label = zone_labels.get(index, ZONE_LABEL_PENDING)
-        axes = derive_zone_labels(bands_to_axes(zone["bands"], page_h=page_h),
-                                  zone=label)
+        _zone_axes = bands_to_axes(zone["bands"], page_h=page_h)
+        if circle_candidates is not None and _zone_axes:
+            from core.model3d.axis_label_circle import normal_offset
+            _ang = float(_zone_axes[0].get("angle_deg") or 0.0)
+            _zone_axes = recover_gap_axes(
+                _zone_axes,
+                [normal_offset(c["cx"], c["cy"], _ang) for c in circle_candidates])
+        axes = derive_zone_labels(_zone_axes, zone=label)
         confirmed = (not needs_confirmation) or label is not ZONE_LABEL_PENDING
         for axis in axes:
             axis["zone_index"] = index
@@ -350,12 +356,58 @@ def suspect_missing_axis_gaps(axes: list[dict],
                 for mid in mids)
         out.append({
             "after_label": ordered[index].get("label"),
+            # **补回发生在编号之前**，那时还没有 label，只能靠下标定位
+            "after_index": index,
             "multiple": multiple,
             "gap_pt": round(gap, 2),
             "base_pt": round(base, 2),
             "confirmed": confirmed,
         })
     return out
+
+
+def recover_gap_axes(axes: list[dict],
+                     circle_offsets: list[float] | None) -> list[dict]:
+    """把**确认漏检**的轴线补回来，在编号之前。
+
+    补回的证据是：那个圈恰好落在已确认轴线构成的**模数网格**上。
+    这比任何一道闸的判断都硬 —— 闸按局部几何判（圈边有没有线、
+    圆里有没有横线），网格是全局规律。
+
+    **实测**（metro 首层框架梁配筋图）：⑦、⑪ 的圈被邻近判据挡掉，
+    余下 12 个圈被顺序标成 1~12，物理位置却是 ①②③④⑤⑥⑧⑨⑩⑫⑬⑭ ——
+    漏一条不只少一条，**其后编号全错**。
+
+    只补「确认」的（`confirmed` 为真）；缺口处无圈的一概不动，
+    那多半是设计上的不等跨。补回的轴线带 `recovered` 标记，可追溯。
+    """
+    if circle_offsets is None or not axes:
+        return axes
+    flags = suspect_missing_axis_gaps(axes, circle_offsets=circle_offsets)
+    confirmed = [f for f in flags if f.get("confirmed")]
+    if not confirmed:
+        return axes
+
+    ordered = sorted(axes, key=lambda a: -float(a["offset_pt"]))
+    extra: list[dict] = []
+    for flag in confirmed:
+        index = flag.get("after_index")
+        if index is None or index + 1 >= len(ordered):
+            continue
+        a_off = float(ordered[index]["offset_pt"])
+        b_off = float(ordered[index + 1]["offset_pt"])
+        for k in range(1, flag["multiple"]):
+            mid = a_off + (b_off - a_off) * k / flag["multiple"]
+            hit = next((c for c in circle_offsets
+                        if abs(c - mid) <= GAP_CIRCLE_MATCH_TOL_PT), None)
+            if hit is None:
+                continue
+            extra.append({**{key: val for key, val in ordered[index].items()
+                             if key not in ("label", "label_source")},
+                          "offset_pt": hit, "recovered": True})
+    if not extra:
+        return axes
+    return sorted([*axes, *extra], key=lambda a: -float(a["offset_pt"]))
 
 
 def merge_both_end_labels(axes: list[dict]) -> list[dict]:
