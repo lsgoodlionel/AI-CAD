@@ -1,0 +1,270 @@
+{
+ "version": 1,
+ "object_classes": [
+  "title_block"
+ ],
+ "units": [
+  {
+   "unit": "TB-sgoh-9cc335cd",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "9cc335cd",
+    "discipline": "architecture",
+    "patch": "T1-1"
+   },
+   "classes": {
+    "title_block": {
+     "method": "fields",
+     "fields": {
+      "drawing_title": "设计说明47",
+      "scale": "1:150",
+      "drawing_no": "A-00-47",
+      "discipline": "建筑",
+      "date": "2020-06-30"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "db_cross_check"
+     ],
+     "note": "GPT 读图签栏 + 库中文件名来源**双向确认**才收。GPT 单独作答的 15 条里 5 条是看着合理的编造（如「地下车库结构图纸」vs 真实的「地下室照明配电箱系统图5」），故未确认的一概不收。"
+    }
+   }
+  },
+  {
+   "unit": "TB-metro-e63c611c",
+   "source": {
+    "project": "metro",
+    "drawing_id": "e63c611c",
+    "discipline": "decoration",
+    "patch": "T1-3"
+   },
+   "classes": {
+    "title_block": {
+     "method": "fields",
+     "fields": {
+      "drawing_title": "2F卫生间平面放大图",
+      "scale": "1:50",
+      "drawing_no": "I-20-10-A",
+      "discipline": "建筑",
+      "date": "2018.09.29"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "db_cross_check"
+     ],
+     "note": "GPT 读图签栏 + 库中文件名来源**双向确认**才收。GPT 单独作答的 15 条里 5 条是看着合理的编造（如「地下车库结构图纸」vs 真实的「地下室照明配电箱系统图5」），故未确认的一概不收。"
+    }
+   }
+  },
+  {
+   "unit": "TB-metro-2da063da",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2da063da",
+    "discipline": "architecture",
+    "patch": "T2-1"
+   },
+   "classes": {
+    "title_block": {
+     "method": "fields",
+     "fields": {
+      "drawing_title": "C5石材系统横剖节点详图",
+      "scale": "1:3",
+      "drawing_no": "C5-H16",
+      "date": "2017.12.1"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "db_cross_check"
+     ],
+     "note": "GPT 读图签栏 + 库中文件名来源**双向确认**才收。GPT 单独作答的 15 条里 5 条是看着合理的编造（如「地下车库结构图纸」vs 真实的「地下室照明配电箱系统图5」），故未确认的一概不收。"
+    }
+   }
+  },
+  {
+   "unit": "TB-metro-d12734f7",
+   "source": {
+    "project": "metro",
+    "drawing_id": "d12734f7",
+    "discipline": "architecture",
+    "patch": "T2-5"
+   },
+   "classes": {
+    "title_block": {
+     "method": "fields",
+     "fields": {
+      "drawing_title": "C6明框幕墙横剖节点图",
+      "scale": "1:4",
+      "drawing_no": "C6-H04",
+      "date": "2017.12.1"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "db_cross_check"
+     ],
+     "note": "GPT 读图签栏 + 库中文件名来源**双向确认**才收。GPT 单独作答的 15 条里 5 条是看着合理的编造（如「地下车库结构图纸」vs 真实的「地下室照明配电箱系统图5」），故未确认的一概不收。"
+    }
+   }
+  },
+  {
+   "unit": "TB-metro-33f40f9f",
+   "source": {
+    "project": "metro",
+    "drawing_id": "33f40f9f",
+    "discipline": "architecture",
+    "patch": "T3-1"
+   },
+   "classes": {
+    "title_block": {
+     "method": "fields",
+     "fields": {
+      "drawing_title": "C2玻璃幕墙竖剖节点详图",
+      "scale": "1:4",
+      "drawing_no": "C2-V22",
+      "date": "2017.12.1"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "db_cross_check"
+     ],
+     "note": "GPT 读图签栏 + 库中文件名来源**双向确认**才收。GPT 单独作答的 15 条里 5 条是看着合理的编造（如「地下车库结构图纸」vs 真实的「地下室照明配电箱系统图5」），故未确认的一概不收。"
+    }
+   }
+  },
+  {
+   "unit": "TB-metro-f1344720",
+   "source": {
+    "project": "metro",
+    "drawing_id": "f1344720",
+    "discipline": "architecture",
+    "patch": "T3-5"
+   },
+   "classes": {
+    "title_block": {
+     "method": "fields",
+     "fields": {
+      "drawing_title": "C1玻璃幕墙横剖节点详图",
+      "scale": "1:2",
+      "drawing_no": "C1-H16",
+      "date": "2017.12.1"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "db_cross_check"
+     ],
+     "note": "GPT 读图签栏 + 库中文件名来源**双向确认**才收。GPT 单独作答的 15 条里 5 条是看着合理的编造（如「地下车库结构图纸」vs 真实的「地下室照明配电箱系统图5」），故未确认的一概不收。"
+    }
+   }
+  },
+  {
+   "unit": "TB-metro-38abd953",
+   "source": {
+    "project": "metro",
+    "drawing_id": "38abd953",
+    "discipline": "architecture",
+    "patch": "T4-1"
+   },
+   "classes": {
+    "title_block": {
+     "method": "fields",
+     "fields": {
+      "drawing_title": "C6明框幕墙横剖节点图",
+      "scale": "1:4",
+      "drawing_no": "C6-H03",
+      "date": "2017.12.1"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "db_cross_check"
+     ],
+     "note": "GPT 读图签栏 + 库中文件名来源**双向确认**才收。GPT 单独作答的 15 条里 5 条是看着合理的编造（如「地下车库结构图纸」vs 真实的「地下室照明配电箱系统图5」），故未确认的一概不收。"
+    }
+   }
+  },
+  {
+   "unit": "TB-sgoh-91c5313e",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "91c5313e",
+    "discipline": "architecture",
+    "patch": "T4-3"
+   },
+   "classes": {
+    "title_block": {
+     "method": "fields",
+     "fields": {
+      "drawing_title": "楼梯T-42放大详图",
+      "drawing_no": "A-40-38A",
+      "discipline": "建筑",
+      "date": "2022-12-15"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "db_cross_check"
+     ],
+     "note": "GPT 读图签栏 + 库中文件名来源**双向确认**才收。GPT 单独作答的 15 条里 5 条是看着合理的编造（如「地下车库结构图纸」vs 真实的「地下室照明配电箱系统图5」），故未确认的一概不收。"
+    }
+   }
+  },
+  {
+   "unit": "TB-metro-d1bd9772",
+   "source": {
+    "project": "metro",
+    "drawing_id": "d1bd9772",
+    "discipline": "architecture",
+    "patch": "T4-4"
+   },
+   "classes": {
+    "title_block": {
+     "method": "fields",
+     "fields": {
+      "drawing_title": "C2玻璃幕墙横剖节点详图",
+      "scale": "1:2",
+      "drawing_no": "C2-H02A",
+      "date": "2017.12.1"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "db_cross_check"
+     ],
+     "note": "GPT 读图签栏 + 库中文件名来源**双向确认**才收。GPT 单独作答的 15 条里 5 条是看着合理的编造（如「地下车库结构图纸」vs 真实的「地下室照明配电箱系统图5」），故未确认的一概不收。"
+    }
+   }
+  },
+  {
+   "unit": "TB-metro-16994e61",
+   "source": {
+    "project": "metro",
+    "drawing_id": "16994e61",
+    "discipline": "architecture",
+    "patch": "T4-5"
+   },
+   "classes": {
+    "title_block": {
+     "method": "fields",
+     "fields": {
+      "drawing_title": "铝型材模具表",
+      "scale": "1:5",
+      "drawing_no": "ST-M006",
+      "date": "2017.12.1"
+     },
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt",
+      "db_cross_check"
+     ],
+     "note": "GPT 读图签栏 + 库中文件名来源**双向确认**才收。GPT 单独作答的 15 条里 5 条是看着合理的编造（如「地下车库结构图纸」vs 真实的「地下室照明配电箱系统图5」），故未确认的一概不收。"
+    }
+   }
+  }
+ ]
+}
