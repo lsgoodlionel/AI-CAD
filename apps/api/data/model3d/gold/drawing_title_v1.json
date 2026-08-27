@@ -1,0 +1,3523 @@
+{
+ "version": 1,
+ "object_classes": [
+  "drawing_title"
+ ],
+ "units": [
+  {
+   "unit": "DT-sgoh-b731c06e",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "b731c06e",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--运营商5G点位一层平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-96c63b1c",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "96c63b1c",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--四层电力平面图（一）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-1f50717e",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "1f50717e",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--运营商垂直线缆走向示意图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-1418631c",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "1418631c",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "二层卫生间详图（一）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-1a251a9d",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "1a251a9d",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--三层电气综合监控平面图（二）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-434c3ca8",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "434c3ca8",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--电力配电箱系统图13",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-0d90bf24",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0d90bf24",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--电力配电箱系统图3",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-115cd686",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "115cd686",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "一层卫生间详图（十二）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-1dc680ce",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "1dc680ce",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--地上照明配电箱系统图5",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-4c048f1f",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "4c048f1f",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "给排水-竣工图--主要设备材料表",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-c59a0594",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "c59a0594",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--电力配电箱系统图81",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-3f7487d9",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "3f7487d9",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--电力配电箱系统图54",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-f8cd477d",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "f8cd477d",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--电力配电箱系统图21",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-7731dff6",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "7731dff6",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--吸气式极早期感烟火灾探测系统图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-e6a399a9",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "e6a399a9",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--电力配电箱系统图26",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-4c67bcb3",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "4c67bcb3",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--六层电气综合监控平面图（一）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-0d98f574",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0d98f574",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--四层电气抗震支架平面图（二）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-fcf7c059",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "fcf7c059",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--三层照明平面图（三）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-48cd72fd",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "48cd72fd",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "二层卫生间详图（二）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-2b51223f",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "2b51223f",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--消防水炮四层平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-0ab37bf0",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0ab37bf0",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--配电系统图28",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-8c4da553",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "8c4da553",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--电力配电箱系统图80",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-7a8df29a",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "7a8df29a",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "地下室卫生间详图（四）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-db2f354d",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "db2f354d",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--一层精装插座平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-8d23dcd0",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "8d23dcd0",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电气-竣工图--四层照明平面图（三）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-5119b3cf",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "5119b3cf",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--南区（大、中歌剧厅）一层次梁配筋图（四）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-96d3fa82",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "96d3fa82",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "08 1区、2-1区围护体平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-31c0f7be",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "31c0f7be",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--楼梯ST-44结构详图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-9b32ba00",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "9b32ba00",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--钢结构统一说明（五）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-742a0eec",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "742a0eec",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--南区（大、中歌剧厅）一层主梁配筋图（四）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-d2d55868",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "d2d55868",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "47 2-1区钢支撑与钢立柱平面布置图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-71d85cc6",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "71d85cc6",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--结构施工图设计统一说明（四）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-da626833",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "da626833",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--C区结构布置图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-d7409798",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "d7409798",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--北区（小歌剧厅）三层结构平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-b51e4395",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "b51e4395",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--大歌剧厅墙上舞台预埋件定位及详图（三）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-63702976",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "63702976",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--北区（小歌剧厅）地下一层墙柱平面总图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-95451fb8",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "95451fb8",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--D1区大屋面结构布置图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-e2aee81c",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "e2aee81c",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--南区（大、中歌剧厅）三层次梁配筋图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-3a4d9a8b",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "3a4d9a8b",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--北区（小歌剧厅）地下一层主梁配筋分区图（一）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-3ac7a958",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "3ac7a958",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--南区（大、中歌剧厅）五~六层柱平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-04a0eb80",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "04a0eb80",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--D1区台塔节点详图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-983d43ab",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "983d43ab",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--基础详图（一）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-15574208",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "15574208",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--楼梯ST-11结构详图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-9c6b9679",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "9c6b9679",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--北区（小歌剧厅）四层楼板~四夹层楼板剪力墙详图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-59eaa28d",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "59eaa28d",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--楼梯ST-28、29、30结构详图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-1f029847",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "1f029847",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--楼梯ST-18、19结构详图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-7e314dda",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "7e314dda",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--结构施工图设计统一说明（五）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-17b4efcb",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "17b4efcb",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--北区（小歌剧厅）地下一层主梁配筋分区图（二）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-03402dc5",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "03402dc5",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--南区（大、中歌剧厅）深台仓结构图（二）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-a6742169",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "a6742169",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "结构-竣工图--D1区大歌剧厅台塔结构布置图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-1f49031a",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "1f49031a",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--二层机房吸声平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-140d8798",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "140d8798",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--大歌剧厅台塔设备屋面排水组织图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-2b1df302",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "2b1df302",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--节点详图(四)",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-ce1cceca",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "ce1cceca",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--大巴停车区节点详图（九）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-a5012d1d",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "a5012d1d",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--地下一层平面图(四)",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-b036719b",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "b036719b",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--设计修改通知单",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-c72fd103",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "c72fd103",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--B1~1F室外螺旋楼梯放大图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-df3e37c3",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "df3e37c3",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--设计说明38",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-c37e054f",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "c37e054f",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--五层31.300夹层（设备层）平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-4a5c2ae6",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "4a5c2ae6",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--中心轴网定位图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-0b99807f",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0b99807f",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--节点详图(二)",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-db755090",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "db755090",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--门窗表（二）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-b810b714",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "b810b714",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--室内装修用料及做法表7",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-1828ce9a",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "1828ce9a",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--预埋件详图(二)",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-3eae6025",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "3eae6025",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--室内装修用料选用表3",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-c7d8fad0",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "c7d8fad0",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--楼梯ST-49放大详图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-8c2ec411",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "8c2ec411",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--设计说明24",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-742f2841",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "742f2841",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--二层平面图(四)",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-03693170",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "03693170",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--楼梯ST-41放大详图(二)",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-a73abdf5",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "a73abdf5",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--绿建专篇8",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-ad825bfe",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "ad825bfe",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--五层(设备层)防火分区图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-6d0f8541",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "6d0f8541",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--楼梯ST-06放大详图(一)",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-a6f72881",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "a6f72881",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--二层平面图(二)",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-12057d23",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "12057d23",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--预埋件详图(一)",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-a1014ec4",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "a1014ec4",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑-竣工图--扇形屋盖排水组织平面图（三）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-780b3e20",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "780b3e20",
+    "discipline": "general"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "三层卫生间详图（二）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-sgoh-4e239a69",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "4e239a69",
+    "discipline": "general"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "一层卫生间详图（二）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-ff6ab536",
+   "source": {
+    "project": "metro",
+    "drawing_id": "ff6ab536",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "三层防火分区平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-bd8111aa",
+   "source": {
+    "project": "metro",
+    "drawing_id": "bd8111aa",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "S--设备层平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-f134b0ac",
+   "source": {
+    "project": "metro",
+    "drawing_id": "f134b0ac",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "地下二层平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-9ddf15de",
+   "source": {
+    "project": "metro",
+    "drawing_id": "9ddf15de",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "设计说明8",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-3f3a867b",
+   "source": {
+    "project": "metro",
+    "drawing_id": "3f3a867b",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "C5石材系统横剖节点详图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-3bba9167",
+   "source": {
+    "project": "metro",
+    "drawing_id": "3bba9167",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "C5石材系统横剖节点详图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-3f749b81",
+   "source": {
+    "project": "metro",
+    "drawing_id": "3f749b81",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "C1玻璃幕墙横剖节点详图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-954d1ab6",
+   "source": {
+    "project": "metro",
+    "drawing_id": "954d1ab6",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "五层埋件布置图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-474b7153",
+   "source": {
+    "project": "metro",
+    "drawing_id": "474b7153",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "GRC局部大样详图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-4cb33056",
+   "source": {
+    "project": "metro",
+    "drawing_id": "4cb33056",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "C1玻璃幕墙竖剖节点详图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-9d61d59d",
+   "source": {
+    "project": "metro",
+    "drawing_id": "9d61d59d",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "设计说明14",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-d6eb3ea5",
+   "source": {
+    "project": "metro",
+    "drawing_id": "d6eb3ea5",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "八层夹层埋件布置图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-047c898a",
+   "source": {
+    "project": "metro",
+    "drawing_id": "047c898a",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "房间装修用料表",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-41aecf61",
+   "source": {
+    "project": "metro",
+    "drawing_id": "41aecf61",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "C5石材系统横剖节点详图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-a3af33db",
+   "source": {
+    "project": "metro",
+    "drawing_id": "a3af33db",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "C6明框幕墙竖剖节点图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-3f8e5ae1",
+   "source": {
+    "project": "metro",
+    "drawing_id": "3f8e5ae1",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "A型埋件加工图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-2da063da",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2da063da",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "C5石材系统横剖节点详图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-501c9bc7",
+   "source": {
+    "project": "metro",
+    "drawing_id": "501c9bc7",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "设计说明5",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-91344c32",
+   "source": {
+    "project": "metro",
+    "drawing_id": "91344c32",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "节点详图（七）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-4558697e",
+   "source": {
+    "project": "metro",
+    "drawing_id": "4558697e",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "局部大样详图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-a7d33455",
+   "source": {
+    "project": "metro",
+    "drawing_id": "a7d33455",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "C5石材系统竖剖节点详图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-0c1340cb",
+   "source": {
+    "project": "metro",
+    "drawing_id": "0c1340cb",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "C5石材系统竖剖节点详图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-92e16a40",
+   "source": {
+    "project": "metro",
+    "drawing_id": "92e16a40",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "C5石材系统横剖节点详图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-74842964",
+   "source": {
+    "project": "metro",
+    "drawing_id": "74842964",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "H型埋件加工图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-4eadb8d7",
+   "source": {
+    "project": "metro",
+    "drawing_id": "4eadb8d7",
+    "discipline": "architecture"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "节点详图（三）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-0532d628",
+   "source": {
+    "project": "metro",
+    "drawing_id": "0532d628",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "高压配电系统图三",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-6c764828",
+   "source": {
+    "project": "metro",
+    "drawing_id": "6c764828",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "装饰给排水-竣工图--卫生间详图（三）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-f5d40988",
+   "source": {
+    "project": "metro",
+    "drawing_id": "f5d40988",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "屋顶层电力平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-8941943c",
+   "source": {
+    "project": "metro",
+    "drawing_id": "8941943c",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "装饰电气-竣工图--一层照明平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-b6d25332",
+   "source": {
+    "project": "metro",
+    "drawing_id": "b6d25332",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "地下二层地板下气体灭火平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-57c4aa98",
+   "source": {
+    "project": "metro",
+    "drawing_id": "57c4aa98",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "综合布线系统图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-5b3cb7d1",
+   "source": {
+    "project": "metro",
+    "drawing_id": "5b3cb7d1",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "装饰给排水-竣工图--地下二层给排水消火栓平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-20639dd9",
+   "source": {
+    "project": "metro",
+    "drawing_id": "20639dd9",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "建筑设备监控（BA）系统图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-4f92bb6f",
+   "source": {
+    "project": "metro",
+    "drawing_id": "4f92bb6f",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "二层地板下气体灭火平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-621adbfc",
+   "source": {
+    "project": "metro",
+    "drawing_id": "621adbfc",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "装饰电气-竣工图--六层火灾自动报警点位平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-b3369e5b",
+   "source": {
+    "project": "metro",
+    "drawing_id": "b3369e5b",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "四层电力平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-a94a9cc6",
+   "source": {
+    "project": "metro",
+    "drawing_id": "a94a9cc6",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "九层水管平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-8099b32f",
+   "source": {
+    "project": "metro",
+    "drawing_id": "8099b32f",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "六层通风风管平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-86c9253f",
+   "source": {
+    "project": "metro",
+    "drawing_id": "86c9253f",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "地下一层消防平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-93a8868c",
+   "source": {
+    "project": "metro",
+    "drawing_id": "93a8868c",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "六层水管平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-c05f74cf",
+   "source": {
+    "project": "metro",
+    "drawing_id": "c05f74cf",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "装饰暖通-竣工图--地下二层空调水管平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-4668afe3",
+   "source": {
+    "project": "metro",
+    "drawing_id": "4668afe3",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "六层消防平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-0a3199ad",
+   "source": {
+    "project": "metro",
+    "drawing_id": "0a3199ad",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "装饰电气-竣工图--一层空调动力平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-4a5254cb",
+   "source": {
+    "project": "metro",
+    "drawing_id": "4a5254cb",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "雨水处理系统工艺流程图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-53b40826",
+   "source": {
+    "project": "metro",
+    "drawing_id": "53b40826",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "空调通风风管设备表（五）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-e00dd49c",
+   "source": {
+    "project": "metro",
+    "drawing_id": "e00dd49c",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "装饰给排水-竣工图--地下一层喷淋平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-92507b2b",
+   "source": {
+    "project": "metro",
+    "drawing_id": "92507b2b",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "五层给排水平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-e6fe79c7",
+   "source": {
+    "project": "metro",
+    "drawing_id": "e6fe79c7",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电缆夹层火灾自动报警系统平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-8c93321a",
+   "source": {
+    "project": "metro",
+    "drawing_id": "8c93321a",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "四层广播平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-e7a0a05d",
+   "source": {
+    "project": "metro",
+    "drawing_id": "e7a0a05d",
+    "discipline": "mep"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "地下一层变电所接地平面布置图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-d8ad6c42",
+   "source": {
+    "project": "metro",
+    "drawing_id": "d8ad6c42",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "1F节点大样图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-59647d8c",
+   "source": {
+    "project": "metro",
+    "drawing_id": "59647d8c",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "电梯轿厢节点（通用）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-84b3de69",
+   "source": {
+    "project": "metro",
+    "drawing_id": "84b3de69",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "2F综合平顶图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-48436e31",
+   "source": {
+    "project": "metro",
+    "drawing_id": "48436e31",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "8F调度中心12-9轴立面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-8b4b67fb",
+   "source": {
+    "project": "metro",
+    "drawing_id": "8b4b67fb",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "8F-9F内墙节点大样图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-f44c5271",
+   "source": {
+    "project": "metro",
+    "drawing_id": "f44c5271",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "消火栓节点大样图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-bc5d327a",
+   "source": {
+    "project": "metro",
+    "drawing_id": "bc5d327a",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "8F-9F内墙节点大样图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-6afcdda0",
+   "source": {
+    "project": "metro",
+    "drawing_id": "6afcdda0",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "负1F平顶尺寸图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-4518518f",
+   "source": {
+    "project": "metro",
+    "drawing_id": "4518518f",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "8F电梯厅-前厅综合天花放大图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-82a68ecb",
+   "source": {
+    "project": "metro",
+    "drawing_id": "82a68ecb",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "负3F隔墙图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-4c364e30",
+   "source": {
+    "project": "metro",
+    "drawing_id": "4c364e30",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "9F地坪图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-884596ec",
+   "source": {
+    "project": "metro",
+    "drawing_id": "884596ec",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "8F地坪图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-7411241d",
+   "source": {
+    "project": "metro",
+    "drawing_id": "7411241d",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "五层会议室放大平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-3c1e72bf",
+   "source": {
+    "project": "metro",
+    "drawing_id": "3c1e72bf",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "F铝板收口节点图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-3ba50200",
+   "source": {
+    "project": "metro",
+    "drawing_id": "3ba50200",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "卫生间节点大样图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-4ffd77b2",
+   "source": {
+    "project": "metro",
+    "drawing_id": "4ffd77b2",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "3F平顶尺寸图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-dad1d890",
+   "source": {
+    "project": "metro",
+    "drawing_id": "dad1d890",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "4F至7F玻璃隔断大样图二",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-0ae59e68",
+   "source": {
+    "project": "metro",
+    "drawing_id": "0ae59e68",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "8F电梯厅-前厅立面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-06386387",
+   "source": {
+    "project": "metro",
+    "drawing_id": "06386387",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "员工门厅平面放大布置图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-b3ba4c85",
+   "source": {
+    "project": "metro",
+    "drawing_id": "b3ba4c85",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "员工门厅立面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-c6053dd5",
+   "source": {
+    "project": "metro",
+    "drawing_id": "c6053dd5",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "防火门立面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-15e87e52",
+   "source": {
+    "project": "metro",
+    "drawing_id": "15e87e52",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "消火栓节点大样图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-9fb7b30f",
+   "source": {
+    "project": "metro",
+    "drawing_id": "9fb7b30f",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "卫生间平面放大图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-896f9dd5",
+   "source": {
+    "project": "metro",
+    "drawing_id": "896f9dd5",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "3F电梯厅-前厅地坪放大图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-70fe3c00",
+   "source": {
+    "project": "metro",
+    "drawing_id": "70fe3c00",
+    "discipline": "decoration"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "2F平顶尺寸图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-19424243",
+   "source": {
+    "project": "metro",
+    "drawing_id": "19424243",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "首层框架梁平面整体配筋图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-c293ff7f",
+   "source": {
+    "project": "metro",
+    "drawing_id": "c293ff7f",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "6结构详图（一）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-d9196de2",
+   "source": {
+    "project": "metro",
+    "drawing_id": "d9196de2",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "7结构详图（四）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-9c0fef43",
+   "source": {
+    "project": "metro",
+    "drawing_id": "9c0fef43",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "7结构详图（一）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-4c4bc06f",
+   "source": {
+    "project": "metro",
+    "drawing_id": "4c4bc06f",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "二层框架梁平面整体配筋图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-ae86324a",
+   "source": {
+    "project": "metro",
+    "drawing_id": "ae86324a",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "被动区及深坑加固平面布置图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-4715a5fe",
+   "source": {
+    "project": "metro",
+    "drawing_id": "4715a5fe",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "地下一层换撑平面布置图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-ba74fc89",
+   "source": {
+    "project": "metro",
+    "drawing_id": "ba74fc89",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "剖面图（一）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-980f722d",
+   "source": {
+    "project": "metro",
+    "drawing_id": "980f722d",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "第二道支撑平面布置图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-3b8514b8",
+   "source": {
+    "project": "metro",
+    "drawing_id": "3b8514b8",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "4结构详图（三）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-570c638f",
+   "source": {
+    "project": "metro",
+    "drawing_id": "570c638f",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "基坑围护设计施工总说明",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-1258634c",
+   "source": {
+    "project": "metro",
+    "drawing_id": "1258634c",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "三层框架梁平面整体配筋图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-cb7df0df",
+   "source": {
+    "project": "metro",
+    "drawing_id": "cb7df0df",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "地下室外墙留洞图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-5012d540",
+   "source": {
+    "project": "metro",
+    "drawing_id": "5012d540",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "楼梯结构通用详图（一）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-af3b54c5",
+   "source": {
+    "project": "metro",
+    "drawing_id": "af3b54c5",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "地下二层次梁平面整体配筋图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-d47c358d",
+   "source": {
+    "project": "metro",
+    "drawing_id": "d47c358d",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "底板详图（三）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-2124af82",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2124af82",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "四层结构平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-ddbeab1f",
+   "source": {
+    "project": "metro",
+    "drawing_id": "ddbeab1f",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "底板结构平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-2973a7cb",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2973a7cb",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "屋顶次梁平面整体配筋图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-b593ba32",
+   "source": {
+    "project": "metro",
+    "drawing_id": "b593ba32",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "4结构详图（二）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-2c6d8e30",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2c6d8e30",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "1结构详图（五）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-41ac4ba3",
+   "source": {
+    "project": "metro",
+    "drawing_id": "41ac4ba3",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "5结构详图（一）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-8f977527",
+   "source": {
+    "project": "metro",
+    "drawing_id": "8f977527",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "二层结构平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-350653fc",
+   "source": {
+    "project": "metro",
+    "drawing_id": "350653fc",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "7结构详图（三）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-4fed90d7",
+   "source": {
+    "project": "metro",
+    "drawing_id": "4fed90d7",
+    "discipline": "structure"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "4结构详图（五）",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-a2961455",
+   "source": {
+    "project": "metro",
+    "drawing_id": "a2961455",
+    "discipline": "general"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "定位放大平面图一",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-9c2d458f",
+   "source": {
+    "project": "metro",
+    "drawing_id": "9c2d458f",
+    "discipline": "general"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "灯具放大平面图二",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-e3875c84",
+   "source": {
+    "project": "metro",
+    "drawing_id": "e3875c84",
+    "discipline": "general"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "灯具放大平面图三",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-6ddc6b8c",
+   "source": {
+    "project": "metro",
+    "drawing_id": "6ddc6b8c",
+    "discipline": "general"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "绿化配置总平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-419ebf3e",
+   "source": {
+    "project": "metro",
+    "drawing_id": "419ebf3e",
+    "discipline": "general"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "上木配置平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-fc6682f7",
+   "source": {
+    "project": "metro",
+    "drawing_id": "fc6682f7",
+    "discipline": "general"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "总平面灯具布置图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-2d548e18",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2d548e18",
+    "discipline": "general"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "下木配置平面图",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  },
+  {
+   "unit": "DT-metro-376379fa",
+   "source": {
+    "project": "metro",
+    "drawing_id": "376379fa",
+    "discipline": "general"
+   },
+   "classes": {
+    "drawing_title": {
+     "method": "text",
+     "text": "灯具放大平面图一",
+     "confidence": 1.0,
+     "verified_by": [
+      "ocr_cross_check"
+     ],
+     "note": "图名取自文件名，并由图面 OCR 文字**独立确认** —— 两者来源不同，核心图名逐字出现在图纸自己的文字里"
+    }
+   }
+  }
+ ]
+}
