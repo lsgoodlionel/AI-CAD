@@ -128,6 +128,58 @@ def dominant_diameter(circles: list[dict],
     return round(sum(best) / len(best), 2)
 
 
+#: 判定「水平直径线」的容差。
+#: 线段近水平：两端 y 差不超过此值（pt）。
+INDEX_LINE_FLATNESS_PT = 1.5
+#: 线段所在高度与圈心的偏差不超过半径的此比例 —— 直径线过圆心。
+INDEX_LINE_CENTER_RATIO = 0.18
+#: 线段横向必须贯通圆的此比例以上 —— 分数式附加轴线的分数线只占小半。
+INDEX_LINE_SPAN_RATIO = 1.2
+
+
+def drop_index_symbol_circles(circles: list[dict] | None,
+                              segments: list | None) -> list[dict]:
+    """丢掉**详图索引符号**——它们不是定位轴线圈。
+
+    GB/T 50001 §6：索引符号用细实线画**水平直径**把圆分成上下两半
+    （上半=详图编号，下半=图纸编号）；§8.0.2 的定位轴线圈里只有编号，
+    没有这条线。
+
+    **实测**（轨道交通「首层框架梁平面整体配筋图」）：一整排索引符号被
+    读成了「1~6 轴」，构成该图轴号识别的全部误检（精确率 72.7%）。
+
+    判据要同时满足三样，少一样都会误伤：
+      * 线段**近水平** —— 否则 §8.0.2 引到圈心的轴线会被当成直径；
+      * 高度**过圈心** —— 否则圈外的尺寸线会命中；
+      * 横向**贯通全圆** —— 否则 §8.0.6 分数式附加轴线的分数线会命中。
+
+    **取不到线段时原样返回**：判不出就不判，不能把整张图清空。
+    """
+    if not circles or not segments:
+        return list(circles or [])
+
+    flat = [((x0, y0), (x1, y1)) for (x0, y0), (x1, y1) in segments
+            if abs(y0 - y1) <= INDEX_LINE_FLATNESS_PT]
+    if not flat:
+        return list(circles)
+
+    kept = []
+    for circle in circles:
+        cx, cy = circle["cx"], circle["cy"]
+        radius = float(circle.get("diameter_pt") or 0.0) / 2.0
+        if radius <= 0:
+            kept.append(circle)
+            continue
+        crossed = any(
+            abs((y0 + y1) / 2.0 - cy) <= radius * INDEX_LINE_CENTER_RATIO
+            and min(x0, x1) <= cx - radius * (INDEX_LINE_SPAN_RATIO / 2)
+            and max(x0, x1) >= cx + radius * (INDEX_LINE_SPAN_RATIO / 2)
+            for (x0, y0), (x1, y1) in flat)
+        if not crossed:
+            kept.append(circle)
+    return kept
+
+
 def find_circles(paths: list[dict],
                  tol: float = DIAMETER_CLUSTER_TOLERANCE_PT) -> dict:
     """一步到位:path 列表 → {circles, diameter_pt, dropped, standard}。
@@ -139,6 +191,10 @@ def find_circles(paths: list[dict],
     # 把整张图的检测带偏（实测基坑图 862 个圈全是桩）。
     endpoints = [pt for p in paths for pt in (p.get("line_points") or ())]
     cands = filter_circles_near_axes(cands, endpoints)
+    # §6 索引符号（带水平直径线的圆）不是定位轴线圈
+    segments = [(endpoints[i], endpoints[i + 1])
+                for i in range(0, len(endpoints) - 1, 2)]
+    cands = drop_index_symbol_circles(cands, segments)
     dom = dominant_diameter(cands, tol)
     kept = [c for c in cands if abs(c["diameter_pt"] - dom) <= tol]
     return {

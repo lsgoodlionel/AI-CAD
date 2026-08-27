@@ -178,3 +178,60 @@ def test_rotated_family_assignment_works():
                                  [{"offset_pt": 500.0}], angle)
     assert got["confirmed"] == [0]
     assert len(got["circles_per_axis"][0]) == 2
+
+
+# --- §6 详图索引符号不是定位轴线圈 ------------------------------------
+
+def _idx_circle(cx, cy, d=28.0):
+    return {"cx": cx, "cy": cy, "diameter_pt": d}
+
+
+@pytest.mark.unit
+def test_a_circle_split_by_a_horizontal_diameter_is_an_index_symbol():
+    """圆内有一条**水平直径线**的是详图索引符号，不是轴号圈。
+
+    GB/T 50001 §6：索引符号用细实线画**水平直径**把圆分成上下两半
+    （上半=详图编号，下半=图纸编号）；§8.0.2 的定位轴线圈里只有编号，
+    没有这条线。
+
+    **实测**（轨道交通「首层框架梁平面整体配筋图」）：一整排索引符号被
+    读成了「1~6 轴」，占该图轴号识别全部误检（精确率 72.7%）。
+    """
+    from core.model3d.axis_label_circle import drop_index_symbol_circles
+
+    circles = [_idx_circle(100.0, 100.0), _idx_circle(200.0, 100.0)]
+    segments = [((86.0, 100.0), (114.0, 100.0))]      # 穿过第一个圈的直径
+    kept = drop_index_symbol_circles(circles, segments)
+    assert [c["cx"] for c in kept] == [200.0]
+
+
+@pytest.mark.unit
+def test_an_axis_line_touching_the_circle_edge_is_not_a_diameter():
+    """轴线画到圈心附近（§8.0.2 圆心在轴线延长线上）不能被当成直径线。
+
+    轴线是**竖直**的（对水平带而言），且不横穿圆；直径线是水平且贯通的。
+    """
+    from core.model3d.axis_label_circle import drop_index_symbol_circles
+
+    circles = [_idx_circle(100.0, 100.0)]
+    segments = [((100.0, 114.0), (100.0, 400.0))]     # 竖直轴线，从圈底引出
+    assert len(drop_index_symbol_circles(circles, segments)) == 1
+
+
+@pytest.mark.unit
+def test_a_short_horizontal_tick_inside_the_circle_is_not_a_diameter():
+    """圈内的短横线（如分数式附加轴线的分数线）不贯通，不算直径。"""
+    from core.model3d.axis_label_circle import drop_index_symbol_circles
+
+    circles = [_idx_circle(100.0, 100.0)]
+    segments = [((96.0, 100.0), (104.0, 100.0))]      # 只有 8pt，直径 28pt
+    assert len(drop_index_symbol_circles(circles, segments)) == 1
+
+
+@pytest.mark.unit
+def test_no_segments_means_no_filtering():
+    """取不到线段时原样返回——判不出就不判，不能把图清空。"""
+    from core.model3d.axis_label_circle import drop_index_symbol_circles
+
+    circles = [_idx_circle(100.0, 100.0)]
+    assert len(drop_index_symbol_circles(circles, [])) == 1

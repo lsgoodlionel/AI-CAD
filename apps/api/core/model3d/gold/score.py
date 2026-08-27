@@ -56,13 +56,60 @@ def _score_count(truth: ObjectClass, got: dict, s: ClassScore) -> ClassScore:
     return s
 
 
+def align_zones(want: dict, have_raw: list) -> dict:
+    """把识别侧的分区**按标签重合度**配到真值侧的分区上。
+
+    **分区序号是任意的**：实测给某图修掉索引符号误判后，一个分区被正确
+    删除，其后分区整体前移（真值 `3·A~E` 对上识别 `2·A~E`），
+    F1 从 78% 假跌到 68.6% —— 掉的是编号，不是识别质量。
+
+    分区的真实身份是 GB/T 50001 §8.0.5 的分区号，而它需人工确认；
+    未确认时不能假定两边编号相同。按重合度贪心配对（大分区优先），
+    配不上的保持原样，于是**整个分区没识别出来时仍如实报为漏检**。
+    """
+    def zone_of(raw):
+        z = raw.get("zone")
+        return None if z is None else str(z)
+
+    want_zones: dict = {}
+    for inst in want.values():
+        want_zones.setdefault(inst.zone, set()).add(inst.id)
+    have_zones: dict = {}
+    for raw in have_raw:
+        have_zones.setdefault(zone_of(raw), set()).add(str(raw["id"]))
+    if len(want_zones) <= 1 and len(have_zones) <= 1:
+        return {}
+
+    mapping: dict = {}
+    taken: set = set()
+    for zone, labels in sorted(want_zones.items(),
+                               key=lambda kv: (-len(kv[1]), str(kv[0]))):
+        best, best_hit = None, 0
+        for cand, cand_labels in have_zones.items():
+            if cand in taken:
+                continue
+            hit = len(labels & cand_labels)
+            if hit > best_hit:
+                best, best_hit = cand, hit
+        if best is not None:
+            mapping[best] = zone
+            taken.add(best)
+    return mapping
+
+
 def _score_instances(truth: ObjectClass, got: dict, s: ClassScore) -> ClassScore:
+    want = {i.key: i for i in truth.instances}
+    have_raw = [i for i in (got.get("instances") or []) if i.get("id")]
+    remap = align_zones(want, have_raw)
+
     def key(raw) -> str:
         zone = raw.get("zone")
-        return f"{zone}·{raw['id']}" if zone is not None else str(raw["id"])
+        if zone is None:
+            return str(raw["id"])
+        zone = remap.get(str(zone), str(zone))
+        return f"{zone}·{raw['id']}"
 
-    want = {i.key: i for i in truth.instances}
-    have = {key(i): i for i in (got.get("instances") or []) if i.get("id")}
+    have = {key(i): i for i in have_raw}
     hit = sorted(set(want) & set(have))
     s.matched = len(hit)
     s.missed = sorted(set(want) - set(have))
