@@ -183,3 +183,47 @@ def test_write_rebar_quantities_missing_marks_without_input():
     model = ifcopenshell.file(schema="IFC4")
     result = write_rebar_quantities(model, {}, rebar_inputs=None)
     assert result["rebar_missing"] is True
+
+
+# --- 兜底来源的量必须能被看见 -----------------------------------------
+
+@pytest.mark.unit
+def test_a_slab_from_the_column_envelope_fallback_is_marked():
+    """柱包络兜底出来的板，其量要标出来 —— 它不是从图上认出来的板。
+
+    **实测**：大歌剧院板混凝土 13,899 m³ 里 **84%（11,734 m³）只来自 15 块
+    `column_envelope` 板** —— 而那是「找不到真实板时用柱的包络凑」的兜底
+    （`SLAB_BASIS_COLUMN_ENVELOPE` 注释原文：兜底：柱/桩包络）。
+
+    算量此前完全不看 `basis`，兜底板与真实板同等计入，而算量喂给创效提案。
+    按本项目「降级必须可见」的一贯做法，标出来而不是删掉 ——
+    删掉会让本就稀少的板量凭空归零，比标出来更糟。
+    """
+    from services.model_qto import compute_quantities
+
+    elements = {"slabs": [
+        {"id": "s1", "outline": [[0, 0], [10, 0], [10, 10], [0, 10]],
+         "thickness": 0.2, "basis": "column_envelope"},
+        {"id": "s2", "outline": [[0, 0], [4, 0], [4, 4], [0, 4]],
+         "thickness": 0.2, "basis": "largest_polygon"},
+    ]}
+    qs = {q.element_id: q for q in compute_quantities(elements)}
+    assert qs["s1"].fallback_basis == "column_envelope"
+    assert qs["s2"].fallback_basis is None
+
+
+@pytest.mark.unit
+def test_the_summary_reports_how_much_volume_came_from_fallbacks():
+    """汇总要给出兜底占比 —— 一个 84% 靠兜底的数字，不能和实测数字同等呈现。"""
+    from services.model_qto import compute_quantities
+    from services.model_qto_summary import summarize
+
+    elements = {"slabs": [
+        {"id": "s1", "outline": [[0, 0], [10, 0], [10, 10], [0, 10]],
+         "thickness": 0.2, "basis": "column_envelope"},
+        {"id": "s2", "outline": [[0, 0], [4, 0], [4, 4], [0, 4]],
+         "thickness": 0.2, "basis": "largest_polygon"},
+    ]}
+    s = summarize(compute_quantities(elements))
+    assert s["fallback"]["gross_volume_m3"] == pytest.approx(20.0)
+    assert s["fallback"]["share"] == pytest.approx(20.0 / 23.2, rel=1e-3)

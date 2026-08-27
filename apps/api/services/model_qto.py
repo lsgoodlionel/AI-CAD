@@ -41,6 +41,11 @@ class ElementQuantity:
     formwork_free_m2: float
     estimated: bool
     source: str
+    #: 该量来自**兜底**构件时记下兜底方式，否则为 None。
+    #: 实测大歌剧院板混凝土的 **84%** 只来自 15 块 `column_envelope` 板 ——
+    #: 那是「找不到真实板时用柱的包络凑」的兜底，与实测的板不是一回事。
+    #: 按「降级必须可见」标出来而不是删掉：删掉会让本就稀少的板量归零。
+    fallback_basis: str | None = None
 
 
 def compute_quantities(
@@ -116,6 +121,11 @@ def _beam_quantity(beam: dict, graph, column_boxes: dict) -> ElementQuantity:
     )
 
 
+#: 哪些 `basis` 算兜底 —— 这两种都不是从图上认出来的板，
+#: 而是用别的构件的包络凑出来的。
+FALLBACK_SLAB_BASES = ("column_envelope", "axis_envelope")
+
+
 def _slab_quantity(slab: dict, graph, beam_index: dict) -> ElementQuantity:
     area = _polygon_area(slab.get("outline"))
     perimeter = _polygon_perimeter(slab.get("outline"))
@@ -153,6 +163,9 @@ def _make(element: dict, element_type: str, gross: float, net: float,
         formwork_free_m2=round(free, 4),
         estimated=estimated,
         source="measured" if not estimated else "estimated",
+        fallback_basis=(str(element.get("basis"))
+                        if str(element.get("basis") or "") in FALLBACK_SLAB_BASES
+                        else None),
     )
 
 

@@ -18,6 +18,11 @@ _DEFAULT_STORY_HEIGHT_M = 4.5
 
 
 def summarize(quantities: list[ElementQuantity]) -> dict[str, Any]:
+    # **兜底来源的量单列** —— 实测大歌剧院板混凝土的 84% 只来自 15 块
+    # 柱包络兜底板，与实测的板混在一起呈现会误导下游（算量喂创效提案）。
+    fb = [q for q in quantities if getattr(q, "fallback_basis", None)]
+    fb_gross = round(sum(q.gross_volume_m3 for q in fb), 4)
+    all_gross = sum(q.gross_volume_m3 for q in quantities)
     """把一组构件量汇总为混凝土/模板合计 + 分类型 + 实测/估算/未覆盖计数。"""
     by_type: dict[str, dict[str, Any]] = {}
     gross = net = contact = free = 0.0
@@ -47,6 +52,12 @@ def summarize(quantities: list[ElementQuantity]) -> dict[str, Any]:
         )
 
     return {
+        "fallback": {
+            "count": len(fb),
+            "gross_volume_m3": fb_gross,
+            "share": round(fb_gross / all_gross, 6) if all_gross else 0.0,
+            "bases": sorted({q.fallback_basis for q in fb}),
+        },
         "concrete": {"gross_m3": round(gross, 4), "net_m3": round(net, 4)},
         "formwork": {"contact_m2": round(contact, 4), "free_m2": round(free, 4)},
         "by_type": by_type,
