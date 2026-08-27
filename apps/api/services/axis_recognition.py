@@ -203,6 +203,22 @@ def recognize(circles: list[dict], *, strokes: list[tuple],
     # §8.0.2 两端各注一个轴号 → 同一条轴线不能算两条
     labelled = merge_both_end_labels(labelled)
 
+    # **合并之后再查**：两端重注的镜像分区各查一遍会把同一处报两次
+    from collections import defaultdict as _dd
+    _by_zone: dict = _dd(list)
+    for _axis in labelled:
+        _by_zone[_axis.get("zone_index")].append(_axis)
+    for _zone, _axes in _by_zone.items():
+        for flag in suspect_missing_axis_gaps(_axes):
+            result["violations"].append({
+                "code": "suspect_missing_axis",
+                "zone": _zone,
+                "message": (f"轴号 {flag['after_label']} 之后的间距是其余档的 "
+                            f"{flag['multiple']} 倍，疑似漏检轴线；"
+                            f"若确为不等跨请人工确认"),
+                **flag,
+            })
+
     # 一图多视图的分幅：各区**只单向**标注轴号（立面/剖面是投影图）。
     # §8.0.5 的分区在平面上两个方向都标轴号 —— 单向就是分幅的指纹。
     # 分幅没有分区号可确认，不该要人工给。
@@ -257,6 +273,54 @@ def recognize(circles: list[dict], *, strokes: list[tuple],
 #: 判定「同一条轴线」时偏移量的容差（图纸点）。两端的轴号圈由同一条轴线
 #: 引出，位置误差只来自圈心测量，实测在 1pt 以内。
 BOTH_END_OFFSET_TOL_PT = 2.0
+
+
+#: 判「整数倍」的相对容差。实测测量误差在 5% 以内，
+#: 而漏一条轴线造成的偏差是 100%（间距翻倍）——分界远得很。
+GAP_MULTIPLE_TOLERANCE = 0.15
+#: 只报 2 倍及以上；且倍数上限防止把巨大跨度报成一串漏检。
+MAX_SUSPECT_MULTIPLE = 6
+
+
+def suspect_missing_axis_gaps(axes: list[dict]) -> list[dict]:
+    """报出「某档间距恰是其余档的整数倍」——**中间很可能漏检了轴线**。
+
+    **实测**（metro 首层框架梁配筋图）：⑦ 与 ⑪ 的轴号圈未检出，而轴号是
+    按顺序推导的，于是余下 12 个圈被标成 1~12，其后编号**整体偏移**。
+    两处双倍间距（309 vs 155）就摆在数据里，只是没人看。
+
+    **只报不猜**：GB 不禁止不等跨，一个真的 18600 跨同样呈现双倍间距。
+    按倍数直接跳号会造出新的一类错误 —— 交给既有的人工确认通道，
+    这与本模块「判不出就说判不出、降级必须可见」的一贯做法一致。
+    """
+    ordered = [a for a in (axes or []) if a.get("offset_pt") is not None]
+    if len(ordered) < 4:
+        return []                      # 少于 4 条定不出「其余档」的基准
+    ordered = sorted(ordered, key=lambda a: -float(a["offset_pt"]))
+    gaps = [abs(float(b["offset_pt"]) - float(a["offset_pt"]))
+            for a, b in zip(ordered, ordered[1:])]
+    positive = sorted(g for g in gaps if g > 0)
+    if not positive:
+        return []
+    base = positive[len(positive) // 4]        # 下四分位：受漏检拉大影响最小
+
+    out: list[dict] = []
+    for index, gap in enumerate(gaps):
+        if base <= 0:
+            break
+        ratio = gap / base
+        multiple = round(ratio)
+        if multiple < 2 or multiple > MAX_SUSPECT_MULTIPLE:
+            continue
+        if abs(ratio - multiple) > GAP_MULTIPLE_TOLERANCE:
+            continue                   # 不成整数倍 → 是设计上的不等跨
+        out.append({
+            "after_label": ordered[index].get("label"),
+            "multiple": multiple,
+            "gap_pt": round(gap, 2),
+            "base_pt": round(base, 2),
+        })
+    return out
 
 
 def merge_both_end_labels(axes: list[dict]) -> list[dict]:

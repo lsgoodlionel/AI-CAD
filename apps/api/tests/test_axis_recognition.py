@@ -575,3 +575,53 @@ def test_same_offset_but_different_direction_is_not_merged():
     axes = [_axis("1", 525.0, 0, angle=90.0),
             _axis("A", 525.0, 1, kind="alpha", angle=0.0)]
     assert len(merge_both_end_labels(axes)) == 2
+
+
+# --- 疑似漏检轴线：报出可疑，不猜 -------------------------------------
+
+def _band(offsets):
+    return [{"label": str(i + 1), "offset_pt": -o, "label_kind": "numeric",
+             "angle_deg": 90.0, "zone_index": 0}
+            for i, o in enumerate(offsets)]
+
+
+@pytest.mark.unit
+def test_a_gap_that_is_a_whole_multiple_of_the_others_is_flagged():
+    """某档间距恰是其余档的整数倍 → 中间**很可能漏检了轴线**，报出来。
+
+    **实测**（metro 首层框架梁配筋图）：⑦ 与 ⑪ 的圈未检出，识别器按顺序
+    把余下 12 个圈标成 1~12，其后编号**整体偏移** —— 而两处双倍间距
+    （309 vs 155）就摆在数据里。
+
+    **只报不猜**：GB 不禁止不等跨，一个真的 18600 跨也会呈现双倍间距。
+    按倍数直接跳号会造出新的一类错误；交给既有的人工确认通道。
+    """
+    from services.axis_recognition import suspect_missing_axis_gaps
+
+    axes = _band([542, 697, 851, 1006, 1161, 1315, 1624, 1779, 1934])
+    flags = suspect_missing_axis_gaps(axes)
+    assert [f["after_label"] for f in flags] == ["6"]
+    assert flags[0]["multiple"] == 2
+
+
+@pytest.mark.unit
+def test_uniform_spacing_raises_no_flag():
+    from services.axis_recognition import suspect_missing_axis_gaps
+
+    assert suspect_missing_axis_gaps(_band([100, 255, 410, 565])) == []
+
+
+@pytest.mark.unit
+def test_an_irregular_but_non_multiple_gap_is_not_flagged():
+    """不等跨但不成整数倍的，不报——那是设计如此。"""
+    from services.axis_recognition import suspect_missing_axis_gaps
+
+    assert suspect_missing_axis_gaps(_band([100, 255, 410, 530])) == []
+
+
+@pytest.mark.unit
+def test_too_few_axes_to_judge():
+    """两条轴线定不出「其余档」，判不出就不判。"""
+    from services.axis_recognition import suspect_missing_axis_gaps
+
+    assert suspect_missing_axis_gaps(_band([100, 255])) == []
