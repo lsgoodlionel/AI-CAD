@@ -132,3 +132,60 @@ def test_a_genuinely_missing_zone_still_shows_as_missing():
     s = score_class(truth, {"instances": [{"id": "1", "zone": "0"}]})
     assert s.matched == 1
     assert len(s.missed) == 1
+
+
+# --- 标签配上了，不等于贴在正确的轴线上 -------------------------------
+
+def _axes_truth(spacings):
+    """按轴距链造真值：labels 1..n，相邻间距取自 spacings（毫米）。"""
+    inst = [{"id": str(i + 1), "kind": "vertical",
+             "to_next_mm": spacings[i] if i < len(spacings) else None}
+            for i in range(len(spacings) + 1)]
+    return parse_unit({"unit": "U", "source": {}, "classes": {"axes": {
+        "method": "instances", "instances": inst,
+        "confidence": 1.0, "verified_by": ["human"]}}}).classes["axes"]
+
+
+@pytest.mark.unit
+def test_a_shifted_label_run_is_caught_by_the_spacing_chain():
+    """漏检一条轴线后，其后编号整体偏移——**集合比对看不出来**。
+
+    **实测**（metro 首层框架梁配筋图）：⑦ 的圈没检出，识别器按顺序把
+    余下 12 个圈标成 1~12，而它们的物理位置是 ①②③④⑤⑥**⑧⑨⑩⑫⑬⑭**。
+    只比标签集合会报「12 个全配上」，其中 6 个贴错了轴线。
+
+    轴距链是图纸自带的判据：真值每档 9300，而识别侧「6→7」的实测间距
+    是相邻档的两倍 —— 那里少了一条轴线。
+    """
+    truth = _axes_truth([9300] * 6)                 # 7 条轴线，等距
+    got = {"instances": [
+        {"id": "1", "offset_pt": 0.0}, {"id": "2", "offset_pt": 155.0},
+        {"id": "3", "offset_pt": 310.0}, {"id": "4", "offset_pt": 465.0},
+        {"id": "5", "offset_pt": 620.0}, {"id": "6", "offset_pt": 775.0},
+        {"id": "7", "offset_pt": 1085.0},           # ← 跳了一档（少了一条）
+    ]}
+    s = score_class(truth, got)
+    assert s.matched == 7                            # 标签集合全中
+    assert s.spacing_conflicts == ["6"]              # 但 6→7 这一档对不上
+    assert not s.sequence_ok
+
+
+@pytest.mark.unit
+def test_a_correct_sequence_reports_no_conflict():
+    """位置与标签自洽时不报冲突（比例不同不算错——只看相对关系）。"""
+    truth = _axes_truth([9300, 9300, 7500])
+    got = {"instances": [
+        {"id": "1", "offset_pt": 0.0}, {"id": "2", "offset_pt": 93.0},
+        {"id": "3", "offset_pt": 186.0}, {"id": "4", "offset_pt": 261.0}]}
+    s = score_class(truth, got)
+    assert s.sequence_ok
+    assert s.spacing_conflicts == []
+
+
+@pytest.mark.unit
+def test_without_offsets_the_check_is_skipped_not_failed():
+    """识别侧没给位置时**跳过**这项检查，不能算作不合格。"""
+    truth = _axes_truth([9300, 9300])
+    s = score_class(truth, {"instances": [{"id": "1"}, {"id": "2"}, {"id": "3"}]})
+    assert s.sequence_ok
+    assert s.spacing_conflicts == []

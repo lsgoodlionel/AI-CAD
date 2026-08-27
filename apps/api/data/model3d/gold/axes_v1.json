@@ -534,104 +534,123 @@
       {
        "id": "1",
        "kind": "vertical",
-       "zone": "0"
+       "zone": "0",
+       "to_next_mm": 9300
       },
       {
        "id": "2",
        "kind": "vertical",
-       "zone": "0"
+       "zone": "0",
+       "to_next_mm": 9300
       },
       {
        "id": "3",
        "kind": "vertical",
-       "zone": "0"
+       "zone": "0",
+       "to_next_mm": 9300
       },
       {
        "id": "4",
        "kind": "vertical",
-       "zone": "0"
+       "zone": "0",
+       "to_next_mm": 9300
       },
       {
        "id": "5",
        "kind": "vertical",
-       "zone": "0"
+       "zone": "0",
+       "to_next_mm": 9300
       },
       {
        "id": "6",
        "kind": "vertical",
-       "zone": "0"
+       "zone": "0",
+       "to_next_mm": 9300
       },
       {
        "id": "7",
        "kind": "vertical",
-       "zone": "0"
+       "zone": "0",
+       "to_next_mm": 9300
       },
       {
        "id": "8",
        "kind": "vertical",
-       "zone": "0"
+       "zone": "0",
+       "to_next_mm": 9300
       },
       {
        "id": "9",
        "kind": "vertical",
-       "zone": "0"
+       "zone": "0",
+       "to_next_mm": 9300
       },
       {
        "id": "10",
        "kind": "vertical",
-       "zone": "0"
+       "zone": "0",
+       "to_next_mm": 9300
       },
       {
        "id": "11",
        "kind": "vertical",
-       "zone": "0"
+       "zone": "0",
+       "to_next_mm": 9300
       },
       {
        "id": "12",
        "kind": "vertical",
-       "zone": "0"
+       "zone": "0",
+       "to_next_mm": 9300
       },
       {
        "id": "13",
        "kind": "vertical",
-       "zone": "0"
+       "zone": "0",
+       "to_next_mm": 7500
       },
       {
        "id": "14",
        "kind": "vertical",
-       "zone": "0"
+       "zone": "0",
+       "to_next_mm": null
       },
       {
        "id": "A",
        "kind": "horizontal",
-       "zone": "3"
+       "zone": "3",
+       "to_next_mm": 3900
       },
       {
        "id": "B",
        "kind": "horizontal",
-       "zone": "3"
+       "zone": "3",
+       "to_next_mm": 9300
       },
       {
        "id": "C",
        "kind": "horizontal",
-       "zone": "3"
+       "zone": "3",
+       "to_next_mm": 9300
       },
       {
        "id": "D",
        "kind": "horizontal",
-       "zone": "3"
+       "zone": "3",
+       "to_next_mm": 11700
       },
       {
        "id": "E",
        "kind": "horizontal",
-       "zone": "3"
+       "zone": "3",
+       "to_next_mm": null
       }
      ],
      "confidence": 1.0,
      "verified_by": [
       "human"
      ],
-     "note": "人工读图 + **尺寸链算术闭合**双重确认：数字向 9300×12+7500=119100 与总标注一致（13 间距=14 轴）；字母向 11700+9300+9300+3900=34200 与总标注一致（4 间距=5 轴）。识别结果 22 条中：数字向漏 13、14；字母向漏 E；另有 6 条来自**详图索引符号**误判（§6 索引符号有水平直径线把圆分成上下两半，轴号圈没有）。"
+     "note": "人工读图 + **尺寸链算术闭合**双重确认：数字向 9300×12+7500=119100 与总标注一致（13 间距=14 轴）；字母向 11700+9300+9300+3900=34200 与总标注一致（4 间距=5 轴）。识别结果 22 条中：数字向漏 13、14；字母向漏 E；另有 6 条来自**详图索引符号**误判（§6 索引符号有水平直径线把圆分成上下两半，轴号圈没有）。 轴距链已随真值记录，用于校验标签是否贴在正确的轴线上。"
     }
    }
   }

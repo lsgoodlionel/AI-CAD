@@ -30,6 +30,10 @@ class ClassScore:
     recall: float = 0.0
     #: 配上对的实体的尺寸误差（毫米）：每根取**逐边最大**，再对所有实体取平均
     size_error_mm: float | None = None
+    #: 标签与位置不自洽的实体（该实体到下一条的实测间距与尺寸链不符）
+    spacing_conflicts: list = field(default_factory=list)
+    #: 尺寸链校验是否通过。**没有位置信息时视为通过**（跳过，不是不合格）
+    sequence_ok: bool = True
 
     @property
     def f1(self) -> float:
@@ -97,6 +101,52 @@ def align_zones(want: dict, have_raw: list) -> dict:
     return mapping
 
 
+#: 实测间距与尺寸链的相对偏差上限。图纸测量误差实测在 5% 以内，
+#: 而漏一条轴线造成的偏差是 100%（间距翻倍）——分界远得很。
+SPACING_TOLERANCE = 0.25
+
+
+def check_spacing_chain(truth, have: dict, matched: list) -> tuple:
+    """校验「标签贴在了正确的轴线上」。
+
+    **只比标签集合看不出错位**：实测 metro 某图漏检 ⑦ 之后，识别器按顺序
+    把余下 12 个圈标成 1~12，而它们的物理位置是 ①②③④⑤⑥**⑧⑨⑩⑫⑬⑭** ——
+    集合比对报「全配上」，其中 6 个贴错了轴线。
+
+    轴距链是**图纸自带**的判据。比例未知也不要紧：先用各档实测间距与
+    标称间距之比取中位数定出比例，再逐档看偏差 —— 只比相对关系。
+
+    识别侧没给位置时**跳过**（返回通过），判不出就不判。
+    """
+    chain = [(i, truth_inst) for i, truth_inst in enumerate(truth.instances)
+             if truth_inst.to_next_mm]
+    if not chain:
+        return [], True
+
+    pairs = []
+    for idx, inst in chain:
+        nxt = truth.instances[idx + 1] if idx + 1 < len(truth.instances) else None
+        if nxt is None:
+            continue
+        a, b = have.get(inst.key), have.get(nxt.key)
+        if a is None or b is None:
+            continue
+        oa, ob = a.get("offset_pt"), b.get("offset_pt")
+        if oa is None or ob is None:
+            continue
+        pairs.append((inst.id, abs(float(ob) - float(oa)), float(inst.to_next_mm)))
+    if not pairs:
+        return [], True
+
+    ratios = sorted(gap / mm for _, gap, mm in pairs if mm)
+    scale = ratios[len(ratios) // 2]
+    if scale <= 0:
+        return [], True
+    conflicts = [label for label, gap, mm in pairs
+                 if abs(gap - mm * scale) > mm * scale * SPACING_TOLERANCE]
+    return conflicts, not conflicts
+
+
 def _score_instances(truth: ObjectClass, got: dict, s: ClassScore) -> ClassScore:
     want = {i.key: i for i in truth.instances}
     have_raw = [i for i in (got.get("instances") or []) if i.get("id")]
@@ -127,6 +177,7 @@ def _score_instances(truth: ObjectClass, got: dict, s: ClassScore) -> ClassScore
         if a and b:
             errs.append(max(abs(float(x) - float(y)) for x, y in zip(a, b)))
     s.size_error_mm = (sum(errs) / len(errs)) if errs else None
+    s.spacing_conflicts, s.sequence_ok = check_spacing_chain(truth, have, hit)
     return s
 
 

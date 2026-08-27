@@ -38,6 +38,9 @@ class Instance:
     id: str
     zone: str | None = None
     size_mm: tuple | None = None
+    #: 到序列中**下一条**轴线的间距（毫米），取自图纸尺寸链。
+    #: 用来校验「标签贴在了正确的轴线上」—— 只比标签集合看不出错位。
+    to_next_mm: float | None = None
     kind: str | None = None
     note: str = ""
 
@@ -85,9 +88,11 @@ class GoldUnit:
 def _instance(raw: dict) -> Instance:
     size = raw.get("size_mm")
     zone = raw.get("zone")
+    to_next = raw.get("to_next_mm")
     return Instance(
         id=str(raw["id"]),
         zone=None if zone is None else str(zone),
+        to_next_mm=None if to_next is None else float(to_next),
         size_mm=tuple(size) if size else None,
         kind=raw.get("kind"),
         note=raw.get("note", ""),
