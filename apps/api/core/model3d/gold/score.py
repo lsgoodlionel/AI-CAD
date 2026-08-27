@@ -57,8 +57,12 @@ def _score_count(truth: ObjectClass, got: dict, s: ClassScore) -> ClassScore:
 
 
 def _score_instances(truth: ObjectClass, got: dict, s: ClassScore) -> ClassScore:
-    want = {i.id: i for i in truth.instances}
-    have = {str(i["id"]): i for i in (got.get("instances") or []) if i.get("id")}
+    def key(raw) -> str:
+        zone = raw.get("zone")
+        return f"{zone}·{raw['id']}" if zone is not None else str(raw["id"])
+
+    want = {i.key: i for i in truth.instances}
+    have = {key(i): i for i in (got.get("instances") or []) if i.get("id")}
     hit = sorted(set(want) & set(have))
     s.matched = len(hit)
     s.missed = sorted(set(want) - set(have))

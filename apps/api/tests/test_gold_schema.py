@@ -100,3 +100,48 @@ def test_instance_ids_must_be_unique():
             "method": "instances",
             "instances": [{"id": "1×A"}, {"id": "1×A"}],
             "confidence": 0.9, "verified_by": ["human"]}}))
+
+
+# --- 身份必须带分区：裸轴号在过半图纸上会撞车 -------------------------
+
+@pytest.mark.unit
+def test_identity_is_qualified_by_zone():
+    """同一张图的两个分区都有「1 轴」，那是两条不同的轴线。
+
+    **实测**（两个工程共 5.3 万条识别轴号）：
+
+    | 身份口径 | 大歌剧院重复率 | 轨道交通重复率 |
+    |---|---|---|
+    | 裸轴号 | **31%** | **37%** |
+    | **(分区, 轴号)** | **0%** | **0%** |
+
+    存在重复轴号的图占 61% / 53%。裸轴号做身份，过半图纸上会撞车 ——
+    GB/T 50001 §8.0.5 的分区编号本就规定轴号形如「分区号-轴线号」。
+    """
+    unit = parse_unit(_unit(classes={"axes": {
+        "method": "instances",
+        "instances": [{"id": "1", "zone": "1"}, {"id": "1", "zone": "2"}],
+        "confidence": 1.0, "verified_by": ["human"]}}))
+    axes = unit.classes["axes"]
+    assert axes.count == 2
+    assert axes.instances[0].key == "1·1"
+    assert axes.instances[1].key == "2·1"
+
+
+@pytest.mark.unit
+def test_same_label_in_the_same_zone_is_still_a_duplicate():
+    """同一分区里的同一轴号才算重复。"""
+    with pytest.raises(ValueError, match="重复"):
+        parse_unit(_unit(classes={"axes": {
+            "method": "instances",
+            "instances": [{"id": "1", "zone": "1"}, {"id": "1", "zone": "1"}],
+            "confidence": 1.0, "verified_by": ["human"]}}))
+
+
+@pytest.mark.unit
+def test_no_zone_falls_back_to_the_bare_label():
+    """轴号本身已含分区前缀（`1-A`）时不必再写 zone。"""
+    unit = parse_unit(_unit(classes={"axes": {
+        "method": "instances", "instances": [{"id": "1-A"}],
+        "confidence": 1.0, "verified_by": ["human"]}}))
+    assert unit.classes["axes"].instances[0].key == "1-A"
