@@ -1,0 +1,524 @@
+{
+ "version": 1,
+ "object_classes": [
+  "axes"
+ ],
+ "units": [
+  {
+   "unit": "AX-A-01-02A",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "5ef4dc1b",
+    "drawing_no": "A-01-02A",
+    "title": "建筑-竣工图--正交轴网定位图"
+   },
+   "classes": {
+    "axes": {
+     "method": "instances",
+     "instances": [
+      {
+       "id": "1-1",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-2",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-3",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-4",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-5",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-6",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-7",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-8",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-9",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-10",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-11",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-12",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-13",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-14",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-15",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-16",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-17",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-18",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-19",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-20",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-21",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-22",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-23",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-24",
+       "kind": "vertical",
+       "note": "分区1"
+      },
+      {
+       "id": "1-A",
+       "kind": "horizontal",
+       "note": "分区1"
+      },
+      {
+       "id": "1-B",
+       "kind": "horizontal",
+       "note": "分区1"
+      },
+      {
+       "id": "1-C",
+       "kind": "horizontal",
+       "note": "分区1"
+      },
+      {
+       "id": "1-D",
+       "kind": "horizontal",
+       "note": "分区1"
+      },
+      {
+       "id": "1-E",
+       "kind": "horizontal",
+       "note": "分区1"
+      },
+      {
+       "id": "1-F",
+       "kind": "horizontal",
+       "note": "分区1"
+      },
+      {
+       "id": "1-G",
+       "kind": "horizontal",
+       "note": "分区1"
+      },
+      {
+       "id": "1-H",
+       "kind": "horizontal",
+       "note": "分区1"
+      },
+      {
+       "id": "1-J",
+       "kind": "horizontal",
+       "note": "分区1"
+      },
+      {
+       "id": "1-K",
+       "kind": "horizontal",
+       "note": "分区1"
+      },
+      {
+       "id": "1-L",
+       "kind": "horizontal",
+       "note": "分区1"
+      },
+      {
+       "id": "1-M",
+       "kind": "horizontal",
+       "note": "分区1"
+      },
+      {
+       "id": "1-N",
+       "kind": "horizontal",
+       "note": "分区1"
+      },
+      {
+       "id": "1-P",
+       "kind": "horizontal",
+       "note": "分区1"
+      },
+      {
+       "id": "1-Q",
+       "kind": "horizontal",
+       "note": "分区1"
+      },
+      {
+       "id": "2-1",
+       "kind": "vertical",
+       "note": "分区2"
+      },
+      {
+       "id": "2-2",
+       "kind": "vertical",
+       "note": "分区2"
+      },
+      {
+       "id": "2-3",
+       "kind": "vertical",
+       "note": "分区2"
+      },
+      {
+       "id": "2-4",
+       "kind": "vertical",
+       "note": "分区2"
+      },
+      {
+       "id": "2-5",
+       "kind": "vertical",
+       "note": "分区2"
+      },
+      {
+       "id": "2-6",
+       "kind": "vertical",
+       "note": "分区2"
+      },
+      {
+       "id": "2-7",
+       "kind": "vertical",
+       "note": "分区2"
+      },
+      {
+       "id": "2-8",
+       "kind": "vertical",
+       "note": "分区2"
+      },
+      {
+       "id": "2-9",
+       "kind": "vertical",
+       "note": "分区2"
+      },
+      {
+       "id": "2-10",
+       "kind": "vertical",
+       "note": "分区2"
+      },
+      {
+       "id": "2-11",
+       "kind": "vertical",
+       "note": "分区2"
+      },
+      {
+       "id": "2-12",
+       "kind": "vertical",
+       "note": "分区2"
+      },
+      {
+       "id": "2-13",
+       "kind": "vertical",
+       "note": "分区2"
+      },
+      {
+       "id": "2-14",
+       "kind": "vertical",
+       "note": "分区2"
+      },
+      {
+       "id": "2-15",
+       "kind": "vertical",
+       "note": "分区2"
+      },
+      {
+       "id": "2-A",
+       "kind": "horizontal",
+       "note": "分区2"
+      },
+      {
+       "id": "2-B",
+       "kind": "horizontal",
+       "note": "分区2"
+      },
+      {
+       "id": "2-C",
+       "kind": "horizontal",
+       "note": "分区2"
+      },
+      {
+       "id": "2-D",
+       "kind": "horizontal",
+       "note": "分区2"
+      },
+      {
+       "id": "2-E",
+       "kind": "horizontal",
+       "note": "分区2"
+      },
+      {
+       "id": "2-F",
+       "kind": "horizontal",
+       "note": "分区2"
+      },
+      {
+       "id": "2-G",
+       "kind": "horizontal",
+       "note": "分区2"
+      },
+      {
+       "id": "2-H",
+       "kind": "horizontal",
+       "note": "分区2"
+      },
+      {
+       "id": "2-J",
+       "kind": "horizontal",
+       "note": "分区2"
+      },
+      {
+       "id": "2-K",
+       "kind": "horizontal",
+       "note": "分区2"
+      },
+      {
+       "id": "2-L",
+       "kind": "horizontal",
+       "note": "分区2"
+      },
+      {
+       "id": "2-M",
+       "kind": "horizontal",
+       "note": "分区2"
+      },
+      {
+       "id": "2-N",
+       "kind": "horizontal",
+       "note": "分区2"
+      },
+      {
+       "id": "2-P",
+       "kind": "horizontal",
+       "note": "分区2"
+      },
+      {
+       "id": "3-1",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-2",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-3",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-4",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-5",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-6",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-7",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-8",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-9",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-10",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-11",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-12",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-13",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-14",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-15",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-16",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-A",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-B",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-C",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-D",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-E",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-F",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-G",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-H",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-J",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-K",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-L",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-M",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-N",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-P",
+       "kind": "rotated",
+       "note": "分区3"
+      },
+      {
+       "id": "3-Q",
+       "kind": "rotated",
+       "note": "分区3"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "human"
+     ],
+     "note": "人工读图标注（Phase I）：轴号注写在轴线端部圆内，一圈一线（GB/T 50001 §8.0.2）；轴距数字作交叉校验"
+    }
+   }
+  }
+ ]
+}
