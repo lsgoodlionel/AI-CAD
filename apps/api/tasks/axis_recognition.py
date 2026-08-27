@@ -163,7 +163,9 @@ async def _recognize_one(drawing_id: str) -> dict:
             circles["circles"], strokes=strokes_from_pdf(pdf),
             segments=segments, page_w=page_w, page_h=page_h,
             read_text=_ocr_reader(pdf), zone_labels=zone_labels,
-            scale_m_pt=stored_scale)
+            scale_m_pt=stored_scale,
+            # 原始候选用于判「缺口处有没有圈」——真漏检 vs 不等跨
+            circle_candidates=circles.get("candidates"))
 
         await save_result(db, project_id=project_id, drawing_id=drawing_id,
                           result=result)

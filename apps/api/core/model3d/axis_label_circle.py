@@ -202,6 +202,9 @@ def find_circles(paths: list[dict],
     只保留众数直径的圈,离群计入 `dropped`。
     """
     cands = circle_candidates(paths)
+    # **原始候选要在过滤之前留住**：下游用它判「缺口处有没有圈」，
+    # 而那正是被各道闸挡掉的圈 —— 交出过滤后的列表等于什么也没说。
+    raw_candidates = list(cands)
     # **必须在选主导直径之前过滤**：桩多时桩径会成为众数，
     # 把整张图的检测带偏（实测基坑图 862 个圈全是桩）。
     endpoints = [pt for p in paths for pt in (p.get("line_points") or ())]
@@ -214,6 +217,9 @@ def find_circles(paths: list[dict],
     kept = [c for c in cands if abs(c["diameter_pt"] - dom) <= tol]
     return {
         "circles": kept,
+        # **原始候选一并交出**：缺口处有没有圈，是「真漏检 vs 不等跨」的
+        # 决定性判据（实测把 50% 精度的间距报警变成近乎确定的判断）。
+        "candidates": raw_candidates,
         "diameter_pt": dom,
         "dropped": len(cands) - len(kept),
         "standard": is_standard_diameter(dom) if dom else False,

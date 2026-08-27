@@ -625,3 +625,39 @@ def test_too_few_axes_to_judge():
     from services.axis_recognition import suspect_missing_axis_gaps
 
     assert suspect_missing_axis_gaps(_band([100, 255])) == []
+
+
+@pytest.mark.unit
+def test_a_gap_with_a_circle_in_it_is_a_confirmed_miss():
+    """缺口处**有圈候选**→ 确认漏检，而不只是「可疑」。
+
+    **实测**（轨道交通 4 张被标出的结构图）：缺口处有圈的 2 张确为漏检
+    （圈被某道闸挡掉了），无圈的 2 张是设计上的不等跨 —— 单看间距的
+    报警精度只有约 50%，而圈候选把它变成近乎确定的判断。
+    """
+    from services.axis_recognition import suspect_missing_axis_gaps
+
+    axes = _band([542, 697, 851, 1006, 1161, 1315, 1624, 1779, 1934])
+    # 缺口中点在 -1470（法向偏移与 offset_pt 同号）
+    flags = suspect_missing_axis_gaps(axes, circle_offsets=[-1470.0])
+    assert flags[0]["confirmed"] is True
+
+
+@pytest.mark.unit
+def test_a_gap_with_no_circle_is_only_suspected():
+    """缺口处无圈 → 多半是不等跨，保留为「可疑」但不确认。"""
+    from services.axis_recognition import suspect_missing_axis_gaps
+
+    axes = _band([542, 697, 851, 1006, 1161, 1315, 1624, 1779, 1934])
+    flags = suspect_missing_axis_gaps(axes, circle_offsets=[-9999.0])
+    assert flags[0]["confirmed"] is False
+
+
+@pytest.mark.unit
+def test_without_circle_offsets_confirmation_is_unknown():
+    """没给圈候选时不下确认结论——判不出就不判。"""
+    from services.axis_recognition import suspect_missing_axis_gaps
+
+    flags = suspect_missing_axis_gaps(
+        _band([542, 697, 851, 1006, 1161, 1315, 1624, 1779, 1934]))
+    assert flags[0]["confirmed"] is None

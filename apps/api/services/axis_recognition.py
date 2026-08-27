@@ -136,7 +136,8 @@ def recognize(circles: list[dict], *, strokes: list[tuple],
               segments: list[tuple], page_w: float, page_h: float,
               read_text, zone_labels: dict[int, str] | None = None,
               directions: tuple[float, ...] = DEFAULT_DIRECTIONS,
-              scale_m_pt: float | None = None) -> dict:
+              scale_m_pt: float | None = None,
+              circle_candidates: list[dict] | None = None) -> dict:
     """一次完整识别。`read_text(leader)` 返回该引线文字处的 OCR token 列表。
 
     传整条引线而非仅锚点:裁图窗口要按**引线尺度**算(见 `text_crop_rect`),
@@ -209,13 +210,23 @@ def recognize(circles: list[dict], *, strokes: list[tuple],
     for _axis in labelled:
         _by_zone[_axis.get("zone_index")].append(_axis)
     for _zone, _axes in _by_zone.items():
-        for flag in suspect_missing_axis_gaps(_axes):
+        _angle = float((_axes[0].get("angle_deg") or 0.0)) if _axes else 0.0
+        _offs = None
+        if circle_candidates is not None:
+            from core.model3d.axis_label_circle import normal_offset
+            _offs = [normal_offset(c["cx"], c["cy"], _angle)
+                     for c in circle_candidates]
+        for flag in suspect_missing_axis_gaps(_axes, circle_offsets=_offs):
             result["violations"].append({
                 "code": "suspect_missing_axis",
                 "zone": _zone,
-                "message": (f"轴号 {flag['after_label']} 之后的间距是其余档的 "
-                            f"{flag['multiple']} 倍，疑似漏检轴线；"
-                            f"若确为不等跨请人工确认"),
+                "message": (
+                    f"轴号 {flag['after_label']} 之后的间距是其余档的 "
+                    f"{flag['multiple']} 倍，"
+                    + ("**缺口处有轴号圈，确认漏检**"
+                       if flag.get("confirmed") else
+                       ("缺口处无圈，多半是不等跨" if flag.get("confirmed") is False
+                        else "疑似漏检轴线；若确为不等跨请人工确认"))),
                 **flag,
             })
 
@@ -282,7 +293,14 @@ GAP_MULTIPLE_TOLERANCE = 0.15
 MAX_SUSPECT_MULTIPLE = 6
 
 
-def suspect_missing_axis_gaps(axes: list[dict]) -> list[dict]:
+#: 缺口中点与圈候选的匹配容差（pt）。轴号圈直径实测 20~28pt，
+#: 6pt 足够容纳测量误差而不会串到相邻轴线。
+GAP_CIRCLE_MATCH_TOL_PT = 6.0
+
+
+def suspect_missing_axis_gaps(axes: list[dict],
+                              circle_offsets: list[float] | None = None,
+                              ) -> list[dict]:
     """报出「某档间距恰是其余档的整数倍」——**中间很可能漏检了轴线**。
 
     **实测**（metro 首层框架梁配筋图）：⑦ 与 ⑪ 的轴号圈未检出，而轴号是
@@ -292,6 +310,12 @@ def suspect_missing_axis_gaps(axes: list[dict]) -> list[dict]:
     **只报不猜**：GB 不禁止不等跨，一个真的 18600 跨同样呈现双倍间距。
     按倍数直接跳号会造出新的一类错误 —— 交给既有的人工确认通道，
     这与本模块「判不出就说判不出、降级必须可见」的一贯做法一致。
+
+    **`circle_offsets` 把「可疑」变成「确认」**：给出全部圈候选的法向偏移后，
+    检查缺口中点处有没有圈 —— 有就是真漏检（圈被某道闸挡掉了），
+    没有就多半是不等跨。实测 4 张被标出的结构图，两者各占一半：
+    单看间距的精度只有约 50%，加上圈候选后判断近乎确定。
+    不给时 `confirmed` 为 `None`（判不出就不判）。
     """
     ordered = [a for a in (axes or []) if a.get("offset_pt") is not None]
     if len(ordered) < 4:
@@ -314,11 +338,22 @@ def suspect_missing_axis_gaps(axes: list[dict]) -> list[dict]:
             continue
         if abs(ratio - multiple) > GAP_MULTIPLE_TOLERANCE:
             continue                   # 不成整数倍 → 是设计上的不等跨
+        confirmed = None
+        if circle_offsets is not None:
+            a_off = float(ordered[index]["offset_pt"])
+            b_off = float(ordered[index + 1]["offset_pt"])
+            mids = [a_off + (b_off - a_off) * k / multiple
+                    for k in range(1, multiple)]
+            confirmed = any(
+                any(abs(c - mid) <= GAP_CIRCLE_MATCH_TOL_PT
+                    for c in circle_offsets)
+                for mid in mids)
         out.append({
             "after_label": ordered[index].get("label"),
             "multiple": multiple,
             "gap_pt": round(gap, 2),
             "base_pt": round(base, 2),
+            "confirmed": confirmed,
         })
     return out
 
