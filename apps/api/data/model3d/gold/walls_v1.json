@@ -1,0 +1,517 @@
+{
+ "version": 1,
+ "object_classes": [
+  "walls"
+ ],
+ "units": [
+  {
+   "unit": "VW-26ce158f",
+   "source": {
+    "project": "metro",
+    "drawing_id": "26ce158f"
+   },
+   "classes": {
+    "walls": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "W2-20",
+       "ok": false,
+       "what": "空白",
+       "note": "墙厚 0.203 m"
+      },
+      {
+       "ref": "W3-01",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "墙厚 0.113 m"
+      },
+      {
+       "ref": "W3-02",
+       "ok": false,
+       "what": "图签栏",
+       "note": "墙厚 0.134 m"
+      },
+      {
+       "ref": "W3-03",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "墙厚 0.203 m"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 W1 的空白/图签栏两项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VW-30d0de0d",
+   "source": {
+    "project": "metro",
+    "drawing_id": "30d0de0d"
+   },
+   "classes": {
+    "walls": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "W1-13",
+       "ok": true,
+       "note": "墙厚 0.199 m"
+      },
+      {
+       "ref": "W1-14",
+       "ok": true,
+       "note": "墙厚 0.199 m"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 W1 的空白/图签栏两项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VW-332334de",
+   "source": {
+    "project": "metro",
+    "drawing_id": "332334de"
+   },
+   "classes": {
+    "walls": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "W1-01",
+       "ok": true,
+       "note": "墙厚 0.199 m"
+      },
+      {
+       "ref": "W1-02",
+       "ok": true,
+       "note": "墙厚 0.203 m"
+      },
+      {
+       "ref": "W1-03",
+       "ok": true,
+       "note": "墙厚 0.199 m"
+      },
+      {
+       "ref": "W1-04",
+       "ok": true,
+       "note": "墙厚 0.203 m"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 W1 的空白/图签栏两项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VW-3941047a",
+   "source": {
+    "project": "metro",
+    "drawing_id": "3941047a"
+   },
+   "classes": {
+    "walls": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "W1-15",
+       "ok": false,
+       "what": "坡道",
+       "note": "墙厚 0.247 m"
+      },
+      {
+       "ref": "W1-16",
+       "ok": false,
+       "what": "楼面或坡道",
+       "note": "墙厚 0.247 m"
+      },
+      {
+       "ref": "W1-17",
+       "ok": false,
+       "what": "楼面线",
+       "note": "墙厚 0.367 m"
+      },
+      {
+       "ref": "W1-18",
+       "ok": false,
+       "what": "柱",
+       "note": "墙厚 0.193 m"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 W1 的空白/图签栏两项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VW-4c8d46c3",
+   "source": {
+    "project": "metro",
+    "drawing_id": "4c8d46c3"
+   },
+   "classes": {
+    "walls": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "W2-07",
+       "ok": true,
+       "note": "墙厚 0.191 m"
+      },
+      {
+       "ref": "W2-08",
+       "ok": true,
+       "note": "墙厚 0.191 m"
+      },
+      {
+       "ref": "W2-09",
+       "ok": true,
+       "note": "墙厚 0.195 m"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 W1 的空白/图签栏两项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VW-5c7d8654",
+   "source": {
+    "project": "metro",
+    "drawing_id": "5c7d8654"
+   },
+   "classes": {
+    "walls": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "W2-10",
+       "ok": true,
+       "note": "墙厚 0.191 m"
+      },
+      {
+       "ref": "W2-11",
+       "ok": true,
+       "note": "墙厚 0.288 m"
+      },
+      {
+       "ref": "W2-12",
+       "ok": true,
+       "note": "墙厚 0.191 m"
+      },
+      {
+       "ref": "W2-13",
+       "ok": true,
+       "note": "墙厚 0.191 m"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 W1 的空白/图签栏两项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VW-7003016d",
+   "source": {
+    "project": "metro",
+    "drawing_id": "7003016d"
+   },
+   "classes": {
+    "walls": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "W2-03",
+       "ok": true,
+       "note": "墙厚 0.563 m"
+      },
+      {
+       "ref": "W2-04",
+       "ok": true,
+       "note": "墙厚 0.563 m"
+      },
+      {
+       "ref": "W2-05",
+       "ok": false,
+       "what": "单线",
+       "note": "墙厚 0.377 m"
+      },
+      {
+       "ref": "W2-06",
+       "ok": true,
+       "note": "墙厚 0.563 m"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 W1 的空白/图签栏两项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VW-713053e1",
+   "source": {
+    "project": "metro",
+    "drawing_id": "713053e1"
+   },
+   "classes": {
+    "walls": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "W2-18",
+       "ok": true,
+       "note": "墙厚 0.567 m"
+      },
+      {
+       "ref": "W2-19",
+       "ok": true,
+       "note": "墙厚 0.207 m"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 W1 的空白/图签栏两项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VW-98e5efeb",
+   "source": {
+    "project": "metro",
+    "drawing_id": "98e5efeb"
+   },
+   "classes": {
+    "walls": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "W3-04",
+       "ok": true,
+       "note": "墙厚 0.135 m"
+      },
+      {
+       "ref": "W3-05",
+       "ok": true,
+       "note": "墙厚 0.39 m"
+      },
+      {
+       "ref": "W3-06",
+       "ok": true,
+       "note": "墙厚 0.134 m"
+      },
+      {
+       "ref": "W3-07",
+       "ok": true,
+       "note": "墙厚 0.188 m"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 W1 的空白/图签栏两项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VW-a08b87e7",
+   "source": {
+    "project": "metro",
+    "drawing_id": "a08b87e7"
+   },
+   "classes": {
+    "walls": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "W2-14",
+       "ok": true,
+       "note": "墙厚 0.135 m"
+      },
+      {
+       "ref": "W2-15",
+       "ok": true,
+       "note": "墙厚 0.135 m"
+      },
+      {
+       "ref": "W2-16",
+       "ok": true,
+       "note": "墙厚 0.135 m"
+      },
+      {
+       "ref": "W2-17",
+       "ok": true,
+       "note": "墙厚 0.135 m"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 W1 的空白/图签栏两项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VW-b5804bdd",
+   "source": {
+    "project": "metro",
+    "drawing_id": "b5804bdd"
+   },
+   "classes": {
+    "walls": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "W1-05",
+       "ok": true,
+       "note": "墙厚 0.18 m"
+      },
+      {
+       "ref": "W1-06",
+       "ok": true,
+       "note": "墙厚 0.182 m"
+      },
+      {
+       "ref": "W1-07",
+       "ok": false,
+       "what": "空白处单线",
+       "note": "墙厚 0.18 m"
+      },
+      {
+       "ref": "W1-08",
+       "ok": false,
+       "what": "图签栏",
+       "note": "墙厚 0.18 m"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 W1 的空白/图签栏两项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VW-c8478ba0",
+   "source": {
+    "project": "metro",
+    "drawing_id": "c8478ba0"
+   },
+   "classes": {
+    "walls": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "W1-09",
+       "ok": false,
+       "what": "柱",
+       "note": "墙厚 0.191 m"
+      },
+      {
+       "ref": "W1-10",
+       "ok": true,
+       "note": "墙厚 0.191 m"
+      },
+      {
+       "ref": "W1-11",
+       "ok": true,
+       "note": "墙厚 0.19 m"
+      },
+      {
+       "ref": "W1-12",
+       "ok": true,
+       "note": "墙厚 0.191 m"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 W1 的空白/图签栏两项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VW-f90543c4",
+   "source": {
+    "project": "metro",
+    "drawing_id": "f90543c4"
+   },
+   "classes": {
+    "walls": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "W1-19",
+       "ok": false,
+       "what": "栏杆",
+       "note": "墙厚 0.123 m"
+      },
+      {
+       "ref": "W1-20",
+       "ok": false,
+       "what": "设备",
+       "note": "墙厚 0.199 m"
+      },
+      {
+       "ref": "W2-01",
+       "ok": true,
+       "note": "墙厚 0.351 m"
+      },
+      {
+       "ref": "W2-02",
+       "ok": true,
+       "note": "墙厚 0.398 m"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 W1 的空白/图签栏两项与判读一致"
+    }
+   }
+  }
+ ]
+}
