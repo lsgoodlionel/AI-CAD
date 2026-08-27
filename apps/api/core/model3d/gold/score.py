@@ -30,6 +30,9 @@ class ClassScore:
     recall: float = 0.0
     #: 配上对的实体的尺寸误差（毫米）：每根取**逐边最大**，再对所有实体取平均
     size_error_mm: float | None = None
+    #: 误检构成：{那是什么: 个数} —— 只有分类才能指导改代码，
+    #: 单看「精确率 59%」不知道往哪儿看
+    taxonomy: dict = field(default_factory=dict)
     #: 标签与位置不自洽的实体（该实体到下一条的实测间距与尺寸链不符）
     spacing_conflicts: list = field(default_factory=list)
     #: 尺寸链校验是否通过。**没有位置信息时视为通过**（跳过，不是不合格）
@@ -204,8 +207,29 @@ def _score_fields(truth: ObjectClass, got: dict, s: ClassScore) -> ClassScore:
     return s
 
 
+def _score_verdicts(truth: ObjectClass, got: dict, s: ClassScore) -> ClassScore:
+    """裁决式真值：算**精确率**并给出误检构成。
+
+    识别结果已包含在裁决里（每条裁决就是对一个候选的判定），
+    所以不需要再喂一份识别输出。
+    """
+    total = len(truth.verdicts)
+    good = [v for v in truth.verdicts if v.ok]
+    s.matched = len(good)
+    s.precision = len(good) / total if total else 0.0
+    s.spurious = sorted(v.ref for v in truth.verdicts if not v.ok)
+    s.exact = not s.spurious
+    tax: dict = {}
+    for v in truth.verdicts:
+        if not v.ok:
+            tax[v.what] = tax.get(v.what, 0) + 1
+    s.taxonomy = tax
+    return s
+
+
 _SCORERS = {"count": _score_count, "instances": _score_instances,
-            "text": _score_text, "fields": _score_fields}
+            "text": _score_text, "fields": _score_fields,
+            "verdicts": _score_verdicts}
 
 
 def score_class(truth: ObjectClass, got: dict) -> ClassScore:

@@ -1,0 +1,2946 @@
+{
+ "version": 1,
+ "object_classes": [
+  "columns"
+ ],
+ "units": [
+  {
+   "unit": "VD-metro_194f877d_t0011",
+   "source": {
+    "project": "metro",
+    "drawing_id": "194f877d",
+    "tile": "metro_194f877d_t0011"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P6-12",
+       "ok": true,
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_194f877d_t0017",
+   "source": {
+    "project": "metro",
+    "drawing_id": "194f877d",
+    "tile": "metro_194f877d_t0017"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P4-16",
+       "ok": true,
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_194f877d_t0019",
+   "source": {
+    "project": "metro",
+    "drawing_id": "194f877d",
+    "tile": "metro_194f877d_t0019"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P6-02",
+       "ok": true,
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_194f877d_t0020",
+   "source": {
+    "project": "metro",
+    "drawing_id": "194f877d",
+    "tile": "metro_194f877d_t0020"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P6-03",
+       "ok": true,
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_194f877d_t0021",
+   "source": {
+    "project": "metro",
+    "drawing_id": "194f877d",
+    "tile": "metro_194f877d_t0021"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P5-06",
+       "ok": true,
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_2124af82_t0002",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2124af82",
+    "tile": "metro_2124af82_t0002"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-11",
+       "ok": false,
+       "what": "墙",
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_2124af82_t0004",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2124af82",
+    "tile": "metro_2124af82_t0004"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-16",
+       "ok": true,
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_2124af82_t0018",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2124af82",
+    "tile": "metro_2124af82_t0018"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P4-10",
+       "ok": true,
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_2124af82_t0019",
+   "source": {
+    "project": "metro",
+    "drawing_id": "2124af82",
+    "tile": "metro_2124af82_t0019"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-07",
+       "ok": true,
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_26ce158f_t0013",
+   "source": {
+    "project": "metro",
+    "drawing_id": "26ce158f",
+    "tile": "metro_26ce158f_t0013"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-18",
+       "ok": false,
+       "what": "标高三角",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_27bc32e6_t0004",
+   "source": {
+    "project": "metro",
+    "drawing_id": "27bc32e6",
+    "tile": "metro_27bc32e6_t0004"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-19",
+       "ok": true,
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_27bc32e6_t0012",
+   "source": {
+    "project": "metro",
+    "drawing_id": "27bc32e6",
+    "tile": "metro_27bc32e6_t0012"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P6-13",
+       "ok": true,
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_27bc32e6_t0018",
+   "source": {
+    "project": "metro",
+    "drawing_id": "27bc32e6",
+    "tile": "metro_27bc32e6_t0018"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P5-10",
+       "ok": true,
+       "note": "框序号 2"
+      },
+      {
+       "ref": "P6-07",
+       "ok": true,
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_33037081_t0009",
+   "source": {
+    "project": "metro",
+    "drawing_id": "33037081",
+    "tile": "metro_33037081_t0009"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-01",
+       "ok": true,
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_33037081_t0011",
+   "source": {
+    "project": "metro",
+    "drawing_id": "33037081",
+    "tile": "metro_33037081_t0011"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-01",
+       "ok": true,
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_33037081_t0012",
+   "source": {
+    "project": "metro",
+    "drawing_id": "33037081",
+    "tile": "metro_33037081_t0012"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P5-09",
+       "ok": true,
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_33037081_t0019",
+   "source": {
+    "project": "metro",
+    "drawing_id": "33037081",
+    "tile": "metro_33037081_t0019"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P5-07",
+       "ok": true,
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_33037081_t0021",
+   "source": {
+    "project": "metro",
+    "drawing_id": "33037081",
+    "tile": "metro_33037081_t0021"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-14",
+       "ok": true,
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_3941047a_t0009",
+   "source": {
+    "project": "metro",
+    "drawing_id": "3941047a",
+    "tile": "metro_3941047a_t0009"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P5-13",
+       "ok": false,
+       "what": "标高三角",
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_3cda3e4f_t0002",
+   "source": {
+    "project": "metro",
+    "drawing_id": "3cda3e4f",
+    "tile": "metro_3cda3e4f_t0002"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P5-12",
+       "ok": false,
+       "what": "空白",
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_3cda3e4f_t0003",
+   "source": {
+    "project": "metro",
+    "drawing_id": "3cda3e4f",
+    "tile": "metro_3cda3e4f_t0003"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-04",
+       "ok": true,
+       "note": "框序号 1"
+      },
+      {
+       "ref": "P4-15",
+       "ok": false,
+       "what": "墙",
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_51d942f3_t0009",
+   "source": {
+    "project": "metro",
+    "drawing_id": "51d942f3",
+    "tile": "metro_51d942f3_t0009"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-10",
+       "ok": false,
+       "what": "缩略图",
+       "note": "框序号 1"
+      },
+      {
+       "ref": "P5-03",
+       "ok": false,
+       "what": "缩略图",
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_66899823_t0030",
+   "source": {
+    "project": "metro",
+    "drawing_id": "66899823",
+    "tile": "metro_66899823_t0030"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-04",
+       "ok": false,
+       "what": "文字",
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_7003016d_t0009",
+   "source": {
+    "project": "metro",
+    "drawing_id": "7003016d",
+    "tile": "metro_7003016d_t0009"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P5-15",
+       "ok": false,
+       "what": "墙",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_7411241d_t0012",
+   "source": {
+    "project": "metro",
+    "drawing_id": "7411241d",
+    "tile": "metro_7411241d_t0012"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-09",
+       "ok": false,
+       "what": "空白",
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_7c73545a_t0013",
+   "source": {
+    "project": "metro",
+    "drawing_id": "7c73545a",
+    "tile": "metro_7c73545a_t0013"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-10",
+       "ok": false,
+       "what": "墙",
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_7c73545a_t0014",
+   "source": {
+    "project": "metro",
+    "drawing_id": "7c73545a",
+    "tile": "metro_7c73545a_t0014"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P4-04",
+       "ok": true,
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_7c73545a_t0015",
+   "source": {
+    "project": "metro",
+    "drawing_id": "7c73545a",
+    "tile": "metro_7c73545a_t0015"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P4-13",
+       "ok": true,
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_7c73545a_t0016",
+   "source": {
+    "project": "metro",
+    "drawing_id": "7c73545a",
+    "tile": "metro_7c73545a_t0016"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-01",
+       "ok": true,
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_7c73545a_t0023",
+   "source": {
+    "project": "metro",
+    "drawing_id": "7c73545a",
+    "tile": "metro_7c73545a_t0023"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P5-08",
+       "ok": false,
+       "what": "图签栏",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_8f977527_t0012",
+   "source": {
+    "project": "metro",
+    "drawing_id": "8f977527",
+    "tile": "metro_8f977527_t0012"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-19",
+       "ok": true,
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_d1cc9d5e_t0001",
+   "source": {
+    "project": "metro",
+    "drawing_id": "d1cc9d5e",
+    "tile": "metro_d1cc9d5e_t0001"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-17",
+       "ok": true,
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_d1cc9d5e_t0013",
+   "source": {
+    "project": "metro",
+    "drawing_id": "d1cc9d5e",
+    "tile": "metro_d1cc9d5e_t0013"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P5-20",
+       "ok": true,
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_d1cc9d5e_t0017",
+   "source": {
+    "project": "metro",
+    "drawing_id": "d1cc9d5e",
+    "tile": "metro_d1cc9d5e_t0017"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P5-14",
+       "ok": true,
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_d1cc9d5e_t0019",
+   "source": {
+    "project": "metro",
+    "drawing_id": "d1cc9d5e",
+    "tile": "metro_d1cc9d5e_t0019"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P4-03",
+       "ok": true,
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_d1cc9d5e_t0021",
+   "source": {
+    "project": "metro",
+    "drawing_id": "d1cc9d5e",
+    "tile": "metro_d1cc9d5e_t0021"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-02",
+       "ok": true,
+       "note": "框序号 2"
+      },
+      {
+       "ref": "P3-16",
+       "ok": true,
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_daa18df0_t0006",
+   "source": {
+    "project": "metro",
+    "drawing_id": "daa18df0",
+    "tile": "metro_daa18df0_t0006"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-02",
+       "ok": true,
+       "note": "框序号 1"
+      },
+      {
+       "ref": "P6-09",
+       "ok": true,
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_daa18df0_t0009",
+   "source": {
+    "project": "metro",
+    "drawing_id": "daa18df0",
+    "tile": "metro_daa18df0_t0009"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-13",
+       "ok": false,
+       "what": "标高三角",
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_daa18df0_t0013",
+   "source": {
+    "project": "metro",
+    "drawing_id": "daa18df0",
+    "tile": "metro_daa18df0_t0013"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P4-09",
+       "ok": false,
+       "what": "标高三角",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_dc35e129_t0005",
+   "source": {
+    "project": "metro",
+    "drawing_id": "dc35e129",
+    "tile": "metro_dc35e129_t0005"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-12",
+       "ok": false,
+       "what": "空白",
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-metro_e2319873_t0021",
+   "source": {
+    "project": "metro",
+    "drawing_id": "e2319873",
+    "tile": "metro_e2319873_t0021"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P6-14",
+       "ok": false,
+       "what": "轴线刻度",
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0224bc80_t0002",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0224bc80",
+    "tile": "sgoh_0224bc80_t0002"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-08",
+       "ok": false,
+       "what": "墙",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0224bc80_t0030",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0224bc80",
+    "tile": "sgoh_0224bc80_t0030"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P6-04",
+       "ok": false,
+       "what": "旋转45度的菱形块",
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_030f8193_t0004",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "030f8193",
+    "tile": "sgoh_030f8193_t0004"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P4-05",
+       "ok": true,
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_030f8193_t0007",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "030f8193",
+    "tile": "sgoh_030f8193_t0007"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-11",
+       "ok": true,
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_030f8193_t0011",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "030f8193",
+    "tile": "sgoh_030f8193_t0011"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-05",
+       "ok": false,
+       "what": "墙",
+       "note": "框序号 2"
+      },
+      {
+       "ref": "P5-01",
+       "ok": false,
+       "what": "旋转45度的菱形块",
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_030f8193_t0012",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "030f8193",
+    "tile": "sgoh_030f8193_t0012"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-13",
+       "ok": true,
+       "note": "框序号 4"
+      },
+      {
+       "ref": "P3-14",
+       "ok": true,
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_030f8193_t0016",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "030f8193",
+    "tile": "sgoh_030f8193_t0016"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P4-20",
+       "ok": true,
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_030f8193_t0020",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "030f8193",
+    "tile": "sgoh_030f8193_t0020"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-04",
+       "ok": true,
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_030f8193_t0028",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "030f8193",
+    "tile": "sgoh_030f8193_t0028"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-03",
+       "ok": true,
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_030f8193_t0038",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "030f8193",
+    "tile": "sgoh_030f8193_t0038"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-17",
+       "ok": true,
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_030f8193_t0039",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "030f8193",
+    "tile": "sgoh_030f8193_t0039"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P6-16",
+       "ok": false,
+       "what": "旋转45度的菱形块",
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_030f8193_t0040",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "030f8193",
+    "tile": "sgoh_030f8193_t0040"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P5-05",
+       "ok": true,
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_030f8193_t0041",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "030f8193",
+    "tile": "sgoh_030f8193_t0041"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-12",
+       "ok": true,
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_030f8193_t0043",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "030f8193",
+    "tile": "sgoh_030f8193_t0043"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P5-04",
+       "ok": true,
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0b7b66c5_t0003",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0b7b66c5",
+    "tile": "sgoh_0b7b66c5_t0003"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P6-05",
+       "ok": true,
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0b7b66c5_t0018",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0b7b66c5",
+    "tile": "sgoh_0b7b66c5_t0018"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-05",
+       "ok": false,
+       "what": "旋转45度的菱形块",
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0b7b66c5_t0030",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0b7b66c5",
+    "tile": "sgoh_0b7b66c5_t0030"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-07",
+       "ok": true,
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0b7b66c5_t0040",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0b7b66c5",
+    "tile": "sgoh_0b7b66c5_t0040"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-15",
+       "ok": true,
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0b7b66c5_t0058",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0b7b66c5",
+    "tile": "sgoh_0b7b66c5_t0058"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P4-18",
+       "ok": true,
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0b7b66c5_t0062",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0b7b66c5",
+    "tile": "sgoh_0b7b66c5_t0062"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P4-11",
+       "ok": true,
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0b7b66c5_t0070",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0b7b66c5",
+    "tile": "sgoh_0b7b66c5_t0070"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-09",
+       "ok": false,
+       "what": "轴线刻度",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0b7b66c5_t0073",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0b7b66c5",
+    "tile": "sgoh_0b7b66c5_t0073"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P5-02",
+       "ok": false,
+       "what": "空白",
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0b7b66c5_t0075",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0b7b66c5",
+    "tile": "sgoh_0b7b66c5_t0075"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P6-08",
+       "ok": false,
+       "what": "旋转45度的菱形块",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0bad5ce4_t0039",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0bad5ce4",
+    "tile": "sgoh_0bad5ce4_t0039"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P4-17",
+       "ok": false,
+       "what": "标高三角",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0ca8f4ae_t0012",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0ca8f4ae",
+    "tile": "sgoh_0ca8f4ae_t0012"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P4-14",
+       "ok": false,
+       "what": "墙",
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0ca8f4ae_t0015",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0ca8f4ae",
+    "tile": "sgoh_0ca8f4ae_t0015"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-16",
+       "ok": true,
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0ca8f4ae_t0020",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0ca8f4ae",
+    "tile": "sgoh_0ca8f4ae_t0020"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-12",
+       "ok": false,
+       "what": "轴线刻度",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0ca8f4ae_t0021",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0ca8f4ae",
+    "tile": "sgoh_0ca8f4ae_t0021"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P4-08",
+       "ok": false,
+       "what": "轴线刻度",
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0ca8f4ae_t0028",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0ca8f4ae",
+    "tile": "sgoh_0ca8f4ae_t0028"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-19",
+       "ok": false,
+       "what": "旋转45度的菱形块",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0ca8f4ae_t0029",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0ca8f4ae",
+    "tile": "sgoh_0ca8f4ae_t0029"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P5-19",
+       "ok": true,
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0ca8f4ae_t0037",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0ca8f4ae",
+    "tile": "sgoh_0ca8f4ae_t0037"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-09",
+       "ok": true,
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0ca8f4ae_t0039",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0ca8f4ae",
+    "tile": "sgoh_0ca8f4ae_t0039"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-05",
+       "ok": false,
+       "what": "墙",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_0ca8f4ae_t0042",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "0ca8f4ae",
+    "tile": "sgoh_0ca8f4ae_t0042"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-18",
+       "ok": true,
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_10b42d57_t0020",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "10b42d57",
+    "tile": "sgoh_10b42d57_t0020"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-10",
+       "ok": false,
+       "what": "门",
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_1302ab12_t0031",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "1302ab12",
+    "tile": "sgoh_1302ab12_t0031"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-08",
+       "ok": false,
+       "what": "标高三角",
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_22afffe1_t0040",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "22afffe1",
+    "tile": "sgoh_22afffe1_t0040"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P6-19",
+       "ok": false,
+       "what": "标高三角",
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_23cf0d4f_t0004",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "23cf0d4f",
+    "tile": "sgoh_23cf0d4f_t0004"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-06",
+       "ok": false,
+       "what": "填充线",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_23cf0d4f_t0012",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "23cf0d4f",
+    "tile": "sgoh_23cf0d4f_t0012"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P4-12",
+       "ok": false,
+       "what": "轴线刻度",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_23cf0d4f_t0020",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "23cf0d4f",
+    "tile": "sgoh_23cf0d4f_t0020"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P5-17",
+       "ok": true,
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_23cf0d4f_t0028",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "23cf0d4f",
+    "tile": "sgoh_23cf0d4f_t0028"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P6-17",
+       "ok": true,
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_23cf0d4f_t0032",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "23cf0d4f",
+    "tile": "sgoh_23cf0d4f_t0032"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-03",
+       "ok": true,
+       "note": "框序号 4"
+      },
+      {
+       "ref": "P4-07",
+       "ok": true,
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_23cf0d4f_t0037",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "23cf0d4f",
+    "tile": "sgoh_23cf0d4f_t0037"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-13",
+       "ok": true,
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_23cf0d4f_t0041",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "23cf0d4f",
+    "tile": "sgoh_23cf0d4f_t0041"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P6-18",
+       "ok": true,
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_23cf0d4f_t0045",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "23cf0d4f",
+    "tile": "sgoh_23cf0d4f_t0045"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-15",
+       "ok": false,
+       "what": "墙",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_318c0434_t0011",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "318c0434",
+    "tile": "sgoh_318c0434_t0011"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-15",
+       "ok": true,
+       "note": "框序号 4"
+      },
+      {
+       "ref": "P6-01",
+       "ok": false,
+       "what": "门",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_3ffbda35_t0023",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "3ffbda35",
+    "tile": "sgoh_3ffbda35_t0023"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P6-10",
+       "ok": true,
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_522b2314_t0000",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "522b2314",
+    "tile": "sgoh_522b2314_t0000"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P6-15",
+       "ok": false,
+       "what": "标高三角",
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_5c5462bc_t0013",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "5c5462bc",
+    "tile": "sgoh_5c5462bc_t0013"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P4-01",
+       "ok": false,
+       "what": "标高三角",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_5c5462bc_t0023",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "5c5462bc",
+    "tile": "sgoh_5c5462bc_t0023"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-17",
+       "ok": true,
+       "note": "框序号 1"
+      },
+      {
+       "ref": "P3-20",
+       "ok": true,
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_63a7ee69_t0030",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "63a7ee69",
+    "tile": "sgoh_63a7ee69_t0030"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-03",
+       "ok": true,
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_9623c010_t0009",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "9623c010",
+    "tile": "sgoh_9623c010_t0009"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-02",
+       "ok": true,
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_9623c010_t0036",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "9623c010",
+    "tile": "sgoh_9623c010_t0036"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-18",
+       "ok": true,
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_9623c010_t0040",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "9623c010",
+    "tile": "sgoh_9623c010_t0040"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P6-06",
+       "ok": true,
+       "note": "框序号 1"
+      },
+      {
+       "ref": "P6-20",
+       "ok": true,
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_9623c010_t0045",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "9623c010",
+    "tile": "sgoh_9623c010_t0045"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P6-11",
+       "ok": false,
+       "what": "空白",
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_b8794f5d_t0020",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "b8794f5d",
+    "tile": "sgoh_b8794f5d_t0020"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-14",
+       "ok": false,
+       "what": "标高三角",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_b8794f5d_t0029",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "b8794f5d",
+    "tile": "sgoh_b8794f5d_t0029"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-06",
+       "ok": false,
+       "what": "标高三角",
+       "note": "框序号 4"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_c10919d7_t0003",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "c10919d7",
+    "tile": "sgoh_c10919d7_t0003"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-20",
+       "ok": true,
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_c10919d7_t0010",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "c10919d7",
+    "tile": "sgoh_c10919d7_t0010"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P4-19",
+       "ok": true,
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_c10919d7_t0012",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "c10919d7",
+    "tile": "sgoh_c10919d7_t0012"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P5-16",
+       "ok": true,
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_c10919d7_t0022",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "c10919d7",
+    "tile": "sgoh_c10919d7_t0022"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-07",
+       "ok": true,
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_c10919d7_t0039",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "c10919d7",
+    "tile": "sgoh_c10919d7_t0039"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-11",
+       "ok": false,
+       "what": "文字",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_c37e054f_t0014",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "c37e054f",
+    "tile": "sgoh_c37e054f_t0014"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P5-18",
+       "ok": false,
+       "what": "标高三角",
+       "note": "框序号 1"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_ce1c8744_t0019",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "ce1c8744",
+    "tile": "sgoh_ce1c8744_t0019"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-06",
+       "ok": true,
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_ce1c8744_t0030",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "ce1c8744",
+    "tile": "sgoh_ce1c8744_t0030"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P4-06",
+       "ok": true,
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_ce1c8744_t0046",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "ce1c8744",
+    "tile": "sgoh_ce1c8744_t0046"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-20",
+       "ok": false,
+       "what": "文字",
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_d5b3b2a0_t0014",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "d5b3b2a0",
+    "tile": "sgoh_d5b3b2a0_t0014"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-08",
+       "ok": false,
+       "what": "空白",
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_d9cccac1_t0021",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "d9cccac1",
+    "tile": "sgoh_d9cccac1_t0021"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P5-11",
+       "ok": false,
+       "what": "标高三角",
+       "note": "框序号 3"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  },
+  {
+   "unit": "VD-sgoh_e446a10e_t0014",
+   "source": {
+    "project": "sgoh",
+    "drawing_id": "e446a10e",
+    "tile": "sgoh_e446a10e_t0014"
+   },
+   "classes": {
+    "columns": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P4-02",
+       "ok": false,
+       "what": "标高三角",
+       "note": "框序号 2"
+      }
+     ],
+     "confidence": 0.9,
+     "verified_by": [
+      "gpt",
+      "human"
+     ],
+     "note": "接触表逐候选裁决；人工抽验 P1 全部 20 项与判读一致"
+    }
+   }
+  }
+ ]
+}

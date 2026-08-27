@@ -189,3 +189,33 @@ def test_without_offsets_the_check_is_skipped_not_failed():
     s = score_class(truth, {"instances": [{"id": "1"}, {"id": "2"}, {"id": "3"}]})
     assert s.sequence_ok
     assert s.spacing_conflicts == []
+
+
+# --- 裁决式真值的评分：精确率 + 误检分类 -------------------------------
+
+@pytest.mark.unit
+def test_verdict_scoring_gives_precision_and_a_taxonomy():
+    """裁决式真值算的是**精确率**，并给出误检构成。
+
+    实测 120 个候选：yes 71 / no 49 → 精确率 59%，
+    误检里标高三角占 29%、墙 18% —— 后者才是能指导改代码的东西。
+    """
+    truth = _cls({"method": "verdicts", "confidence": 0.9,
+                  "verified_by": ["human"],
+                  "verdicts": [{"ref": "a", "ok": True},
+                               {"ref": "b", "ok": False, "what": "标高三角"},
+                               {"ref": "c", "ok": False, "what": "标高三角"},
+                               {"ref": "d", "ok": False, "what": "墙"}]})
+    s = score_class(truth, {})
+    assert s.precision == pytest.approx(0.25)
+    assert s.matched == 1
+    assert s.taxonomy == {"标高三角": 2, "墙": 1}
+
+
+@pytest.mark.unit
+def test_verdicts_need_no_recognition_input():
+    """裁决已经把识别结果包含在内 —— 不需要再喂一份。"""
+    truth = _cls({"method": "verdicts", "confidence": 0.9,
+                  "verified_by": ["human"],
+                  "verdicts": [{"ref": "a", "ok": True}]})
+    assert score_class(truth, None).precision == 1.0

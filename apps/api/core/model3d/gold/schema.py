@@ -23,7 +23,7 @@ MIN_CONFIDENCE = 0.8
 #: 只有一方给出、且未经人工复核的，不足以当真值。
 HUMAN = "human"
 
-METHODS = ("count", "instances", "text", "fields")
+METHODS = ("count", "instances", "text", "fields", "verdicts")
 
 
 @dataclass(frozen=True)
@@ -51,12 +51,26 @@ class Instance:
 
 
 @dataclass(frozen=True)
+class Verdict:
+    """对**某个既有识别结果**的裁决。
+
+    与 `Instance` 是两种真值形态：`Verdict` 以**识别结果**为单位
+    （能算精确率与误检分类），`Instance` 以**图面实体**为单位（能算召回率）。
+    """
+    ref: str
+    ok: bool
+    what: str = ""
+    note: str = ""
+
+
+@dataclass(frozen=True)
 class ObjectClass:
     """一处范围上、某一类对象的真值。"""
     name: str
     method: str
     count: int | None = None
     instances: tuple = ()
+    verdicts: tuple = ()
     text: str | None = None
     fields: dict = field(default_factory=dict)
     confidence: float = 0.0
@@ -99,6 +113,17 @@ def _instance(raw: dict) -> Instance:
     )
 
 
+def _verdict(name: str, raw: dict) -> Verdict:
+    ok = bool(raw.get("ok"))
+    what = str(raw.get("what") or "").strip()
+    # **判「不是」必须说明是什么**：只说不是，改不了识别器。
+    # 实测正是靠 what 才把「精确率 59%」变成可行动的误检分类清单。
+    if not ok and not what:
+        raise ValueError(f"{name}: 裁决 {raw.get('ref')!r} 判为否却没写 what")
+    return Verdict(ref=str(raw["ref"]), ok=ok, what=what,
+                   note=raw.get("note", ""))
+
+
 def _object_class(name: str, raw: dict) -> ObjectClass:
     method = raw.get("method")
     if method not in METHODS:
@@ -110,11 +135,20 @@ def _object_class(name: str, raw: dict) -> ObjectClass:
         dupes = sorted({i for i in ids if ids.count(i) > 1})
         raise ValueError(f"{name}: 实体身份重复 {dupes} —— 同一分区的同一轴号不应出现两次")
 
+    verdicts = tuple(_verdict(name, v) for v in raw.get("verdicts") or ())
+    refs = [v.ref for v in verdicts]
+    if len(refs) != len(set(refs)):
+        dupes = sorted({r for r in refs if refs.count(r) > 1})
+        raise ValueError(f"{name}: 裁决编号重复 {dupes}")
+
     count = raw.get("count")
+    if method == "verdicts":
+        count = len(verdicts)
     if method == "instances":
         count = len(instances)          # 实体级的计数由实体推出，不另填
     return ObjectClass(
         name=name, method=method, count=count, instances=instances,
+        verdicts=verdicts,
         text=raw.get("text"), fields=dict(raw.get("fields") or {}),
         confidence=float(raw.get("confidence") or 0.0),
         verified_by=tuple(raw.get("verified_by") or ()),

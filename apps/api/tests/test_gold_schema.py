@@ -145,3 +145,44 @@ def test_no_zone_falls_back_to_the_bare_label():
         "method": "instances", "instances": [{"id": "1-A"}],
         "confidence": 1.0, "verified_by": ["human"]}}))
     assert unit.classes["axes"].instances[0].key == "1-A"
+
+
+# --- 第五种真值：对既有识别结果的逐项裁决 -----------------------------
+
+@pytest.mark.unit
+def test_verdicts_carry_a_ruling_per_existing_candidate():
+    """`verdicts` 判的是「这个候选框对不对」，不是「这处有几根柱」。
+
+    两者是不同的真值形态：前者以**识别结果**为单位，能直接算精确率
+    并给出误检分类；后者以**图面区域**为单位，能算召回率。
+    实测 120 个候选的逐项裁决（yes 71 / no 49）此前落在格式之外，
+    因而不受自审、不进统一评分。
+    """
+    unit = parse_unit(_unit(classes={"columns": {
+        "method": "verdicts",
+        "verdicts": [{"ref": "P1-01", "ok": True},
+                     {"ref": "P1-02", "ok": False, "what": "标高三角"}],
+        "confidence": 0.9, "verified_by": ["gpt", "human"]}}))
+    cls = unit.classes["columns"]
+    assert cls.count == 2                     # 裁决数即候选数
+    assert cls.verdicts[1].what == "标高三角"
+
+
+@pytest.mark.unit
+def test_a_negative_verdict_must_say_what_it_actually_is():
+    """判「不是」必须说明是什么 —— 只说不是，改不了识别器。"""
+    with pytest.raises(ValueError, match="what"):
+        parse_unit(_unit(classes={"columns": {
+            "method": "verdicts",
+            "verdicts": [{"ref": "P1-02", "ok": False}],
+            "confidence": 0.9, "verified_by": ["human"]}}))
+
+
+@pytest.mark.unit
+def test_verdict_refs_must_be_unique():
+    with pytest.raises(ValueError, match="重复"):
+        parse_unit(_unit(classes={"columns": {
+            "method": "verdicts",
+            "verdicts": [{"ref": "P1-01", "ok": True},
+                         {"ref": "P1-01", "ok": True}],
+            "confidence": 0.9, "verified_by": ["human"]}}))
