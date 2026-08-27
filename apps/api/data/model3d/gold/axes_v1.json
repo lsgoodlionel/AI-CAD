@@ -519,6 +519,121 @@
      "note": "人工读图标注（Phase I）：轴号注写在轴线端部圆内，一圈一线（GB/T 50001 §8.0.2）；轴距数字作交叉校验"
     }
    }
+  },
+  {
+   "unit": "AX-metro-19424243",
+   "source": {
+    "project": "metro",
+    "drawing_id": "19424243",
+    "title": "首层框架梁平面整体配筋图"
+   },
+   "classes": {
+    "axes": {
+     "method": "instances",
+     "instances": [
+      {
+       "id": "1",
+       "kind": "vertical",
+       "zone": "0"
+      },
+      {
+       "id": "2",
+       "kind": "vertical",
+       "zone": "0"
+      },
+      {
+       "id": "3",
+       "kind": "vertical",
+       "zone": "0"
+      },
+      {
+       "id": "4",
+       "kind": "vertical",
+       "zone": "0"
+      },
+      {
+       "id": "5",
+       "kind": "vertical",
+       "zone": "0"
+      },
+      {
+       "id": "6",
+       "kind": "vertical",
+       "zone": "0"
+      },
+      {
+       "id": "7",
+       "kind": "vertical",
+       "zone": "0"
+      },
+      {
+       "id": "8",
+       "kind": "vertical",
+       "zone": "0"
+      },
+      {
+       "id": "9",
+       "kind": "vertical",
+       "zone": "0"
+      },
+      {
+       "id": "10",
+       "kind": "vertical",
+       "zone": "0"
+      },
+      {
+       "id": "11",
+       "kind": "vertical",
+       "zone": "0"
+      },
+      {
+       "id": "12",
+       "kind": "vertical",
+       "zone": "0"
+      },
+      {
+       "id": "13",
+       "kind": "vertical",
+       "zone": "0"
+      },
+      {
+       "id": "14",
+       "kind": "vertical",
+       "zone": "0"
+      },
+      {
+       "id": "A",
+       "kind": "horizontal",
+       "zone": "3"
+      },
+      {
+       "id": "B",
+       "kind": "horizontal",
+       "zone": "3"
+      },
+      {
+       "id": "C",
+       "kind": "horizontal",
+       "zone": "3"
+      },
+      {
+       "id": "D",
+       "kind": "horizontal",
+       "zone": "3"
+      },
+      {
+       "id": "E",
+       "kind": "horizontal",
+       "zone": "3"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "human"
+     ],
+     "note": "人工读图 + **尺寸链算术闭合**双重确认：数字向 9300×12+7500=119100 与总标注一致（13 间距=14 轴）；字母向 11700+9300+9300+3900=34200 与总标注一致（4 间距=5 轴）。识别结果 22 条中：数字向漏 13、14；字母向漏 E；另有 6 条来自**详图索引符号**误判（§6 索引符号有水平直径线把圆分成上下两半，轴号圈没有）。"
+    }
+   }
   }
  ]
 }
