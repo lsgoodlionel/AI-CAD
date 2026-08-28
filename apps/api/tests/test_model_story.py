@@ -79,7 +79,7 @@ def test_normalize_story_table_keeps_units_independent_and_queues_unclassified()
             "drawing_no": "A-D-001",
             "title": "楼梯节点详图",
             "building_unit_key": "main",
-            "reason": "story_unclassified",
+            "reason": "story_role_excluded",
         }
     ]
     issue = next(item for item in result.issues if item.issue_type == "story_spacing_too_small")

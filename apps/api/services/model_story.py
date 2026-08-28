@@ -6,6 +6,9 @@ import json
 import re
 from typing import Any
 
+from services.drawing_role import (
+    ROLE_COORDINATE_BASE, ROLE_DETAIL, ROLE_NON_GEOMETRIC, classify_role,
+)
 from services.floor_parser import (
     FOUNDATION_FLOOR, HIGH_ROOF_FLOOR, ROOF_FLOOR, parse_floor)
 
@@ -401,6 +404,24 @@ def _trusted_story_band(
     return (min(numeric), max(numeric))
 
 
+# **本就不该有楼层的建模角色** —— 由实测定，不是想当然。
+#
+# 80 张图独立判读：19 张系统指派了楼层，而那张图本就不该有层（确凿 12 张 = 15%）。
+# 哨兵层错 43%，是常规层 20% 的两倍；`order=101` 的唯一一张是「正压系统原理图」。
+# 而 `drawing_role` 其实已经认识其中一部分，只是从未接进楼层归属：
+#
+#     判读说不该有层的 19 张   non_geometric 4 · detail 3 · coordinate_base 1
+#     判读说该有层的   61 张   这三个角色出现 **0 次**
+#
+# 所以按这三个角色拦截，在该样本上删掉 8/19 错误、**误伤为零**。
+# `unknown` **不**列入 —— 判不出不等于不该有层，宁可保留（蓝图 §7 约束 5）。
+NON_FLOOR_ROLES = frozenset({
+    ROLE_NON_GEOMETRIC,   # 说明、通知单、目录、材料表 —— 整页无几何
+    ROLE_DETAIL,          # 节点大样：几何属于构件截面表，不属于某一层
+    ROLE_COORDINATE_BASE, # 轴网定位图：定位用，不贡献楼层构件
+})
+
+
 def normalize_story_table(
     drawings: list[dict[str, Any]],
     annotations: dict[str, dict[str, Any]] | None = None,
@@ -429,7 +450,14 @@ def normalize_story_table(
         if annotation.get("candidate_sources") is not None:
             annotation["candidate_sources"] = _serialize_candidate_sources(annotation["candidate_sources"])
         unit = detect_building_unit(drawing, annotation)
-        story = extract_story_candidate(drawing, annotation, trusted_band=trusted_band)
+        # **角色闸**：本就不该有层的图（说明/节点大样/轴网定位）不进楼层，
+        # 走已有的 unclassified 通道并留下可见的质量问题 —— 不悄悄丢。
+        role_excluded = classify_role(drawing).role in NON_FLOOR_ROLES
+        story = (StoryCandidate(story_key=None, display_name=None, story_order=None,
+                                elevation_m=None, confidence=0.0, source="role_gate")
+                 if role_excluded
+                 else extract_story_candidate(drawing, annotation,
+                                              trusted_band=trusted_band))
 
         building_units.setdefault(
             unit.unit_key,
@@ -477,12 +505,16 @@ def normalize_story_table(
                     "drawing_no": str(drawing.get("drawing_no") or ""),
                     "title": str(drawing.get("title") or ""),
                     "building_unit_key": unit.unit_key,
-                    "reason": "story_unclassified",
+                    "reason": "story_role_excluded" if role_excluded
+                              else "story_unclassified",
                 }
             )
+            if role_excluded:
+                assignment["story_role_excluded"] = True
             issues.append(
                 ModelQualityIssue(
-                    issue_type="story_unclassified",
+                    issue_type="story_role_excluded" if role_excluded
+                               else "story_unclassified",
                     severity="warning",
                     message="图纸未识别出楼层，已进入待人工标注队列",
                     drawing_id=drawing_id,

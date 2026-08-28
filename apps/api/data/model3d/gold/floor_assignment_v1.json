@@ -1,0 +1,463 @@
+{
+ "version": 1,
+ "object_classes": [
+  "floor_assignment"
+ ],
+ "units": [
+  {
+   "unit": "FL-metro",
+   "source": {
+    "project": "metro"
+   },
+   "classes": {
+    "floor_assignment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "RCUJ",
+       "ok": true,
+       "note": "系统指派 order=10"
+      },
+      {
+       "ref": "PWMD",
+       "ok": true,
+       "note": "系统指派 order=8"
+      },
+      {
+       "ref": "VP2R",
+       "ok": true,
+       "note": "系统指派 order=2"
+      },
+      {
+       "ref": "PAKG",
+       "ok": false,
+       "what": "multi_floor",
+       "note": "系统指派 order=9；判读 multi_floor/section；图名一致"
+      },
+      {
+       "ref": "9W43",
+       "ok": true,
+       "note": "系统指派 order=4"
+      },
+      {
+       "ref": "39FV",
+       "ok": true,
+       "note": "系统指派 order=99"
+      },
+      {
+       "ref": "R63C",
+       "ok": true,
+       "note": "系统指派 order=3"
+      },
+      {
+       "ref": "HE7C",
+       "ok": true,
+       "note": "系统指派 order=7"
+      },
+      {
+       "ref": "X6WE",
+       "ok": true,
+       "note": "系统指派 order=-2"
+      },
+      {
+       "ref": "W3VR",
+       "ok": true,
+       "note": "系统指派 order=-3"
+      },
+      {
+       "ref": "9XYV",
+       "ok": true,
+       "note": "系统指派 order=2"
+      },
+      {
+       "ref": "LV42",
+       "ok": false,
+       "what": "multi_floor",
+       "note": "系统指派 order=-3；判读 multi_floor/section；图名一致"
+      },
+      {
+       "ref": "RTTN",
+       "ok": true,
+       "note": "系统指派 order=5"
+      },
+      {
+       "ref": "G494",
+       "ok": true,
+       "note": "系统指派 order=7"
+      },
+      {
+       "ref": "YLR9",
+       "ok": true,
+       "note": "系统指派 order=5"
+      },
+      {
+       "ref": "VGEW",
+       "ok": true,
+       "note": "系统指派 order=6"
+      },
+      {
+       "ref": "7PYQ",
+       "ok": true,
+       "note": "系统指派 order=6"
+      },
+      {
+       "ref": "38GV",
+       "ok": false,
+       "what": "no_floor",
+       "note": "系统指派 order=-4；判读 no_floor/schedule；图名一致"
+      },
+      {
+       "ref": "6MNY",
+       "ok": true,
+       "note": "系统指派 order=4"
+      },
+      {
+       "ref": "KLQ4",
+       "ok": true,
+       "note": "系统指派 order=3"
+      },
+      {
+       "ref": "66JT",
+       "ok": true,
+       "note": "系统指派 order=-3"
+      },
+      {
+       "ref": "339U",
+       "ok": false,
+       "what": "no_floor",
+       "note": "系统指派 order=-1；判读 no_floor/other；图名一致"
+      },
+      {
+       "ref": "6RFX",
+       "ok": false,
+       "what": "no_floor",
+       "note": "系统指派 order=-98；判读 no_floor/text；图名一致"
+      },
+      {
+       "ref": "XW2U",
+       "ok": true,
+       "note": "系统指派 order=-4"
+      },
+      {
+       "ref": "84PD",
+       "ok": true,
+       "note": "系统指派 order=8"
+      },
+      {
+       "ref": "2LYN",
+       "ok": true,
+       "note": "系统指派 order=5"
+      },
+      {
+       "ref": "H7UW",
+       "ok": true,
+       "note": "系统指派 order=-2"
+      },
+      {
+       "ref": "EJK6",
+       "ok": true,
+       "note": "系统指派 order=7"
+      },
+      {
+       "ref": "UJUF",
+       "ok": false,
+       "what": "no_floor",
+       "note": "系统指派 order=-4；判读 no_floor/detail；图名一致"
+      },
+      {
+       "ref": "CD6W",
+       "ok": false,
+       "what": "no_floor",
+       "note": "系统指派 order=101；判读 no_floor/detail；图名一致"
+      },
+      {
+       "ref": "H4QY",
+       "ok": true,
+       "note": "系统指派 order=1"
+      },
+      {
+       "ref": "LKWV",
+       "ok": true,
+       "note": "系统指派 order=-1"
+      },
+      {
+       "ref": "8K28",
+       "ok": false,
+       "what": "no_floor",
+       "note": "系统指派 order=4；判读 no_floor/text；图名一致"
+      },
+      {
+       "ref": "WBLR",
+       "ok": true,
+       "note": "系统指派 order=-1"
+      },
+      {
+       "ref": "FRKA",
+       "ok": true,
+       "note": "系统指派 order=-2"
+      },
+      {
+       "ref": "P6JC",
+       "ok": true,
+       "note": "系统指派 order=3"
+      },
+      {
+       "ref": "AW7K",
+       "ok": true,
+       "note": "系统指派 order=6"
+      },
+      {
+       "ref": "MYV4",
+       "ok": true,
+       "note": "系统指派 order=2"
+      },
+      {
+       "ref": "T8PG",
+       "ok": true,
+       "note": "系统指派 order=8"
+      },
+      {
+       "ref": "NLVG",
+       "ok": true,
+       "note": "系统指派 order=1"
+      },
+      {
+       "ref": "6NJQ",
+       "ok": true,
+       "note": "系统指派 order=99"
+      },
+      {
+       "ref": "2M2U",
+       "ok": true,
+       "note": "系统指派 order=1"
+      },
+      {
+       "ref": "RJL6",
+       "ok": true,
+       "note": "系统指派 order=99"
+      },
+      {
+       "ref": "YTBV",
+       "ok": true,
+       "note": "系统指派 order=9"
+      },
+      {
+       "ref": "6P2Q",
+       "ok": true,
+       "note": "系统指派 order=9"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "整图缩略判「这张图该不该只属于一个楼层」。系统给 80 张每一张都指派了恰好一层，故任何 multi_floor/no_floor 判读直接是系统错误。**图名与判读一致认定的确凿错误 12 张 = 15%**；另 7 张缩略图判 detail 而图名写着平面图，未决。哨兵层错 43%，是常规层 20% 的两倍。问法特意避开读图名——字符转写是已知不可靠的能力边界。"
+    }
+   }
+  },
+  {
+   "unit": "FL-sgoh",
+   "source": {
+    "project": "sgoh"
+   },
+   "classes": {
+    "floor_assignment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "FCJ3",
+       "ok": true,
+       "note": "系统指派 order=-2"
+      },
+      {
+       "ref": "99XT",
+       "ok": true,
+       "note": "系统指派 order=2"
+      },
+      {
+       "ref": "7K4B",
+       "ok": true,
+       "note": "系统指派 order=-98"
+      },
+      {
+       "ref": "W423",
+       "ok": true,
+       "note": "系统指派 order=1"
+      },
+      {
+       "ref": "P9FP",
+       "ok": true,
+       "note": "系统指派 order=-1"
+      },
+      {
+       "ref": "MWD4",
+       "ok": false,
+       "what": "no_floor",
+       "note": "系统指派 order=99；判读 no_floor/schematic；**图名写着平面图，未决**"
+      },
+      {
+       "ref": "P9BF",
+       "ok": false,
+       "what": "no_floor",
+       "note": "系统指派 order=5；判读 no_floor/schedule；图名一致"
+      },
+      {
+       "ref": "LF3E",
+       "ok": true,
+       "note": "系统指派 order=4"
+      },
+      {
+       "ref": "9GNL",
+       "ok": true,
+       "note": "系统指派 order=1"
+      },
+      {
+       "ref": "3T8B",
+       "ok": false,
+       "what": "no_floor",
+       "note": "系统指派 order=99；判读 no_floor/detail；图名一致"
+      },
+      {
+       "ref": "K23T",
+       "ok": true,
+       "note": "系统指派 order=-1"
+      },
+      {
+       "ref": "96HL",
+       "ok": true,
+       "note": "系统指派 order=3"
+      },
+      {
+       "ref": "6NQM",
+       "ok": true,
+       "note": "系统指派 order=3"
+      },
+      {
+       "ref": "2TYF",
+       "ok": false,
+       "what": "no_floor",
+       "note": "系统指派 order=100；判读 no_floor/detail；图名一致"
+      },
+      {
+       "ref": "84T7",
+       "ok": true,
+       "note": "系统指派 order=6"
+      },
+      {
+       "ref": "E7KY",
+       "ok": true,
+       "note": "系统指派 order=6"
+      },
+      {
+       "ref": "G37Q",
+       "ok": true,
+       "note": "系统指派 order=2"
+      },
+      {
+       "ref": "BV46",
+       "ok": false,
+       "what": "no_floor",
+       "note": "系统指派 order=-3；判读 no_floor/detail；**图名写着平面图，未决**"
+      },
+      {
+       "ref": "KJD4",
+       "ok": false,
+       "what": "no_floor",
+       "note": "系统指派 order=-3；判读 no_floor/detail；图名一致"
+      },
+      {
+       "ref": "M7BM",
+       "ok": true,
+       "note": "系统指派 order=4"
+      },
+      {
+       "ref": "F7MQ",
+       "ok": false,
+       "what": "multi_floor",
+       "note": "系统指派 order=1；判读 multi_floor/detail；**图名写着平面图，未决**"
+      },
+      {
+       "ref": "FD3P",
+       "ok": false,
+       "what": "no_floor",
+       "note": "系统指派 order=-3；判读 no_floor/schematic；**图名写着平面图，未决**"
+      },
+      {
+       "ref": "D4D3",
+       "ok": true,
+       "note": "系统指派 order=5"
+      },
+      {
+       "ref": "U46Q",
+       "ok": true,
+       "note": "系统指派 order=99"
+      },
+      {
+       "ref": "BRNY",
+       "ok": true,
+       "note": "系统指派 order=100"
+      },
+      {
+       "ref": "JMQB",
+       "ok": true,
+       "note": "系统指派 order=-2"
+      },
+      {
+       "ref": "6LCE",
+       "ok": true,
+       "note": "系统指派 order=4"
+      },
+      {
+       "ref": "JTMN",
+       "ok": true,
+       "note": "系统指派 order=2"
+      },
+      {
+       "ref": "CKYK",
+       "ok": false,
+       "what": "no_floor",
+       "note": "系统指派 order=6；判读 no_floor/detail；**图名写着平面图，未决**"
+      },
+      {
+       "ref": "KMFK",
+       "ok": true,
+       "note": "系统指派 order=-98"
+      },
+      {
+       "ref": "HA9D",
+       "ok": false,
+       "what": "no_floor",
+       "note": "系统指派 order=100；判读 no_floor/detail；**图名写着平面图，未决**"
+      },
+      {
+       "ref": "U872",
+       "ok": false,
+       "what": "no_floor",
+       "note": "系统指派 order=-1；判读 no_floor/detail；**图名写着平面图，未决**"
+      },
+      {
+       "ref": "QH2D",
+       "ok": true,
+       "note": "系统指派 order=5"
+      },
+      {
+       "ref": "2B6N",
+       "ok": true,
+       "note": "系统指派 order=3"
+      },
+      {
+       "ref": "WY9P",
+       "ok": true,
+       "note": "系统指派 order=-98"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "整图缩略判「这张图该不该只属于一个楼层」。系统给 80 张每一张都指派了恰好一层，故任何 multi_floor/no_floor 判读直接是系统错误。**图名与判读一致认定的确凿错误 12 张 = 15%**；另 7 张缩略图判 detail 而图名写着平面图，未决。哨兵层错 43%，是常规层 20% 的两倍。问法特意避开读图名——字符转写是已知不可靠的能力边界。"
+    }
+   }
+  }
+ ]
+}
