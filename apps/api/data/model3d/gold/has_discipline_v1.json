@@ -1,0 +1,519 @@
+{
+ "version": 1,
+ "object_classes": [
+  "has_discipline"
+ ],
+ "units": [
+  {
+   "unit": "ND-metro",
+   "source": {
+    "project": "metro"
+   },
+   "classes": {
+    "has_discipline": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "C4EP",
+       "ok": true,
+       "note": "系统指派 general；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "YMFF",
+       "ok": true,
+       "note": "系统指派 structure；第二版判 structure；第一版判 structure（两版一致）"
+      },
+      {
+       "ref": "WAV3",
+       "ok": true,
+       "note": "系统指派 decoration；第二版判 architecture；第一版判 structure"
+      },
+      {
+       "ref": "CCYV",
+       "ok": true,
+       "note": "系统指派 decoration；第二版判 architecture；第一版判 detail"
+      },
+      {
+       "ref": "3LVW",
+       "ok": true,
+       "note": "系统指派 structure；第二版判 structure；第一版判 structure（两版一致）"
+      },
+      {
+       "ref": "U4YA",
+       "ok": true,
+       "note": "系统指派 architecture；第二版判 architecture；第一版判 detail"
+      },
+      {
+       "ref": "AWMP",
+       "ok": true,
+       "note": "系统指派 architecture；第二版判 structure；第一版判 not_drawing"
+      },
+      {
+       "ref": "PAUH",
+       "ok": true,
+       "note": "系统指派 general；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "A949",
+       "ok": true,
+       "note": "系统指派 structure；第二版判 structure；第一版判 detail"
+      },
+      {
+       "ref": "CKA9",
+       "ok": true,
+       "note": "系统指派 general；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "KCL9",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 architecture；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      },
+      {
+       "ref": "4FLL",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 decoration；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      },
+      {
+       "ref": "EJNK",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 structure；第二版判 not_drawing；第一版判 detail"
+      },
+      {
+       "ref": "JEYH",
+       "ok": true,
+       "note": "系统指派 structure；第二版判 structure；第一版判 detail"
+      },
+      {
+       "ref": "HJ4E",
+       "ok": true,
+       "note": "系统指派 architecture；第二版判 decoration；第一版判 structure"
+      },
+      {
+       "ref": "XW34",
+       "ok": true,
+       "note": "系统指派 structure；第二版判 structure；第一版判 structure（两版一致）"
+      },
+      {
+       "ref": "CCPL",
+       "ok": true,
+       "note": "系统指派 general；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "YLMU",
+       "ok": true,
+       "note": "系统指派 decoration；第二版判 structure；第一版判 architecture"
+      },
+      {
+       "ref": "CFUR",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 mep；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      },
+      {
+       "ref": "JCE4",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 decoration；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      },
+      {
+       "ref": "HHNU",
+       "ok": true,
+       "note": "系统指派 architecture；第二版判 structure；第一版判 structure（两版一致）"
+      },
+      {
+       "ref": "ELEM",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 mep；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      },
+      {
+       "ref": "3XCW",
+       "ok": true,
+       "note": "系统指派 mep；第二版判 structure；第一版判 structure（两版一致）"
+      },
+      {
+       "ref": "MXWU",
+       "ok": true,
+       "note": "系统指派 mep；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "VHRF",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 architecture；第二版判 not_drawing；第一版判 structure"
+      },
+      {
+       "ref": "JU9N",
+       "ok": true,
+       "note": "系统指派 decoration；第二版判 structure；第一版判 detail"
+      },
+      {
+       "ref": "KVH9",
+       "ok": true,
+       "note": "系统指派 general；第二版判 architecture；第一版判 landscape"
+      },
+      {
+       "ref": "4PMC",
+       "ok": true,
+       "note": "系统指派 structure；第二版判 architecture；第一版判 structure"
+      },
+      {
+       "ref": "EULC",
+       "ok": true,
+       "note": "系统指派 general；第二版判 landscape；第一版判 not_drawing"
+      },
+      {
+       "ref": "RNLX",
+       "ok": true,
+       "note": "系统指派 mep；第二版判 mep；第一版判 structure"
+      },
+      {
+       "ref": "JEKV",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 decoration；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      },
+      {
+       "ref": "XLKN",
+       "ok": true,
+       "note": "系统指派 general；第二版判 architecture；第一版判 landscape"
+      },
+      {
+       "ref": "CYLR",
+       "ok": true,
+       "note": "系统指派 mep；第二版判 mep；第一版判 architecture"
+      },
+      {
+       "ref": "YKVC",
+       "ok": true,
+       "note": "系统指派 structure；第二版判 structure；第一版判 structure（两版一致）"
+      },
+      {
+       "ref": "UF3Y",
+       "ok": true,
+       "note": "系统指派 general；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "YNCF",
+       "ok": true,
+       "note": "系统指派 architecture；第二版判 mep；第一版判 detail"
+      },
+      {
+       "ref": "HRKF",
+       "ok": true,
+       "note": "系统指派 architecture；第二版判 structure；第一版判 structure（两版一致）"
+      },
+      {
+       "ref": "YFXW",
+       "ok": true,
+       "note": "系统指派 decoration；第二版判 decoration；第一版判 detail"
+      },
+      {
+       "ref": "3JAL",
+       "ok": true,
+       "note": "系统指派 structure；第二版判 structure；第一版判 structure（两版一致）"
+      },
+      {
+       "ref": "FJLY",
+       "ok": true,
+       "note": "系统指派 decoration；第二版判 decoration；第一版判 decoration（两版一致）"
+      },
+      {
+       "ref": "EKKR",
+       "ok": true,
+       "note": "系统指派 general；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "KC3X",
+       "ok": true,
+       "note": "系统指派 mep；第二版判 structure；第一版判 architecture"
+      },
+      {
+       "ref": "UU9L",
+       "ok": true,
+       "note": "系统指派 mep；第二版判 structure；第一版判 architecture"
+      },
+      {
+       "ref": "9EXR",
+       "ok": true,
+       "note": "系统指派 architecture；第二版判 structure；第一版判 structure（两版一致）"
+      },
+      {
+       "ref": "V9UP",
+       "ok": true,
+       "note": "系统指派 mep；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "NA4X",
+       "ok": true,
+       "note": "系统指派 general；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "NEWN",
+       "ok": true,
+       "note": "系统指派 mep；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "4ML4",
+       "ok": true,
+       "note": "系统指派 architecture；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "HXEW",
+       "ok": true,
+       "note": "系统指派 decoration；第二版判 architecture；第一版判 detail"
+      },
+      {
+       "ref": "WFMP",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 structure；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "criteria": "CRITERIA.md#discipline",
+     "note": "**只记「这张图有没有专业」，不记「是哪个专业」。** 专业本身两次实测都不够格：整图缩略 21%、局部高倍 27%，而同一批图两次独立判读的**重测信度只有 74%** —— 判读者自己都不稳定到能给专业定标。但 `not_drawing` 这一档是稳的：两次独立渲染的交集 19/23，且 **22/23 = 96% 能被图名证实**（目录/说明/通知单/清单/表/封面/图例/材料）。系统给每一张图都指派了一个专业，而其中约四分之一根本没有专业可言。受控对比另有一条：同样 90 张图、同样问题与判据，只把 DPI 44 整图缩略换成 DPI 130 局部裁剪，**机电召回从 1/20 = 5% 升到 5/20 = 25%** —— 渲染分辨率要匹配问题所在的尺度。"
+    }
+   }
+  },
+  {
+   "unit": "ND-sgoh",
+   "source": {
+    "project": "sgoh"
+   },
+   "classes": {
+    "has_discipline": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "PAVM",
+       "ok": true,
+       "note": "系统指派 architecture；第二版判 structure；第一版判 structure（两版一致）"
+      },
+      {
+       "ref": "YKRJ",
+       "ok": true,
+       "note": "系统指派 architecture；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "EARN",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 general；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      },
+      {
+       "ref": "NKPM",
+       "ok": true,
+       "note": "系统指派 architecture；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "JU33",
+       "ok": true,
+       "note": "系统指派 architecture；第二版判 structure；第一版判 structure（两版一致）"
+      },
+      {
+       "ref": "UMMF",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 structure；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      },
+      {
+       "ref": "AMJM",
+       "ok": true,
+       "note": "系统指派 structure；第二版判 structure；第一版判 detail"
+      },
+      {
+       "ref": "9UUH",
+       "ok": true,
+       "note": "系统指派 architecture；第二版判 architecture；第一版判 detail"
+      },
+      {
+       "ref": "WK4N",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 general；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      },
+      {
+       "ref": "JRN4",
+       "ok": true,
+       "note": "系统指派 architecture；第二版判 structure；第一版判 detail"
+      },
+      {
+       "ref": "EM9U",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 architecture；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      },
+      {
+       "ref": "RYLV",
+       "ok": true,
+       "note": "系统指派 mep；第二版判 mep；第一版判 mep（两版一致）"
+      },
+      {
+       "ref": "REXN",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 structure；第二版判 not_drawing；第一版判 mep"
+      },
+      {
+       "ref": "4UHP",
+       "ok": true,
+       "note": "系统指派 structure；第二版判 landscape；第一版判 architecture"
+      },
+      {
+       "ref": "3PKH",
+       "ok": true,
+       "note": "系统指派 architecture；第二版判 structure；第一版判 detail"
+      },
+      {
+       "ref": "PRJY",
+       "ok": true,
+       "note": "系统指派 general；第二版判 architecture；第一版判 detail"
+      },
+      {
+       "ref": "CER3",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 general；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      },
+      {
+       "ref": "NHEU",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 general；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      },
+      {
+       "ref": "KJVE",
+       "ok": true,
+       "note": "系统指派 mep；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "3PNX",
+       "ok": true,
+       "note": "系统指派 structure；第二版判 structure；第一版判 structure（两版一致）"
+      },
+      {
+       "ref": "KHCM",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 architecture；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      },
+      {
+       "ref": "HEWU",
+       "ok": true,
+       "note": "系统指派 architecture；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "XEKE",
+       "ok": true,
+       "note": "系统指派 mep；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "N3AU",
+       "ok": true,
+       "note": "系统指派 mep；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "X4WF",
+       "ok": true,
+       "note": "系统指派 structure；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "K3NK",
+       "ok": true,
+       "note": "系统指派 mep；第二版判 mep；第一版判 structure"
+      },
+      {
+       "ref": "XLCM",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 structure；第二版判 not_drawing；第一版判 structure"
+      },
+      {
+       "ref": "NELY",
+       "ok": true,
+       "note": "系统指派 mep；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "PRUE",
+       "ok": true,
+       "note": "系统指派 mep；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "WRAX",
+       "ok": true,
+       "note": "系统指派 structure；第二版判 landscape；第一版判 architecture"
+      },
+      {
+       "ref": "UAMN",
+       "ok": true,
+       "note": "系统指派 structure；第二版判 structure；第一版判 structure（两版一致）"
+      },
+      {
+       "ref": "YCE4",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 general；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      },
+      {
+       "ref": "JUU3",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 general；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      },
+      {
+       "ref": "YE3V",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 general；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      },
+      {
+       "ref": "M4WC",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 general；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      },
+      {
+       "ref": "HNVK",
+       "ok": true,
+       "note": "系统指派 mep；第二版判 architecture；第一版判 architecture（两版一致）"
+      },
+      {
+       "ref": "JPPA",
+       "ok": true,
+       "note": "系统指派 mep；第二版判 mep；第一版判 structure"
+      },
+      {
+       "ref": "3KUE",
+       "ok": false,
+       "what": "no_discipline",
+       "note": "系统指派 general；第二版判 not_drawing；第一版判 not_drawing（两版一致）"
+      },
+      {
+       "ref": "PJPH",
+       "ok": true,
+       "note": "系统指派 structure；第二版判 structure；第一版判 structure（两版一致）"
+      },
+      {
+       "ref": "YJRU",
+       "ok": true,
+       "note": "系统指派 mep；第二版判 landscape；第一版判 architecture"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "criteria": "CRITERIA.md#discipline",
+     "note": "**只记「这张图有没有专业」，不记「是哪个专业」。** 专业本身两次实测都不够格：整图缩略 21%、局部高倍 27%，而同一批图两次独立判读的**重测信度只有 74%** —— 判读者自己都不稳定到能给专业定标。但 `not_drawing` 这一档是稳的：两次独立渲染的交集 19/23，且 **22/23 = 96% 能被图名证实**（目录/说明/通知单/清单/表/封面/图例/材料）。系统给每一张图都指派了一个专业，而其中约四分之一根本没有专业可言。受控对比另有一条：同样 90 张图、同样问题与判据，只把 DPI 44 整图缩略换成 DPI 130 局部裁剪，**机电召回从 1/20 = 5% 升到 5/20 = 25%** —— 渲染分辨率要匹配问题所在的尺度。"
+    }
+   }
+  }
+ ]
+}

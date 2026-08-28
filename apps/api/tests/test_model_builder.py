@@ -378,7 +378,10 @@ async def test_missing_file_key_skips_render(fake_db, monkeypatch):
     scene, assets = await build_scene(fake_db, PROJECT_ID)
 
     assert assets[DRAWING_1] == {"image_key": "", "width": 0, "height": 0, "parser": "none"}
-    assert scene["floors"][0]["key"] == "UNZONED"
+    # `总说明` 归不了层 → 不生成楼层（不再造出全零的幻影层），
+    # 但照实进待人工标注队列。
+    assert scene["floors"] == []
+    assert [item["drawing_id"] for item in scene["annotation_queue"]] == [DRAWING_1]
 
 
 # ── IFC 缺依赖降级 ───────────────────────────────────────────

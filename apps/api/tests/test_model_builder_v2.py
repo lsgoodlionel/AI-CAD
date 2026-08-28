@@ -124,7 +124,10 @@ async def test_scene_v2_buildings_and_elements(fake_db, monkeypatch):
     _arrange(fake_db, [
         _drawing(D_SOUTH, "S-1", "南区（大、中歌剧厅）一层墙柱结构平面图"),
         _drawing(D_NORTH, "S-2", "北区（小歌剧厅）一层墙柱结构平面图"),
-        _drawing(D_MAIN, "S-3", "一层通用节点图"),
+        # 第三个单体用一张**能归层**的平面图：本例考的是多单体分组，
+        # 不该再借角色闸排除的图来凑数（那条路径由
+        # `test_未分类图纸不再造出空幻影层` 单独覆盖）。
+        _drawing(D_MAIN, "S-3", "一层墙柱结构平面图"),
     ], [_issue(D_SOUTH)])
 
     # Act
@@ -140,17 +143,11 @@ async def test_scene_v2_buildings_and_elements(fake_db, monkeypatch):
     floor = south["floors"][0]
     assert ELEMENT_KINDS <= set(floor["elements"])
     assert floor["element_stats"]["columns"] == 1
-    # 拍平 floors 兼容层也带 elements。
-    # **不按下标断言**：`一层通用节点图` 现在被角色闸挡在楼层之外
-    # （节点大样的几何属于构件截面表，不属于某一层），于是 floors 的
-    # 首位换成了未分类层。测试要的是「兼容层带 elements」，不是某个下标。
+    # 拍平 floors 兼容层也带 elements。**不按下标断言**：楼层顺序由 order
+    # 决定，测试要的是「兼容层带 elements」，不是某个下标。
     assert any(f["element_stats"]["walls"] == 1 for f in scene["floors"])
     # 统计
-    # `一层通用节点图` 被角色闸挡在楼层之外后落进「未分层」桶，
-    # 于是多出一个全零的空层，reconstruction 随之降级为 mixed。
-    # 那个空层是**所有未分类图纸的既有行为**（实测第二工程场景本就有
-    # 一个 order=0 挂 0 张图的空层），留作独立待办。
-    assert scene["stats"]["reconstruction"] == "mixed"
+    assert scene["stats"]["reconstruction"] == "elements"
     assert scene["stats"]["elements_total"]["columns"] >= 1
     assert scene["stats"]["buildings"] == 3
 
@@ -311,3 +308,68 @@ def test_apply_real_elevations_sign_constraint():
     by_key = {f["key"]: f["elevation_m"] for f in floors}
     assert by_key["B2"] == pytest.approx(0.0)   # 地下层允许 ±0.000（顶板）
     assert by_key["F1"] is None or by_key["F1"] >= -0.5
+
+
+# ── 未分类图纸不造幻影层 ─────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_未分类图纸不再造出空幻影层(fake_db, monkeypatch):
+    """未分类图纸只进待人工标注队列，不生成 `element_stats` 全零的楼层。
+
+    实测第二工程：`UNZONED` 层挂 946 张图、构件 0 个，在三维里是一个
+    什么都没有的空层，还把 `stats.reconstruction` 从 elements 拖成 mixed。
+    """
+    monkeypatch.setattr(model_builder, "_render_and_upload_sync", _fake_render)
+    monkeypatch.setattr(
+        model_elements, "build_floor_elements", _fake_build_floor_elements
+    )
+    _arrange(fake_db, [
+        _drawing(D_SOUTH, "S-1", "南区（大、中歌剧厅）一层墙柱结构平面图"),
+        _drawing(D_MAIN, "S-3", "一层通用节点图"),  # 角色闸排除 → 未分层
+    ], [])
+
+    scene, _ = await build_scene(fake_db, PROJECT_ID)
+
+    assert "UNZONED" not in {f["key"] for f in scene["floors"]}
+    assert all(f["key"] != "UNZONED"
+               for b in scene["buildings"] for f in b["floors"])
+    assert scene["stats"]["reconstruction"] == "elements"
+    # 图纸没有凭空消失：仍照实进待人工标注队列与统计
+    assert D_MAIN in {item["drawing_id"] for item in scene["annotation_queue"]}
+    assert scene["stats"]["unclassified_drawings"] == 1
+
+
+@pytest.mark.asyncio
+async def test_全部未分类时场景没有楼层且不报错(fake_db, monkeypatch):
+    """极端边界：一张能归层的图都没有 → floors 为空，降级到 texture，不抛异常。"""
+    monkeypatch.setattr(model_builder, "_render_and_upload_sync", _fake_render)
+    monkeypatch.setattr(
+        model_elements, "build_floor_elements", _fake_build_floor_elements
+    )
+    _arrange(fake_db, [_drawing(D_MAIN, "S-3", "一层通用节点图")], [])
+
+    scene, _ = await build_scene(fake_db, PROJECT_ID)
+
+    assert scene["floors"] == []
+    assert scene["stats"]["floors"] == 0
+    assert scene["stats"]["reconstruction"] == "texture"
+
+
+@pytest.mark.unit
+def test_build_floors_不生成未分层但_floor_of_仍覆盖每张图():
+    """不生成楼层，但 `floor_of` 必须仍覆盖每张图 ——
+    下游 `floor_of[drawing_id]` 是无条件取值，漏一张就 KeyError。"""
+    import services.model_story as model_story
+
+    drawings = [
+        {"id": "d1", "drawing_no": "", "title": "正压系统原理图（三）",
+         "discipline": "structure"},
+        {"id": "d2", "drawing_no": "", "title": "三层结构平面图",
+         "discipline": "structure"},
+    ]
+    normalization = model_story.normalize_story_table(drawings)
+
+    floors, floor_of = model_builder._build_floors(drawings, {}, {}, normalization)
+
+    assert [f["key"] for f in floors] == ["F3"]
+    assert floor_of == {"d1": "UNZONED", "d2": "F3"}

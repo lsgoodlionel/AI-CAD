@@ -40,3 +40,34 @@ def test_同一个种子给出同一批编号():
 
 def test_不同种子给出不同批编号():
     assert make_codes(50, seed=7) != make_codes(50, seed=8)
+
+
+def test_生成的编号校验位都对():
+    from core.model3d.gold.batch_codes import is_valid_code
+    assert all(is_valid_code(c) for c in make_codes(100, seed=3))
+
+
+def test_单字符转写错误能被检出():
+    """剔除清单追不上：成对剔除之后又撞见 9→G、F→M 两对新的。
+    校验位靠算，不靠猜。"""
+    from core.model3d.gold.batch_codes import CODE_ALPHABET, is_valid_code
+    code = make_codes(1, seed=5)[0]
+    bad = 0
+    for i in range(4):
+        for c in CODE_ALPHABET:
+            if c != code[i] and not is_valid_code(code[:i] + c + code[i+1:]):
+                bad += 1
+    assert bad == 4 * (len(CODE_ALPHABET) - 1)   # 每一处单字符改动都被检出
+
+
+def test_已发出集合内的转写错误能自动纠正():
+    from core.model3d.gold.batch_codes import CODE_ALPHABET, repair_code
+    issued = set(make_codes(80, seed=11))
+    code = sorted(issued)[0]
+    wrong = code[:1] + next(c for c in CODE_ALPHABET if c != code[1]) + code[2:]
+    assert repair_code(wrong, issued) == code
+
+
+def test_无法唯一确定时不猜():
+    from core.model3d.gold.batch_codes import repair_code
+    assert repair_code("XX", set()) is None

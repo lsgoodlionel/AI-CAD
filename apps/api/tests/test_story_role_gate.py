@@ -17,6 +17,7 @@ from services.drawing_role import (
     ROLE_COMPONENT_SOURCE, ROLE_COORDINATE_BASE, ROLE_DETAIL,
     ROLE_FLOOR_SKELETON, ROLE_NON_GEOMETRIC, ROLE_UNKNOWN,
 )
+from services.floor_parser import UNZONED_FLOOR
 from services.model_story import NON_FLOOR_ROLES, normalize_story_table
 
 
@@ -75,15 +76,16 @@ def test_拦截原因写进质量问题里可见():
     assert any(i.issue_type == "story_role_excluded" for i in r.issues)
 
 
-def test_被排除的图仍会落进未分层_这是既有行为():
-    """被排除的图落进「未分层」桶，于是场景里出现一个全零的空层。
+def test_被排除的图仍落在未分层桶里_但不再造出楼层():
+    """归属层照记（图不能凭空消失），**楼层层面则不再生成**。
 
-    **这是所有未分类图纸的既有行为**，不是角色闸引入的 ——
-    实测第二工程场景本来就有一个 `order=0` 且挂 0 张图的空层。
-    在 builder 侧跳过它会让下游按 `floor_of[drawing_id]` 取值 KeyError，
-    波及面超出本次改动，故留作独立待办，不在这里顺手改。
+    未分层是个记账桶，不是楼层：`normalize_story_table` 仍把被排除的图记在
+    `UNZONED` 下，供 `floor_of` / 待人工标注队列使用；而 `_build_floors` 不再
+    为它产出楼层 —— 实测第二工程该层挂 946 张图、构件 0 个，在三维里就是一个
+    全零的空层，还把 `stats.reconstruction` 从 elements 拖成 mixed。
+    builder 侧的行为由 `tests/test_model_builder_v2.py` 覆盖。
     """
     r = normalize_story_table([_drawing("d1", "正压系统原理图（三）")])
     a = r.drawing_assignments["d1"]
     assert a["story_role_excluded"] is True
-    assert a["story_key"]          # 仍落在未分层桶里，没有凭空消失
+    assert a["story_key"] == UNZONED_FLOOR[0]   # 仍落在未分层桶里，没有凭空消失
