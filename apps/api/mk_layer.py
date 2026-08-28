@@ -11,6 +11,7 @@ import asyncio, collections, json, os, random, string
 import databases as databases_lib, fitz
 from PIL import Image, ImageDraw, ImageFont
 from core.config import settings
+from core.model3d.gold.batch_codes import make_codes
 from core.model3d.element_recognizer import recognize
 from core.model3d.geometry_extractor import extract_pdf_geometry
 from core.model3d.layer_conventions import classify_by_layer, is_annotation_layer
@@ -22,12 +23,6 @@ CTX_RATIO, MIN_HALF_PT = 12.0, 60.0  # 上下文 = 图元自身尺寸 ×12，下
 OUT, DPI = "/tmp/gpt_layer", 200
 PROJECTS = ("77777777-7777-7777-7777-777777777777",
             "88888888-8888-8888-8888-888888888888")
-# **编号字母表剔除 I O 0 1 S 5**：判读者把 `YIWX` 转写成 `Y1WX`、
-# `L96T` 转写成 `L967T` —— 视觉判断可靠、字符转写不可靠（早已记录的能力边界）。
-# 这与 GB/T 50001 §8.0.4「轴号不得用 I、O、Z」是同一条道理：
-# 易混字符不该进标识符。
-_CODE_ALPHABET = "".join(c for c in string.ascii_uppercase + string.digits
-                         if c not in "IO01S5Z")
 
 random.seed(20260906)
 os.makedirs(OUT, exist_ok=True)

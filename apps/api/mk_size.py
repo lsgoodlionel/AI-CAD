@@ -19,6 +19,7 @@ import asyncio, collections, json, os, random, string
 import databases as databases_lib, fitz
 from PIL import Image, ImageDraw, ImageFont
 from core.config import settings
+from core.model3d.gold.batch_codes import make_codes
 from core.model3d.element_recognizer import recognize
 from core.model3d.geometry_extractor import extract_pdf_geometry
 from core.model3d.yolo_export import meters_to_page
@@ -29,8 +30,6 @@ OUT, DPI = "/tmp/gpt_size", 200
 CTX_RATIO, MIN_HALF_PT = 6.0, 40.0
 PROJECTS = {"metro": "77777777-7777-7777-7777-777777777777",
             "sgoh": "9188e163-c684-415e-a4ec-08f208273eff"}
-_CODE_ALPHABET = "".join(c for c in string.ascii_uppercase + string.digits
-                         if c not in "IO01S5Z")
 random.seed(20260909)
 os.makedirs(OUT, exist_ok=True)
 

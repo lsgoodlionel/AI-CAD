@@ -17,6 +17,7 @@ import asyncio, collections, json, os, random, string
 import databases as databases_lib, fitz
 from PIL import Image, ImageDraw, ImageFont
 from core.config import settings
+from core.model3d.gold.batch_codes import make_codes
 from core.storage import get_file_bytes
 
 PER_FLOOR = 3
@@ -25,8 +26,6 @@ PROJECTS = {"metro": "77777777-7777-7777-7777-777777777777",
             "sgoh": "9188e163-c684-415e-a4ec-08f208273eff"}
 # 易混字符不进标识符 —— 与 GB/T 50001 §8.0.4「轴号不得用 I、O、Z」同理。
 # 实测判读把 YIWX 转写成 Y1WX、L96T 转写成 L967T。
-_CODE_ALPHABET = "".join(c for c in string.ascii_uppercase + string.digits
-                         if c not in "IO01S5Z")
 random.seed(20260911)
 os.makedirs(OUT, exist_ok=True)
 
