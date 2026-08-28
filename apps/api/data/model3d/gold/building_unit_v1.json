@@ -1,0 +1,494 @@
+{
+ "version": 1,
+ "object_classes": [
+  "building_unit"
+ ],
+ "units": [
+  {
+   "unit": "BU-metro",
+   "source": {
+    "project": "metro"
+   },
+   "classes": {
+    "building_unit": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "QV4J",
+       "ok": true,
+       "note": "系统指派 unit=main；判读 whole_site"
+      },
+      {
+       "ref": "XBLL",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial（判读原词 `multi_floor` 来自上一批分类，已归并）"
+      },
+      {
+       "ref": "KBTR",
+       "ok": false,
+       "what": "partial",
+       "note": "系统指派 unit=main；判读 partial"
+      },
+      {
+       "ref": "2BAE",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "DR26",
+       "ok": true,
+       "note": "系统指派 unit=main；判读 one_building"
+      },
+      {
+       "ref": "WHET",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial（判读原词 `no_floor` 来自上一批分类，已归并）"
+      },
+      {
+       "ref": "FCKM",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "MXKR",
+       "ok": true,
+       "note": "系统指派 unit=main；判读 one_building"
+      },
+      {
+       "ref": "Y8V6",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial（判读原词 `multi_floor` 来自上一批分类，已归并）"
+      },
+      {
+       "ref": "RQJB",
+       "ok": true,
+       "note": "系统指派 unit=main；判读 one_building"
+      },
+      {
+       "ref": "WENP",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "BQMW",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "GXUQ",
+       "ok": true,
+       "note": "系统指派 unit=main；判读 one_building"
+      },
+      {
+       "ref": "QFDX",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial（判读原词 `multi_floor` 来自上一批分类，已归并）"
+      },
+      {
+       "ref": "RRXY",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "UMU9",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial（判读原词 `multi_floor` 来自上一批分类，已归并）"
+      },
+      {
+       "ref": "MQVJ",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "CPYV",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "DJPR",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial（判读原词 `multi_floor` 来自上一批分类，已归并）"
+      },
+      {
+       "ref": "QWJV",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial（判读原词 `multi_floor` 来自上一批分类，已归并）"
+      },
+      {
+       "ref": "KEAH",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial（判读原词 `multi_floor` 来自上一批分类，已归并）"
+      },
+      {
+       "ref": "TUT6",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "8GUB",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "KNBL",
+       "ok": true,
+       "note": "系统指派 unit=main；判读 one_building"
+      },
+      {
+       "ref": "KTDF",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "HKYL",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "整图缩略判「这张图画的是工程的哪一部分」。系统给每张图都指派了一个单体，故 `not_spatial`（无空间范围）与 `partial`（只画一部分）都是无意义的归属。**50/80 = 62% 的图被指派了单体，却根本没有空间范围或只是局部**。metro 侧 26 张全判 `main`，而判读里 19 张是 `not_spatial` —— 「全是 main」不是因为只有一个单体，是因为多数图本就不该有单体。**判读用了上一批（楼层批）的分类词 10 格**（multi_floor 9 · no_floor 1），不在本批清单里，按语义归入 not_spatial 并在此如实记录 —— 跨批次污染的证据。现成的 `NON_FLOOR_ROLES` 闸（上一轮为楼层归属做的）**能删 31/50 张错的、只误伤 1/30 张对的**；未在本轮接线，因 `detect_building_unit` 所在文件正被另一任务修改。"
+    }
+   }
+  },
+  {
+   "unit": "BU-sgoh",
+   "source": {
+    "project": "sgoh"
+   },
+   "classes": {
+    "building_unit": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "6NJJ",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "W4WR",
+       "ok": true,
+       "note": "系统指派 unit=main；判读 one_building"
+      },
+      {
+       "ref": "H6CV",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "7XL7",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "AGHL",
+       "ok": false,
+       "what": "partial",
+       "note": "系统指派 unit=south；判读 partial"
+      },
+      {
+       "ref": "2K2A",
+       "ok": true,
+       "note": "系统指派 unit=main；判读 multi_building"
+      },
+      {
+       "ref": "7EX6",
+       "ok": true,
+       "note": "系统指派 unit=north；判读 one_building"
+      },
+      {
+       "ref": "VEMG",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=south；判读 not_spatial"
+      },
+      {
+       "ref": "6UH3",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "VNEF",
+       "ok": true,
+       "note": "系统指派 unit=north；判读 one_building"
+      },
+      {
+       "ref": "324X",
+       "ok": true,
+       "note": "系统指派 unit=north；判读 one_building"
+      },
+      {
+       "ref": "8PPC",
+       "ok": true,
+       "note": "系统指派 unit=main；判读 whole_site"
+      },
+      {
+       "ref": "CJD9",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=south；判读 not_spatial"
+      },
+      {
+       "ref": "2EAY",
+       "ok": true,
+       "note": "系统指派 unit=south；判读 whole_site"
+      },
+      {
+       "ref": "XJG4",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "32C3",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "M4G9",
+       "ok": false,
+       "what": "partial",
+       "note": "系统指派 unit=main；判读 partial"
+      },
+      {
+       "ref": "CKRY",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "XNB3",
+       "ok": false,
+       "what": "partial",
+       "note": "系统指派 unit=south；判读 partial"
+      },
+      {
+       "ref": "FPC3",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "MH7B",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=north；判读 not_spatial（判读原词 `multi_floor` 来自上一批分类，已归并）"
+      },
+      {
+       "ref": "BJ4Y",
+       "ok": false,
+       "what": "partial",
+       "note": "系统指派 unit=main；判读 partial"
+      },
+      {
+       "ref": "GY6E",
+       "ok": true,
+       "note": "系统指派 unit=main；判读 whole_site"
+      },
+      {
+       "ref": "VXQV",
+       "ok": true,
+       "note": "系统指派 unit=north；判读 one_building"
+      },
+      {
+       "ref": "24VU",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "NJH6",
+       "ok": true,
+       "note": "系统指派 unit=south；判读 multi_building"
+      },
+      {
+       "ref": "M9QY",
+       "ok": true,
+       "note": "系统指派 unit=south；判读 whole_site"
+      },
+      {
+       "ref": "2AUJ",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=south；判读 not_spatial"
+      },
+      {
+       "ref": "EGEY",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=north；判读 not_spatial"
+      },
+      {
+       "ref": "RCY2",
+       "ok": true,
+       "note": "系统指派 unit=main；判读 whole_site"
+      },
+      {
+       "ref": "3Y7R",
+       "ok": true,
+       "note": "系统指派 unit=main；判读 one_building"
+      },
+      {
+       "ref": "QVYF",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "WV3H",
+       "ok": true,
+       "note": "系统指派 unit=south；判读 whole_site"
+      },
+      {
+       "ref": "JQBU",
+       "ok": true,
+       "note": "系统指派 unit=south；判读 whole_site"
+      },
+      {
+       "ref": "AV4H",
+       "ok": true,
+       "note": "系统指派 unit=north；判读 whole_site"
+      },
+      {
+       "ref": "H4LM",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=south；判读 not_spatial"
+      },
+      {
+       "ref": "GNWA",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "2B9R",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "VJJW",
+       "ok": true,
+       "note": "系统指派 unit=main；判读 whole_site"
+      },
+      {
+       "ref": "4JCR",
+       "ok": false,
+       "what": "partial",
+       "note": "系统指派 unit=north；判读 partial"
+      },
+      {
+       "ref": "WP8G",
+       "ok": true,
+       "note": "系统指派 unit=north；判读 whole_site"
+      },
+      {
+       "ref": "EGFN",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "VVF2",
+       "ok": true,
+       "note": "系统指派 unit=north；判读 whole_site"
+      },
+      {
+       "ref": "LJTT",
+       "ok": true,
+       "note": "系统指派 unit=main；判读 one_building"
+      },
+      {
+       "ref": "2PWF",
+       "ok": true,
+       "note": "系统指派 unit=south；判读 whole_site"
+      },
+      {
+       "ref": "F37K",
+       "ok": true,
+       "note": "系统指派 unit=main；判读 one_building"
+      },
+      {
+       "ref": "9QFP",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=south；判读 not_spatial"
+      },
+      {
+       "ref": "Y8CT",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial"
+      },
+      {
+       "ref": "TL8L",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=north；判读 not_spatial"
+      },
+      {
+       "ref": "LCJP",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=south；判读 not_spatial"
+      },
+      {
+       "ref": "TKXB",
+       "ok": true,
+       "note": "系统指派 unit=north；判读 whole_site"
+      },
+      {
+       "ref": "4DHY",
+       "ok": false,
+       "what": "partial",
+       "note": "系统指派 unit=north；判读 partial"
+      },
+      {
+       "ref": "99WV",
+       "ok": false,
+       "what": "not_spatial",
+       "note": "系统指派 unit=main；判读 not_spatial（判读原词 `multi_floor` 来自上一批分类，已归并）"
+      },
+      {
+       "ref": "ADUQ",
+       "ok": true,
+       "note": "系统指派 unit=north；判读 whole_site"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "整图缩略判「这张图画的是工程的哪一部分」。系统给每张图都指派了一个单体，故 `not_spatial`（无空间范围）与 `partial`（只画一部分）都是无意义的归属。**50/80 = 62% 的图被指派了单体，却根本没有空间范围或只是局部**。metro 侧 26 张全判 `main`，而判读里 19 张是 `not_spatial` —— 「全是 main」不是因为只有一个单体，是因为多数图本就不该有单体。**判读用了上一批（楼层批）的分类词 10 格**（multi_floor 9 · no_floor 1），不在本批清单里，按语义归入 not_spatial 并在此如实记录 —— 跨批次污染的证据。现成的 `NON_FLOOR_ROLES` 闸（上一轮为楼层归属做的）**能删 31/50 张错的、只误伤 1/30 张对的**；未在本轮接线，因 `detect_building_unit` 所在文件正被另一任务修改。"
+    }
+   }
+  }
+ ]
+}

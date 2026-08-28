@@ -57,9 +57,10 @@
 
 ## 1.5 金标准覆盖面（2026-08-28 实测）
 
-    已建 **11 类**（columns、axes、drawing_title、title_block、walls、beams、
+    已建 **14 类**（columns、axes、drawing_title、title_block、walls、beams、
                   slabs + 计划外新增的 drawing_usable、equipment、pipes、
-                  **floor_assignment**）
+                  floor_assignment、**column_outline**、**building_unit**）
+    判据固定在 `data/model3d/gold/CRITERIA.md`（跨批次单一来源）
     **六类规则构件已全部量过**，`_RULE_CONFIDENCE_BY_KIND` 不再有空缺
     语料覆盖  metro **9.62%**（173/1798） · sgoh **5.41%**（125/2309）
     自审      9 个数据文件，问题 **0** 条
@@ -69,6 +70,48 @@
 但**它证明的是「这些图上做对了」，不是「系统做对了」**。
 
 # 二、微观（逐次记录）
+
+## 2026-09-11 · 单体归属 62% 无意义 —— 与楼层归属是同一个病
+
+单体归属是楼层归属的另一半（楼层管 z，单体管 xy 分组），同样从未量过。
+系统给**每一张图**都指派了一个单体。
+
+**80 张整图缩略判读**
+
+    判读的 scope   not_spatial 43 · whole_site 15 · one_building 13
+                   partial 7 · multi_building 2
+
+    **50/80 = 62% 的图被指派了单体，却根本没有空间范围或只是局部**
+
+| 系统指派 | 有空间意义 | 不该有单体归属 |
+|---|---|---|
+| `main` | 15/52 | **37 张 = 71%** |
+| `south` | 6/14 | 8 张 = 57% |
+| `north` | 9/14 | 5 张 = 36% |
+
+**「metro 全是 main」的真相**：26 张里判读有 **19 张是 `not_spatial`**。
+不是因为地铁只有一个单体，是因为**多数图本就不该有单体**。
+
+**与楼层归属是同一个病，而且药已经配好了**
+
+上一轮为楼层归属做的 `NON_FLOOR_ROLES = {non_geometric, detail, coordinate_base}`
+用在这里：
+
+    能删 31/50 张错误归属，误伤 1/30 张正确的（3.3%）
+
+判读说「不该有单体」的 50 张里：detail 20 · non_geometric 11 ·
+component_source 9 · unknown 7 · elevation_reference 3。
+
+**本轮没有接线** —— `detect_building_unit` 所在的 `model_story.py`
+正被另一个任务（修空幻影层）修改，避免冲突。改法与数字已连同金标准记录，
+并开了独立任务待那边落地后执行。
+
+**判读用了上一批的分类词**：10 格答成 `multi_floor`（9）/ `no_floor`（1），
+那是**楼层批**的选项，不在本批清单里。按语义归入 `not_spatial` 并在金标准
+note 里如实记录 —— 这是跨批次污染的证据，也再次说明**每批必须开新对话**。
+
+**覆盖面**：11 类 → **14 类**（本轮 building_unit + 上轮 column_outline）；
+自审 15 个文件、0 问题；**3781 测试全绿**。
 
 ## 2026-09-10 · 0.59 与 0.22 的真相：两批用了不同的「柱」定义
 
