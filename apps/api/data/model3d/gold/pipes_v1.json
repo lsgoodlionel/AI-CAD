@@ -1,0 +1,736 @@
+{
+ "version": 1,
+ "object_classes": [
+  "pipes"
+ ],
+ "units": [
+  {
+   "unit": "P-05ee9653",
+   "source": {
+    "drawing_id": "05ee9653",
+    "title": "一层照明平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-04",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P3-05",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P3-06",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-0a3199ad",
+   "source": {
+    "drawing_id": "0a3199ad",
+    "title": "装饰电气-竣工图--一层空调动力平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-07",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P1-08",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P1-09",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-0dd5c28d",
+   "source": {
+    "drawing_id": "0dd5c28d",
+    "title": "二层给排水平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-15",
+       "ok": false,
+       "what": "leader",
+       "note": ""
+      },
+      {
+       "ref": "P2-16",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P2-17",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-2112cb0d",
+   "source": {
+    "drawing_id": "2112cb0d",
+    "title": "七层消防平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-07",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      },
+      {
+       "ref": "P3-08",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      },
+      {
+       "ref": "P3-09",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-25d07321",
+   "source": {
+    "drawing_id": "25d07321",
+    "title": "装饰给排水-竣工图--五层喷淋管线平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-20",
+       "ok": false,
+       "what": "leader",
+       "note": ""
+      },
+      {
+       "ref": "P2-01",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P2-02",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-3d00cb34",
+   "source": {
+    "drawing_id": "3d00cb34",
+    "title": "装饰暖通-竣工图--二层空调通风平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-18",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P2-19",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P2-20",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-4349885e",
+   "source": {
+    "drawing_id": "4349885e",
+    "title": "三层给排水平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-09",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      },
+      {
+       "ref": "P2-10",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P2-11",
+       "ok": false,
+       "what": "leader",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-492004d4",
+   "source": {
+    "drawing_id": "492004d4",
+    "title": "六层电力平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-16",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P3-17",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P3-18",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-515dddec",
+   "source": {
+    "drawing_id": "515dddec",
+    "title": "四层照明平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-10",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P3-11",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P3-12",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-561f6a22",
+   "source": {
+    "drawing_id": "561f6a22",
+    "title": "三层地板下气体灭火平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-17",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      },
+      {
+       "ref": "P1-18",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P1-19",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-5dffd492",
+   "source": {
+    "drawing_id": "5dffd492",
+    "title": "4层通风风管平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-03",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      },
+      {
+       "ref": "P2-04",
+       "ok": false,
+       "what": "leader",
+       "note": ""
+      },
+      {
+       "ref": "P2-05",
+       "ok": false,
+       "what": "leader",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-6b3fa410",
+   "source": {
+    "drawing_id": "6b3fa410",
+    "title": "8层工位送风风管平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-01",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P3-02",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      },
+      {
+       "ref": "P3-03",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-92507b2b",
+   "source": {
+    "drawing_id": "92507b2b",
+    "title": "五层给排水平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-04",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      },
+      {
+       "ref": "P1-05",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      },
+      {
+       "ref": "P1-06",
+       "ok": false,
+       "what": "leader",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-9a5e66dd",
+   "source": {
+    "drawing_id": "9a5e66dd",
+    "title": "九层消防电源、防火门与电气监控平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-13",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-a99f068e",
+   "source": {
+    "drawing_id": "a99f068e",
+    "title": "七层电力平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-14",
+       "ok": false,
+       "what": "leader",
+       "note": ""
+      },
+      {
+       "ref": "P1-15",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P1-16",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-af8224f5",
+   "source": {
+    "drawing_id": "af8224f5",
+    "title": "八层电力平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-10",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      },
+      {
+       "ref": "P1-11",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P1-12",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-b210a45c",
+   "source": {
+    "drawing_id": "b210a45c",
+    "title": "装饰电气-竣工图--三层火灾自动报警点位平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P1-01",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      },
+      {
+       "ref": "P1-02",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P1-03",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-b6959e54",
+   "source": {
+    "drawing_id": "b6959e54",
+    "title": "三层电力平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P3-13",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P3-14",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P3-15",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-c78cf481",
+   "source": {
+    "drawing_id": "c78cf481",
+    "title": "七层通风风管平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-06",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      },
+      {
+       "ref": "P2-07",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P2-08",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  },
+  {
+   "unit": "P-f2e3d271",
+   "source": {
+    "drawing_id": "f2e3d271",
+    "title": "屋顶层给排水平面图"
+   },
+   "classes": {
+    "pipes": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P2-12",
+       "ok": false,
+       "what": "wall",
+       "note": ""
+      },
+      {
+       "ref": "P2-13",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      },
+      {
+       "ref": "P2-14",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
+    }
+   }
+  }
+ ]
+}

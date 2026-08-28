@@ -1,0 +1,738 @@
+{
+ "version": 1,
+ "object_classes": [
+  "equipment"
+ ],
+ "units": [
+  {
+   "unit": "E-015a3a9b",
+   "source": {
+    "drawing_id": "015a3a9b",
+    "title": "四层给排水平面图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E2-11",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E2-12",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E2-13",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-0444794d",
+   "source": {
+    "drawing_id": "0444794d",
+    "title": "地下三层给排水平面图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E3-15",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E3-16",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E3-17",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-05ee9653",
+   "source": {
+    "drawing_id": "05ee9653",
+    "title": "一层照明平面图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E1-13",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E1-14",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E1-15",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-2112cb0d",
+   "source": {
+    "drawing_id": "2112cb0d",
+    "title": "七层消防平面图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E3-03",
+       "ok": true,
+       "note": "判读者标注看不清"
+      },
+      {
+       "ref": "E3-04",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E3-05",
+       "ok": false,
+       "what": "line_only",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-288da884",
+   "source": {
+    "drawing_id": "288da884",
+    "title": "装饰电气-竣工图--二层空调动力平面图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E2-02",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E2-03",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E2-04",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-3d00cb34",
+   "source": {
+    "drawing_id": "3d00cb34",
+    "title": "装饰暖通-竣工图--二层空调通风平面图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E2-08",
+       "ok": true,
+       "note": ""
+      },
+      {
+       "ref": "E2-09",
+       "ok": true,
+       "note": ""
+      },
+      {
+       "ref": "E2-10",
+       "ok": true,
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-45a699be",
+   "source": {
+    "drawing_id": "45a699be",
+    "title": "地下一层变电所平面布置图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E1-19",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E1-20",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E2-01",
+       "ok": false,
+       "what": "nothing",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-484a2d46",
+   "source": {
+    "drawing_id": "484a2d46",
+    "title": "4层消防风管平面图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E2-20",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E3-01",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E3-02",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-538e1333",
+   "source": {
+    "drawing_id": "538e1333",
+    "title": "屋顶层消防平面图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E3-09",
+       "ok": true,
+       "note": ""
+      },
+      {
+       "ref": "E3-10",
+       "ok": true,
+       "note": ""
+      },
+      {
+       "ref": "E3-11",
+       "ok": true,
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-76095e42",
+   "source": {
+    "drawing_id": "76095e42",
+    "title": "B3层通水管平面图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E2-05",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E2-06",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E2-07",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-78d4814e",
+   "source": {
+    "drawing_id": "78d4814e",
+    "title": "地下一层变电所桥架平面布置图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E2-17",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E2-18",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E2-19",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-86c9253f",
+   "source": {
+    "drawing_id": "86c9253f",
+    "title": "地下一层消防平面图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E1-01",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E1-02",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E1-03",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-99c633bc",
+   "source": {
+    "drawing_id": "99c633bc",
+    "title": "地下一层工艺桥架平面图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E1-10",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E1-11",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E1-12",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-9ccdbcaf",
+   "source": {
+    "drawing_id": "9ccdbcaf",
+    "title": "六层消防电源、防火门与电气监控平面图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E3-06",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E3-07",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E3-08",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-a1d85162",
+   "source": {
+    "drawing_id": "a1d85162",
+    "title": "装饰给排水-竣工图--七层喷淋管线平面图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E3-12",
+       "ok": false,
+       "what": "line_only",
+       "note": "判读者标注看不清"
+      },
+      {
+       "ref": "E3-13",
+       "ok": false,
+       "what": "line_only",
+       "note": "判读者标注看不清"
+      },
+      {
+       "ref": "E3-14",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-b6959e54",
+   "source": {
+    "drawing_id": "b6959e54",
+    "title": "三层电力平面图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E3-18",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E3-19",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E3-20",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-d2f985f7",
+   "source": {
+    "drawing_id": "d2f985f7",
+    "title": "5层通风风管平面图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E1-07",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E1-08",
+       "ok": true,
+       "note": ""
+      },
+      {
+       "ref": "E1-09",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-daa108a9",
+   "source": {
+    "drawing_id": "daa108a9",
+    "title": "五层工艺桥架平面图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E2-14",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E2-15",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      },
+      {
+       "ref": "E2-16",
+       "ok": false,
+       "what": "structure",
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-e6622901",
+   "source": {
+    "drawing_id": "e6622901",
+    "title": "屋顶层消防、通风风管及水管平面图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E1-16",
+       "ok": true,
+       "note": ""
+      },
+      {
+       "ref": "E1-17",
+       "ok": false,
+       "what": "line_only",
+       "note": "判读者标注看不清"
+      },
+      {
+       "ref": "E1-18",
+       "ok": true,
+       "note": ""
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  },
+  {
+   "unit": "E-fba28922",
+   "source": {
+    "drawing_id": "fba28922",
+    "title": "屋顶层综合安防，无线对讲平面图"
+   },
+   "classes": {
+    "equipment": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "E1-04",
+       "ok": false,
+       "what": "line_only",
+       "note": "判读者标注看不清"
+      },
+      {
+       "ref": "E1-05",
+       "ok": false,
+       "what": "line_only",
+       "note": "判读者标注看不清"
+      },
+      {
+       "ref": "E1-06",
+       "ok": false,
+       "what": "line_only",
+       "note": "判读者标注看不清"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "设备候选逐个判读。误检 42/50 是柱墙 —— 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开；rect 分支实测产出 0 个，设备全部来自 poly 分支。"
+    }
+   }
+  }
+ ]
+}

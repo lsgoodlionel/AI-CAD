@@ -63,11 +63,18 @@ conventions:
 
   # 门（洞口）：门 / DOOR / M- 门编号 / A-DOOR
   #   注：门窗多为「块（block）」命名，加载器优先用块名匹配。
+  # **`M-` 前缀与裸 `M` 别名已移除**：与上面的 `C-` 是同一个碰撞的另一半 ——
+  # AIA CAD Layer Guidelines 里 **M = Mechanical 学科代码**，
+  # 实测把整个机电命名空间判成门：`M-PIPE`（管线自己的前缀，就写在
+  # layer_class_map.yaml 里）、`M-EQPM`、`M-PIPE-SUPPLY` 全部 → door。
+  # 而 door 在 `_KIND_ORDER` 里排在 pipe/equipment 之前，抢先命中。
+  # 中国院的门编号是 **M + 数字**（M1、M0921、M-1521），由 `^M\d` 与 `^M-\d`
+  # 两条 pattern 一起覆盖，信息不丢 —— 与上面窗的 `^C\d` / `^C-\d` 完全对称。
   - kind: door
-    aliases: ["A-DOOR", "门", "DOOR", "M"]
-    prefixes: ["A-DOOR", "A-DOR", "门-", "M-", "MEN-", "DOOR-"]
+    aliases: ["A-DOOR", "门", "DOOR"]
+    prefixes: ["A-DOOR", "A-DOR", "门-", "MEN-", "DOOR-"]
     substrings: ["门"]
-    patterns: ['^M\d', 'DOOR']
+    patterns: ['^M\d', '^M-\d', 'DOOR']
 
   # 窗（洞口）：窗 / WINDOW / C+数字 窗编号 / A-GLAZ
   #

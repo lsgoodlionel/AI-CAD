@@ -552,7 +552,56 @@ def _augment_circle_columns(
 # （规则侧用本图已识别构件整体包络，模型侧用页面 page_w/page_h）再做 IoU 配对
 # ——这是尽力而为的空间对齐近似，不是像素级精确匹配；类别仲裁与强规则保护
 # （fusion_policy）不受此近似影响，因为仲裁只依赖 IoU 是否达到「同处」阈值。
-_RULE_CONFIDENCE = 0.92  # 几何规则识别默认置信（≥ fusion_policy.rule_strong_confidence=0.85）
+_RULE_CONFIDENCE = 0.92  # 未实测类别的兜底（≥ fusion_policy.rule_strong_confidence=0.85）
+
+# **按类的实测精确率**，取自 `data/model3d/gold/` 的裁决式真值。
+# 原来所有类共用 `_RULE_CONFIDENCE = 0.92`：柱（实测 0.59）与管线（实测 0.00）
+# 对外报同一个数字，这个置信度不衡量它声称衡量的东西。
+#
+# 数字来路（金标准文件 · 裁决样本量）：
+#   walls      0.70  walls_v1.json     n=47
+#   columns    0.59  verdicts_v1.json  n=120
+#   beams      0.56  beams_v1.json     n=50
+#   equipment  0.17  equipment_v1.json n=60
+#   pipes      0.00  pipes_v1.json     n=58   ← 58 个候选无一是管线
+#
+# 未列入的类别（slabs）**从未做过裁决式验证**，退回 `_RULE_CONFIDENCE`；
+# 缺席本身就是「没量过」的如实表示，不要给它编一个数。
+_RULE_CONFIDENCE_BY_KIND = {
+    "walls": 0.70, "columns": 0.59, "beams": 0.56,
+    "equipment": 0.17, "pipes": 0.00,
+}
+
+
+# **实测精确率约等于 0 的类别**，在规则×模型仲裁里不再享有「强规则不被覆盖」保护。
+# 只列被实测证伪的类：管线 0/58、设备 10/60。其余类别（0.56~0.70）维持原行为 ——
+# 要判它们该不该继续受保护，需要的是**模型侧的分类精确率**，那个还没量过，
+# 在量出来之前不拿两个类的实测去推翻五个类的行为。
+#
+# 注：`fusion_policy.rule_strong_confidence = 0.85` 是照着 0.92 这个常数反推的，
+# 它本身不携带独立信息；真正该做的是从数据里重新定义「强规则」，见 PROGRESS 待办。
+_UNPROTECTED_KINDS = frozenset({"pipes", "equipment"})
+
+
+def rule_confidence(kind: str) -> float:
+    """该构件类规则识别的置信度 —— 即它在金标准上实测的精确率。
+
+    用于**对外的构件条目**（前端展示、算量、人审排队）。
+    """
+    return _RULE_CONFIDENCE_BY_KIND.get(kind, _RULE_CONFIDENCE)
+
+
+def fusion_confidence(kind: str) -> float:
+    """规则×模型仲裁用的置信度。
+
+    与 `rule_confidence` 分开：仲裁问的是「规则的确定性够不够压过模型」，
+    不是「规则有多准」。默认沿用几何确定性常数；只有被实测证伪的类别
+    （`_UNPROTECTED_KINDS`）交回实测值，从而失去强规则保护。
+    """
+    if kind in _UNPROTECTED_KINDS:
+        return _RULE_CONFIDENCE_BY_KIND[kind]
+    return _RULE_CONFIDENCE
+
 _KIND_TO_CATEGORY = {
     "columns": "column", "walls": "wall", "beams": "beam",
     "slabs": "slab", "pipes": "pipe", "equipment": "equipment",
@@ -609,8 +658,10 @@ def _rule_candidates_from_elements(
 ) -> tuple[tuple, dict[int, tuple[str, int]]]:
     """规则构件 → SymbolCandidate（bbox 归一化 + evidence 携带回填索引）。
 
-    confidence 固定为 ``_RULE_CONFIDENCE``（几何确定性识别，达到 fusion_policy 的
-    强命中门槛）——契合「规则强命中不被模型覆盖」，融合时模型只补规则漏召回。
+    confidence 由 ``fusion_confidence(kind)`` 给出：默认仍是几何确定性常数
+    ``_RULE_CONFIDENCE``（仲裁问的是确定性，不是准确率），但**被实测证伪的类别**
+    （管线 0/58、设备 10/60）交回实测值，从而失去「规则强命中不被模型覆盖」的
+    保护 —— 让 0% 精确率的规则否决模型是说不通的。
     ``_rule_index`` 写入 evidence：fusion 引擎的 ``replace()`` 链路（consensus /
     rule_protected / weak_conflict）与「未配对规则原样保留」均会透传该字段的原始
     evidence 字典，使融合后每个规则来源候选都能精确映射回原构件条目。
@@ -628,7 +679,7 @@ def _rule_candidates_from_elements(
             candidates.append(
                 SymbolCandidate(
                     category=category,
-                    confidence=_RULE_CONFIDENCE,
+                    confidence=fusion_confidence(kind),
                     bbox=_normalize_bbox(bbox_m, envelope),
                     source="rule",
                     evidence={"_rule_index": idx},
@@ -681,7 +732,8 @@ def _spot_model_candidates(geom, drawing_id: str) -> tuple:
 def _tag_rule_source(elements: dict[str, list]) -> dict[str, list]:
     """无模型候选时的兜底：仅补 source/confidence 标注，几何/数量完全不变（回退路径）。"""
     return {
-        kind: [{**item, "source": "rule", "confidence": _RULE_CONFIDENCE} for item in items]
+        kind: [{**item, "source": "rule", "confidence": rule_confidence(kind)}
+               for item in items]
         for kind, items in elements.items()
     }
 
@@ -727,10 +779,13 @@ def _apply_fusion_result(
         rule_idx = cand.evidence.get("_rule_index") if isinstance(cand.evidence, dict) else None
         if rule_idx is not None and rule_idx in index_map:
             kind, pos = index_map[rule_idx]
+            # 仍由规则担保的位（未被模型改写类别）**报该类的实测精确率**，
+            # 而不是仲裁用的确定性常数 —— 否则同一个柱「融合跑了报 0.92、
+            # 没跑报 0.59」，对外的数字取决于内部走没走融合。
+            conf = (rule_confidence(kind) if cand.source == "rule"
+                    else round(cand.confidence, 3))
             updated[kind][pos] = {
-                **updated[kind][pos],
-                "source": cand.source,
-                "confidence": round(cand.confidence, 3),
+                **updated[kind][pos], "source": cand.source, "confidence": conf,
             }
         elif cand.source == "model":
             new_item = _element_from_model_candidate(cand, envelope, drawing_id)

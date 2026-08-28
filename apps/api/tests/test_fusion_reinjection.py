@@ -81,7 +81,9 @@ def test_no_real_backend_falls_back_to_rule_tagging_only(monkeypatch):
     col = result["columns"][0]
     assert col["outline"] == original_outline
     assert col["source"] == "rule"
-    assert col["confidence"] == pytest.approx(model_elements._RULE_CONFIDENCE)
+    # 对外置信 = 该类**实测精确率**（柱 0.59，n=120，verdicts_v1.json），
+    # 不再是所有类共用的 0.92 —— 那个常数对 0% 精确率的管线也报同一个数
+    assert col["confidence"] == pytest.approx(model_elements.rule_confidence("columns"))
     # 其余类别仍为空列表（数量不变）
     assert result["walls"] == [] and result["pipes"] == []
 
@@ -133,7 +135,9 @@ def test_strong_rule_not_overridden_by_conflicting_model(monkeypatch):
     col = result["columns"][0]
     assert col["outline"] == original_outline
     assert col["source"] == "rule"
-    assert col["confidence"] == pytest.approx(model_elements._RULE_CONFIDENCE)
+    # 对外置信 = 该类**实测精确率**（柱 0.59，n=120，verdicts_v1.json），
+    # 不再是所有类共用的 0.92 —— 那个常数对 0% 精确率的管线也报同一个数
+    assert col["confidence"] == pytest.approx(model_elements.rule_confidence("columns"))
 
 
 # ── ④ 模型补召回 —— 空白区落盘为新构件 ───────────────────

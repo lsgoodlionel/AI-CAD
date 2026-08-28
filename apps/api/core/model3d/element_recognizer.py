@@ -945,10 +945,20 @@ def _find_pipes(
     for i, (x0, y0, x1, y1) in enumerate(lines):
         if i in axis_idx:
             continue
+        # **图层闸**（与柱对称）：58 个管线候选独立判读 **0 个是管线** ——
+        # 墙 30 / 结构线 21 / 标注线 7。当时唯一判据是「够长且不是轴线」，
+        # 于是每一条墙线、梁线、尺寸线都成了管。实测该图层闸删掉 41.2%；
+        # 余下 57.5% 图层判不出，闸管不到 —— 那部分仍无真值（见 _RULE_CONFIDENCE_BY_KIND）。
+        _lay = _at(line_layers, i)
+        if is_annotation_layer(_lay):
+            continue
+        _kind = classify_by_layer(_lay)
+        if _kind is not None and _kind != "pipe":
+            continue
         length_m = ctx.len_m(((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5)
         if length_m >= _PIPE_MIN_LEN_M:
             # 图层可判定系统时优先（消防/给排水/电气/暖通），否则回退全图关键词
-            system = classify_system(_at(line_layers, i)) or default_system
+            system = classify_system(_lay) or default_system
             pipes.append({
                 "path": [ctx.to_m(x0, y0), ctx.to_m(x1, y1)],
                 "dia": 0.1, "system": system, "src": ctx.src,
@@ -964,7 +974,13 @@ def _find_equipment(
 ) -> list[dict]:
     equipment: list[dict] = []
     for i, (x, y, w, h, _filled) in enumerate(rects):
-        is_equip_layer = classify_by_layer(_at(rect_layers, i), _at(rect_blocks, i)) == "equipment"
+        _lay = _at(rect_layers, i)
+        _kind = classify_by_layer(_lay, _at(rect_blocks, i))
+        # **图层闸**：60 个设备候选独立判读只有 10 个是设备，误检 42 个是柱墙 ——
+        # 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开
+        if is_annotation_layer(_lay) or (_kind is not None and _kind != "equipment"):
+            continue
+        is_equip_layer = _kind == "equipment"
         # 图层/块名明确为设备时，放宽尺寸阈值（具名设备块常不规则）
         if not is_equip_layer and not _is_equipment_size(ctx.len_m(w), ctx.len_m(h)):
             continue
@@ -975,7 +991,11 @@ def _find_equipment(
             return equipment
     for i, poly in enumerate(polys):
         x, y, w, h = _poly_bbox(poly)
-        is_equip_layer = classify_by_layer(_at(poly_layers, i), _at(poly_blocks, i)) == "equipment"
+        _lay = _at(poly_layers, i)
+        _kind = classify_by_layer(_lay, _at(poly_blocks, i))
+        if is_annotation_layer(_lay) or (_kind is not None and _kind != "equipment"):
+            continue
+        is_equip_layer = _kind == "equipment"
         if not is_equip_layer and not _is_equipment_size(ctx.len_m(w), ctx.len_m(h)):
             continue
         label = _text_inside(texts, x, y, w, h)
