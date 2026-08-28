@@ -1,0 +1,391 @@
+{
+ "version": 1,
+ "object_classes": [
+  "column_outline"
+ ],
+ "units": [
+  {
+   "unit": "CO-metro",
+   "source": {
+    "project": "metro"
+   },
+   "classes": {
+    "column_outline": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "GMT9",
+       "ok": false,
+       "what": "no_text",
+       "note": "728×415 mm"
+      },
+      {
+       "ref": "7KH9",
+       "ok": false,
+       "what": "no_text",
+       "note": "720×478 mm"
+      },
+      {
+       "ref": "6FTJ",
+       "ok": true,
+       "note": "423×338 mm"
+      },
+      {
+       "ref": "UXWX",
+       "ok": true,
+       "note": "150×233 mm"
+      },
+      {
+       "ref": "DCXX",
+       "ok": false,
+       "what": "no_wall",
+       "note": "213×191 mm"
+      },
+      {
+       "ref": "UCTX",
+       "ok": true,
+       "note": "148×235 mm"
+      },
+      {
+       "ref": "MD6W",
+       "ok": false,
+       "what": "no_empty",
+       "note": "1198×698 mm"
+      },
+      {
+       "ref": "LLCB",
+       "ok": true,
+       "note": "1270×1270 mm；轮廓偏大"
+      },
+      {
+       "ref": "43K4",
+       "ok": false,
+       "what": "no_empty",
+       "note": "334×872 mm"
+      },
+      {
+       "ref": "4EL7",
+       "ok": false,
+       "what": "no_wall",
+       "note": "667×667 mm"
+      },
+      {
+       "ref": "CW6A",
+       "ok": false,
+       "what": "no_wall",
+       "note": "667×666 mm"
+      },
+      {
+       "ref": "K6TX",
+       "ok": false,
+       "what": "no_wall",
+       "note": "667×666 mm"
+      },
+      {
+       "ref": "XXLN",
+       "ok": false,
+       "what": "no_wall",
+       "note": "250×246 mm"
+      },
+      {
+       "ref": "GWUR",
+       "ok": false,
+       "what": "no_wall",
+       "note": "246×246 mm"
+      },
+      {
+       "ref": "K67H",
+       "ok": false,
+       "what": "no_wall",
+       "note": "245×225 mm"
+      },
+      {
+       "ref": "G4VR",
+       "ok": false,
+       "what": "no_wall",
+       "note": "666×667 mm"
+      },
+      {
+       "ref": "XC86",
+       "ok": false,
+       "what": "no_wall",
+       "note": "603×667 mm"
+      },
+      {
+       "ref": "3P4Q",
+       "ok": true,
+       "note": "463×736 mm"
+      },
+      {
+       "ref": "N7N4",
+       "ok": false,
+       "what": "no_wall",
+       "note": "385×1058 mm"
+      },
+      {
+       "ref": "NHBJ",
+       "ok": false,
+       "what": "no_furniture",
+       "note": "237×478 mm"
+      },
+      {
+       "ref": "XDN9",
+       "ok": true,
+       "note": "1152×1147 mm"
+      },
+      {
+       "ref": "RX29",
+       "ok": true,
+       "note": "250×246 mm"
+      },
+      {
+       "ref": "7YWM",
+       "ok": true,
+       "note": "250×246 mm"
+      },
+      {
+       "ref": "VC7J",
+       "ok": true,
+       "note": "250×249 mm"
+      },
+      {
+       "ref": "XBK8",
+       "ok": false,
+       "what": "no_hatch",
+       "note": "377×349 mm"
+      },
+      {
+       "ref": "Q3QJ",
+       "ok": false,
+       "what": "no_wall",
+       "note": "959×1130 mm"
+      },
+      {
+       "ref": "7BQJ",
+       "ok": false,
+       "what": "no_hatch",
+       "note": "376×349 mm"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "柱轮廓吻合度：先判「那里有没有柱」，再判「红框与柱的真实轮廓吻不吻合」。**特意不让读尺寸数字**——字符转写是已知不可靠的能力边界，改为纯视觉比例判断。样本取自**当前代码**逐张 recognize() 的输出，不是存量场景（实测存量比当前代码多 46%/82% 的柱）。结果 13/60 = 22%，与 `verdicts_v1` 的 0.59 **冲突**：两批在抽样源与上下文倍数上的差异都指向本批应当更好，剩下的唯一解释是**问法**——本批给出 7 种具名的「不是」理由，说不的门槛更低。**未据此覆盖 0.59**，两个数并存待对照实验分辨。另一条负面结果：识别宽度不能区分真假（真柱中位 423 mm，误检 394 mm），**没有基于尺寸的修法**。判为真的 13 根里 11 根轮廓吻合。"
+    }
+   }
+  },
+  {
+   "unit": "CO-sgoh",
+   "source": {
+    "project": "sgoh"
+   },
+   "classes": {
+    "column_outline": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "43V3",
+       "ok": false,
+       "what": "no_empty",
+       "note": "362×331 mm"
+      },
+      {
+       "ref": "FTB6",
+       "ok": false,
+       "what": "no_empty",
+       "note": "362×329 mm"
+      },
+      {
+       "ref": "N7PT",
+       "ok": false,
+       "what": "no_empty",
+       "note": "362×331 mm"
+      },
+      {
+       "ref": "UDJ6",
+       "ok": true,
+       "note": "570×573 mm"
+      },
+      {
+       "ref": "E8EP",
+       "ok": false,
+       "what": "no_empty",
+       "note": "852×1095 mm"
+      },
+      {
+       "ref": "MJH3",
+       "ok": false,
+       "what": "no_other",
+       "note": "1049×1049 mm"
+      },
+      {
+       "ref": "MGLU",
+       "ok": false,
+       "what": "no_furniture",
+       "note": "297×303 mm"
+      },
+      {
+       "ref": "U9NT",
+       "ok": false,
+       "what": "no_furniture",
+       "note": "300×299 mm"
+      },
+      {
+       "ref": "DJRN",
+       "ok": false,
+       "what": "no_furniture",
+       "note": "299×300 mm"
+      },
+      {
+       "ref": "B2TM",
+       "ok": false,
+       "what": "no_other",
+       "note": "286×576 mm"
+      },
+      {
+       "ref": "HU4Q",
+       "ok": false,
+       "what": "no_other",
+       "note": "283×578 mm"
+      },
+      {
+       "ref": "EU3A",
+       "ok": true,
+       "note": "286×578 mm；轮廓只盖住一部分"
+      },
+      {
+       "ref": "6JWH",
+       "ok": false,
+       "what": "no_empty",
+       "note": "623×623 mm"
+      },
+      {
+       "ref": "2HYG",
+       "ok": true,
+       "note": "526×529 mm"
+      },
+      {
+       "ref": "DHR8",
+       "ok": true,
+       "note": "1159×1159 mm"
+      },
+      {
+       "ref": "PCNP",
+       "ok": false,
+       "what": "no_wall",
+       "note": "197×197 mm"
+      },
+      {
+       "ref": "NADA",
+       "ok": false,
+       "what": "no_wall",
+       "note": "197×329 mm"
+      },
+      {
+       "ref": "K82U",
+       "ok": false,
+       "what": "no_empty",
+       "note": "394×328 mm"
+      },
+      {
+       "ref": "YFCJ",
+       "ok": false,
+       "what": "no_empty",
+       "note": "879×859 mm"
+      },
+      {
+       "ref": "QGFU",
+       "ok": false,
+       "what": "no_empty",
+       "note": "202×521 mm"
+      },
+      {
+       "ref": "QBJD",
+       "ok": false,
+       "what": "no_other",
+       "note": "755×741 mm"
+      },
+      {
+       "ref": "T729",
+       "ok": false,
+       "what": "no_wall",
+       "note": "396×297 mm"
+      },
+      {
+       "ref": "VYRK",
+       "ok": false,
+       "what": "no_furniture",
+       "note": "396×296 mm"
+      },
+      {
+       "ref": "28Y4",
+       "ok": false,
+       "what": "no_furniture",
+       "note": "273×305 mm"
+      },
+      {
+       "ref": "29K9",
+       "ok": false,
+       "what": "no_wall",
+       "note": "302×1202 mm"
+      },
+      {
+       "ref": "WPH7",
+       "ok": false,
+       "what": "no_wall",
+       "note": "800×804 mm"
+      },
+      {
+       "ref": "UPLY",
+       "ok": false,
+       "what": "no_wall",
+       "note": "302×899 mm"
+      },
+      {
+       "ref": "YF9C",
+       "ok": false,
+       "what": "no_other",
+       "note": "453×262 mm"
+      },
+      {
+       "ref": "9NCM",
+       "ok": false,
+       "what": "no_wall",
+       "note": "527×1211 mm"
+      },
+      {
+       "ref": "ENQ8",
+       "ok": false,
+       "what": "no_other",
+       "note": "455×262 mm"
+      },
+      {
+       "ref": "Q6QU",
+       "ok": false,
+       "what": "no_other",
+       "note": "455×262 mm"
+      },
+      {
+       "ref": "UF9D",
+       "ok": false,
+       "what": "no_other",
+       "note": "455×262 mm"
+      },
+      {
+       "ref": "4LD2",
+       "ok": false,
+       "what": "no_other",
+       "note": "453×262 mm"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "柱轮廓吻合度：先判「那里有没有柱」，再判「红框与柱的真实轮廓吻不吻合」。**特意不让读尺寸数字**——字符转写是已知不可靠的能力边界，改为纯视觉比例判断。样本取自**当前代码**逐张 recognize() 的输出，不是存量场景（实测存量比当前代码多 46%/82% 的柱）。结果 13/60 = 22%，与 `verdicts_v1` 的 0.59 **冲突**：两批在抽样源与上下文倍数上的差异都指向本批应当更好，剩下的唯一解释是**问法**——本批给出 7 种具名的「不是」理由，说不的门槛更低。**未据此覆盖 0.59**，两个数并存待对照实验分辨。另一条负面结果：识别宽度不能区分真假（真柱中位 423 mm，误检 394 mm），**没有基于尺寸的修法**。判为真的 13 根里 11 根轮廓吻合。"
+    }
+   }
+  }
+ ]
+}
