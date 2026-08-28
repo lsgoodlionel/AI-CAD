@@ -1,0 +1,702 @@
+{
+ "version": 1,
+ "object_classes": [
+  "slabs"
+ ],
+ "units": [
+  {
+   "unit": "SL-0ca8f4ae",
+   "source": {
+    "drawing_id": "0ca8f4ae",
+    "title": "结构-竣工图--南区（大、中歌剧厅）一层结构平面图（三）"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "HKFE",
+       "ok": false,
+       "what": "sliver",
+       "note": "红框压在一条细竖线或细长区域上"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-1302ab12",
+   "source": {
+    "drawing_id": "1302ab12",
+    "title": "建筑-竣工图--三层隔声隔振平面图（二）"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "TFYH",
+       "ok": false,
+       "what": "room",
+       "note": "矩形房间或功能区，内部基本为空"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-154b4380",
+   "source": {
+    "drawing_id": "154b4380",
+    "title": "结构-竣工图--南区（大、中歌剧厅）坡道台阶结构图（汽车坡道1剖面）"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "AS32",
+       "ok": false,
+       "what": "sliver",
+       "note": "空白处的一小段细长标记"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-22afffe1",
+   "source": {
+    "drawing_id": "22afffe1",
+    "title": "建筑-竣工图--四层21.940夹层（设备层）隔声隔+振平面图"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "YIWX",
+       "ok": false,
+       "what": "section_view",
+       "note": "带立体表现的剖面或构造区域［判读转写成 Y1WX，按位置纠正］"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-26ce158f",
+   "source": {
+    "drawing_id": "26ce158f",
+    "title": "六层防火分区平面图"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "BVNU",
+       "ok": false,
+       "what": "building_outline",
+       "note": "红色多边形覆盖整栋建筑的平面范围"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-32f87374",
+   "source": {
+    "drawing_id": "32f87374",
+    "title": "四层至七层西电梯厅放大平面图、平顶图"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "L96T",
+       "ok": false,
+       "what": "wall_or_beam",
+       "note": "红框落在前室旁的细长灰色墙体上［判读转写成 L967T，按位置纠正］"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-343b0cda",
+   "source": {
+    "drawing_id": "343b0cda",
+    "title": "首层结构平面图"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "9PJI",
+       "ok": false,
+       "what": "building_outline",
+       "note": "红色多边形覆盖了较大的整层平面范围"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-36e98389",
+   "source": {
+    "drawing_id": "36e98389",
+    "title": "2F平面布置图"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "CLX3",
+       "ok": false,
+       "what": "room",
+       "note": "带图案和机电标注的室内平面区域"
+      },
+      {
+       "ref": "B2BA",
+       "ok": false,
+       "what": "room",
+       "note": "带填充和机电文字的室内区域"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-3b8514b8",
+   "source": {
+    "drawing_id": "3b8514b8",
+    "title": "4结构详图（三）"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "QM1R",
+       "ok": false,
+       "what": "wall_or_beam",
+       "note": "带尺寸标注的粗长条形灰色构件"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-46f2ec33",
+   "source": {
+    "drawing_id": "46f2ec33",
+    "title": "地下一层结构平面图"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "R416",
+       "ok": false,
+       "what": "wall_or_beam",
+       "note": "图块边缘的一条细长竖向墙体区域"
+      },
+      {
+       "ref": "THII",
+       "ok": false,
+       "what": "building_outline",
+       "note": "红色多边形覆盖整层建筑平面外轮廓"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-56e35bb1",
+   "source": {
+    "drawing_id": "56e35bb1",
+    "title": "结构-竣工图--南区（大、中歌剧厅）地下二层夹层（-7.3m）结构图"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "TREW",
+       "ok": false,
+       "what": "building_outline",
+       "note": "红色多边形横跨较大的建筑平面区域"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-617132cf",
+   "source": {
+    "drawing_id": "617132cf",
+    "title": "9F平面布置图"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "GNC5",
+       "ok": false,
+       "what": "room",
+       "note": "标有功能名称的矩形房间区域"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-6a71a0f1",
+   "source": {
+    "drawing_id": "6a71a0f1",
+    "title": "建筑-竣工图--一层隔声隔振平面图（二）"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "DXMB",
+       "ok": true,
+       "note": "红色矩形覆盖大范围平面楼面（范围圈大了）"
+      },
+      {
+       "ref": "9DQJ",
+       "ok": true,
+       "note": "不规则多边形覆盖带斜边的较大平面区域（范围圈大了）"
+      },
+      {
+       "ref": "JFOM",
+       "ok": false,
+       "what": "building_outline",
+       "note": "红色多边形覆盖大范围建筑平面区域"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-713053e1",
+   "source": {
+    "drawing_id": "713053e1",
+    "title": "四层至七层东电梯厅放大平面图、平顶图"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "UQ5G",
+       "ok": false,
+       "what": "room",
+       "note": "标有前室的矩形功能区"
+      },
+      {
+       "ref": "XRNU",
+       "ok": false,
+       "what": "wall_or_beam",
+       "note": "房间边界处的细长竖向墙体"
+      },
+      {
+       "ref": "2472",
+       "ok": false,
+       "what": "wall_or_beam",
+       "note": "红框落在粗长条形灰色构件上"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-7c043b8c",
+   "source": {
+    "drawing_id": "7c043b8c",
+    "title": "地下室外墙节点图"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "533Y",
+       "ok": false,
+       "what": "wall_or_beam",
+       "note": "剖面中的细长灰色构件并带有尺寸标注"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-7c73545a",
+   "source": {
+    "drawing_id": "7c73545a",
+    "title": "定位放大平面图三"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "P0AJ",
+       "ok": false,
+       "what": "building_outline",
+       "note": "红色多边形覆盖整层建筑平面范围"
+      },
+      {
+       "ref": "8LNU",
+       "ok": false,
+       "what": "room",
+       "note": "红框内为细长矩形房间区域"
+      },
+      {
+       "ref": "BW1K",
+       "ok": false,
+       "what": "room",
+       "note": "红框内为矩形房间或功能区"
+      },
+      {
+       "ref": "IEZK",
+       "ok": false,
+       "what": "room",
+       "note": "矩形房间或井道区域"
+      },
+      {
+       "ref": "7QOU",
+       "ok": false,
+       "what": "wall_or_beam",
+       "note": "沿斜向边界的细长条形构件"
+      },
+      {
+       "ref": "915X",
+       "ok": false,
+       "what": "nothing",
+       "note": "未见清晰的红色多边形标记"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-8657c221",
+   "source": {
+    "drawing_id": "8657c221",
+    "title": "建筑-竣工图--地下一层平面图(五)"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "EZNJ",
+       "ok": false,
+       "what": "wall_or_beam",
+       "note": "沿边界布置的长条形构件"
+      },
+      {
+       "ref": "WVET",
+       "ok": false,
+       "what": "wall_or_beam",
+       "note": "沿斜向边界布置的细长构件"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-8e206589",
+   "source": {
+    "drawing_id": "8e206589",
+    "title": "地下二层结构平面图"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "GRNU",
+       "ok": true,
+       "note": "红色多边形覆盖较大的楼面区域（范围圈大了）"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-b8794f5d",
+   "source": {
+    "drawing_id": "b8794f5d",
+    "title": "建筑-竣工图--地下一层夹层平面图"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "U1L0",
+       "ok": false,
+       "what": "sliver",
+       "note": "空白区域旁的一条细长斜向标记"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-d074c1f9",
+   "source": {
+    "drawing_id": "d074c1f9",
+    "title": "地下二层防火分区平面图"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "MLYK",
+       "ok": true,
+       "note": "红色多边形覆盖较大的楼面区域（范围圈大了）"
+      },
+      {
+       "ref": "CR29",
+       "ok": false,
+       "what": "building_outline",
+       "note": "红色多边形覆盖整栋建筑平面范围"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  },
+  {
+   "unit": "SL-daa18df0",
+   "source": {
+    "drawing_id": "daa18df0",
+    "title": "竖向放大平面图三"
+   },
+   "classes": {
+    "slabs": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "6Z9I",
+       "ok": false,
+       "what": "room",
+       "note": "矩形房间及其内部楼面区域"
+      },
+      {
+       "ref": "031X",
+       "ok": false,
+       "what": "room",
+       "note": "细长矩形房间区域，周边有墙线"
+      },
+      {
+       "ref": "R5FB",
+       "ok": false,
+       "what": "room",
+       "note": "细长矩形房间或功能区轮廓"
+      },
+      {
+       "ref": "WXD5",
+       "ok": false,
+       "what": "sliver",
+       "note": "沿墙边的一条很细的竖向区域"
+      },
+      {
+       "ref": "B6EQ",
+       "ok": false,
+       "what": "room",
+       "note": "带楼面标高文字的矩形房间区域"
+      },
+      {
+       "ref": "9GWN",
+       "ok": true,
+       "note": "楼梯及其休息平台区域"
+      },
+      {
+       "ref": "4XIY",
+       "ok": false,
+       "what": "opening",
+       "note": "矩形井道或洞口区域"
+      },
+      {
+       "ref": "MALA",
+       "ok": false,
+       "what": "building_outline",
+       "note": "红色多边形覆盖建筑平面外轮廓"
+      },
+      {
+       "ref": "UHTB",
+       "ok": false,
+       "what": "wall_or_beam",
+       "note": "沿房间边界的细长竖向构件"
+      },
+      {
+       "ref": "I3NA",
+       "ok": false,
+       "what": "opening",
+       "note": "矩形井道或空洞区域"
+      },
+      {
+       "ref": "ODJG",
+       "ok": false,
+       "what": "room",
+       "note": "红框内为矩形房间区域"
+      },
+      {
+       "ref": "DBXQ",
+       "ok": false,
+       "what": "room",
+       "note": "带楼面标高标记的矩形房间区域"
+      },
+      {
+       "ref": "AWE1",
+       "ok": false,
+       "what": "section_view",
+       "note": "红框覆盖剖面或详图中的构造区域"
+      },
+      {
+       "ref": "A823",
+       "ok": false,
+       "what": "room",
+       "note": "带楼面标高文字的矩形房间区域"
+      },
+      {
+       "ref": "EI05",
+       "ok": false,
+       "what": "building_outline",
+       "note": "红色多边形覆盖不规则建筑平面外轮廓"
+      },
+      {
+       "ref": "J3X1",
+       "ok": false,
+       "what": "wall_or_beam",
+       "note": "红框落在粗长条形灰色构件上"
+      },
+      {
+       "ref": "YMH1",
+       "ok": false,
+       "what": "room",
+       "note": "带楼面标高标记的矩形房间区域"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "板候选逐块判读（红色多边形 = 系统认定的板边界）。误检 32% 是房间轮廓、22% 是墙或梁、18% 是整层外轮廓。**判为板的 5 块里 4 块「圈大了」——真正圈得对的只有 1/50。**两个 basis 分层一样差：largest_polygon 3/25、layer 2/25。另有 6% 的板是 column_envelope/axis_envelope 兜底，其 src 是合成标记而非图纸 id，**图上无处可看、判读不了**，而它们扛着 84% 的混凝土量。"
+    }
+   }
+  }
+ ]
+}

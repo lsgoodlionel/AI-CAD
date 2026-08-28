@@ -26,6 +26,13 @@ CTX_RATIO, MIN_SPAN_M = 1.6, 6.0   # 上下文 = 板自身尺寸 ×1.6，让整�
 PROJECTS = {"metro": "77777777-7777-7777-7777-777777777777",
             "sgoh": "9188e163-c684-415e-a4ec-08f208273eff"}
 FALLBACK = ("column_envelope", "axis_envelope")
+# **编号字母表剔除 I O 0 1 S 5**：判读者把 `YIWX` 转写成 `Y1WX`、
+# `L96T` 转写成 `L967T` —— 视觉判断可靠、字符转写不可靠（早已记录的能力边界）。
+# 这与 GB/T 50001 §8.0.4「轴号不得用 I、O、Z」是同一条道理：
+# 易混字符不该进标识符。
+_CODE_ALPHABET = "".join(c for c in string.ascii_uppercase + string.digits
+                         if c not in "IO01S5Z")
+
 random.seed(20260907)
 os.makedirs(OUT, exist_ok=True)
 
@@ -86,8 +93,7 @@ async def main():
     CELL, COLS, ROWS = 400, 5, 4
     codes = set()
     while len(codes) < 300:
-        codes.add("".join(random.choice(string.ascii_uppercase + string.digits)
-                          for _ in range(4)))
+        codes.add("".join(random.choice(_CODE_ALPHABET) for _ in range(4)))
     codes = sorted(codes); random.shuffle(codes)
 
     tiles = []

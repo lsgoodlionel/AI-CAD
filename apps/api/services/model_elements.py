@@ -563,24 +563,27 @@ _RULE_CONFIDENCE = 0.92  # 未实测类别的兜底（≥ fusion_policy.rule_str
 #   columns    0.59  verdicts_v1.json  n=120
 #   beams      0.56  beams_v1.json     n=50
 #   equipment  0.17  equipment_v1.json n=60
+#   equipment  0.17  equipment_v1.json n=60
+#   slabs      0.10  slabs_v1.json     n=50   ← 且 5 块真阳里 4 块「圈大了」
 #   pipes      0.00  pipes_v1.json     n=58   ← 58 个候选无一是管线
 #
-# 未列入的类别（slabs）**从未做过裁决式验证**，退回 `_RULE_CONFIDENCE`；
-# 缺席本身就是「没量过」的如实表示，不要给它编一个数。
+# 未列入的类别退回 `_RULE_CONFIDENCE`；缺席本身就是「没量过」的如实表示，
+# 不要给它编一个数。（六类规则构件目前已全部量过。）
 _RULE_CONFIDENCE_BY_KIND = {
     "walls": 0.70, "columns": 0.59, "beams": 0.56,
-    "equipment": 0.17, "pipes": 0.00,
+    "equipment": 0.17, "slabs": 0.10, "pipes": 0.00,
 }
 
 
 # **实测精确率约等于 0 的类别**，在规则×模型仲裁里不再享有「强规则不被覆盖」保护。
-# 只列被实测证伪的类：管线 0/58、设备 10/60。其余类别（0.56~0.70）维持原行为 ——
+# 只列被实测证伪的类：管线 0/50、设备 10/60、板 5/50（且 4 块圈大了）。
+# 其余类别（0.56~0.70）维持原行为 ——
 # 要判它们该不该继续受保护，需要的是**模型侧的分类精确率**，那个还没量过，
 # 在量出来之前不拿两个类的实测去推翻五个类的行为。
 #
 # 注：`fusion_policy.rule_strong_confidence = 0.85` 是照着 0.92 这个常数反推的，
 # 它本身不携带独立信息；真正该做的是从数据里重新定义「强规则」，见 PROGRESS 待办。
-_UNPROTECTED_KINDS = frozenset({"pipes", "equipment"})
+_UNPROTECTED_KINDS = frozenset({"pipes", "equipment", "slabs"})
 
 
 def rule_confidence(kind: str) -> float:

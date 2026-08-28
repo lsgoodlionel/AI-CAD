@@ -13,14 +13,16 @@ def test_每一类的置信度就是它实测的精确率():
     assert rule_confidence("columns") == 0.59
     assert rule_confidence("beams") == 0.56
     assert rule_confidence("equipment") == 0.17
+    assert rule_confidence("slabs") == 0.10
     assert rule_confidence("pipes") == 0.00
 
 
 def test_未实测的类退回旧默认值():
-    """板从未做过裁决式验证 —— 退回旧常数，并由 _RULE_CONFIDENCE_BY_KIND 的
-    缺席如实表示「没量过」，而不是假装量过。"""
-    assert "slabs" not in _RULE_CONFIDENCE_BY_KIND
-    assert rule_confidence("slabs") == _RULE_CONFIDENCE
+    """没量过的类退回旧常数，并由 _RULE_CONFIDENCE_BY_KIND 的缺席如实表示
+    「没量过」，而不是假装量过。六类规则构件现已全部量过，故用一个不存在的
+    类别来守这条契约。"""
+    assert "stairs" not in _RULE_CONFIDENCE_BY_KIND
+    assert rule_confidence("stairs") == _RULE_CONFIDENCE
 
 
 def test_管线不再够格当强规则命中():
@@ -43,13 +45,14 @@ def test_仲裁置信与对外置信是两件事():
     assert fusion_confidence("columns") == _RULE_CONFIDENCE   # 0.59 但仍受保护
     assert fusion_confidence("pipes") == 0.00                 # 实测证伪，失去保护
     assert fusion_confidence("equipment") == 0.17
+    assert fusion_confidence("slabs") == 0.10
 
 
 def test_被证伪的类不再压过模型():
     from services.model_elements import _UNPROTECTED_KINDS, fusion_confidence
 
     STRONG = 0.85
-    assert _UNPROTECTED_KINDS == {"pipes", "equipment"}
+    assert _UNPROTECTED_KINDS == {"pipes", "equipment", "slabs"}
     assert all(fusion_confidence(k) < STRONG for k in _UNPROTECTED_KINDS)
 
 
