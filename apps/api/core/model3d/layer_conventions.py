@@ -59,10 +59,37 @@ class _SystemRule:
 
 @dataclass(frozen=True)
 class _GateRule:
-    """非构件图层闸的一组判据（该图层画的不是建筑实体）。"""
+    """非构件图层闸的一组判据（该图层画的不是建筑实体）。
+
+    ``exempt`` 是**组内豁免**：命中它的图层，本组不再判它是非构件。
+    两条实测：`钢筋混凝土墙` 之于 annotation 组的「钢筋」（那是材料名，
+    GB/T 50083），`I—装饰—填充01(线状)` 之于 finish 组的「装饰」
+    （填充截面就是构件本体，装修 60 张实测这一豁免保住 22.4 万图元）。
+
+    ``match`` 是「子串（转义）+ 正则」合成的**一条**联合正则，加载时编译一次 ——
+    `is_non_component_layer` 在 `_find_parallel_pairs` 里逐线调用，
+    实测单图 line_layers 近 2 万条，逐词扫集合是热路径上的白烧。
+    """
     group: str
     substrings: tuple[str, ...] = ()
     patterns: tuple[re.Pattern[str], ...] = ()
+    exempt: tuple[re.Pattern[str], ...] = ()
+    match: re.Pattern[str] | None = None
+
+    def hits(self, text: str) -> bool:
+        if self.match is None or not text:
+            return False
+        if any(pattern.search(text) for pattern in self.exempt):
+            return False
+        return bool(self.match.search(text))
+
+
+def _union_regex(substrings: tuple[str, ...],
+                 patterns: tuple[re.Pattern[str], ...]) -> re.Pattern[str] | None:
+    """子串（转义）+ 已编译正则 → 一条大小写不敏感的联合正则。"""
+    parts = [re.escape(sub) for sub in substrings if sub]
+    parts += [f"(?:{pattern.pattern})" for pattern in patterns]
+    return re.compile("|".join(parts), re.IGNORECASE) if parts else None
 
 
 @dataclass(frozen=True)
@@ -70,17 +97,13 @@ class LayerConventions:
     """已解析、可直接匹配的图层约定集合。"""
     kind_rules: tuple[_KindRule, ...] = ()
     system_rules: tuple[_SystemRule, ...] = ()
-    #: 非构件闸分组（group → 判据），供将来按组分别开关用。
-    gate_groups: dict[str, _GateRule] = field(default_factory=dict)
-    #: 闸词表 = yaml ∪ 兜底，**加载时算一次**（`is_non_component_layer` 在
-    #: `_find_parallel_pairs` 里逐线调用，实测单图 line_layers 近 2 万条，
-    #: 每次重建集合是热路径上的白烧）。
+    #: 非构件闸分组（group → 判据），**yaml ∪ 兜底、加载时合并一次**。
+    #: `is_non_component_layer` 取各组的并集，`is_annotation_layer` 只问
+    #: `annotation` 一组 —— 分组开关由这个字典提供，不必把语义拆进函数名。
     #: 默认值就是兜底词表 —— 于是 `LayerConventions()` 这个**降级返回值**
     #: 天然带着闸，不必在降级分支里再记得补一遍。
-    gate_substrings: frozenset[str] = field(
-        default_factory=lambda: _DEFAULT_GATE_SUBSTRINGS)
-    gate_patterns: tuple[re.Pattern[str], ...] = field(
-        default_factory=lambda: _DEFAULT_GATE_PATTERNS)
+    gate_groups: dict[str, _GateRule] = field(
+        default_factory=lambda: _default_gate_groups())
 
 
 def _norm(text: str | None) -> str:
@@ -133,10 +156,11 @@ def _build_gate_rule(entry: dict) -> _GateRule | None:
     group = str(entry.get("group") or "").strip()
     if not group:
         return None
-    return _GateRule(
-        group=group,
-        substrings=_str_list(entry.get("substrings")),
-        patterns=_compile_patterns(entry.get("patterns")),
+    return _gate_rule(
+        group,
+        _str_list(entry.get("substrings")),
+        _compile_patterns(entry.get("patterns")),
+        _compile_patterns(entry.get("exempt")),
     )
 
 
@@ -176,20 +200,16 @@ def load_conventions() -> LayerConventions:
         for entry in data.get("systems", []) or []
         if isinstance(entry, dict) and (rule := _build_system_rule(entry)) is not None
     )
-    gate_groups = {
+    yaml_groups = {
         rule.group: rule
         for entry in data.get("non_component", []) or []
         if isinstance(entry, dict) and (rule := _build_gate_rule(entry)) is not None
     }
-    # **yaml 只能加词，挖不掉地板**：与兜底取并集，不是覆盖。
+    # **yaml 只能加词，挖不掉地板**：与兜底逐组取并集，不是覆盖。
     return LayerConventions(
         kind_rules=tuple(sorted(kind_rules, key=_order_key)),
         system_rules=system_rules,
-        gate_groups=gate_groups,
-        gate_substrings=_DEFAULT_GATE_SUBSTRINGS.union(
-            *(r.substrings for r in gate_groups.values())),
-        gate_patterns=_DEFAULT_GATE_PATTERNS + tuple(
-            p for r in gate_groups.values() for p in r.patterns),
+        gate_groups=_merge_gate_groups(yaml_groups),
     )
 
 
@@ -243,50 +263,22 @@ _XREF_BOUND_RE = re.compile(r"^.*\$\d+\$\d*")
 _XREF_ATTACHED_RE = re.compile(r"^.*\|")
 
 
-#: **标注/文字图层不是构件图层**。实测大歌剧院一张
-#: 「1区立柱桩及钢立柱平面布置图」贡献 3410 根「柱」，
-#: 全部来自图层名「**立柱桩标注**」—— 那画的是引线与文字，不是柱。
-#:
-#: 中文用「标注/文字/标高/说明/编号/尺寸」，AIA 用
-#: `-TEXT`/`-DIMS`/`-NOTE`/`-IDEN`/`-ANNO` 后缀 ——
-#: **都是通用制图用语**，不是某工程的命名习惯。
-#: 同理，**钢筋图层也不是构件图层**：`墙柱纵筋` / `墙柱箍筋` 画的是钢筋，
-#: 却因含「柱」被判成柱（实测一张墙配筋图造出 711 根假柱）。
-#: 「纵筋/箍筋/配筋/钢筋」是通用结构制图用语，非某工程命名。
-_ANNOTATION_LAYER_RE = re.compile(
-    r"标注|文字|说明|编号|尺寸标|标高标|注释|图例"
-    r"|纵筋|箍筋|配筋|钢筋|拉筋|分布筋"
-    # **前后都可以是边界**：旧写法要求前导横线，裸图层名 `TEXT` 因此漏网
-    # （实测「屋顶设备层埋件平面布置图」的 TEXT 层造出 21 个「柱」）。
-    # 收尾仍用 `(?:-|$)`，`TEXTURE` 不会被误伤。
-    r"|(?:^|-)(?:TEXT|DIMS?|NOTE|IDEN|ANNO|TAG|LABEL|REBAR|REIN)(?:-|$)",
-    re.IGNORECASE)
-
-
-#: **「钢筋混凝土」是材料名，不是钢筋图层**（GB/T 50083 材料术语）。
-#: 探测判据边界时抓出：`钢筋混凝土墙` 含「钢筋」被判成标注层，
-#: 而那是真真正正的墙 —— **误杀的代价是构件凭空消失**，
-#: 比放进几条钢筋线严重得多。必须先于「钢筋」子串判掉。
-_CONCRETE_MATERIAL_RE = re.compile(r"钢筋(?:混凝土|砼)")
-
-
 def is_annotation_layer(layer: str | None) -> bool:
-    """该图层画的是标注而非构件本身。
+    """该图层画的是**标注**而非构件本身 —— 非构件闸的 `annotation` 一组。
 
     **与 `classify_by_layer` 是两个问题**：后者答「这个图层属于哪个构件
     类别」（`S-BEAM-TEXT` 属于梁），本函数答「这条线是不是构件几何」
     （梁的文字标注不是梁）。我第一版把两者混为一谈，
     直接让 `classify_by_layer` 对标注层返回 None，打断了 4 个既有断言。
+
+    **识别器里要拦构件产出的地方一律用 `is_non_component_layer`**（并集）；
+    本函数留给只关心「标注」这一层语义的地方 —— 分组度量、
+    以及需要把标注与图框分开统计的抽样脚本。
+
+    词表在 yaml 的 `non_component.annotation`（此前是本文件的硬编码正则）；
+    「钢筋混凝土」由该组的 `exempt` 摘掉 —— 那是材料名，不是钢筋图层。
     """
-    # **只看图层自己的名字**：外参前缀是**来源图纸**的名字，不是图层语义。
-    # 实测 `S-南区-PLAN-1F - 板配筋(-3.5~0.0)$0$0S-COLS-HATCH` ——
-    # `S-COLS` 是 AIA 标准的结构柱层，却因前缀里的「配筋」被整体判成标注，
-    # 该图 658 个柱候选全被丢弃（金标准 12 根 → 识别 0）。
-    # 剥离后仍含标注词的（`...$0$墙柱纵筋`）照旧判出，那才是图层自己的语义。
-    text = normalize_layer_name(layer)
-    # 「钢筋混凝土X」先摘掉，再判 —— 否则材料名里的「钢筋」会误杀真构件层
-    text = _CONCRETE_MATERIAL_RE.sub("", text)
-    return bool(_ANNOTATION_LAYER_RE.search(text))
+    return is_gate_group_hit(layer, "annotation")
 
 
 #: 非构件闸兜底词表 —— **yaml 丢了闸也必须还在**。
@@ -309,38 +301,108 @@ _DEFAULT_GATE_VOCAB: dict[str, dict[str, tuple[str, ...]]] = {
         "substrings": ("图框", "标题块", "会签栏", "图签"),
         "patterns": (r'(?:^|[-_])(?:SHET|TTLB|TBLK)(?:[-_]|$)',),
     },
+    # 标注 / 文字 / 钢筋 —— **此前是本文件里的硬编码正则 `_ANNOTATION_LAYER_RE`**，
+    # 挪进词表后与 yaml 同源。`is_annotation_layer()` 只问这一组。
+    #
+    # 实测出处：「1区立柱桩及钢立柱平面布置图」贡献 3410 根「柱」，全部来自
+    # 图层名「立柱桩标注」——画的是引线与文字；一张墙配筋图的 `墙柱纵筋`
+    # 因含「柱」造出 711 根假柱。中文的「标注/文字/标高/说明/编号/尺寸」与
+    # AIA 的 -TEXT/-DIMS/-NOTE/-IDEN/-ANNO 都是通用制图用语，非某工程命名。
+    # 正则前后都留边界：裸图层名 `TEXT` 也要命中（实测造出 21 根假柱），
+    # 收尾用 (?:-|$) 保证 `TEXTURE` 不被误伤。
+    "annotation": {
+        "substrings": ("标注", "文字", "说明", "编号", "尺寸标", "标高标", "注释",
+                       "图例", "纵筋", "箍筋", "配筋", "钢筋", "拉筋", "分布筋"),
+        "patterns": (r"(?:^|-)(?:TEXT|DIMS?|NOTE|IDEN|ANNO|TAG|LABEL|REBAR|REIN)(?:-|$)",),
+        # 「钢筋混凝土」是材料名（GB/T 50083），不是钢筋图层。
+        "exempt": (r"钢筋(?:混凝土|砼)",),
+    },
+    # 装修饰面 / 图案 —— 被 wall 的通用子串「墙」判成结构墙的那批
+    # （`I—平面—墙面材料` / `I—平面—外墙装饰面层线` / `I—隔墙—地面阴影`）。
+    "finish": {
+        "substrings": ("饰面", "装饰", "面层", "材料", "阴影", "图案", "铺装",
+                       "拼花", "分格", "石材"),
+        "patterns": (r"(?:^|-)(?:FINH|PATT)(?:-|$)",),
+        # **填充不是饰面**：填充截面就是构件本体，清掉会造成大面积构件消失。
+        "exempt": (r"填充", r"HATCH"),
+    },
 }
 
-#: 兜底词表拍平后的成品（`LayerConventions` 的字段默认值直接用它们）。
-_DEFAULT_GATE_SUBSTRINGS: frozenset[str] = frozenset(
-    _norm(sub) for vocab in _DEFAULT_GATE_VOCAB.values()
-    for sub in vocab["substrings"] if sub
-)
-_DEFAULT_GATE_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
-    re.compile(p, re.IGNORECASE)
-    for vocab in _DEFAULT_GATE_VOCAB.values() for p in vocab["patterns"]
-)
+def _gate_rule(group: str, substrings: tuple[str, ...],
+               patterns: tuple[re.Pattern[str], ...],
+               exempt: tuple[re.Pattern[str], ...]) -> _GateRule:
+    """把一组词汇装配成规则（联合正则在此编译一次）。"""
+    return _GateRule(group=group, substrings=substrings, patterns=patterns,
+                     exempt=exempt, match=_union_regex(substrings, patterns))
+
+
+def _default_gate_groups() -> dict[str, _GateRule]:
+    """由 .py 内置词表构造的闸（yaml 不可用时的地板）。"""
+    return {
+        group: _gate_rule(
+            group,
+            tuple(_norm(sub) for sub in vocab.get("substrings", ()) if sub),
+            tuple(re.compile(p, re.IGNORECASE) for p in vocab.get("patterns", ())),
+            tuple(re.compile(p, re.IGNORECASE) for p in vocab.get("exempt", ())),
+        )
+        for group, vocab in _DEFAULT_GATE_VOCAB.items()
+    }
+
+
+def _merge_gate_groups(yaml_groups: dict[str, _GateRule]) -> dict[str, _GateRule]:
+    """yaml ∪ 兜底，**逐组合并**（yaml 只能加词，挖不掉地板）。
+
+    yaml 里独有的组原样收下；两边都有的组，词汇/正则/豁免各取并集。
+    """
+    merged = _default_gate_groups()
+    for group, rule in yaml_groups.items():
+        floor = merged.get(group)
+        if floor is None:
+            merged[group] = rule
+            continue
+        substrings = tuple(dict.fromkeys(floor.substrings + rule.substrings))
+        patterns = floor.patterns + tuple(
+            p for p in rule.patterns
+            if p.pattern not in {q.pattern for q in floor.patterns})
+        exempt = floor.exempt + tuple(
+            p for p in rule.exempt
+            if p.pattern not in {q.pattern for q in floor.exempt})
+        merged[group] = _gate_rule(group, substrings, patterns, exempt)
+    return merged
 
 
 def is_non_component_layer(layer: str | None) -> bool:
-    """该图层画的**不是建筑实体**，任何构件都不该从它产出。
+    """该图层画的**不是建筑实体**，任何构件都不该从它产出 —— 各组的**并集**。
 
-    **与 `is_annotation_layer` 是两个问题**（别合并成一个正则）：
-      - 标注**依附于某个构件** —— `S-BEAM-TEXT` 是梁的文字，语义上仍属 beam。
-      - 图框/标题块/会签栏**不依附任何构件**，画的是「纸」不是「楼」。
-    AIA 本身也分开：`-ANNO/-IDEN/-DIMS` 是挂在专业构件后的 minor group，
-    而 `SHET`/`TTLB` 自成一系。合并后就再也无法分别开关。
+    三组，语义各不相同，但对识别器是同一个答案「别从这儿产出构件」：
+      - ``sheet``      图框/标题块/会签栏：画的是「纸」不是「楼」
+      - ``annotation`` 标注/文字/钢筋：依附于某个构件，但画的不是构件几何
+      - ``finish``     装修饰面/图案：贴在构件表面的材料表达，不是构件本体
 
-    **只看图层自己的名字**：`|` 前是**来源图纸**的名字而非图层语义 ——
-    与 `is_annotation_layer` 同一条教训（前缀里的「配筋」曾让某图 658 个
-    柱候选全被丢弃）。故 `图框A2$0$S-COLU` 判为 False，那是真柱层。
+    **分组开关由 `conv.gate_groups` 提供**，不必把语义拆进函数名 ——
+    `is_annotation_layer()` 就是「只问 annotation 一组」的那个入口。
+
+    **不能改成让 `classify_by_layer` 返回 None**：识别器里柱与设备的判据是
+    `_kind is not None and _kind != "equipment"`，None 是**放行**，
+    图元会掉进「按尺寸猜」的路径，比判错类型更糟。
+
+    **只看图层自己的名字**：`|` / `$N$` 前是**来源图纸**的名字而非图层语义 ——
+    实测前缀里的「配筋」曾让某图 658 个柱候选全被丢弃。
+    故 `图框A2$0$S-COLU`、`装饰施工图$0$S-WALL` 都判为 False，那是真构件层。
     """
     text = _norm(normalize_layer_name(layer))
     if not text:
         return False
-    conv = load_conventions()
-    return (any(sub in text for sub in conv.gate_substrings)
-            or any(pattern.search(text) for pattern in conv.gate_patterns))
+    return any(rule.hits(text) for rule in load_conventions().gate_groups.values())
+
+
+def is_gate_group_hit(layer: str | None, group: str) -> bool:
+    """只问某一组闸（分组开关的入口；`is_annotation_layer` 即其特例）。"""
+    text = _norm(normalize_layer_name(layer))
+    if not text:
+        return False
+    rule = load_conventions().gate_groups.get(group)
+    return rule.hits(text) if rule is not None else False
 
 
 def normalize_layer_name(layer: str | None) -> str:

@@ -383,3 +383,56 @@ def test_梁也走同一道闸():
     geom.texts[-1] = (360.0, 20.0, "梁配筋平面图")
     result = recognize(geom, "structure", "dtb")
     assert result.beams == []
+
+
+# ── 同一道闸的另外两组：标注 与 装修饰面 ──────────────────────
+# 图框那组（上面）证明了平行线对判据此前不问图层；标注与饰面走同一条缝：
+#   「底板换撑平面布置图」309 面墙里 278 面是 `TEXT` 层笔画两两配对、12 面 `Dim`
+#   「8F节点大样图」420 面里 269 面是 `I—装饰—细线/中线/中粗` 互配
+# 判据是**换算到实际尺寸**后的 0.1~0.4m，而图上 1~4 毫米的笔画间距
+# 按 1:100 换算正好落在这个区间的正中间。
+@pytest.mark.unit
+def test_饰面图层的平行线对不再产出墙():
+    """外墙装饰面层线是**贴在墙面上的线**，不是墙。"""
+    result = recognize(
+        _plan_thick_parallel_wall("I—平面—外墙装饰面层线", 0.2), "structure", "dw")
+    assert result.walls == []
+
+
+@pytest.mark.unit
+def test_标注图层的平行线对不再产出墙():
+    """标注线成对出现也不是墙 —— 这条纪律此前只接在柱/管/设备上。"""
+    result = recognize(_plan_thick_parallel_wall("S-COLU-DIMS", 0.2), "structure", "dw")
+    assert result.walls == []
+
+
+@pytest.mark.unit
+def test_宽墙上限只对真墙图层放宽():
+    """0.6m 已超普通上限 0.4m，只有**真墙图层**才配解锁 1.0m 宽墙上限。
+
+    饰面层被 `classify_by_layer` 判成 wall 后，连这条特权也一并拿到了。
+    """
+    result = recognize(
+        _plan_thick_parallel_wall("I—平面—墙面材料", 0.6), "structure", "dw")
+    assert result.walls == []
+
+
+@pytest.mark.unit
+def test_填充图层的平行线对仍然产出墙():
+    """**填充层不受这道闸影响**：填充截面就是构件本身（50.2 万 path）。"""
+    result = recognize(
+        _plan_thick_parallel_wall("I—隔墙—填充01(线状)", 0.2), "structure", "dw")
+    assert len(result.walls) == 1
+
+
+@pytest.mark.unit
+def test_饰面图层上的多边形不走尺寸猜测路径():
+    """饰面层上**尺寸正好像柱**的多边形不算柱。
+
+    与 `test_an_unclassifiable_layer_still_reaches_the_size_guess` 是一对：
+    判不出类型（None）的图层**会**掉进尺寸猜测路径、产出 9 根柱。
+    所以「让 classify_by_layer 对饰面层返回 None」不是修法，
+    是把问题换成更糟的一个 —— 拦住它的必须是这道非构件闸。
+    """
+    result = recognize(_plan_with_polys_on("I—平面—墙面材料"), "structure", "d1")
+    assert len(result.columns) == 4          # 只剩 4 根真柱
