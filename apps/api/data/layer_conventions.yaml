@@ -1,6 +1,14 @@
 # 图层约定配置 —— 中国施工图「图层名 / 块名 → 构件类型」映射
 #
-# 用途：为构件识别（core/model3d/element_recognizer.py，A-16）提供强先验。
+# **本文件是图层分类的单一真相源。** 2026-09-14 之前仓库里有两份互相分岔的配置：
+# 本文件（生产唯一判据）与 `data/model3d/layer_class_map.yaml`（只喂 Phase C
+# 数据集标注）。实测「灯具」在前者出现 0 次、在后者 4 次 —— 装修 / 吊顶 / 铺装 /
+# 饰面的整套词汇仓库里有，却到不了生产路径，歌剧院的装修图层因此全部落进
+# 「图层判不出」那 57.5%。已把后者并入本文件并删除，
+# `dataset/auto_label.py` 的默认补充映射改读本文件（见其模块文档）。
+#
+# 用途：为构件识别（core/model3d/element_recognizer.py，A-16）提供强先验，
+#       并为 Phase C 弱标注引擎（core/model3d/dataset/auto_label.py）提供同一判据。
 #       CAD 图层命名往往直接编码了构件语义，比纯几何启发式更可靠。
 #
 # 参考来源：
@@ -14,67 +22,96 @@
 #   3. substrings—— 子串匹配（图层名 / 块名包含此片段）
 #   4. patterns  —— 正则匹配（Python re，大小写不敏感）
 #
+# 强制约束（共享 taxonomy，勿自造顶层类别）：
+#   - conventions.kind ∈ {column, beam, slab, wall, door, window, pipe, equipment, axis}
+#   - systems.system   ∈ {消防, 给排水, 电气, 暖通}
+#   非法 kind / system 的条目由加载器静默跳过（不抛异常）。
+#
 # 可扩展性：用户可直接向任一列表追加别名 / 前缀 / 子串 / 正则，无需改代码。
 # 原则：只覆盖常见约定，不臆造过细的行业内部私有命名。
 
-version: "1.0"
+version: "2.0"
 description: "中国施工图图层/块命名 → 构件类型映射（column/wall/beam/slab/pipe/equipment/door/window/axis）"
 
 # ── 构件类型映射 ─────────────────────────────────────────────
 # kind 取值须与 element_recognizer 的构件体系一致。
+# 同一 kind 可有多条条目（加载器按 _KIND_ORDER 稳定排序），
+# 结构/机电与装修分块登记，便于看清每条词汇的来路。
 conventions:
   # 结构柱：S-COLU（AIA）/ KZ 框架柱 / GZ 构造柱 / 中文「柱」
+  #   并入原 layer_class_map：GKZ 框支柱 / AZ 暗柱 / YBZ、GBZ 边缘构件 / 端柱 / 芯柱
   - kind: column
-    aliases: ["S-COLU", "S-COLS", "STRU-COLU", "结构柱", "框架柱", "KZ", "GZ", "COLUMN"]
-    prefixes: ["S-COLU", "S-COL", "A-COLS", "结-柱", "结构-柱"]
-    substrings: ["柱"]
-    patterns: ['^(?:S|STR)[-_]?COL']
+    aliases: ["S-COLU", "S-COLS", "STRU-COLU", "结构柱", "框架柱", "KZ", "GZ", "COLUMN",
+              "GKZ", "AZ", "YBZ", "GBZ", "框支柱", "暗柱", "端柱", "芯柱"]
+    prefixes: ["S-COLU", "S-COL", "A-COLS", "结-柱", "结构-柱",
+               "STR-COLU", "STRUCT-COL", "PKPM-COL", "砼-柱", "混凝土-柱"]
+    substrings: ["柱"]   # 柱帽 / 柱墩 等已被「柱」覆盖，不再重复登记
+    patterns: ['^(?:S|STR)[-_]?COL',
+               '(?:^|[-_])(?:GKZ|AZ|YBZ|GBZ|KZ|GZ)\d']
 
   # 结构梁：S-BEAM / KL 框架梁 / LL 连梁 / 中文「梁」
+  #   并入原 layer_class_map：XL 悬挑梁 / JCL、JL 基础梁 / QL 圈梁 / GL 过梁 / WKL 屋面框架梁
   - kind: beam
-    aliases: ["S-BEAM", "STRU-BEAM", "结构梁", "框架梁", "KL", "LL", "BEAM"]
-    prefixes: ["S-BEAM", "S-BEA", "结-梁", "结构-梁"]
-    substrings: ["梁"]
-    patterns: ['^(?:S|STR)[-_]?BEA']
+    aliases: ["S-BEAM", "STRU-BEAM", "结构梁", "框架梁", "KL", "LL", "BEAM",
+              "XL", "JCL", "JL", "QL", "GL", "WKL"]
+    prefixes: ["S-BEAM", "S-BEA", "结-梁", "结构-梁",
+               "STR-BEAM", "STRUCT-BEA", "砼-梁", "混凝土-梁"]
+    substrings: ["梁"]   # 次梁 / 连梁 / 梁配筋 等已被「梁」覆盖
+    patterns: ['^(?:S|STR)[-_]?BEA',
+               '(?:^|[-_])(?:KL|LL|XL|WKL|JCL|JL|QL|GL)\d']
 
   # 结构板 / 楼板 / 基础底板 / 筏板 / 承台：S-SLAB / 中文「板」「楼板」「筏板」「底板」「承台」
   #   注：底板/筏板/顶板/叠合板等中文名含「板」子串已可命中；此处补充承台（无「板」字）
   #       与筏板/底板/顶板的英文/拼音代号（FB/DB/CT/JC/RAFT），提升基础平面图覆盖。
+  #   并入原 layer_class_map：LB 楼板 / WB 屋面板 / XB 悬挑板 / TB 楼梯板 / 压型钢板
   - kind: slab
     aliases: ["S-SLAB", "STRU-SLAB", "结构板", "楼板", "现浇板", "筏板", "底板", "基础底板",
-              "承台", "顶板", "叠合板", "悬挑板", "屋面板", "SLAB", "FLOOR-SLAB", "RAFT"]
+              "承台", "顶板", "叠合板", "悬挑板", "屋面板", "SLAB", "FLOOR-SLAB", "RAFT",
+              "LB", "WB", "XB", "TB", "FB", "DB", "压型钢板"]
     prefixes: ["S-SLAB", "S-SLB", "S-FLOR", "S-RAFT", "S-FND", "结-板", "结构-板",
-               "FB-", "DB-", "WB-", "TB-", "CT-", "JC-", "筏板-", "底板-", "承台-"]
-    substrings: ["楼板", "现浇板", "筏板", "底板", "承台", "顶板", "叠合板", "悬挑板", "屋面板", "板"]
-    patterns: ['^(?:S|STR)[-_]?SL', '^(?:S[-_]?)?(?:RAFT|FND)', '^(?:FB|DB|WB|TB|CT|JC)\d']
+               "FB-", "DB-", "WB-", "TB-", "CT-", "JC-", "筏板-", "底板-", "承台-",
+               "STR-SLAB", "STRUCT-SL", "砼-板", "混凝土-板", "板-"]
+    substrings: ["楼板", "现浇板", "筏板", "底板", "承台", "顶板", "叠合板", "悬挑板", "屋面板",
+                 "板"]
+    patterns: ['^(?:S|STR)[-_]?SL', '^(?:S[-_]?)?(?:RAFT|FND)', '^(?:FB|DB|WB|TB|CT|JC)\d',
+               '(?:^|[-_])(?:LB|WB|XB|TB|FB|DB)\d']
 
   # 墙：S-WALL 剪力墙 / A-WALL 建筑墙 / 地下室外墙 / 挡土墙 / 人防墙 / 中文「墙」
   #   注：含「墙」的中文名（外墙/内墙/挡土墙/人防墙/承重墙/女儿墙…）已可经子串「墙」命中；
   #       此处补充拼音/英文代号（DWQ 地下室外墙 / RFQ 人防墙 / DTQ 挡土墙）与精确别名。
+  #   并入原 layer_class_map：NEQ 内墙 / A-PART 建筑隔墙 / JLQ 剪力墙代号
   - kind: wall
     aliases: ["S-WALL", "A-WALL", "剪力墙", "建筑墙", "砌体墙", "填充墙", "地下室外墙", "挡土墙",
               "人防墙", "外墙", "内墙", "承重墙", "女儿墙", "幕墙", "栏板墙", "WALL", "Q",
-              "DWQ", "RFQ", "DTQ"]
+              "DWQ", "RFQ", "DTQ", "NEQ", "隔墙"]
     prefixes: ["S-WALL", "A-WALL", "S-WAL", "A-WAL", "S-RETW", "建-墙", "结-墙", "墙-",
-               "DWQ-", "RFQ-", "DTQ-", "外墙-", "挡土墙-"]
+               "DWQ-", "RFQ-", "DTQ-", "外墙-", "挡土墙-",
+               "A-PART", "ARCH-WAL", "STRUCT-WAL", "建筑-墙", "混凝土-墙", "砼-墙"]
     substrings: ["剪力墙", "砌体", "填充墙", "地下室外墙", "挡土墙", "人防墙", "承重墙", "女儿墙",
-                 "幕墙", "栏板墙", "外墙", "内墙", "墙"]
-    patterns: ['^[AS][-_]?WAL', '^(?:DWQ|RFQ|DTQ)']
+                 "幕墙", "栏板墙", "外墙", "内墙", "隔墙", "墙"]
+    patterns: ['^[AS][-_]?WAL', '^(?:DWQ|RFQ|DTQ)',
+               '(?:^|[-_])(?:DWQ|JLQ|Q)\d']
 
   # 门（洞口）：门 / DOOR / M- 门编号 / A-DOOR
   #   注：门窗多为「块（block）」命名，加载器优先用块名匹配。
-  # **`M-` 前缀与裸 `M` 别名已移除**：与上面的 `C-` 是同一个碰撞的另一半 ——
+  # **`M-` 前缀与裸 `M` 别名已移除**：与下面窗的 `C-` 是同一个碰撞的另一半 ——
   # AIA CAD Layer Guidelines 里 **M = Mechanical 学科代码**，
-  # 实测把整个机电命名空间判成门：`M-PIPE`（管线自己的前缀，就写在
-  # layer_class_map.yaml 里）、`M-EQPM`、`M-PIPE-SUPPLY` 全部 → door。
+  # 实测把整个机电命名空间判成门：`M-PIPE`（管线自己的前缀）、
+  # `M-EQPM`、`M-PIPE-SUPPLY` 全部 → door。
   # 而 door 在 `_KIND_ORDER` 里排在 pipe/equipment 之前，抢先命中。
   # 中国院的门编号是 **M + 数字**（M1、M0921、M-1521），由 `^M\d` 与 `^M-\d`
-  # 两条 pattern 一起覆盖，信息不丢 —— 与上面窗的 `^C\d` / `^C-\d` 完全对称。
+  # 两条 pattern 一起覆盖，信息不丢 —— 与下面窗的 `^C\d` / `^C-\d` 完全对称。
+  # **合并时勿把 `M-` / `C-` 前缀改回去。**
+  #   并入原 layer_class_map：FM 防火门 / RFM 人防门 / JLM 卷帘门 / 子母门 / 各类开启方式
   - kind: door
-    aliases: ["A-DOOR", "门", "DOOR"]
-    prefixes: ["A-DOOR", "A-DOR", "门-", "MEN-", "DOOR-"]
-    substrings: ["门"]
-    patterns: ['^M\d', '^M-\d', 'DOOR']
+    aliases: ["A-DOOR", "门", "DOOR",
+              "FM", "RFM", "JLM", "防火门", "人防门", "卷帘门", "子母门",
+              "木门", "钢门", "旋转门", "平开门", "推拉门"]
+    prefixes: ["A-DOOR", "A-DOR", "门-", "MEN-", "DOOR-",
+               "A-DOOR-", "ARCH-DOR", "门窗-门", "户门-", "FM-", "FHM-"]
+    substrings: ["门"]   # 防火门 / 卷帘门 / 洞口-门 等已被「门」覆盖
+    patterns: ['^M\d', '^M-\d', 'DOOR',
+               '(?:^|[-_])(?:FM|RFM|JLM|FHM|LM|TLM)\d']
 
   # 窗（洞口）：窗 / WINDOW / C+数字 窗编号 / A-GLAZ
   #
@@ -82,49 +119,110 @@ conventions:
   # **C = Civil 学科代码**，实测把 `C-SHET-TTLB`（图框标题块）判成了窗，
   # 导致 window 命中数虚高到 49670。中国院的窗编号是 **C + 数字**
   # （C1、C-1），已由 `patterns: ^C\d` 与 `^C-\d` 覆盖，信息不丢。
+  # **合并时勿把 `C-` 前缀改回去。**
+  #   并入原 layer_class_map：FC 防火窗 / PC 飘窗 / BYC 百叶窗 / GC 高窗 / 各类材质窗
   - kind: window
-    aliases: ["A-GLAZ", "A-WIND", "窗", "WINDOW"]
-    prefixes: ["A-GLAZ", "A-WIND", "窗-", "CHUANG-", "WIN-", "WINDOW-"]
-    substrings: ["窗"]
-    patterns: ['^C\d', '^C-\d', 'WIND']
+    aliases: ["A-GLAZ", "A-WIND", "窗", "WINDOW",
+              "BYC", "防火窗", "飘窗", "百叶窗",
+              "高窗", "塑钢窗", "铝合金窗", "落地窗", "转角窗"]
+    prefixes: ["A-GLAZ", "A-WIND", "窗-", "CHUANG-", "WIN-", "WINDOW-",
+               "A-WIND-", "ARCH-WIN", "门窗-窗", "FC-", "PC-"]
+    substrings: ["窗", "百叶"]   # 防火窗 / 飘窗 / 洞口-窗 等已被「窗」覆盖
+    patterns: ['^C\d', '^C-\d', 'WIND',
+               '(?:^|[-_])(?:FC|PC|BYC|GC|TC|LC)\d']
 
   # 机电管线：暖通风管 / 给排水管 / 中文「管」；system 另由 systems 段判定
+  #   并入原 layer_class_map：喷淋 / 桥架 / 母线 / 立管支管干管 / 冷媒冷凝水
   - kind: pipe
-    aliases: ["M-DUCT", "P-PIPE", "H-PIPE", "风管", "水管", "管线", "PIPE", "DUCT"]
-    prefixes: ["M-DUCT", "P-PIPE", "P-DOMW", "P-SANR", "M-HVAC", "暖-", "水-", "风-"]
-    substrings: ["风管", "水管", "管道", "管线", "管"]
-    patterns: ['^[MPH][-_]?(?:PIPE|DUCT|HVAC)']
+    aliases: ["M-DUCT", "P-PIPE", "H-PIPE", "风管", "水管", "管线", "PIPE", "DUCT",
+              "SP-PIPE", "CT-BUS", "喷淋管", "母线", "雨水管", "污水管",
+              "冷媒管", "冷凝水管", "消火栓管", "喷淋支管", "热水管"]
+    prefixes: ["M-DUCT", "P-PIPE", "P-DOMW", "P-SANR", "M-HVAC", "暖-", "水-", "风-",
+               "W-PIPE", "P-STRM", "P-WASV", "M-PIPE", "H-DUCT", "喷淋-",
+               "桥架-", "母线-", "风管-", "水管-"]
+    substrings: ["风管", "水管", "管道", "管线", "管",
+                 "喷淋", "桥架", "母线槽", "立管", "支管", "干管", "冷媒", "冷凝水"]
+    patterns: ['^[MPH][-_]?(?:PIPE|DUCT|HVAC)',
+               '(?:^|[-_])SP(?:$|[-_\d])', '[-_](?:PIPE|DUCT|TUBE)(?:$|[-_])']
 
   # 机电设备：设备 / EQPM / 电箱 / 桥架末端设备等
+  #   并入原 layer_class_map：水泵 / 风机 / 配电柜 / 消火栓箱 / 灯具 / 插座 / 烟感温感 /
+  #   喷头 / 摄像头 / 空调新风冷水机组 / 水箱集水坑 / 阀门仪表
+  #   —— **本类是并入后新增量最大的一类，且下游 `_find_equipment` 对
+  #   `_kind == "equipment"` 会放宽尺寸阈值**，故新增词汇必须是设备本体的图层名，
+  #   不要把「灯具编号」「设备表」一类标注词写进来（那由 is_annotation_layer 拦）。
   - kind: equipment
-    aliases: ["M-EQPM", "E-EQPM", "P-EQPM", "设备", "机电设备", "EQUIPMENT", "EQPM"]
-    prefixes: ["M-EQPM", "E-EQPM", "P-EQPM", "E-POWR", "E-LITE", "设备-", "电-"]
-    substrings: ["设备", "配电箱", "桥架", "水泵", "风机", "空调机"]
-    patterns: ['[-_]EQPM', '^E[-_]?(?:POWR|LITE)']
+    aliases: ["M-EQPM", "E-EQPM", "P-EQPM", "设备", "机电设备", "EQUIPMENT", "EQPM",
+              "水泵", "风机", "配电柜", "配电箱", "消火栓箱", "灯具", "插座",
+              "开关", "传感器", "喷头", "烟感", "温感", "摄像头", "空调机组",
+              "新风机组", "冷水机组", "水箱", "集水坑"]
+    prefixes: ["M-EQPM", "E-EQPM", "P-EQPM", "E-POWR", "E-LITE", "设备-", "电-",
+               "M-EQPM-", "E-DEVC", "E-LITE-", "E-COMM", "P-FIXT",
+               "末端-", "灯具-", "插座-"]
+    substrings: ["设备", "配电箱", "桥架", "水泵", "风机", "空调机",
+                 "喷头", "灯具", "插座", "烟感", "温感", "配电", "机组", "水箱",
+                 "阀门", "仪表"]
+    patterns: ['[-_]EQPM', '^E[-_]?(?:POWR|LITE)',
+               '[-_]EQPM(?:$|[-_])', '(?:^|[-_])(?:FHSX|WB|SB)\d']
 
   # 轴网 / 轴线：AXIS / GRID / DOTE(AIA 定位) / 中文「轴线」「轴网」「定位」
+  #   并入原 layer_class_map：定位轴 / 辅助轴 / 附加轴 / 轴圈 / 轴号
   - kind: axis
-    aliases: ["S-GRID", "A-GRID", "AXIS", "GRID", "DOTE", "轴线", "轴网", "定位轴线"]
-    prefixes: ["S-GRID", "A-GRID", "M-GRID", "轴-", "轴线-", "AXIS-", "GRID-"]
-    substrings: ["轴线", "轴网", "定位轴"]
-    patterns: ['[-_]?(?:GRID|AXIS)$', '^DOTE']
+    aliases: ["S-GRID", "A-GRID", "AXIS", "GRID", "DOTE", "轴线", "轴网", "定位轴线",
+              "定位轴", "辅助轴", "附加轴", "圆弧轴线", "轴号", "轴标"]
+    prefixes: ["S-GRID", "A-GRID", "M-GRID", "轴-", "轴线-", "AXIS-", "GRID-",
+               "E-GRID", "P-GRID", "STR-GRID", "ARCH-GRID", "定位-", "轴号-"]
+    substrings: ["轴线", "轴网", "定位轴", "辅助轴", "附加轴", "轴圈", "轴号"]
+    patterns: ['[-_]?(?:GRID|AXIS)$', '^DOTE',
+               '[-_](?:GRID|AXIS|GRIDLINE)(?:$|[-_])']
+
+  # ── 装修专业域（Interior / Finish）—— 统一归入既有 9 类，不新增顶层类别 ──
+  # 只登记**装修构件**（隔墙 / 吊顶板 / 成品门）。
+  # 装修**饰面与图案**（石材墙面、地面铺装、分格线、填充）不是构件，
+  # 由下面的 `non_components` 段拦下，见该段说明。
+
+  # 装修隔墙 / 背景墙 → wall
+  - kind: wall
+    aliases: ["I-WALL", "背景墙", "造型墙", "软包墙", "装饰墙"]
+    prefixes: ["I-WALL", "F-WALL", "装-墙", "精装-墙", "室内-墙"]
+    substrings: ["背景墙", "造型墙", "护墙板"]
+
+  # **吊顶 / 天花 → slab 的映射不并入**（原 layer_class_map 有，此处刻意舍弃）。
+  # 理由是实测出来的下游后果，不是口味：`slab` 在 `services/model_qto.py` 里
+  # 直接变成 `IfcSlab`，按 `thickness` 算**混凝土净体积 / 模板 / 钢筋**，
+  # 而这些量会经 `POST /model/quantities/to-proposal` 进创效提案。
+  # 吊顶是石膏板 / 矿棉板，不是混凝土 —— 判成 slab 等于把装修面积算成砼方量。
+  # 实测：并入后 134 张样本的 slabs 从 154 涨到 423（+174.7%），
+  # 其中 269 个全部来自 3 张「大巴停车区吊顶图」。
+  # 9 类 taxonomy 里没有 ceiling，**宁可判不出，也不判错**（勿新增顶层类别）。
+  # 同理未并入的还有原表的「地面铺装 → slab」（铺装是面层，不是楼板）。
+
+  # 装修门（成品门 / 移门）→ door
+  - kind: door
+    aliases: ["成品门", "移门", "隐形门", "谷仓门", "装饰门"]
+    prefixes: ["I-DOOR", "F-DOOR", "装-门", "精装-门"]
+    substrings: ["成品门", "移门", "隐形门"]
 
 # ── 机电系统判定（仅对 pipe / equipment 有意义）─────────────────
 # 返回的 system 与 element_recognizer._SYSTEM_KEYWORDS 命名保持一致：
 #   消防 / 给排水 / 电气 / 暖通
 systems:
   - system: 消防
-    substrings: ["消防", "喷淋", "消火栓", "FIRE", "SPKL"]
-    prefixes: ["F-", "FP-", "FIRE-"]
+    substrings: ["消防", "喷淋", "消火栓", "FIRE", "SPKL",
+                 "气体灭火", "防排烟", "报警阀", "水炮", "FHS"]
+    prefixes: ["F-", "FP-", "FIRE-", "FS-", "FA-", "XF-", "消-", "喷-"]
 
   - system: 给排水
-    substrings: ["给排水", "给水", "排水", "雨水", "污水", "废水", "中水", "DOMW", "SANR", "STRM"]
-    prefixes: ["P-", "PD-", "给-", "排-", "水-"]
+    substrings: ["给排水", "给水", "排水", "雨水", "污水", "废水", "中水", "DOMW", "SANR", "STRM",
+                 "热水", "冷凝水", "虹吸", "WASV"]
+    prefixes: ["P-", "PD-", "给-", "排-", "水-", "W-", "PW-"]
 
   - system: 电气
-    substrings: ["电气", "桥架", "配电", "照明", "动力", "强电", "弱电", "POWR", "LITE"]
-    prefixes: ["E-", "EL-", "电-"]
+    substrings: ["电气", "桥架", "配电", "照明", "动力", "强电", "弱电", "POWR", "LITE",
+                 "母线", "综合布线", "安防", "消防电", "COMM"]
+    prefixes: ["E-", "EL-", "电-", "EP-", "EC-", "强电-", "弱电-"]
 
   - system: 暖通
-    substrings: ["暖通", "风管", "空调", "通风", "采暖", "HVAC", "DUCT"]
-    prefixes: ["M-", "H-", "暖-", "通-", "风-"]
+    substrings: ["暖通", "风管", "空调", "通风", "采暖", "HVAC", "DUCT",
+                 "新风", "冷媒", "地暖", "风盘", "多联机", "冷冻水", "冷却水", "VRV", "AHU"]
+    prefixes: ["M-", "H-", "暖-", "通-", "风-", "HV-", "AC-", "VT-", "空调-"]
