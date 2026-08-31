@@ -19,7 +19,11 @@ from core.model3d.yolo_export import meters_to_page
 from core.storage import get_file_bytes
 
 PER_CLASS, N_UNKNOWN = 7, 40
-CTX_RATIO, MIN_HALF_PT = 12.0, 60.0  # 上下文 = 图元自身尺寸 ×12，下限 60pt
+CTX_RATIO, MIN_HALF_PT = 12.0, 14.0  # 上下文 = 图元自身尺寸 ×12，下限 14pt
+# **下限从 60pt 降到 14pt**：60pt 的下限让极小图元（填充点、灯具边）的裁剪被撑成
+# 整个房间，红点淹没在画面里，判读者转而描述四周的墙 —— 实测 U 表 21 格里
+# 8 格把吊顶格栅灯阵列判成「柱网」、8 格把空白处的红点判成「墙」。
+# 这与本批第一版「固定 8 米上下文」是同一个失效模式，只是没那么极端。
 OUT, DPI = "/tmp/gpt_layer", 200
 PROJECTS = ("77777777-7777-7777-7777-777777777777",
             "88888888-8888-8888-8888-888888888888")
@@ -83,11 +87,7 @@ async def main():
         font = ImageFont.load_default()
     CELL, COLS, ROWS = 380, 5, 4
 
-    _seen: set[str] = set()
-    while len(_seen) < 400:
-        _seen.add("".join(random.choice(_CODE_ALPHABET) for _ in range(4)))
-    _codes = sorted(_seen)
-    random.shuffle(_codes)
+    _codes = make_codes(400, seed=20260914)
 
     def build(entries, prefix):
         tiles = []
