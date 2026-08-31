@@ -93,6 +93,23 @@
 > - `data/layer_conventions.yaml` 的 slab/wall 已补 承台/筏板/底板/地下室外墙/挡土墙/人防墙 及 DWQ/RFQ/FB/DB/CT 等拼音·英文代号;`model_elements._STRUCTURE_TITLE_RE` 与 `drawing_filename_parser` 补「基础/筏板/底板/承台/地下室」,避免基础平面图被漏筛出结构桶。
 > - 收益取决于图层命名规范度;图层缺失/非常规命名时仍走几何兜底,精度不劣于旧版。
 
+> **非构件图层闸补齐三组(2026-09-24)**:`data/layer_conventions.yaml` 的 `non_component`
+> 段由图框闸批的 1 组扩为 **3 组** —— `sheet`(图框/标题块/会签栏)、
+> `annotation`(标注/文字/钢筋,此前是 .py 硬编码正则)、`finish`(装修饰面/图案)。
+> - `is_non_component_layer()` 取**三组并集**;`is_annotation_layer()` 与新增的
+>   `is_gate_group_hit(layer, group)` 提供分组开关。
+> - **闸接到全部 7 个调用点**(此前图框闸只接了 `_find_parallel_pairs` 一处):
+>   实测随机 200 张 equipment −36.7%、pipes −14.4%、columns −16.5%、walls −17.3%,
+>   其中管线那 2428 根多来自图框边框线被「够长且不是轴线」的判据照单全收。
+> - **为什么不是让 `classify_by_layer` 返回 None**:柱/设备的判据是
+>   `_kind is not None and _kind != "equipment"` —— None 是**放行**,会掉进
+>   「按尺寸猜」的路径,比判错类型更糟。故饰面层照旧分类为 wall,拦它的是这道闸。
+> - **组内 `exempt`**:`填充`/`HATCH` 保住构件填充截面(装修 60 张实测 22.4 万图元,
+>   其中 `I—装饰—填充01(线状)` 含「装饰」正落在饰面词表上);`钢筋混凝土` 保住真墙。
+> - **降级不 fail-open**:yaml 与 .py 兜底词表**逐组取并集**(yaml 只能加词、挖不掉地板)。
+> - **装修图对结构模型的贡献基本归零**(装修 60 张:柱 −38.9%、墙 −57.7%),
+>   只留 `I—隔墙—填充` 这类明确画构件截面的层——这是判断,不是事实,详见 PROGRESS 条目。
+
 ---
 
 ## 4. API 端点完整清单
@@ -618,3 +635,4 @@ Phase D 合并了多处同类入口(见 `docs/PHASE_D_BLUEPRINT.md` §0.3),前�
 | V1.3 | 2026-07-16 | Phase E:§6.3 新增「图纸信息档案层 + PDF 几何识别」能力与诚实边界——档案层(导入即抽取/人审 verified/单一真相源,migration 029-031)、围护桩圆检测(整机 columns 3089→5794)、构件类型标签(档案 OCR 反哺);纯 PDF 项目边界(无图层/矢量文字取不到/圆检测/OCR回填滞后/板数十块量级)。详见 `docs/PHASE_E_BLUEPRINT.md`、`docs/PHASE_E_E3_AUDIT.md` |
 | V1.4 | 2026-08-13 | Phase I/J:§4.8 新增轴网识别与定位状态 API(识别/分区确认/传播/**荐锚**/未分层分类),并补「坐标变换的来源与清理」(migration 047)——`drawing_transform` 一图一行而三条路径共写,`manual` 不被自动覆盖、清理只动同来源、两条路径各握一半时轴网路径借用已落库比例(仍过 §6.0.4 门禁) |
 | V1.5 | 2026-08-14 | J7:§4.9 新增「坐标系与比例的四道兜底」——四条产出路径共用同一套门禁(漏掉的两条恰是决定构件坐标的)、三个关键阈值(`MAX_DRAWING_EXTENT_M`/`MAX_RENDER_MEGAPIXELS`/`_RECOGNIZE_TIMEOUT_SEC` 及其「假超时」性质)、线程池被僵尸占满的排查方法(判据是日志时间戳而非 CPU,定性用 py-spy)、层内坐标系矛盾机制(B1 6358→248 米,构件数不变) |
+| V1.6 | 2026-09-24 | 非构件图层闸补齐三组(sheet/annotation/finish + 组内 `exempt`),`is_non_component_layer()` 取并集并接到全部 7 个调用点(图框闸此前只接墙一处,柱/管/设备仍在吃图框);`is_gate_group_hit()` 提供分组开关;饰面层仍分类为 wall(返回 None 会掉进尺寸猜测路径,更糟);`填充`/`HATCH` 豁免保住构件填充截面;yaml 与兜底词表逐组取并集,降级不 fail-open。实测见 §3 与 `docs/PROGRESS.md`「2026-09-24」条目 |
