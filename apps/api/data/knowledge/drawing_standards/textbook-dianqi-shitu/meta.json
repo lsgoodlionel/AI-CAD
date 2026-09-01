@@ -1,0 +1,41 @@
+{
+  "source": {
+    "key": "textbook-dianqi-shitu",
+    "filename": "看范例快速识读建筑电气工程图 (《年范例快速识读建筑电气工程图》编委会编, 看范例快速识读建筑电气工程图编委会编 etc.) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
+    "std_no": null,
+    "title": "看范例快速识读建筑电气工程图",
+    "kind": "textbook",
+    "discipline": "mep",
+    "pages": 74,
+    "extract_method": "ocr",
+    "identified_by": "OCR 封面（PDF 无任何文本层）",
+    "priority": 2,
+    "supersedes": null,
+    "superseded_by": null,
+    "notes": "唯一的机电专业资料。金标准实测管线识别 0%（有把握口径），电气图例是补这块短板的起点。"
+  },
+  "evidence": {},
+  "stats": {
+    "extracted_pages": 74,
+    "declared_pages": 74,
+    "missing_pages": [],
+    "char_count": 78682,
+    "mean_confidence": 0.9446,
+    "low_confidence_pages": [
+      5,
+      11,
+      18,
+      20,
+      21,
+      22,
+      38,
+      39,
+      41,
+      61
+    ],
+    "near_empty_pages": [
+      2
+    ],
+    "ocr_dpi": 200
+  }
+}

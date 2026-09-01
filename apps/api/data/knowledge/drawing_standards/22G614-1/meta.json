@@ -1,0 +1,30 @@
+{
+  "source": {
+    "key": "22G614-1",
+    "filename": "平法图集/22G614-1.pdf",
+    "std_no": "22G614-1",
+    "title": "砌体填充墙结构构造",
+    "kind": "atlas",
+    "discipline": "structure",
+    "pages": 49,
+    "extract_method": "ocr",
+    "identified_by": "OCR 封面",
+    "priority": 2,
+    "supersedes": "12G614-1",
+    "superseded_by": null,
+    "notes": ""
+  },
+  "evidence": {},
+  "stats": {
+    "extracted_pages": 49,
+    "declared_pages": 49,
+    "missing_pages": [],
+    "char_count": 25948,
+    "mean_confidence": 0.9759,
+    "low_confidence_pages": [],
+    "near_empty_pages": [
+      48
+    ],
+    "ocr_dpi": 200
+  }
+}

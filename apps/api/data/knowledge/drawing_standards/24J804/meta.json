@@ -1,0 +1,30 @@
+{
+  "source": {
+    "key": "24J804",
+    "filename": "平法图集/24J804.pdf",
+    "std_no": "24J804",
+    "title": "民用建筑工程总平面初步设计、施工图设计深度图样",
+    "kind": "atlas",
+    "discipline": "architecture",
+    "pages": 57,
+    "extract_method": "ocr",
+    "identified_by": "OCR 封面 + 页内文本层（本书原文本层质量最好，可交叉校验）",
+    "priority": 1,
+    "supersedes": "05J804",
+    "superseded_by": null,
+    "notes": "『图纸深度』正是本平台主题。是图纸完整性审查的直接依据。"
+  },
+  "evidence": {},
+  "stats": {
+    "extracted_pages": 57,
+    "declared_pages": 57,
+    "missing_pages": [],
+    "char_count": 93047,
+    "mean_confidence": 0.9772,
+    "low_confidence_pages": [],
+    "near_empty_pages": [
+      56
+    ],
+    "ocr_dpi": 200
+  }
+}

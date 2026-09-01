@@ -34,6 +34,18 @@
 > `grid_ref`（Phase H 声称的主键）只有 **42.58%** 有值。
 > 存量场景比当前代码多 **46%/82%** 的柱 —— **所有修复都还没到达用户，模型需要重建**。
 
+> **识图标准资料已知识化（2026-09-01）**：`/Users/lionel/work/识图标准` 的
+> 14 份国家建筑标准设计图集与识图教材（1851 页）已全量识别入库，
+> 详见 `docs/KNOWLEDGE_BASE_DRAWING_STANDARDS.md`。
+> **平法代号表、构件识别的专业闸、标准比例表三处从此有原件出处**，
+> 不再是凭记忆写的常量。三条新教训：
+> ① **凭记忆写的标准常量会错** —— 代号表混进了非平法代号又漏掉 2022 版新增的，
+>    比例表里有国标根本没有的 `1:75`；
+> ② **形态相同不等于语义相同** —— `LN1` 在结构图上是受扭梁、在配电图上是照明回路，
+>    差别只在专业，不在字形；
+> ③ **加新能力时最大的收益常来自顺带发现的旧缺陷** —— 本轮新代号只净增 121 次识别，
+>    而专业闸挡掉了 2368 次一直存在的误收。
+
 ## 项目概述
 
 本项目基于《全面推行图纸深化全过程管理体系》分析报告，自主开发（整合 GitHub 开源库）一套覆盖建筑施工全周期的图纸深化管理与创效平台。
@@ -128,6 +140,7 @@
 | Phase E｜E3-0 缺口审计：歌剧院 2309 图 100% PDF、矢量文字取不到、识别器无欠费（近方 poly 13↔识别 13）；桩/钢柱是圆/线段簇表达。**⚠「无图层」结论已推翻（2026-08-18）：实测 path 100% 带 layer，只是命名不规范、命中率 6.6%** | ✅ | `docs/PHASE_E_E3_AUDIT.md` |
 | Phase E｜**E3-B 围护桩/圆柱圆检测（栅格 HoughCircles，双闸：仅平面图 view_type=plan + 仅结构/通用；0.5m 下限排钢筋；去重）——整机 columns 3089→5794（+2705 桩），剖面零误检** | ✅ | `core/model3d/circle_detector.py`、`services/model_elements.py`、`tests/test_circle_detector.py` |
 | Phase E｜路径C：A1 每图坐标变换持久化（`drawing_transform` pt→米）+ A2 档案轴号→3D（好标签升级识别路径 "X"）+ C-下一步 档案 OCR 文字→构件类型标签（钢构/幕墙/围护桩，就近关联，不新增顶层类别）| ✅ 代码/测试完成（整机显效受 OCR 回填覆盖+变换质量门控）| migration 031、`services/drawing_transform.py`、`services/model_elements.py`(archive_axes_to_scene/type labels)、`core/model3d/component_labels.py` |
+| **识图标准资料知识化（本轮）**：14 份图集/教材（1851 页，**132 万字，零缺页**）→ ①可核对全文入 `regulation_books`（migration 050 加 `doc_kind` 区分规范/图集/教材，**否则 RAG 会把教材当规范原文**）+ 10 本图集补上空了的 `standard_drawings` + 原件 433MB 入 MinIO；②符号训练标注 380 条（`reference/` 层，**明确不并入 raw/gold**，域差异见数据卡）；③**三处已生效的识别修正**——平法代号表 26→72 个逐条有出处（补齐全部楼梯/基础代号，治「墙的最大误检是楼梯 31%」；修掉「整串大写」判据导致 `LLk`/`DJj`/`ATa`/`Lg` **一个也认不出**的系统性缺口）、**专业闸挡掉 2368 次假阳性**（`LN1~LN14` 1144 次全在 mep 配电系统图上是照明回路号；顺带发现既有代号 `L` 一直在误收 1069 次）、比例表按 GB/T 50001 校订（删掉表里根本没有的 `1:75`，补 1:1~1:6/60/80/600，**全库合规率 83.1%→88.0%**）| ✅ 后端 3860 passed / 0 failed | `core/knowledge/{source_registry,text_extract,markdown_writer,figure_extract,legend_table,label_map}.py`、`scripts/knowledge/*`、migration 050、`docs/KNOWLEDGE_BASE_DRAWING_STANDARDS.md`、`data/model3d/dataset/reference/DATASHEET.md` |
 
 ---
 
