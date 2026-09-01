@@ -1,0 +1,28 @@
+{
+  "source": {
+    "key": "06SJ813",
+    "filename": "平法图集/std_927.pdf",
+    "std_no": "06SJ813",
+    "title": "《民用建筑设计通则》图示",
+    "kind": "atlas",
+    "discipline": "architecture",
+    "pages": 102,
+    "extract_method": "ocr",
+    "identified_by": "OCR 封面（文件名 std_927 不含书名）",
+    "priority": 4,
+    "supersedes": null,
+    "superseded_by": "20J813",
+    "notes": "已被 20J813 替代。仍抽取以便比对差异，但条款冲突时以 20J813 为准。"
+  },
+  "evidence": {},
+  "stats": {
+    "extracted_pages": 102,
+    "declared_pages": 102,
+    "missing_pages": [],
+    "char_count": 35739,
+    "mean_confidence": 0.9817,
+    "low_confidence_pages": [],
+    "near_empty_pages": [],
+    "ocr_dpi": 200
+  }
+}

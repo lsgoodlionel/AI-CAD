@@ -1,0 +1,33 @@
+{
+  "source": {
+    "key": "22G101-3",
+    "filename": "平法图集/22G101-3.pdf",
+    "std_no": "22G101-3",
+    "title": "混凝土结构施工图平面整体表示方法制图规则和构造详图（独立基础、条形基础、筏形基础、桩基础）",
+    "kind": "atlas",
+    "discipline": "structure",
+    "pages": 121,
+    "extract_method": "ocr",
+    "identified_by": "OCR 封面",
+    "priority": 1,
+    "supersedes": null,
+    "superseded_by": null,
+    "notes": "基础/承台/桩代号。E3-B 围护桩圆检测（+2705 桩）缺的正是编号侧证据。"
+  },
+  "evidence": {},
+  "stats": {
+    "extracted_pages": 121,
+    "declared_pages": 121,
+    "missing_pages": [],
+    "char_count": 83526,
+    "mean_confidence": 0.9731,
+    "low_confidence_pages": [
+      50
+    ],
+    "near_empty_pages": [
+      8,
+      59
+    ],
+    "ocr_dpi": 200
+  }
+}

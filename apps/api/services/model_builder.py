@@ -41,8 +41,13 @@ from services import (
 )
 from services.drawing_semantics import extract_semantic_candidates
 from services.drawing_view_classifier import classify_view_type
-from services.floor_parser import parse_floor
+from services.floor_parser import UNZONED_FLOOR, parse_floor
 from services.model_lod import ModelScopeEvidence, aggregate_lod_modes, evaluate_lod_capability
+
+#: 未分层兜底楼层 key。**不是一个真楼层** —— 它是「这张图归不了层」的记账桶，
+#: 只走 `floor_of` / `annotation_queue`，不进 `scene.floors`（见 `_build_floors`）。
+UNCLASSIFIED_FLOOR_KEY = UNZONED_FLOOR[0]
+UNCLASSIFIED_FLOOR_LABEL = UNZONED_FLOOR[1]
 
 logger = logging.getLogger(__name__)
 
@@ -385,8 +390,9 @@ def _drawing_entry(
             {
                 "building_unit_key": assignment.get("building_unit_key") or "main",
                 "building_unit_display_name": assignment.get("building_unit_display_name") or "主体",
-                "story_key": assignment.get("story_key") or "UNZONED",
-                "story_display_name": assignment.get("story_display_name") or "未分层",
+                "story_key": assignment.get("story_key") or UNCLASSIFIED_FLOOR_KEY,
+                "story_display_name": (assignment.get("story_display_name")
+                                       or UNCLASSIFIED_FLOOR_LABEL),
                 "assignment_source": assignment.get("assignment_source") or "detected",
                 "assignment_confidence": assignment.get("story_confidence")
                 or assignment.get("building_unit_confidence")
@@ -413,15 +419,24 @@ def _build_floors(
     assets: dict,
     normalization: model_story.StoryNormalizationResult,
 ) -> tuple[list[dict], dict[str, str]]:
-    """楼层堆叠：使用 normalized story assignment 组装 floors。"""
+    """楼层堆叠：使用 normalized story assignment 组装 floors。
+
+    **未分层桶不产出楼层**。归不了层的图没有可放的几何 —— 构件识别一直把
+    这层置空，于是它在三维里是一个 `element_stats` 全零的空层，还把
+    `stats.reconstruction` 从 `elements` 拖成 `mixed`（实测第二工程已建场景：
+    该层挂 946 张图、构件 0 个，而其余 17 层构件均非空）。
+    这些图仍照实上报：`floor_of` 记为
+    `UNCLASSIFIED_FLOOR_KEY`（下游按图纸取层是无条件取值，漏一张就 KeyError），
+    并进 `scene.annotation_queue` 与 `stats.unclassified_drawings`。
+    """
     floors: dict[str, dict] = {}
     floor_of: dict[str, str] = {}
     for drawing in drawings:
         drawing_id = str(drawing["id"])
         issues = issues_by_drawing.get(drawing_id, [])
         assignment = normalization.drawing_assignments.get(drawing_id) or {}
-        key = str(assignment.get("story_key") or "UNZONED")
-        label = str(assignment.get("story_display_name") or "未分层")
+        key = str(assignment.get("story_key") or UNCLASSIFIED_FLOOR_KEY)
+        label = str(assignment.get("story_display_name") or UNCLASSIFIED_FLOOR_LABEL)
         order = int(assignment.get("story_order") or 0)
         floor = floors.setdefault(
             key,
@@ -447,7 +462,10 @@ def _build_floors(
             )
         )
         floor_of[drawing_id] = key
-    ordered = sorted(floors.values(), key=lambda f: f["order"])
+    ordered = sorted(
+        (f for f in floors.values() if f["key"] != UNCLASSIFIED_FLOOR_KEY),
+        key=lambda f: f["order"],
+    )
     for floor in ordered:
         floor["building_units"] = sorted(floor["building_units"])
     # 楼层级标高门禁要能到界面上 —— 前端读的是 floors[]，不是 story_tables。
@@ -499,7 +517,7 @@ def _build_markers(
     """
     by_severity: dict[str, list[tuple[dict, str]]] = {key: [] for key in SEVERITY_KEYS}
     for drawing_id, issues in issues_by_drawing.items():
-        fallback_key = floor_of.get(drawing_id, "UNZONED")
+        fallback_key = floor_of.get(drawing_id, UNCLASSIFIED_FLOOR_KEY)
         for issue in issues:
             location = _safe_json(issue.get("location_json"), {})
             parsed = next(
@@ -910,9 +928,12 @@ async def _attach_floor_elements(
 
     placements(H23):有工程坐标锚点的图按绝对坐标摆放,其余保持相对配准。
     """
+    # 未分层图纸(多为详图/系统图/说明,非平面图)在这里仍占一个桶,但 `_build_floors`
+    # 已不为它生成楼层,故其几何不会被注入任何一层——否则其数千个"构件"会在基座
+    # 平面堆叠成噪声。这些图在待人工识别队列中,人工归层后重建即可正确落层。
     drawings_by_floor: dict[str, list[dict]] = {}
     for drawing in drawings:
-        key = floor_of.get(str(drawing["id"]), "UNZONED")
+        key = floor_of.get(str(drawing["id"]), UNCLASSIFIED_FLOOR_KEY)
         drawings_by_floor.setdefault(key, []).append(drawing)
 
     yolo_total = 0
@@ -921,16 +942,6 @@ async def _attach_floor_elements(
             "recognize", "识别楼层构件（柱/墙/梁/板/管线/设备）",
             str(floor.get("label") or floor["key"]), index, len(floors),
         ))
-        if floor["key"] == "UNZONED":
-            # 未分层图纸(多为详图/系统图/说明,非平面图)未定位到楼层,不注入楼层
-            # 构件几何——否则其数千个"构件"会在基座平面堆叠成噪声(挤在一起)。
-            # 这些图在待人工识别队列中,人工归层后重建即可正确落层。
-            floor["elements"] = {k: [] for k in model_elements.EMPTY_ELEMENTS}
-            floor["element_stats"] = model_elements.element_stats(floor["elements"])
-            floor["_elevation_candidates"] = []
-            floor["_lod_registered_drawings"] = 0
-            floor["_lod_evidence"] = {}
-            continue
         floor_drawings = drawings_by_floor.get(floor["key"], [])
         try:
             elements, yolo_count, meta = await model_elements.build_floor_elements(
@@ -1227,7 +1238,8 @@ def _apply_real_elevations(floors: list[dict]) -> None:
     最低层取候选最小值。UNZONED/无候选层为 None（前端回退层序高度）。
     """
     ordered = sorted(
-        (f for f in floors if f["key"] != "UNZONED"), key=lambda f: f["order"]
+        (f for f in floors if f["key"] != UNCLASSIFIED_FLOOR_KEY),
+        key=lambda f: f["order"],
     )
     previous: float | None = None
     for floor in ordered:
@@ -1612,7 +1624,10 @@ def _scope_evidence_for(
     ifc_models: list[dict],
     matched_units: set[str] | None = None,
 ) -> ModelScopeEvidence:
-    relevant_floors = [floor for floor in floors if floor.get("key") != "UNZONED"] or list(floors)
+    relevant_floors = [
+        floor for floor in floors
+        if floor.get("key") != UNCLASSIFIED_FLOOR_KEY
+    ] or list(floors)
     drawings = [drawing for floor in relevant_floors for drawing in floor.get("drawings") or []]
     drawing_ids = {str(drawing.get("drawing_id") or "") for drawing in drawings}
     ifc_scope_models = [

@@ -98,3 +98,12 @@ celerybeat.pid
 
 # 编辑器工作区文件
 *.code-workspace
+gold_sheets/
+
+# ── 识图标准资料的派生产物（core.knowledge）──────────────
+# 资料本身是**受版权保护的出版物**（图集/教材，用户本地提供）。
+# 派生的全文与切图仅供平台内部识别与人工核对，**不进版本库、不随代码分发**。
+# 它们都可再生：原件在 MinIO `atlases` 桶，OCR 缓存在 ~/.cache/cad-knowledge。
+# 仓库里保留的是**管线代码 + 元数据 + 清单 + 数据卡**，那才是可复用的部分。
+apps/api/data/knowledge/drawing_standards/*/book.md
+apps/api/data/model3d/dataset/reference/symbols/

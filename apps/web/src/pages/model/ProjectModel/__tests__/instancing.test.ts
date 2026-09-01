@@ -9,8 +9,8 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import { applyMarkerVisibility, buildMarkerInstances } from '../sceneBuilder'
-import { resolveEquipmentPick } from '../elementsBuilder'
-import type { EquipmentPick } from '../elementsBuilder'
+import { geometryTriangleCount, resolveEquipmentPick, resolveItemPick } from '../elementsBuilder'
+import type { ElementItemPick, EquipmentPick } from '../elementsBuilder'
 import type { SceneMarker } from '@/services/projectModel'
 
 function marker(overrides: Partial<SceneMarker>): SceneMarker {
@@ -91,5 +91,61 @@ describe('resolveEquipmentPick', () => {
 
   it('returns null for an empty pick list', () => {
     expect(resolveEquipmentPick([], 3)).toBeNull()
+  })
+})
+
+
+// ── 逐构件反向追溯：三角形口径必须与 raycaster faceIndex 一致 ──────────
+
+describe('geometryTriangleCount', () => {
+  it('索引几何(BoxGeometry,墙/梁)按 index 计数,而非 position', () => {
+    // Arrange：BoxGeometry 是索引几何 —— position 24 顶点,index 36 → 12 个三角形
+    const box = new THREE.BoxGeometry(1, 1, 1)
+
+    // Act
+    const triangles = geometryTriangleCount(box)
+
+    // Assert：raycaster 的 faceIndex 按 index 编号(0..11),故必须是 12
+    expect(box.index).not.toBeNull()
+    expect(box.getAttribute('position').count / 3).toBe(8) // 旧口径(错误)
+    expect(triangles).toBe(12)                             // 新口径(与 faceIndex 一致)
+  })
+
+  it('非索引几何(ExtrudeGeometry,柱/板)按 position 计数', () => {
+    // Arrange
+    const shape = new THREE.Shape()
+    shape.moveTo(0, 0); shape.lineTo(1, 0); shape.lineTo(1, 1); shape.closePath()
+    const extruded = new THREE.ExtrudeGeometry(shape, { depth: 1, bevelEnabled: false })
+
+    // Act / Assert
+    expect(extruded.index).toBeNull()
+    expect(geometryTriangleCount(extruded))
+      .toBe(extruded.getAttribute('position').count / 3)
+  })
+})
+
+describe('resolveItemPick 边界与索引几何对齐', () => {
+  it('墙/梁按 12 三角形/段累加时,faceIndex 落在正确构件上', () => {
+    // Arrange：两段墙,各 12 个三角形(BoxGeometry 真实值)
+    const picks: ElementItemPick[] = [
+      { faceEnd: 12, src: 'drawing-A' },
+      { faceEnd: 24, src: 'drawing-B' },
+    ]
+
+    // Act / Assert：第 11 面属第一段,第 12 面(exclusive)已属第二段
+    expect(resolveItemPick(picks, 0)?.src).toBe('drawing-A')
+    expect(resolveItemPick(picks, 11)?.src).toBe('drawing-A')
+    expect(resolveItemPick(picks, 12)?.src).toBe('drawing-B')
+    expect(resolveItemPick(picks, 23)?.src).toBe('drawing-B')
+  })
+
+  it('旧的 8 三角形/段口径会把第二段的面误判成第一段(回归保护)', () => {
+    // 旧口径产出的错误边界
+    const stalePicks: ElementItemPick[] = [
+      { faceEnd: 8, src: 'drawing-A' },
+      { faceEnd: 16, src: 'drawing-B' },
+    ]
+    // 真实第一段有 12 个面,第 10 面本应属 A,旧边界却判给 B —— 即追溯到错误图纸
+    expect(resolveItemPick(stalePicks, 10)?.src).toBe('drawing-B')
   })
 })

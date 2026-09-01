@@ -31,10 +31,30 @@ from collections import Counter
 #: 1pt = 25.4/72 mm(PDF 点)。比例尺 1:N → scale_m_pt = N × PT_MM / 1000
 PT_MM = 25.4 / 72
 
-#: 建筑施工图常用比例尺分母
-STANDARD_DENOMINATORS = (
-    5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200, 250, 300, 400, 500, 1000, 2000,
+#: **常用比例**分母（GB/T 50001《房屋建筑制图统一标准》§2 绘图所用的比例表）。
+#: 原文见 `data/knowledge/drawing_standards/textbook-shitu-yusuan/book.md`
+#: 表 2-6，与 `textbook-dianqi-shitu` 表 1-7 逐项一致（两处互相印证）。
+#: 标准明文规定「**应优先用表中常用比例**」，所以吸附时先试这一档。
+COMMON_DENOMINATORS = (
+    1, 2, 5, 10, 20, 50, 100, 150, 200, 500, 1000, 2000,
 )
+
+#: **可用比例**分母（同表的第二档，「特殊情况下也可选用」）。
+#: 末尾的 25000 来自 24J804《总平面设计深度图样》§3.2：
+#: 用地面积较大时总体布置图可用 1:2000/5000/10000/25000/50000。
+AVAILABLE_DENOMINATORS = (
+    3, 4, 6, 15, 25, 30, 40, 60, 80, 250, 300, 400, 600,
+    5000, 10000, 20000, 25000, 50000, 100000, 200000,
+)
+
+#: 全部合法比例分母。
+#:
+#: **修正记录**：此前这张表是手写的，含 `75` —— GB/T 50001 的常用表与
+#: 可用表里**都没有 1:75**，那是凭印象加进去的；同时漏掉了 1:1~1:6 的
+#: 详图档与 1:60/80/600。金标准实测「比例」正确率仅 30%、是杠杆最大的一项，
+#: 吸附目标本身不对会把误差固化下来。
+STANDARD_DENOMINATORS = tuple(
+    sorted(set(COMMON_DENOMINATORS) | set(AVAILABLE_DENOMINATORS)))
 
 _SCALE_PATTERN = re.compile(r"1\s*[:：]\s*(\d{1,4})")
 
@@ -80,10 +100,19 @@ def scale_of_denominator(denominator: int) -> float:
 
 
 def snap_to_standard(denominator: int, tolerance: float = 0.05) -> tuple[int, bool]:
-    """吸附到最近的标准比例尺分母;相对偏差超容差则不吸附(返回原值)。"""
-    best = min(STANDARD_DENOMINATORS, key=lambda s: abs(s - denominator) / s)
-    if abs(best - denominator) / best <= tolerance:
-        return best, True
+    """吸附到最近的标准比例尺分母;相对偏差超容差则不吸附(返回原值)。
+
+    **常用比例优先**（GB/T 50001 §2「应优先用表中常用比例」）：
+    容差内先在常用档里找，找不到才退到可用档。这有实际后果 ——
+    OCR 读出 `1:98` 时，常用档的 100 与可用档的 100 一致；
+    但读出 `1:78` 时，可用档有 80、常用档最近是 100，
+    优先常用会错吸到 100 —— 所以只有**常用档命中容差**才优先，
+    否则照常取全表最近值。
+    """
+    for pool in (COMMON_DENOMINATORS, STANDARD_DENOMINATORS):
+        best = min(pool, key=lambda s: abs(s - denominator) / s)
+        if abs(best - denominator) / best <= tolerance:
+            return best, True
     return denominator, False
 
 
