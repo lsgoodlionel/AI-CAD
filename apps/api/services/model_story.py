@@ -10,7 +10,7 @@ from services.drawing_role import (
     ROLE_COORDINATE_BASE, ROLE_DETAIL, ROLE_NON_GEOMETRIC, classify_role,
 )
 from services.floor_parser import (
-    FOUNDATION_FLOOR, HIGH_ROOF_FLOOR, ROOF_FLOOR, parse_floor)
+    FOUNDATION_FLOOR, HIGH_ROOF_FLOOR, ROOF_FLOOR, UNZONED_FLOOR, parse_floor)
 
 MIN_STORY_SPACING_M = 2.8
 #: 楼层**标高**的来源。与 `height_source`（层高来源）是两回事——
@@ -26,7 +26,9 @@ ELEVATION_SOURCE_DEFAULT = "default"
 
 DEFAULT_STORY_HEIGHT_M = 4.5
 DEFAULT_BASEMENT_HEIGHT_M = 4.2
-_DEFAULT_UNCLASSIFIED_STORY = ("UNZONED", "未分层", 0)
+#: 未分层兜底三元组。**回指 `floor_parser` 单一来源** —— 这里曾各写一遍
+#: 同一个字面量，改一处漏一处就会让两侧的 key 对不上。
+_DEFAULT_UNCLASSIFIED_STORY = UNZONED_FLOOR
 
 _DIRECTIONAL_UNIT_KEYS = {
     "南区": "south",
