@@ -151,3 +151,47 @@ def test_sidebar_becomes_page_heading():
         [{"index": 0, "text": "正文" * 40, "confidence": 0.99,
           "sidebar": ["平法制图规则"]}])
     assert "〔平法制图规则〕" in md
+
+
+# ── 条款登记表（本轮按资料原件扩充）─────────────────────
+
+@pytest.mark.unit
+def test_every_clause_declares_where_it_applies():
+    """条款登记表的意义是**可回溯**：每条要说清在哪生效。
+    还没落地的写「待落地」，不能空着假装已实现。"""
+    from core.model3d.drawing_conventions import CLAUSES
+
+    for key, clause in CLAUSES.items():
+        assert clause["text"].strip(), key
+        assert clause["applied_in"].strip(), key
+
+
+@pytest.mark.unit
+def test_scale_clause_points_at_the_module_that_uses_it():
+    from core.model3d.drawing_conventions import CLAUSES
+
+    assert "scale_candidates" in CLAUSES["2.0.2"]["applied_in"]
+
+
+@pytest.mark.unit
+def test_classification_symbol_is_registered_as_an_axis_circle_confuser():
+    """GB/T 50105 的「相同部分分类符号」与 §8.0.2 轴号圈**几何完全同形**
+    （同为 8~10mm 细实线圆、圈内单个大写字母）。这条登记的价值就是
+    让下一个人知道轴号圈的误检可能来自哪里。"""
+    from core.model3d.drawing_conventions import (
+        CLASSIFICATION_SYMBOL_DIAMETER_MM, CLAUSES, LABEL_CIRCLE_DIAMETER_MM,
+    )
+
+    assert CLASSIFICATION_SYMBOL_DIAMETER_MM == LABEL_CIRCLE_DIAMETER_MM
+    assert "GB/T 50105-3.0.x" in CLAUSES
+
+
+@pytest.mark.unit
+def test_line_width_series_matches_the_standard():
+    from core.model3d.drawing_conventions import (
+        LINE_WIDTH_RATIOS, LINE_WIDTH_SERIES_MM, MIN_LINE_WIDTH_MM,
+    )
+
+    assert LINE_WIDTH_SERIES_MM == (1.4, 1.0, 0.7, 0.5, 0.35, 0.25, 0.18, 0.13)
+    assert LINE_WIDTH_RATIOS == (1.0, 0.7, 0.5, 0.25)
+    assert MIN_LINE_WIDTH_MM == 0.1
