@@ -11,6 +11,7 @@ import re
 from .geometry_extractor import MAX_PRIMITIVES
 from .layer_conventions import (
     classify_by_layer, classify_system, is_annotation_layer,
+    is_non_component_layer,
 )
 from .types import DrawingGeometry, FloorElements
 
@@ -627,7 +628,15 @@ def _find_parallel_pairs(
     for i, (x0, y0, x1, y1) in enumerate(lines):
         if i in axis_idx:
             continue
-        wall_layer = allow_wide_walls and classify_by_layer(_at(line_layers, i)) == "wall"
+        layer = _at(line_layers, i)
+        # 图框/标题块是一圈**双线边框**：间距恰在墙宽区间、重叠远超 1m，
+        # 完美符合本函数的墙判据。此前这里对图层不设任何拦截（图层只用来
+        # 放宽墙宽上限），实测大歌剧院「底板换撑平面布置图」
+        # `通用-图框C-SHET` 产出 11 面、`C-SHET-TTLB` 7 面，
+        # 「8F节点大样图」`A2|C—图框—标题块` 产出 72 面假墙。
+        if is_non_component_layer(layer):
+            continue
+        wall_layer = allow_wide_walls and classify_by_layer(layer) == "wall"
         if abs(y0 - y1) <= _LINE_STRAIGHT_TOL_PT:
             horizontal.append(((y0 + y1) / 2, min(x0, x1), max(x0, x1), wall_layer))
         elif abs(x0 - x1) <= _LINE_STRAIGHT_TOL_PT:

@@ -128,3 +128,38 @@ systems:
   - system: 暖通
     substrings: ["暖通", "风管", "空调", "通风", "采暖", "HVAC", "DUCT"]
     prefixes: ["M-", "H-", "暖-", "通-", "风-"]
+
+# ── 非构件图层闸（图层画的不是建筑实体，任何构件都不该从它产出）──────
+#
+# 与 `conventions` 是**相反方向**的判据：那边答「这个图层属于哪个构件类别」，
+# 这边答「这个图层根本不产出构件」。
+#
+# **为什么单开 `sheet` 组，而不并进标注（annotation）**：
+#   - 标注**依附于某个构件** —— `S-BEAM-TEXT` 是梁的文字，语义上仍属于 beam，
+#     所以它由 `is_annotation_layer` 配合 `classify_by_layer` 组合使用。
+#   - 图框/标题块/会签栏**不依附任何构件**，画的是「纸」不是「楼」，
+#     与建筑实体零关系。
+#   - AIA CAD Layer Guidelines 本身也是分开的：`-ANNO/-IDEN/-DIMS` 是挂在
+#     专业构件后的 minor group，而 `SHET`(sheet)/`TTLB`(title block) 自成一系。
+#   - 实践后果：将来要「只隐藏标注、保留图框」或反之，两组必须能分别开关；
+#     混进同一个正则里就再也分不开。
+#
+# **兜底**：`core/model3d/layer_conventions.py::_DEFAULT_GATE_VOCAB` 有一份同样的
+# 词表。`load_conventions()` 在 yaml 缺失/损坏时降级为空，构件映射降级只是
+# 「少认几个构件」，而**闸降级会反向放行假构件** —— 代价方向相反，
+# 所以闸不能只活在 yaml 里。两份的一致性由 `test_兜底词表与yaml不漂移` 钉住。
+non_component:
+  # 图框 / 标题块 / 会签栏：GB/T 50001《房屋建筑制图统一标准》第 4 章通用制图用语，
+  # 非某工程的命名习惯。AIA 次级码 SHET=sheet、TTLB/TBLK=title block。
+  #
+  # **不得使用裸 `C-` 前缀**：`C` 是 AIA 的 Civil 学科码（总图/道路/管网），
+  # 上面窗的 `C-` 前缀正是因为把 `C-SHET-TTLB` 判成窗才被移除（见 window 段注释）。
+  # 判据必须落在 SHET/TTLB 这些**次级码**上，落在学科码上会误杀整个市政专业。
+  #
+  # 实测（大歌剧院，`_find_parallel_pairs` 接闸前）：图框是一圈双线边框，
+  # 间距恰在墙宽区间、重叠远超 1m，完美符合「墙」的几何判据 ——
+  #   「底板换撑平面布置图」 `通用-图框C-SHET` 11 面 + `C-SHET-TTLB` 7 面假墙
+  #   「8F节点大样图」       `A2|C—图框—标题块` 72 面假墙
+  - group: sheet
+    substrings: ["图框", "标题块", "会签栏", "图签"]
+    patterns: ['(?:^|[-_])(?:SHET|TTLB|TBLK)(?:[-_]|$)']
