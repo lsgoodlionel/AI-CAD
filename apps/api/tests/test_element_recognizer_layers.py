@@ -339,3 +339,47 @@ def test_an_unclassifiable_layer_still_reaches_the_size_guess():
     """判不出类型的图层照旧走尺寸猜测——不因这道闸而漏检。"""
     result = recognize(_plan_with_polys_on("XYZ-999"), "structure", "d1")
     assert len(result.columns) == 9
+
+
+# ── 图框/标题块图层闸：双线边框不再产出假墙 ────────────────────
+#
+# `_find_parallel_pairs` 此前对图层**不设任何拦截**（只用图层放宽墙宽上限），
+# 图框是一圈双线边框、间距恰在墙宽区间、重叠远超 1m —— 完美符合「墙」的几何判据。
+# 实测（大歌剧院）：
+#     「底板换撑平面布置图」 `通用-图框C-SHET` 11 面 + `C-SHET-TTLB` 7 面
+#     「8F节点大样图」       `A2|C—图框—标题块` 72 面
+
+@pytest.mark.unit
+@pytest.mark.parametrize("layer", [
+    "通用-图框C-SHET",
+    "C-SHET-TTLB",
+    "A2|C—图框—标题块",
+])
+def test_图框图层的平行线对不再产出墙(layer):
+    result = recognize(_plan_thick_parallel_wall(layer, 0.24), "structure", "dtb")
+    assert result.walls == []
+
+
+@pytest.mark.unit
+def test_同样几何在真墙图层上仍然产出墙():
+    """零回归对照：闸只按图层拦，几何判据一字未改。"""
+    result = recognize(_plan_thick_parallel_wall("A-WALL", 0.24), "structure", "dtb")
+    assert len(result.walls) == 1
+    assert result.walls[0]["width"] == pytest.approx(0.24, abs=0.02)
+
+
+@pytest.mark.unit
+def test_图框闸不误伤无图层信息的几何():
+    """57.5% 的线段图层判不出，闸管不到它们 —— 已知能力边界，
+    与 `test_图层判不出时仍然收下` 同一条口径。"""
+    result = recognize(_plan_thick_parallel_wall("", 0.24), "structure", "dtb")
+    assert len(result.walls) == 1
+
+
+@pytest.mark.unit
+def test_梁也走同一道闸():
+    """`_find_parallel_pairs` 是墙/梁共用，闸一次两边都生效。"""
+    geom = _plan_thick_parallel_wall("C-SHET-TTLB", 0.3)
+    geom.texts[-1] = (360.0, 20.0, "梁配筋平面图")
+    result = recognize(geom, "structure", "dtb")
+    assert result.beams == []
