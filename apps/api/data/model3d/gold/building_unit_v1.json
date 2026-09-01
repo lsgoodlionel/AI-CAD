@@ -168,7 +168,7 @@
      "verified_by": [
       "gpt"
      ],
-     "note": "整图缩略判「这张图画的是工程的哪一部分」。系统给每张图都指派了一个单体，故 `not_spatial`（无空间范围）与 `partial`（只画一部分）都是无意义的归属。**50/80 = 62% 的图被指派了单体，却根本没有空间范围或只是局部**。metro 侧 26 张全判 `main`，而判读里 19 张是 `not_spatial` —— 「全是 main」不是因为只有一个单体，是因为多数图本就不该有单体。**判读用了上一批（楼层批）的分类词 10 格**（multi_floor 9 · no_floor 1），不在本批清单里，按语义归入 not_spatial 并在此如实记录 —— 跨批次污染的证据。现成的 `NON_FLOOR_ROLES` 闸（上一轮为楼层归属做的）**能删 31/50 张错的、只误伤 1/30 张对的**；未在本轮接线，因 `detect_building_unit` 所在文件正被另一任务修改。"
+     "note": "整图缩略判「这张图画的是工程的哪一部分」。系统给每张图都指派了一个单体，故 `not_spatial`（无空间范围）与 `partial`（只画一部分）都是无意义的归属。**50/80 = 62% 的图被指派了单体，却根本没有空间范围或只是局部**。metro 侧 26 张全判 `main`，而判读里 19 张是 `not_spatial` —— 「全是 main」不是因为只有一个单体，是因为多数图本就不该有单体。**判读用了上一批（楼层批）的分类词 10 格**（multi_floor 9 · no_floor 1），不在本批清单里，按语义归入 not_spatial 并在此如实记录 —— 跨批次污染的证据。现成的 `NON_FLOOR_ROLES` 闸（上一轮为楼层归属做的）**能删 31/50 张错的、只误伤 1/30 张对的**；**已于 2026-09-24 接线**（`NON_UNIT_ROLES`，与楼层闸复用同一集合）：被排除的图不再写入 `building_units` 聚合，并在图纸归属上留下 `building_unit_role_excluded` 标记、发同名质量问题（降级必须可见）。单张图的 `building_unit_key` **刻意未清空** —— 清空会让下游 `model_elements.building_of` 走回退分支重新识别一遍、静默撤销闸门；要真正落地得给这些图一个专门的归属桶、并让 `building_of` 认这个标记。上游修掉空幻影层后（`_build_floors` 不再产出 `UNZONED` 层）这条边界已小了一半 —— `group_buildings` 够不到被排除的图，但 `_marker_building_keys` 仍对全部图纸调 `building_of`，静默撤销在那条路上依然成立；且该步应先有实测（本轮量的是聚合层）。整库实测闸门命中 **1034/1798 = 57.5%**（detail 685 · non_geometric 349）；但 `main` 仍在 —— 还有真平面图撑着，单体集合未变小。"
     }
    }
   },
@@ -486,7 +486,7 @@
      "verified_by": [
       "gpt"
      ],
-     "note": "整图缩略判「这张图画的是工程的哪一部分」。系统给每张图都指派了一个单体，故 `not_spatial`（无空间范围）与 `partial`（只画一部分）都是无意义的归属。**50/80 = 62% 的图被指派了单体，却根本没有空间范围或只是局部**。metro 侧 26 张全判 `main`，而判读里 19 张是 `not_spatial` —— 「全是 main」不是因为只有一个单体，是因为多数图本就不该有单体。**判读用了上一批（楼层批）的分类词 10 格**（multi_floor 9 · no_floor 1），不在本批清单里，按语义归入 not_spatial 并在此如实记录 —— 跨批次污染的证据。现成的 `NON_FLOOR_ROLES` 闸（上一轮为楼层归属做的）**能删 31/50 张错的、只误伤 1/30 张对的**；未在本轮接线，因 `detect_building_unit` 所在文件正被另一任务修改。"
+     "note": "整图缩略判「这张图画的是工程的哪一部分」。系统给每张图都指派了一个单体，故 `not_spatial`（无空间范围）与 `partial`（只画一部分）都是无意义的归属。**50/80 = 62% 的图被指派了单体，却根本没有空间范围或只是局部**。metro 侧 26 张全判 `main`，而判读里 19 张是 `not_spatial` —— 「全是 main」不是因为只有一个单体，是因为多数图本就不该有单体。**判读用了上一批（楼层批）的分类词 10 格**（multi_floor 9 · no_floor 1），不在本批清单里，按语义归入 not_spatial 并在此如实记录 —— 跨批次污染的证据。现成的 `NON_FLOOR_ROLES` 闸（上一轮为楼层归属做的）**能删 31/50 张错的、只误伤 1/30 张对的**；**已于 2026-09-24 接线**（`NON_UNIT_ROLES`，与楼层闸复用同一集合）：被排除的图不再写入 `building_units` 聚合，并在图纸归属上留下 `building_unit_role_excluded` 标记、发同名质量问题（降级必须可见）。单张图的 `building_unit_key` **刻意未清空** —— 清空会让下游 `model_elements.building_of` 走回退分支重新识别一遍、静默撤销闸门；要真正落地得给这些图一个专门的归属桶、并让 `building_of` 认这个标记。上游修掉空幻影层后（`_build_floors` 不再产出 `UNZONED` 层）这条边界已小了一半 —— `group_buildings` 够不到被排除的图，但 `_marker_building_keys` 仍对全部图纸调 `building_of`，静默撤销在那条路上依然成立；且该步应先有实测（本轮量的是聚合层）。整库实测闸门命中 **1069/2309 = 46.3%**（non_geometric 613 · detail 454 · coordinate_base 2）；单体集合 main/north/south 未变小（各自都还有真平面图撑着），实际减少的是幻影证据 —— south 的 candidate_sources 129→117、north 67→55。"
     }
    }
   }
