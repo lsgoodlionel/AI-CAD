@@ -1,0 +1,30 @@
+{
+  "source": {
+    "key": "12SG620",
+    "filename": "平法图集/std_191290.pdf",
+    "std_no": "12SG620",
+    "title": "砌体结构设计与构造",
+    "kind": "atlas",
+    "discipline": "structure",
+    "pages": 99,
+    "extract_method": "ocr",
+    "identified_by": "OCR 封面（文件名 std_191290 不含任何书名线索）",
+    "priority": 3,
+    "supersedes": null,
+    "superseded_by": null,
+    "notes": "全书无文本层，逐页仅一行水印『本资料限内部使用』。"
+  },
+  "evidence": {},
+  "stats": {
+    "extracted_pages": 99,
+    "declared_pages": 99,
+    "missing_pages": [],
+    "char_count": 63313,
+    "mean_confidence": 0.976,
+    "low_confidence_pages": [
+      6
+    ],
+    "near_empty_pages": [],
+    "ocr_dpi": 200
+  }
+}

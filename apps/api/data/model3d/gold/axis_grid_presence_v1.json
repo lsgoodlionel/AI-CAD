@@ -1,0 +1,432 @@
+{
+ "version": 1,
+ "object_classes": [
+  "axis_grid_presence"
+ ],
+ "units": [
+  {
+   "unit": "AX-corpus",
+   "source": {
+    "note": "两工程混合，按 axis_count 分层"
+   },
+   "classes": {
+    "axis_grid_presence": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "LEHV",
+       "ok": true,
+       "note": "系统 axis=0 circle=2；判读 no"
+      },
+      {
+       "ref": "W93P",
+       "ok": false,
+       "what": "yes_full",
+       "note": "系统 axis=0 circle=0；判读 yes_full"
+      },
+      {
+       "ref": "JLL9",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "HKM4",
+       "ok": false,
+       "what": "yes_full",
+       "note": "系统 axis=0 circle=5；判读 yes_full"
+      },
+      {
+       "ref": "99RN",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "JUJE",
+       "ok": true,
+       "note": "系统 axis=8 circle=16；判读 no；**立面／剖面／详图只有单方向轴线，问法要求纵横两向所致的分类假象**"
+      },
+      {
+       "ref": "EVNH",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "9AVU",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "3X9R",
+       "ok": true,
+       "note": "系统 axis=8 circle=8；判读 yes_full"
+      },
+      {
+       "ref": "4FKL",
+       "ok": true,
+       "note": "系统 axis=0 circle=2；判读 no"
+      },
+      {
+       "ref": "XWRA",
+       "ok": true,
+       "note": "系统 axis=17 circle=33；判读 yes_full"
+      },
+      {
+       "ref": "FKYJ",
+       "ok": true,
+       "note": "系统 axis=8 circle=8；判读 no；**立面／剖面／详图只有单方向轴线，问法要求纵横两向所致的分类假象**"
+      },
+      {
+       "ref": "WWYH",
+       "ok": true,
+       "note": "系统 axis=9 circle=23；判读 yes_full"
+      },
+      {
+       "ref": "V3L3",
+       "ok": false,
+       "what": "no",
+       "note": "系统 axis=65 circle=65；判读 no"
+      },
+      {
+       "ref": "WVKV",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "C393",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "KP3V",
+       "ok": true,
+       "note": "系统 axis=184 circle=315；判读 yes_full"
+      },
+      {
+       "ref": "VL33",
+       "ok": true,
+       "note": "系统 axis=16 circle=63；判读 yes_full"
+      },
+      {
+       "ref": "E394",
+       "ok": true,
+       "note": "系统 axis=22 circle=26；判读 yes_full"
+      },
+      {
+       "ref": "AHEK",
+       "ok": true,
+       "note": "系统 axis=9 circle=12；判读 yes_full"
+      },
+      {
+       "ref": "CFMU",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "JAPX",
+       "ok": true,
+       "note": "系统 axis=40 circle=100；判读 yes_full"
+      },
+      {
+       "ref": "NH4R",
+       "ok": true,
+       "note": "系统 axis=0 circle=3；判读 no"
+      },
+      {
+       "ref": "LHWJ",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "AJMV",
+       "ok": true,
+       "note": "系统 axis=14 circle=17；判读 yes_full"
+      },
+      {
+       "ref": "4XJ4",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "JNKA",
+       "ok": true,
+       "note": "系统 axis=40 circle=40；判读 yes_full"
+      },
+      {
+       "ref": "4UL3",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "XR9J",
+       "ok": true,
+       "note": "系统 axis=30 circle=30；判读 yes_full"
+      },
+      {
+       "ref": "HNH3",
+       "ok": true,
+       "note": "系统 axis=16 circle=34；判读 yes_full"
+      },
+      {
+       "ref": "UH9X",
+       "ok": true,
+       "note": "系统 axis=22 circle=38；判读 no；**立面／剖面／详图只有单方向轴线，问法要求纵横两向所致的分类假象**"
+      },
+      {
+       "ref": "KLJ4",
+       "ok": true,
+       "note": "系统 axis=5 circle=13；判读 yes_full"
+      },
+      {
+       "ref": "FF4H",
+       "ok": true,
+       "note": "系统 axis=13 circle=13；判读 yes_partial"
+      },
+      {
+       "ref": "VMAC",
+       "ok": true,
+       "note": "系统 axis=17 circle=17；判读 yes_full"
+      },
+      {
+       "ref": "3CXV",
+       "ok": true,
+       "note": "系统 axis=35 circle=41；判读 yes_full"
+      },
+      {
+       "ref": "F434",
+       "ok": true,
+       "note": "系统 axis=12 circle=24；判读 no；**立面／剖面／详图只有单方向轴线，问法要求纵横两向所致的分类假象**"
+      },
+      {
+       "ref": "4YAW",
+       "ok": true,
+       "note": "系统 axis=17 circle=33；判读 yes_full"
+      },
+      {
+       "ref": "RCJ3",
+       "ok": false,
+       "what": "no",
+       "note": "系统 axis=23 circle=25；判读 no"
+      },
+      {
+       "ref": "3WJY",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "YMRX",
+       "ok": false,
+       "what": "yes_full",
+       "note": "系统 axis=0 circle=0；判读 yes_full"
+      },
+      {
+       "ref": "94MJ",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "RWHN",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "CNM4",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "M4V9",
+       "ok": true,
+       "note": "系统 axis=16 circle=34；判读 yes_full"
+      },
+      {
+       "ref": "W4L9",
+       "ok": true,
+       "note": "系统 axis=18 circle=32；判读 yes_full"
+      },
+      {
+       "ref": "AMXF",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "E3VU",
+       "ok": true,
+       "note": "系统 axis=43 circle=71；判读 yes_full"
+      },
+      {
+       "ref": "FPAV",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "CCFJ",
+       "ok": true,
+       "note": "系统 axis=13 circle=17；判读 yes_full"
+      },
+      {
+       "ref": "F3AA",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "4L3E",
+       "ok": true,
+       "note": "系统 axis=26 circle=30；判读 yes_full"
+      },
+      {
+       "ref": "VHFA",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "MPMK",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "J3WY",
+       "ok": true,
+       "note": "系统 axis=37 circle=42；判读 yes_full"
+      },
+      {
+       "ref": "MVVW",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "XJ99",
+       "ok": true,
+       "note": "系统 axis=16 circle=20；判读 no；**立面／剖面／详图只有单方向轴线，问法要求纵横两向所致的分类假象**"
+      },
+      {
+       "ref": "KFKX",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "U4JX",
+       "ok": true,
+       "note": "系统 axis=17 circle=68；判读 yes_full"
+      },
+      {
+       "ref": "KNLE",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "AUK4",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "4MYE",
+       "ok": false,
+       "what": "yes_full",
+       "note": "系统 axis=0 circle=3；判读 yes_full"
+      },
+      {
+       "ref": "FXYW",
+       "ok": true,
+       "note": "系统 axis=25 circle=28；判读 yes_full"
+      },
+      {
+       "ref": "APRC",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "WFXU",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "K39E",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "VNPU",
+       "ok": true,
+       "note": "系统 axis=17 circle=33；判读 yes_full"
+      },
+      {
+       "ref": "WJXW",
+       "ok": true,
+       "note": "系统 axis=16 circle=34；判读 yes_full"
+      },
+      {
+       "ref": "CLJV",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "VYVE",
+       "ok": true,
+       "note": "系统 axis=42 circle=60；判读 yes_full"
+      },
+      {
+       "ref": "ELER",
+       "ok": true,
+       "note": "系统 axis=25 circle=31；判读 yes_full"
+      },
+      {
+       "ref": "WUEM",
+       "ok": true,
+       "note": "系统 axis=47 circle=70；判读 yes_full"
+      },
+      {
+       "ref": "MHNC",
+       "ok": true,
+       "note": "系统 axis=14 circle=16；判读 yes_full"
+      },
+      {
+       "ref": "NUCE",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "LWHJ",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "93NJ",
+       "ok": true,
+       "note": "系统 axis=0 circle=2；判读 no"
+      },
+      {
+       "ref": "FNWK",
+       "ok": true,
+       "note": "系统 axis=0 circle=3；判读 no"
+      },
+      {
+       "ref": "U34L",
+       "ok": true,
+       "note": "系统 axis=14 circle=42；判读 yes_full"
+      },
+      {
+       "ref": "LCN3",
+       "ok": true,
+       "note": "系统 axis=0 circle=0；判读 no"
+      },
+      {
+       "ref": "4UM4",
+       "ok": true,
+       "note": "系统 axis=0 circle=2；判读 no"
+      },
+      {
+       "ref": "JNF3",
+       "ok": true,
+       "note": "系统 axis=8 circle=8；判读 no；**立面／剖面／详图只有单方向轴线，问法要求纵横两向所致的分类假象**"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "note": "整图缩略判「这张图有没有轴网」，不读轴号（字符转写不可靠）。**批次自带有效性检查**：混入 40 张系统识别出 ≥5 条轴线的与 40 张一条都没识别的。判读结果 80% vs 10%，**差 +70%，仪器有效**，数字可用。漏检 4/40 = 10%（系统 0 条而图上确有轴网）；误检表面 8/40，但其中 **6 个是问法造成的分类假象** —— 立面／剖面／详图按国标只出现**一个方向**的轴线，而我的问法要求「纵横两个方向」，判读者于是答 no 而非 yes_partial。扣掉后真误检 2/40 = 5%，总体一致 74/80 = **92%**。**外推：axis_count=0 的 2045 张里，约 204 张实际有轴网** —— 这是可量化的召回缺口。这是 Phase I「三张图 100%」之后第一次有全库泛化的数字。"
+    }
+   }
+  }
+ ]
+}

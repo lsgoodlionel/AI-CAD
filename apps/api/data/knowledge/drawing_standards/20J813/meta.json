@@ -1,0 +1,28 @@
+{
+  "source": {
+    "key": "20J813",
+    "filename": "平法图集/20J813.pdf",
+    "std_no": "20J813",
+    "title": "《民用建筑设计统一标准》图示",
+    "kind": "atlas",
+    "discipline": "architecture",
+    "pages": 156,
+    "extract_method": "ocr",
+    "identified_by": "OCR 封面",
+    "priority": 2,
+    "supersedes": "06SJ813",
+    "superseded_by": null,
+    "notes": ""
+  },
+  "evidence": {},
+  "stats": {
+    "extracted_pages": 156,
+    "declared_pages": 156,
+    "missing_pages": [],
+    "char_count": 114471,
+    "mean_confidence": 0.9821,
+    "low_confidence_pages": [],
+    "near_empty_pages": [],
+    "ocr_dpi": 200
+  }
+}

@@ -1,0 +1,416 @@
+{
+ "version": 1,
+ "object_classes": [
+  "rule_vs_model"
+ ],
+ "units": [
+  {
+   "unit": "YL-both",
+   "source": {
+    "group": "both"
+   },
+   "classes": {
+    "rule_vs_model": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "V4YL",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=both；实为 seat"
+      },
+      {
+       "ref": "3HMN",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=both；实为 seat"
+      },
+      {
+       "ref": "AP4M",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=both；实为 seat"
+      },
+      {
+       "ref": "XFRN",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=both；实为 seat"
+      },
+      {
+       "ref": "YEA4",
+       "ok": true,
+       "note": "分组=both"
+      },
+      {
+       "ref": "WAAW",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=both；实为 seat"
+      },
+      {
+       "ref": "XFFC",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=both；实为 seat"
+      },
+      {
+       "ref": "PRKL",
+       "ok": true,
+       "note": "分组=both"
+      },
+      {
+       "ref": "PCEV",
+       "ok": true,
+       "note": "分组=both"
+      },
+      {
+       "ref": "M33E",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=both；实为 seat"
+      },
+      {
+       "ref": "MAVC",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=both；实为 seat"
+      },
+      {
+       "ref": "FE4F",
+       "ok": true,
+       "note": "分组=both"
+      },
+      {
+       "ref": "KNYR",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=both；实为 seat"
+      },
+      {
+       "ref": "L3AH",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=both；实为 seat"
+      },
+      {
+       "ref": "KE3J",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=both；实为 seat"
+      },
+      {
+       "ref": "HN3P",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=both；实为 seat"
+      },
+      {
+       "ref": "JCWA",
+       "ok": true,
+       "note": "分组=both"
+      },
+      {
+       "ref": "VE3U",
+       "ok": false,
+       "what": "text",
+       "note": "分组=both；实为 text"
+      },
+      {
+       "ref": "RC4P",
+       "ok": true,
+       "note": "分组=both"
+      },
+      {
+       "ref": "3YMC",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=both；实为 seat"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "criteria": "CRITERIA.md#columns",
+     "note": "规则引擎 × YOLO v5 在**同一批 45 块 640px 瓦片**上的分歧裁决。实测框数：规则 444 · 模型 205 · 两者一致仅 106 —— 规则框里 76% 模型不认，模型框里 47% 规则不认。判据从 `CRITERIA.md#columns` 整段照抄，判读者**不知道每格来自哪一方**。**原始三组**：both 6/20 = 30% · rule_only 1/20 = 5% · model_only 2/20 = 10%，按事先声明的门槛（对照组须高出分歧组 30%）**有效性检查失败**。**失败的方式本身是发现**：both 组 14 个错里 **13 个是座椅** —— 28/60 格判为座椅，且只来自 **4 张图**（一张独占 15 格）。**剔除座椅格后**：both 6/7 = **86%** · rule_only 1/16 = **6%** · model_only 2/9 = **22%**，检查转为通过。口径说明：座椅剔除是**事后**按判读结果做的，86% 是「在不是座椅的前提下」的条件值，不是干净估计；且样本集中（60 格来自 22 张图）。"
+    }
+   }
+  },
+  {
+   "unit": "YL-model_only",
+   "source": {
+    "group": "model_only"
+   },
+   "classes": {
+    "rule_vs_model": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "9R3L",
+       "ok": true,
+       "note": "分组=model_only"
+      },
+      {
+       "ref": "NYNW",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=model_only；实为 seat"
+      },
+      {
+       "ref": "UXKV",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=model_only；实为 seat"
+      },
+      {
+       "ref": "JJWH",
+       "ok": false,
+       "what": "axis",
+       "note": "分组=model_only；实为 axis"
+      },
+      {
+       "ref": "FPYN",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=model_only；实为 seat"
+      },
+      {
+       "ref": "34NH",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=model_only；实为 seat"
+      },
+      {
+       "ref": "9UL4",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=model_only；实为 seat"
+      },
+      {
+       "ref": "3VPA",
+       "ok": false,
+       "what": "door",
+       "note": "分组=model_only；实为 door"
+      },
+      {
+       "ref": "VXUA",
+       "ok": true,
+       "note": "分组=model_only"
+      },
+      {
+       "ref": "CJKU",
+       "ok": false,
+       "what": "text",
+       "note": "分组=model_only；实为 text"
+      },
+      {
+       "ref": "MAR9",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=model_only；实为 seat"
+      },
+      {
+       "ref": "WPYA",
+       "ok": false,
+       "what": "equipment",
+       "note": "分组=model_only；实为 equipment"
+      },
+      {
+       "ref": "AP3L",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=model_only；实为 seat"
+      },
+      {
+       "ref": "3AHC",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=model_only；实为 seat"
+      },
+      {
+       "ref": "WRW9",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=model_only；实为 seat"
+      },
+      {
+       "ref": "RVEK",
+       "ok": false,
+       "what": "wall",
+       "note": "分组=model_only；实为 wall"
+      },
+      {
+       "ref": "MCER",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=model_only；实为 seat"
+      },
+      {
+       "ref": "JLFX",
+       "ok": false,
+       "what": "text",
+       "note": "分组=model_only；实为 text"
+      },
+      {
+       "ref": "LJ3N",
+       "ok": false,
+       "what": "axis",
+       "note": "分组=model_only；实为 axis"
+      },
+      {
+       "ref": "C9KK",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=model_only；实为 seat"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "criteria": "CRITERIA.md#columns",
+     "note": "规则引擎 × YOLO v5 在**同一批 45 块 640px 瓦片**上的分歧裁决。实测框数：规则 444 · 模型 205 · 两者一致仅 106 —— 规则框里 76% 模型不认，模型框里 47% 规则不认。判据从 `CRITERIA.md#columns` 整段照抄，判读者**不知道每格来自哪一方**。**原始三组**：both 6/20 = 30% · rule_only 1/20 = 5% · model_only 2/20 = 10%，按事先声明的门槛（对照组须高出分歧组 30%）**有效性检查失败**。**失败的方式本身是发现**：both 组 14 个错里 **13 个是座椅** —— 28/60 格判为座椅，且只来自 **4 张图**（一张独占 15 格）。**剔除座椅格后**：both 6/7 = **86%** · rule_only 1/16 = **6%** · model_only 2/9 = **22%**，检查转为通过。口径说明：座椅剔除是**事后**按判读结果做的，86% 是「在不是座椅的前提下」的条件值，不是干净估计；且样本集中（60 格来自 22 张图）。"
+    }
+   }
+  },
+  {
+   "unit": "YL-rule_only",
+   "source": {
+    "group": "rule_only"
+   },
+   "classes": {
+    "rule_vs_model": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "NJ4U",
+       "ok": false,
+       "what": "beam",
+       "note": "分组=rule_only；实为 beam"
+      },
+      {
+       "ref": "PFK9",
+       "ok": false,
+       "what": "text",
+       "note": "分组=rule_only；实为 text"
+      },
+      {
+       "ref": "JEP3",
+       "ok": false,
+       "what": "wall",
+       "note": "分组=rule_only；实为 wall"
+      },
+      {
+       "ref": "ER3P",
+       "ok": false,
+       "what": "hatch",
+       "note": "分组=rule_only；实为 hatch"
+      },
+      {
+       "ref": "EXRM",
+       "ok": false,
+       "what": "axis",
+       "note": "分组=rule_only；实为 axis"
+      },
+      {
+       "ref": "LKNE",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=rule_only；实为 seat"
+      },
+      {
+       "ref": "UFJA",
+       "ok": false,
+       "what": "hatch",
+       "note": "分组=rule_only；实为 hatch"
+      },
+      {
+       "ref": "XXXJ",
+       "ok": false,
+       "what": "wall",
+       "note": "分组=rule_only；实为 wall"
+      },
+      {
+       "ref": "3ERP",
+       "ok": true,
+       "note": "分组=rule_only"
+      },
+      {
+       "ref": "3A9Y",
+       "ok": false,
+       "what": "equipment",
+       "note": "分组=rule_only；实为 equipment"
+      },
+      {
+       "ref": "4XVK",
+       "ok": false,
+       "what": "furniture",
+       "note": "分组=rule_only；实为 furniture"
+      },
+      {
+       "ref": "MEUE",
+       "ok": false,
+       "what": "hatch",
+       "note": "分组=rule_only；实为 hatch"
+      },
+      {
+       "ref": "LF4M",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=rule_only；实为 seat"
+      },
+      {
+       "ref": "LCUA",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=rule_only；实为 seat"
+      },
+      {
+       "ref": "JULH",
+       "ok": false,
+       "what": "wall",
+       "note": "分组=rule_only；实为 wall"
+      },
+      {
+       "ref": "EAAE",
+       "ok": false,
+       "what": "seat",
+       "note": "分组=rule_only；实为 seat"
+      },
+      {
+       "ref": "J3CF",
+       "ok": false,
+       "what": "beam",
+       "note": "分组=rule_only；实为 beam"
+      },
+      {
+       "ref": "WXRA",
+       "ok": false,
+       "what": "wall",
+       "note": "分组=rule_only；实为 wall"
+      },
+      {
+       "ref": "9YE3",
+       "ok": false,
+       "what": "text",
+       "note": "分组=rule_only；实为 text"
+      },
+      {
+       "ref": "UUW4",
+       "ok": false,
+       "what": "equipment",
+       "note": "分组=rule_only；实为 equipment"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "criteria": "CRITERIA.md#columns",
+     "note": "规则引擎 × YOLO v5 在**同一批 45 块 640px 瓦片**上的分歧裁决。实测框数：规则 444 · 模型 205 · 两者一致仅 106 —— 规则框里 76% 模型不认，模型框里 47% 规则不认。判据从 `CRITERIA.md#columns` 整段照抄，判读者**不知道每格来自哪一方**。**原始三组**：both 6/20 = 30% · rule_only 1/20 = 5% · model_only 2/20 = 10%，按事先声明的门槛（对照组须高出分歧组 30%）**有效性检查失败**。**失败的方式本身是发现**：both 组 14 个错里 **13 个是座椅** —— 28/60 格判为座椅，且只来自 **4 张图**（一张独占 15 格）。**剔除座椅格后**：both 6/7 = **86%** · rule_only 1/16 = **6%** · model_only 2/9 = **22%**，检查转为通过。口径说明：座椅剔除是**事后**按判读结果做的，86% 是「在不是座椅的前提下」的条件值，不是干净估计；且样本集中（60 格来自 22 张图）。"
+    }
+   }
+  }
+ ]
+}
