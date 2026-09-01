@@ -264,10 +264,13 @@ def test_longest_substring_wins_over_kind_order():
     mep 末端符号；`data/review_protocol/disciplines.yaml` 把百叶风口列为
     暖通部位级对象；09-04 那批独立判读里，10 个真设备的具体类型就包含风口。
 
-    **诚实边界**：`I—墙面—风口` 这个图层名在当前语料里**并不存在**
-    （2989 个图层名中含「墙面」的是 0 个，装修族是 `I—隔墙—`/`I—平顶—`/
-    `I—地坪—`）。这条护栏钉的是规则，不是已发生的收益；
-    真正产生收益的是下面那条 `0M-空调管风口` / `0M-风机盘管`。
+    全库 4108 张实测：`二层小歌剧厅$0$I—墙面—风口`（外参绑定形式，135 图元）
+    确实存在且确实由 wall 改判 equipment —— 这正是本条要修的那个 case。
+    另有 `暖通-排烟-风口`（1071 图元）此前**判不出**（None），现判 equipment。
+
+    注意 `0M-通风管风口`（707 图元）**不动**：它同时含 pipe 的「风管」与
+    equipment 的「风口」，两者等长 ⇒ 回落 `_KIND_ORDER` 判 pipe。
+    等长即维持现状，是这套规则的设计意图，不是遗漏。
     """
     assert lc.classify_by_layer("I—墙面—风口") == "equipment"
     assert lc.classify_by_layer("I-墙面-送风口") == "equipment"
@@ -347,3 +350,34 @@ def test_existing_substring_verdicts_are_unchanged():
     assert lc.classify_by_layer("给水管道平面") == "pipe"
     assert lc.classify_by_layer("二层梁配筋图") == "beam"
     assert lc.classify_by_layer("定位轴线网") == "axis"
+
+
+@pytest.mark.unit
+def test_library_wide_reclassifications_are_pinned():
+    """全库 4108 张实测出的 5 个改判，逐条钉住 —— 它们是这次改动的**全部**收益。
+
+    前两条来自「最长子串压过通用短子串」，后三条是意料之外的：
+      · `防火门监控系统设备` 此前被 **door** 的「门」抢走（door 在 `_KIND_ORDER`
+        里排在 equipment 之前），而它是防火门监控系统的**设备**
+      · `暖通-排烟-风口` 此前**判不出**（None）—— 纯增量，来自 yaml 加的「风口」
+      · `…$0$I—墙面—风口` 是外参绑定形式，剥离后仍含「墙面」
+
+    元素级代价（全库）：pipes −358（−0.10%）· equipment +207（+0.37%）·
+    columns / walls / beams / slabs 全部 0。
+    """
+    assert lc.classify_by_layer("0M-空调管风口") == "equipment"
+    assert lc.classify_by_layer("0M-风机盘管") == "equipment"
+    assert lc.classify_by_layer("防火门监控系统设备") == "equipment"
+    assert lc.classify_by_layer("暖通-排烟-风口") == "equipment"
+    assert lc.classify_by_layer("二层小歌剧厅$0$I—墙面—风口") == "equipment"
+
+
+@pytest.mark.unit
+def test_equal_length_rival_substrings_keep_the_status_quo():
+    """`0M-通风管风口` 同时含 pipe 的「风管」与 equipment 的「风口」，两者等长。
+
+    等长回落 `_KIND_ORDER`（pipe 在 equipment 之前）⇒ 判 pipe，维持现状。
+    **等长即不改判**是这套规则的设计意图 —— 也正是靠它，
+    pipe 的「管井/管丼」才能顶住 equipment 的「设备」。
+    """
+    assert lc.classify_by_layer("0M-通风管风口") == "pipe"
