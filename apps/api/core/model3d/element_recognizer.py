@@ -12,6 +12,7 @@ from .geometry_extractor import MAX_PRIMITIVES
 from .layer_conventions import (
     classify_by_layer, classify_system, is_annotation_layer,
 )
+from .true_extent import min_area_rect
 from .types import DrawingGeometry, FloorElements
 
 
@@ -542,8 +543,24 @@ def _find_columns(
         columns.append(_rect_element(x, y, w, h, ctx))
         if len(columns) >= _CAPS["columns"]:
             return columns
+    degenerate = 0
     for i, poly in enumerate(polys):
-        x, y, w, h = _poly_bbox(poly)
+        # **量真实尺寸，不量它在坐标轴上的影子**。
+        #
+        # 多边形的轴对齐包围盒对斜着的构件是错的：一条 45° 的细条，
+        # 影子是方的。标高符号正是这样混进来的 —— 实测隔声隔振平面图上
+        # `∨` 形标高符号的每一条笔画单独成为一个填充多边形，包围盒
+        # 0.52×0.59m（长宽比 1.13、落在柱窗口正中间），真实尺寸却是
+        # 0.7×0.12m 这一档。判据依据见 `true_extent` 模块文档。
+        #
+        # **只换量法，不换阈值**：量出的 (长边, 短边) 仍分别交给
+        # `_is_plausible_column`（图层路径）与 `_is_column_size`（猜测路径）。
+        # 实测结构平面图上有 0.18m 的柱按柱图层进来，把猜测路径的下限
+        # 套到它头上会删掉真柱。
+        extent = min_area_rect(poly)
+        if extent is None:
+            degenerate += 1      # 共线/点不足 —— 不是构件，计数见函数末日志
+            continue
         # **标注/钢筋图层不产出构件**（与矩形分支同一条纪律）——
         # 我第一版只在矩形分支加了这道闸，而实测那 711 根假柱
         # 全部来自**多边形**（`墙柱纵筋` 图层），修了一半等于没修。
@@ -559,7 +576,7 @@ def _find_columns(
         # 落在 `A—门窗`(door)/`A-GLAZ`(window)/`A—设备管丼`(pipe)/
         # `景-平面-红线`(slab) 上——分类器答得出，识别器却不听。
         other_kind = _kind is not None and _kind != "column"
-        w_m, h_m = ctx.len_m(w), ctx.len_m(h)
+        w_m, h_m = ctx.len_m(extent[0]), ctx.len_m(extent[1])
         if is_column_layer:
             if not _is_plausible_column(w_m, h_m):
                 continue
@@ -569,6 +586,10 @@ def _find_columns(
         columns.append({"outline": [ctx.to_m(px, py) for px, py in _downsample_ring(poly, 8)], "src": ctx.src})
         if len(columns) >= _CAPS["columns"]:
             break
+    if degenerate:
+        # 删除量不静默（`MODELING_PIPELINE_BLUEPRINT.md` §7：降级必须可见）
+        logger.info("[model3d] 柱候选剔除退化多边形(%s): %d 个（共线或点不足）",
+                    ctx.src, degenerate)
     return columns
 
 
