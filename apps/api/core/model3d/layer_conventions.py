@@ -58,10 +58,29 @@ class _SystemRule:
 
 
 @dataclass(frozen=True)
+class _GateRule:
+    """非构件图层闸的一组判据（该图层画的不是建筑实体）。"""
+    group: str
+    substrings: tuple[str, ...] = ()
+    patterns: tuple[re.Pattern[str], ...] = ()
+
+
+@dataclass(frozen=True)
 class LayerConventions:
     """已解析、可直接匹配的图层约定集合。"""
     kind_rules: tuple[_KindRule, ...] = ()
     system_rules: tuple[_SystemRule, ...] = ()
+    #: 非构件闸分组（group → 判据），供将来按组分别开关用。
+    gate_groups: dict[str, _GateRule] = field(default_factory=dict)
+    #: 闸词表 = yaml ∪ 兜底，**加载时算一次**（`is_non_component_layer` 在
+    #: `_find_parallel_pairs` 里逐线调用，实测单图 line_layers 近 2 万条，
+    #: 每次重建集合是热路径上的白烧）。
+    #: 默认值就是兜底词表 —— 于是 `LayerConventions()` 这个**降级返回值**
+    #: 天然带着闸，不必在降级分支里再记得补一遍。
+    gate_substrings: frozenset[str] = field(
+        default_factory=lambda: _DEFAULT_GATE_SUBSTRINGS)
+    gate_patterns: tuple[re.Pattern[str], ...] = field(
+        default_factory=lambda: _DEFAULT_GATE_PATTERNS)
 
 
 def _norm(text: str | None) -> str:
@@ -109,6 +128,18 @@ def _build_system_rule(entry: dict) -> _SystemRule | None:
     )
 
 
+def _build_gate_rule(entry: dict) -> _GateRule | None:
+    """构造一组非构件闸判据。分组名缺失即整条丢弃（宁可不拦，不可乱拦）。"""
+    group = str(entry.get("group") or "").strip()
+    if not group:
+        return None
+    return _GateRule(
+        group=group,
+        substrings=_str_list(entry.get("substrings")),
+        patterns=_compile_patterns(entry.get("patterns")),
+    )
+
+
 def _order_key(rule: _KindRule) -> int:
     try:
         return _KIND_ORDER.index(rule.kind)
@@ -145,9 +176,20 @@ def load_conventions() -> LayerConventions:
         for entry in data.get("systems", []) or []
         if isinstance(entry, dict) and (rule := _build_system_rule(entry)) is not None
     )
+    gate_groups = {
+        rule.group: rule
+        for entry in data.get("non_component", []) or []
+        if isinstance(entry, dict) and (rule := _build_gate_rule(entry)) is not None
+    }
+    # **yaml 只能加词，挖不掉地板**：与兜底取并集，不是覆盖。
     return LayerConventions(
         kind_rules=tuple(sorted(kind_rules, key=_order_key)),
         system_rules=system_rules,
+        gate_groups=gate_groups,
+        gate_substrings=_DEFAULT_GATE_SUBSTRINGS.union(
+            *(r.substrings for r in gate_groups.values())),
+        gate_patterns=_DEFAULT_GATE_PATTERNS + tuple(
+            p for r in gate_groups.values() for p in r.patterns),
     )
 
 
@@ -245,6 +287,60 @@ def is_annotation_layer(layer: str | None) -> bool:
     # 「钢筋混凝土X」先摘掉，再判 —— 否则材料名里的「钢筋」会误杀真构件层
     text = _CONCRETE_MATERIAL_RE.sub("", text)
     return bool(_ANNOTATION_LAYER_RE.search(text))
+
+
+#: 非构件闸兜底词表 —— **yaml 丢了闸也必须还在**。
+#:
+#: `load_conventions()` 对「文件缺失 / 无 pyyaml / 内容损坏 / 根节点非映射」
+#: 一律降级为空（四条降级用例）。这对构件映射是安全的：降级只是**少认几个
+#: 构件**。但对闸是**反向**的：降级会**放行假构件**。代价方向相反，
+#: 所以闸不能只活在配置里。
+#:
+#: 与 `data/layer_conventions.yaml` 的 `non_component` 段是同一份词表，
+#: 运行时取**并集**（yaml 只能加词，不能把地板挖掉），
+#: 一致性由 `test_兜底词表与yaml不漂移` 钉住。
+#: HEAD 那次实测的教训正是两份配置互相分岔：「灯具」在数据集那份出现 4 次、
+#: 生产这份 0 次，整套装修词汇到不了生产路径。
+_DEFAULT_GATE_VOCAB: dict[str, dict[str, tuple[str, ...]]] = {
+    # 图框 / 标题块 / 会签栏：GB/T 50001 通用制图用语 + AIA 次级码
+    # SHET(sheet) / TTLB·TBLK(title block)。
+    # **判据落在次级码上，绝不能落在裸 `C-`** —— 那是 AIA 的 Civil 学科码。
+    "sheet": {
+        "substrings": ("图框", "标题块", "会签栏", "图签"),
+        "patterns": (r'(?:^|[-_])(?:SHET|TTLB|TBLK)(?:[-_]|$)',),
+    },
+}
+
+#: 兜底词表拍平后的成品（`LayerConventions` 的字段默认值直接用它们）。
+_DEFAULT_GATE_SUBSTRINGS: frozenset[str] = frozenset(
+    _norm(sub) for vocab in _DEFAULT_GATE_VOCAB.values()
+    for sub in vocab["substrings"] if sub
+)
+_DEFAULT_GATE_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
+    re.compile(p, re.IGNORECASE)
+    for vocab in _DEFAULT_GATE_VOCAB.values() for p in vocab["patterns"]
+)
+
+
+def is_non_component_layer(layer: str | None) -> bool:
+    """该图层画的**不是建筑实体**，任何构件都不该从它产出。
+
+    **与 `is_annotation_layer` 是两个问题**（别合并成一个正则）：
+      - 标注**依附于某个构件** —— `S-BEAM-TEXT` 是梁的文字，语义上仍属 beam。
+      - 图框/标题块/会签栏**不依附任何构件**，画的是「纸」不是「楼」。
+    AIA 本身也分开：`-ANNO/-IDEN/-DIMS` 是挂在专业构件后的 minor group，
+    而 `SHET`/`TTLB` 自成一系。合并后就再也无法分别开关。
+
+    **只看图层自己的名字**：`|` 前是**来源图纸**的名字而非图层语义 ——
+    与 `is_annotation_layer` 同一条教训（前缀里的「配筋」曾让某图 658 个
+    柱候选全被丢弃）。故 `图框A2$0$S-COLU` 判为 False，那是真柱层。
+    """
+    text = _norm(normalize_layer_name(layer))
+    if not text:
+        return False
+    conv = load_conventions()
+    return (any(sub in text for sub in conv.gate_substrings)
+            or any(pattern.search(text) for pattern in conv.gate_patterns))
 
 
 def normalize_layer_name(layer: str | None) -> str:
