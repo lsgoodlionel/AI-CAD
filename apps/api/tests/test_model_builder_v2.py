@@ -373,3 +373,32 @@ def test_build_floors_不生成未分层但_floor_of_仍覆盖每张图():
 
     assert [f["key"] for f in floors] == ["F3"]
     assert floor_of == {"d1": "UNZONED", "d2": "F3"}
+
+
+@pytest.mark.asyncio
+async def test_未分层图纸上的问题标记数照实统计(fake_db, monkeypatch):
+    """未分层不再产出楼层 → 落在其上的问题标记没有楼层可落。
+
+    前端按 `floor_key` 找不到楼层就跳过该标记，**数量必须出现在 stats 里**，
+    否则「红点少了」会成为新的谜（降级必须可见）。
+    """
+    monkeypatch.setattr(model_builder, "_render_and_upload_sync", _fake_render)
+    monkeypatch.setattr(
+        model_elements, "build_floor_elements", _fake_build_floor_elements
+    )
+    unzoned_issue = {
+        "drawing_id": D_MAIN, "issue_id": "issue-unzoned", "severity": "major",
+        "description": "节点大样与说明不符", "discipline_code": "JG",
+        "location_json": json.dumps({"levels": [], "axes": []}),
+    }
+    _arrange(fake_db, [
+        _drawing(D_SOUTH, "S-1", "南区（大、中歌剧厅）一层墙柱结构平面图"),
+        _drawing(D_MAIN, "S-3", "一层通用节点图"),  # 角色闸排除 → 未分层
+    ], [_issue(D_SOUTH), unzoned_issue])
+
+    scene, _ = await build_scene(fake_db, PROJECT_ID)
+
+    floor_keys = {f["key"] for f in scene["floors"]}
+    orphans = [m for m in scene["markers"] if m["floor_key"] not in floor_keys]
+    assert [m["ref"]["drawing_id"] for m in orphans] == [D_MAIN]
+    assert scene["stats"]["markers_without_floor"] == 1

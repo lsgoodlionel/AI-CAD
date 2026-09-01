@@ -41,7 +41,7 @@ from services import (
 )
 from services.drawing_semantics import extract_semantic_candidates
 from services.drawing_view_classifier import classify_view_type
-from services.floor_parser import parse_floor
+from services.floor_parser import UNZONED_FLOOR, parse_floor
 from services.model_lod import ModelScopeEvidence, aggregate_lod_modes, evaluate_lod_capability
 
 logger = logging.getLogger(__name__)
@@ -413,16 +413,28 @@ def _build_floors(
     assets: dict,
     normalization: model_story.StoryNormalizationResult,
 ) -> tuple[list[dict], dict[str, str]]:
-    """楼层堆叠：使用 normalized story assignment 组装 floors。"""
+    """楼层堆叠：使用 normalized story assignment 组装 floors。
+
+    **未分层（`UNZONED`）只记账，不造楼层**：归不了层的图纸（详图/系统图/
+    说明/角色闸排除的图）仍写进 `floor_of` 与待人工标注队列，但不产出楼层 ——
+    实测第二工程该桶挂 946 张图、构件 0 个，在三维里就是一个什么都没有的
+    空层，还把 `stats.reconstruction` 从 elements 拖成 mixed。
+
+    `floor_of` 仍覆盖每一张图：下游 `floor_of[drawing_id]` 是无条件取值。
+    """
     floors: dict[str, dict] = {}
     floor_of: dict[str, str] = {}
+    unzoned_key = UNZONED_FLOOR[0]
     for drawing in drawings:
         drawing_id = str(drawing["id"])
         issues = issues_by_drawing.get(drawing_id, [])
         assignment = normalization.drawing_assignments.get(drawing_id) or {}
-        key = str(assignment.get("story_key") or "UNZONED")
-        label = str(assignment.get("story_display_name") or "未分层")
+        key = str(assignment.get("story_key") or unzoned_key)
+        label = str(assignment.get("story_display_name") or UNZONED_FLOOR[1])
         order = int(assignment.get("story_order") or 0)
+        floor_of[drawing_id] = key
+        if key == unzoned_key:
+            continue
         floor = floors.setdefault(
             key,
             {
@@ -446,7 +458,6 @@ def _build_floors(
                 assignment,
             )
         )
-        floor_of[drawing_id] = key
     ordered = sorted(floors.values(), key=lambda f: f["order"])
     for floor in ordered:
         floor["building_units"] = sorted(floor["building_units"])
@@ -1847,6 +1858,13 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     stats["reconstruction"] = model_elements.reconstruction_mode(floors)
     stats["buildings"] = 0  # 占位，下方 buildings 组装后回填
     stats["unclassified_drawings"] = len(normalization.unclassified_drawings)
+    # 未分层不产出楼层（见 `_build_floors`），落在未分层图纸上的标记于是没有
+    # 楼层可落 —— 前端按 floor_key 找不到楼层就跳过。**数量必须可见**，
+    # 否则「红点少了」会成为新的谜；这些图本就在待人工标注队列里等归层。
+    _floor_keys = {str(f["key"]) for f in floors}
+    stats["markers_without_floor"] = sum(
+        1 for marker in markers if marker["floor_key"] not in _floor_keys
+    )
     stats["quality_issues"] = len(normalization.issues)
     if yolo_total:
         stats["yolo_equipment"] = yolo_total
