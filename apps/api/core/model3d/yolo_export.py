@@ -12,7 +12,7 @@ from __future__ import annotations
 
 #: 类别顺序**必须稳定**：训练好的权重按 id 索引类别，
 #: 顺序一变，模型输出的「柱」就成了「墙」。
-#: 与 Phase C 的 9 类体系一致（`data/model3d/layer_class_map.yaml`），不另起一套。
+#: 与 Phase C 的 9 类体系一致（`data/layer_conventions.yaml`），不另起一套。
 CLASS_NAMES = ["column", "wall", "beam", "slab", "pipe", "equipment",
                "door", "window", "axis"]
 
