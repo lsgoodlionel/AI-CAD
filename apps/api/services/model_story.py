@@ -424,6 +424,29 @@ NON_FLOOR_ROLES = frozenset({
 })
 
 
+# **本就不该有单体归属的建模角色** —— 与楼层闸是同一副药，故直接复用同一个
+# 集合（写两遍必然漂移）。但**证据是独立的一批**：
+#
+# 80 张整图缩略判读（`data/model3d/gold/building_unit_v1.json`）：系统给每一张图
+# 都指派了一个单体，而 **50/80 = 62% 的图根本没有空间范围或只画了一部分**
+# （not_spatial 43 · partial 7）。「metro 26 张全是 main」不是因为地铁只有一个
+# 单体，是因为其中 19 张判读为 `not_spatial`。
+#
+#     判读说不该有单体的 50 张   detail 20 · non_geometric 11 ·
+#                                component_source 9 · unknown 7 ·
+#                                elevation_reference 3
+#
+# 按这三个角色拦截，在该样本上**删掉 31/50 张错误归属，误伤 1/30（3.3%）**。
+# `unknown` 同样**不**列入（那 7 张覆盖不到，如实留证）——
+# 判不出不等于不该有单体（蓝图 §7 约束 5）。
+#
+# 另有一处同类判据：`services/building_unit_fallback.classify_unit_assignment`
+# 也把 non_geometric / detail 判成 `not_applicable`，但它只做**统计口径**、
+# 不参与这里的归属聚合，且**少一个 coordinate_base**。本轮不动它 ——
+# 那个差别在 80 张样本上出现 0 次，没有实测依据的扩面就是想当然。
+NON_UNIT_ROLES = NON_FLOOR_ROLES
+
+
 def normalize_story_table(
     drawings: list[dict[str, Any]],
     annotations: dict[str, dict[str, Any]] | None = None,
@@ -451,34 +474,39 @@ def normalize_story_table(
         annotation = dict(annotations.get(drawing_id) or {})
         if annotation.get("candidate_sources") is not None:
             annotation["candidate_sources"] = _serialize_candidate_sources(annotation["candidate_sources"])
-        unit = detect_building_unit(drawing, annotation)
         # **角色闸**：本就不该有层的图（说明/节点大样/轴网定位）不进楼层，
         # 走已有的 unclassified 通道并留下可见的质量问题 —— 不悄悄丢。
         role_excluded = classify_role(drawing).role in NON_FLOOR_ROLES
+        unit = detect_building_unit(drawing, annotation)
+        # **单体闸**：同一副药的另一半。这些图不撑起单体 —— 否则一张
+        # `北区轴网定位图` 就能在「已识别单体」里立起一个一层楼都没有的
+        # `north`。**人工指定的单体压过闸门**（人审在环，E1.5）。
+        unit_excluded = role_excluded and unit.source != "manual"
         story = (StoryCandidate(story_key=None, display_name=None, story_order=None,
                                 elevation_m=None, confidence=0.0, source="role_gate")
                  if role_excluded
                  else extract_story_candidate(drawing, annotation,
                                               trusted_band=trusted_band))
 
-        building_units.setdefault(
-            unit.unit_key,
-            {
-                "unit_key": unit.unit_key,
-                "display_name": unit.display_name,
-                "confidence": unit.confidence,
-                "candidate_sources": list(unit.candidate_sources),
-                "source": unit.source,
-            },
-        )
-        existing_unit = building_units[unit.unit_key]
-        existing_unit["confidence"] = max(existing_unit["confidence"], unit.confidence)
-        for candidate in unit.candidate_sources:
-            if candidate not in existing_unit["candidate_sources"]:
-                existing_unit["candidate_sources"].append(candidate)
-        if unit.source == "manual":
-            existing_unit["source"] = "manual"
-            existing_unit["display_name"] = unit.display_name
+        if not unit_excluded:
+            building_units.setdefault(
+                unit.unit_key,
+                {
+                    "unit_key": unit.unit_key,
+                    "display_name": unit.display_name,
+                    "confidence": unit.confidence,
+                    "candidate_sources": list(unit.candidate_sources),
+                    "source": unit.source,
+                },
+            )
+            existing_unit = building_units[unit.unit_key]
+            existing_unit["confidence"] = max(existing_unit["confidence"], unit.confidence)
+            for candidate in unit.candidate_sources:
+                if candidate not in existing_unit["candidate_sources"]:
+                    existing_unit["candidate_sources"].append(candidate)
+            if unit.source == "manual":
+                existing_unit["source"] = "manual"
+                existing_unit["display_name"] = unit.display_name
 
         assignment = {
             "drawing_id": drawing_id,
@@ -496,6 +524,20 @@ def normalize_story_table(
             "normalized_elevation_m": None,
         }
         assignments[drawing_id] = assignment
+
+        if unit_excluded:
+            # **降级必须可见**（蓝图 §7 约束 3）：被拿掉的单体键留在问题里，
+            # 否则事后无从追查「那个南区去哪了」。
+            assignment["building_unit_role_excluded"] = True
+            issues.append(
+                ModelQualityIssue(
+                    issue_type="building_unit_role_excluded",
+                    severity="info",
+                    message="图纸按建模角色判为本就无单体归属，未计入已识别单体",
+                    drawing_id=drawing_id,
+                    building_unit_key=unit.unit_key,
+                )
+            )
 
         if story.story_key is None or story.story_order is None or story.display_name is None:
             assignment["story_key"] = _DEFAULT_UNCLASSIFIED_STORY[0]
