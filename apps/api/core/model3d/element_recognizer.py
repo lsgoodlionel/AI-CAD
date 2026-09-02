@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import re
 
+from .dense_array_filter import find_dense_array_flags
 from .geometry_extractor import MAX_PRIMITIVES
 from .layer_conventions import (
     classify_by_layer, classify_system, is_annotation_layer,
@@ -256,10 +257,22 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     # 仍保留「图层明确为柱」的路径 —— 那是设计师的明确标注，
     # 比图名更强（墙图上确实可能画几根柱）。
     wall_drawing = is_wall_drawing(drawing_title) or _is_embedded_part_plan(drawing_title)
-    result.columns = _find_columns(
+    # **密排阵列不是柱**：座椅/吸声板/铺装单元的尺寸落在柱的窗口
+    # （0.2~1.5m）正中间，尺寸判据分不开；分开它们的是「间距≈自身尺寸」
+    # ——真柱之间隔着一个跨度。实测 60 格判读里 28 格是座椅
+    # （`data/model3d/gold/rule_vs_model_v1.json`），判据依据见
+    # `dense_array_filter` 模块文档。删除量记进日志，不静默。
+    _column_candidates = _find_columns(
         rects, rect_layers, rect_blocks, polys, poly_layers, poly_blocks, ctx,
         layer_only=wall_drawing,
     )
+    _array_flags = find_dense_array_flags(_column_candidates)
+    result.columns = [c for c, f in zip(_column_candidates, _array_flags) if not f]
+    result.dense_arrays = [c for c, f in zip(_column_candidates, _array_flags) if f]
+    if result.dense_arrays:
+        logger.info("[model3d] 密排阵列剔除(%s): 柱候选 %d → %d（-%d）",
+                    drawing_id, len(_column_candidates), len(result.columns),
+                    len(result.dense_arrays))
     # **图名对图种有否决权**：墙配筋图上的平行线对是墙不是梁
     # （实测 F4 层因此墙 0 梁 186）。
     pairs_are_beams = is_beam_drawing_effective(

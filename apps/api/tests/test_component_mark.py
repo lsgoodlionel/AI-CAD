@@ -152,3 +152,82 @@ def test_steel_grades_are_rejected():
     # 真墙编号不受影响
     for text in ("Q1", "Q2", "Q8", "Q12"):
         assert parse_component_mark(text) is not None, text
+
+
+# ── 22G101 图集原件校订后新增的代号（本轮）────────────────────
+#
+# 出处逐条核对过图集原件（`core.knowledge.source_registry`）。
+# 此前这张表是凭记忆写的：混进了非平法代号，也漏掉 2022 版新增的代号。
+
+@pytest.mark.unit
+def test_codes_with_lowercase_letters_are_recognised():
+    """**旧实现的系统性缺口**：`raw != raw.upper()` 一刀切拒绝含小写的串，
+    而 `LLk`/`DJj`/`ATa`/`Lg` 是国标规定的写法 —— 这批代号一个也认不出。"""
+    for text, kind in [("LLk3", "beam"), ("Lg7(5)", "beam"),
+                       ("DJj1", "foundation"), ("DJz2", "foundation"),
+                       ("BJj1", "foundation"), ("TJBp3", "foundation"),
+                       ("CTj1", "foundation"), ("ATa2", "stair"),
+                       ("BTb1", "stair"), ("DTb1", "stair")]:
+        got = parse_component_mark(text)
+        assert got is not None and got.kind == kind, f"{text} → {got}"
+
+
+@pytest.mark.unit
+def test_stair_marks_are_recognised():
+    """22G101-2 梯板代号。**金标准实测「墙」的最大误检源正是楼梯（31%）**，
+    而此前表里一个楼梯代号都没有 —— `AT1` 只能落进 other。"""
+    for text in ("AT1", "BT4", "CT2", "DT6", "ET1", "FT3", "GT1", "ATc2"):
+        got = parse_component_mark(text)
+        assert got is not None and got.kind == "stair", text
+
+
+@pytest.mark.unit
+def test_new_2022_codes_are_recognised():
+    """22 版新增/此前漏掉的：转换柱 ZHZ、楼层框架扁梁 KBL、托柱转换梁 TZL、
+    暗梁 AL、边框梁 BKL。"""
+    for text, kind in [("ZHZ2", "column"), ("KBL5", "beam"), ("TZL1", "beam"),
+                       ("AL2", "beam"), ("BKL1", "beam"), ("KBH1", "beam")]:
+        got = parse_component_mark(text)
+        assert got is not None and got.kind == kind, f"{text} → {got}"
+
+
+@pytest.mark.unit
+def test_legacy_16g101_codes_are_kept():
+    """旧版代号**不能删**：实测全库图纸说明引用 `16G101` 155 次、
+    `11G101` 48 次，按旧版绘制的图上就是写 `KZZ`/`LZ`/`QZ`。"""
+    for text in ("KZZ3", "LZ1", "QZ2"):
+        assert parse_component_mark(text) is not None, text
+
+
+@pytest.mark.unit
+def test_every_code_records_where_it_came_from():
+    """出处必须可回溯；查无出处的要如实标 `unverified`，不能装作有依据。"""
+    from core.model3d.component_mark import MARK_SPECS
+
+    for spec in MARK_SPECS:
+        assert spec.source.strip(), spec.code
+        assert spec.name.strip(), spec.code
+
+
+@pytest.mark.unit
+def test_mep_drawings_reject_structural_marks():
+    """**实测**：`LN1`~`LN14` 全库出现 1144 次，**全部在 mep 的配电系统图上**，
+    是照明回路编号，不是 22G101 的「受扭非框架梁」；
+    `CT2` 出现在电气「基础接地平面」上，是电流互感器不是 CT 型梯板。"""
+    for text in ("LN1", "CT2", "L3", "Q1", "AT1"):
+        assert parse_component_mark(text, discipline="mep") is None, text
+
+
+@pytest.mark.unit
+def test_structural_drawings_keep_structural_marks():
+    """反过来，`AT1`/`BT4`/`DT6` 实测全部落在 structure 专业的
+    「楼梯 ST-xx 结构详图」上 —— 那是真的梯板编号。
+    判据不是「这些代号可疑」，而是**专业不对才不认**。"""
+    for text in ("AT1", "BT4", "DT6", "KZ1"):
+        assert parse_component_mark(text, discipline="structure") is not None, text
+
+
+@pytest.mark.unit
+def test_openings_survive_the_mep_gate():
+    """门窗不在结构族里 —— 电气图上标防火门监控是正常的，不该被闸掉。"""
+    assert parse_component_mark("FM1", discipline="mep") is not None

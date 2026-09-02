@@ -1,0 +1,39 @@
+{
+  "source": {
+    "key": "textbook-lu-jianzhu-shitu",
+    "filename": "建筑识图 (闾成德) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
+    "std_no": null,
+    "title": "建筑识图（闾成德，国家职业资格培训教材第 2 版）",
+    "kind": "textbook",
+    "discipline": "general",
+    "pages": 321,
+    "extract_method": "text_layer",
+    "identified_by": "PDF 文本层 + 219 条书签目录",
+    "priority": 1,
+    "supersedes": null,
+    "superseded_by": null,
+    "notes": "真文本层 + 完整多级目录，制图原理最系统的一本。"
+  },
+  "evidence": {},
+  "stats": {
+    "extracted_pages": 321,
+    "declared_pages": 321,
+    "missing_pages": [],
+    "char_count": 194047,
+    "mean_confidence": null,
+    "low_confidence_pages": [],
+    "near_empty_pages": [
+      0,
+      16,
+      106,
+      121,
+      176,
+      177,
+      301,
+      307,
+      310,
+      320
+    ],
+    "ocr_dpi": 200
+  }
+}

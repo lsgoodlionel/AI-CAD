@@ -1,0 +1,44 @@
+{
+  "source": {
+    "key": "22G101-1",
+    "filename": "平法图集/22G101-1.pdf",
+    "std_no": "22G101-1",
+    "title": "混凝土结构施工图平面整体表示方法制图规则和构造详图（现浇混凝土框架、剪力墙、梁、板）",
+    "kind": "atlas",
+    "discipline": "structure",
+    "pages": 138,
+    "extract_method": "ocr",
+    "identified_by": "OCR 封面 + 页内文本层（原文本层可读性差，仅用于交叉印证）",
+    "priority": 1,
+    "supersedes": null,
+    "superseded_by": null,
+    "notes": "component_mark._MARK_KINDS 的权威上游。柱/墙/梁/板代号在此定义。"
+  },
+  "evidence": {
+    "archive_citations": {
+      "16G101": 155,
+      "11G101": 48,
+      "16G101-1": 42,
+      "16G101-2": 42,
+      "16G101-3": 12
+    }
+  },
+  "stats": {
+    "extracted_pages": 138,
+    "declared_pages": 138,
+    "missing_pages": [],
+    "char_count": 103015,
+    "mean_confidence": 0.9678,
+    "low_confidence_pages": [
+      51,
+      53,
+      54,
+      111
+    ],
+    "near_empty_pages": [
+      8,
+      59
+    ],
+    "ocr_dpi": 200
+  }
+}
