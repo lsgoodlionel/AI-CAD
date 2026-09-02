@@ -417,8 +417,9 @@ def _build_floors(
 
     **未分层（`UNZONED`）只记账，不造楼层**：归不了层的图纸（详图/系统图/
     说明/角色闸排除的图）仍写进 `floor_of` 与待人工标注队列，但不产出楼层 ——
-    实测第二工程该桶挂 946 张图、构件 0 个，在三维里就是一个什么都没有的
-    空层，还把 `stats.reconstruction` 从 elements 拖成 mixed。
+    在三维里那就是一个什么都没有的空层，还把 `stats.reconstruction` 从
+    elements 拖成 mixed。实测存量场景（2026-09-01 查 `project_models`）：
+    第二工程该层挂 1216 张图、构件 0 个；大歌剧院 1061 张、构件 0 个。
 
     `floor_of` 仍覆盖每一张图：下游 `floor_of[drawing_id]` 是无条件取值。
     """
@@ -1861,6 +1862,9 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     # 未分层不产出楼层（见 `_build_floors`），落在未分层图纸上的标记于是没有
     # 楼层可落 —— 前端按 floor_key 找不到楼层就跳过。**数量必须可见**，
     # 否则「红点少了」会成为新的谜；这些图本就在待人工标注队列里等归层。
+    # 量级不小：实测大歌剧院 1500 个标记里 719 个（48%）没有楼层，其中
+    # 712 个来自未分层图纸，另 7 个的 floor_key 是问题 levels 解析出的
+    # 不存在楼层（F64/B9/B8/F69）—— 后者是本改动之前就在静默丢失的。
     _floor_keys = {str(f["key"]) for f in floors}
     stats["markers_without_floor"] = sum(
         1 for marker in markers if marker["floor_key"] not in _floor_keys
