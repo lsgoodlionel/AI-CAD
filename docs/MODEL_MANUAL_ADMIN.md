@@ -391,7 +391,7 @@ CLI:`scripts/model3d/eval_harness.py --demo`(合成)或 `--manifest`(冻结 test
 |---|---|---|
 | 输入聚合 | projects/drawings | 项目不存在→任务失败重试;无图纸→空 scene |
 | VLM 语义 | `vlm_semantic_enabled` | 关闭时三步恒等无副作用 |
-| 楼层解析 | 图名/图号文本 | 匹配不到→UNZONED;标注表未部署→回退自动识别 |
+| 楼层解析 | 图名/图号文本 | 匹配不到→归 UNZONED **记账桶**(只进待人工标注队列与 `stats.unclassified_drawings`,**不生成楼层**——否则是个构件全零的空层);标注表未部署→回退自动识别 |
 | Z 恢复 | 剖面 + 几何 | 无剖面→no-op;单图失败/20s 超时→跳过;配准失败→降级剖面单证据 |
 | 资产渲染 | MinIO + fitz/ezdxf/ifcopenshell | 单图失败/90s 超时→`image_key=""` 线框;>25MB 跳贴图;>400 张线框占位;ifcopenshell 缺失→ifc_skipped |
 | 构件识别 | `core.model3d` + 几何 | ImportError/单图 20s 超时→回退贴图空 elements |
@@ -618,3 +618,4 @@ Phase D 合并了多处同类入口(见 `docs/PHASE_D_BLUEPRINT.md` §0.3),前�
 | V1.3 | 2026-07-16 | Phase E:§6.3 新增「图纸信息档案层 + PDF 几何识别」能力与诚实边界——档案层(导入即抽取/人审 verified/单一真相源,migration 029-031)、围护桩圆检测(整机 columns 3089→5794)、构件类型标签(档案 OCR 反哺);纯 PDF 项目边界(无图层/矢量文字取不到/圆检测/OCR回填滞后/板数十块量级)。详见 `docs/PHASE_E_BLUEPRINT.md`、`docs/PHASE_E_E3_AUDIT.md` |
 | V1.4 | 2026-08-13 | Phase I/J:§4.8 新增轴网识别与定位状态 API(识别/分区确认/传播/**荐锚**/未分层分类),并补「坐标变换的来源与清理」(migration 047)——`drawing_transform` 一图一行而三条路径共写,`manual` 不被自动覆盖、清理只动同来源、两条路径各握一半时轴网路径借用已落库比例(仍过 §6.0.4 门禁) |
 | V1.5 | 2026-08-14 | J7:§4.9 新增「坐标系与比例的四道兜底」——四条产出路径共用同一套门禁(漏掉的两条恰是决定构件坐标的)、三个关键阈值(`MAX_DRAWING_EXTENT_M`/`MAX_RENDER_MEGAPIXELS`/`_RECOGNIZE_TIMEOUT_SEC` 及其「假超时」性质)、线程池被僵尸占满的排查方法(判据是日志时间戳而非 CPU,定性用 py-spy)、层内坐标系矛盾机制(B1 6358→248 米,构件数不变) |
+| V1.6 | 2026-08-28 | 修掉「未分类图纸造出空幻影层」:`_build_floors` 不再为 UNZONED 记账桶产出楼层(实测第二工程该层挂 946 张图、构件 0 个,在三维里是个空层,还把 `stats.reconstruction` 从 elements 拖成 mixed);图纸不丢——`floor_of` 照旧覆盖每张图(下游按图纸取层是无条件取值),并照实进 `scene.annotation_queue` 与 `stats.unclassified_drawings`。副作用如实:`stats.floors` 少 1 层,只有未分类图的单体不再出现在 `buildings` 里 |
