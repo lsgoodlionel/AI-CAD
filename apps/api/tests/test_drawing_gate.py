@@ -128,11 +128,17 @@ def test_coordinate_base_is_degraded():
 
 
 @pytest.mark.unit
-def test_unknown_role_is_degraded_never_skipped():
-    """判不出就说判不出（蓝图 §7 约束 5）—— `unknown` 永远不拦截。
+def test_unknown_role_neither_skipped_nor_degraded():
+    """判不出就说判不出（蓝图 §7 约束 5）—— `unknown` 既不拦截**也不降级**。
 
-    本样本上 `unknown` 4 张恰好全是不可用的（误伤 0），
-    **仍然不升级为拦截** —— 4 张不足以支撑，且判不出不等于不该建。
+    首版在 36 张上得到 `unknown` 误伤 0%，据此让它降级。把样本扩到 295 张、
+    并逐判据对齐各自真值维度后，**它是反信号**：
+
+        unknown_role   可判 12 · 真该拦 3 · 误伤 75%   而该维度基线只有 37%
+
+    劣于基线意味着「角色判不出」这件事**本身不携带负面信息** —— 被它降级的图
+    四分之三是正常图。所以既不拦也不降，放行。
+    见 `scripts/model3d/drawing_gate_backtest_full.py`。
     """
     # Arrange：图名与图号都给不出线索
     signals = _plan(title="", drawing_no="", discipline="general")
@@ -141,8 +147,8 @@ def test_unknown_role_is_degraded_never_skipped():
     result = evaluate_drawing(signals)
 
     # Assert
-    assert result.verdict == VERDICT_DEGRADE
-    assert CODE_UNKNOWN_ROLE in {r.code for r in result.reasons}
+    assert result.verdict == VERDICT_BUILD
+    assert CODE_UNKNOWN_ROLE not in {r.code for r in result.reasons}
 
 
 # ── G6：比例不可信 → 降级（35% 误伤，只够降级）──────────────────

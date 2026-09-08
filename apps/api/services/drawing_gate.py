@@ -98,6 +98,17 @@ CODE_DETAIL = "detail"
 CODE_COORDINATE_BASE = "coordinate_base"
 CODE_ELEVATION_REFERENCE = "elevation_reference"
 CODE_UNKNOWN_ROLE = "unknown_role"
+# ⚠ **`unknown_role` 实测是反信号，已从默认判据移除**。
+# 首版在 36 张（`drawing_usable_v1`）上得到误伤 0%；用 `gold_sheets/*/manifest.tsv`
+# 的真实 drawing_id 把样本扩到 295 张、并**逐判据对齐各自的真值维度**后：
+#
+#     判据                      可判  真该拦  误伤率   该维度基线
+#     non_geometric             24     20    17%      37%   ✅ 优于基线
+#     scale_not_authoritative   34     22    35%      70%   ✅ 优于基线
+#     detail                     3      3     0%      24%   ⚠ n 太小
+#     unknown_role              12      3    75%      37%   ❌ 劣于基线 = 反信号
+#
+# 36 张上的 0% 是小样本假象。见 `scripts/model3d/drawing_gate_backtest_full.py`。
 CODE_SCALE_NOT_AUTHORITATIVE = "scale_not_authoritative"
 
 #: **唯一够格拦截的角色**。实测误伤 0（`drawing_usable_v1.json` 36 张拦 10）。
@@ -123,12 +134,9 @@ _DEGRADE_ROLES: dict[str, tuple[str, str, str]] = {
         "axis_grid_presence_v1.json 80 条 note 实测：立面/剖面/详图"
         "按国标只出现单方向轴线，6/8 的「误检」实为此分类假象",
     ),
-    ROLE_UNKNOWN: (
-        CODE_UNKNOWN_ROLE,
-        "三级级联均未命中，角色判不出",
-        "drawing_usable_v1.json 36 张：拦 4、误伤 0，"
-        "**仍不升级为拦截** —— 判不出不等于不该建（蓝图 §7 约束 5）",
-    ),
+    # ROLE_UNKNOWN 曾在此降级，**已按实测移除**（见上方 CODE_UNKNOWN_ROLE 注释）：
+    # 36 张上误伤 0%，扩到 295 张并对齐真值维度后误伤 75%，劣于 37% 的基线。
+    # 「角色判不出」本身不携带负面信息，被它降级的图四分之三是正常图。
 }
 
 _SKIP_BASIS = (
