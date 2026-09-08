@@ -10,8 +10,13 @@ _origin_pt 算出并 persist_transform 落库(drawing_transform 表,migration 03
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any
+
+from core.model3d.scale_evidence import evaluate as evaluate_scale_evidence
+
+logger = logging.getLogger(__name__)
 
 #: 1 排版点 = 25.4/72 mm。比例分母与 `scale_m_pt` 的换算基准。
 PT_TO_MM = 25.4 / 72
@@ -106,7 +111,16 @@ class DrawingTransform:
     origin_x: float
     origin_y: float
     page_h: float
+    #: **比例证据分**（见 `core.model3d.scale_evidence`）——
+    #: 衡量「这个比例有没有旁证支持」，与旧口径不同，见 `label_confidence`。
     confidence: float | None = None
+    #: 旧 confidence：`带标签轴线数/轴线总数 × 比例是否常用值`。
+    #:
+    #: **它衡量的是轴号识别质量，不是比例对错**——金标准 56 条实测
+    #: `confidence=1.00` 的合理率 24%、`<1.00` 的反而 37%，
+    #: 即旧值携带**负信息**。但「轴号识别得怎么样」本身是有用的，
+    #: 所以换名保留，不扔。
+    label_confidence: float | None = None
     #: 该方向**没有检出轴线**，原点按 0 兜底 —— 不是「原点真在 0」。
     #: 实测 1436 条里 x 缺 72 张、y 缺 77 张（10.4%），
     #: 而「两方向都缺」是 0 张 —— 它们缺的都是**一个**方向。
@@ -124,8 +138,39 @@ def pt_to_meter(x_pt: float, y_pt: float, t: DrawingTransform) -> tuple[float, f
     return round(fx * t.scale_m_pt, 3), round(fy * t.scale_m_pt, 3)
 
 
-def transform_from_geometry(geom: Any) -> DrawingTransform | None:
-    """从几何算坐标变换;比例尺检测失败(<=0)返回 None(不落无效变换)。"""
+def _blend_confidence(label_confidence: float, evidence: Any) -> float:
+    """把证据分合进 confidence —— **弱证据只能往下压，不能把分数抬上去。**
+
+    三种情形：
+
+    | 证据 | confidence |
+    |---|---|
+    | 有图上印刷比例（`INDEPENDENT`）| 直接用证据分 —— 图纸自己说了算 |
+    | 只有必要不充分的佐证 | `min(旧值, 证据分)` —— 只否定，不背书 |
+    | 一条证据都没有 | 保留旧值 —— 没有新信息就别改行为 |
+
+    **不这么分会出事**：全库 2142 条变换在没有 OCR 文本注入时只剩
+    「图幅覆盖」一条，1866 条会拿到 1.00，`scale_gate` 判为可信的从
+    1290 涨到 1891 —— 用一个必要条件当背书，正是旧公式的病。
+    """
+    if evidence.score is None:
+        return label_confidence
+    if evidence.has_independent:
+        return float(evidence.score)
+    return round(min(label_confidence, float(evidence.score)), 4)
+
+
+def transform_from_geometry(
+    geom: Any, *, printed_texts: Any = None,
+) -> DrawingTransform | None:
+    """从几何算坐标变换;比例尺检测失败(<=0)返回 None(不落无效变换)。
+
+    ``printed_texts`` 是**读比例用的文本来源**，形如 ``(x, y, content)``。
+    不给就退回 ``geom.texts``（矢量文字）——但实测这批 PDF 的文字是
+    轮廓化的，56 张金标准图里只有 5 张的矢量文字含 `1:N`、其中 4 张还是
+    误命中；而图纸信息档案的 OCR 覆盖 54/60。**所以调用方应当把档案
+    OCR 文本传进来**，接线点在 `services/drawing_info_extractor.py`。
+    """
     try:
         from core.model3d.element_recognizer import (
             _detect_axes,
@@ -151,12 +196,22 @@ def transform_from_geometry(geom: Any) -> DrawingTransform | None:
         # 在 100 米建筑上就是 4.9 米位置误差。
         scale = snap_scale_to_standard(scale)
         origin = _origin_pt(axis_x, axis_y, geom.page_h)
-        # confidence 要同时反映**轴号识别质量**与**比例尺是否标准**。
-        # 旧公式只有前者，于是比例错到 1:335 万仍是满分。
+        # **旧口径保留但改名**：`轴号识别质量 × 比例是否常用值`，
+        # 与比例对错无关（金标准实测它携带负信息，见 `label_confidence`）。
         labeled = sum(1 for label, _ in (*axis_x, *axis_y) if str(label or "").strip())
         label_score = (labeled / total) if total else 0.0
         scale_score = 1.0 if is_standard_scale(scale) else 0.5
-        confidence = round(label_score * scale_score, 4)
+        label_confidence = round(label_score * scale_score, 4)
+        # **新 confidence = 多来源交叉证据**（图上印刷比例 / §6.0.4 表 /
+        # 图幅覆盖）。证据一条都没有时为 None —— 不假装有信息。
+        evidence = evaluate_scale_evidence(
+            scale,
+            texts=printed_texts if printed_texts is not None else geom.texts,
+            page_w_pt=geom.page_w,
+            page_h_pt=geom.page_h,
+        )
+        logger.debug("[transform] 比例证据 %s -> %s", evidence.reason(), evidence.score)
+        confidence = _blend_confidence(label_confidence, evidence)
         # **原点缺失时按 0 落库但标记出来** —— 不拒绝,因为拒绝会让
         # 149 张(10.4%)图失去定位、影响面大;标记是纯增量,
         # 下游(包络/校验)可据此排除该方向（「降级必须可见」）。
@@ -170,6 +225,7 @@ def transform_from_geometry(geom: Any) -> DrawingTransform | None:
             origin_y_estimated=origin_y_missing,
             page_h=float(geom.page_h),
             confidence=confidence,
+            label_confidence=label_confidence,
             source=TRANSFORM_SOURCE_GEOMETRY,
         )
     except Exception:  # noqa: BLE001 — 变换算不出则不落,下游降级
@@ -184,12 +240,13 @@ def transform_from_geometry(geom: Any) -> DrawingTransform | None:
 _UPSERT_SQL = f"""
 INSERT INTO drawing_transform
     (drawing_id, project_id, scale_m_pt, origin_x, origin_y, page_h, confidence,
-     origin_x_estimated, origin_y_estimated, source, updated_at)
+     label_confidence, origin_x_estimated, origin_y_estimated, source, updated_at)
 VALUES
     (:drawing_id, :project_id, :scale_m_pt, :origin_x, :origin_y, :page_h, :confidence,
-     :origin_x_estimated, :origin_y_estimated, :source, now())
+     :label_confidence, :origin_x_estimated, :origin_y_estimated, :source, now())
 ON CONFLICT (drawing_id) DO UPDATE SET
     scale_m_pt = EXCLUDED.scale_m_pt,
+    label_confidence = EXCLUDED.label_confidence,
     origin_x = EXCLUDED.origin_x,
     origin_y = EXCLUDED.origin_y,
     origin_x_estimated = EXCLUDED.origin_x_estimated,
@@ -226,6 +283,7 @@ async def persist_transform(
         "origin_y": transform.origin_y,
         "page_h": transform.page_h,
         "confidence": transform.confidence,
+        "label_confidence": transform.label_confidence,
         "origin_x_estimated": bool(transform.origin_x_estimated),
         "origin_y_estimated": bool(transform.origin_y_estimated),
         "source": transform.source or TRANSFORM_SOURCE_UNKNOWN,
@@ -246,7 +304,7 @@ async def clear_transform(db: Any, *, drawing_id: str, source: str) -> None:
 
 _FETCH_SQL = """
 SELECT drawing_id, scale_m_pt, origin_x, origin_y, page_h, confidence,
-       origin_x_estimated, origin_y_estimated, source
+       label_confidence, origin_x_estimated, origin_y_estimated, source
 FROM drawing_transform WHERE project_id = :project_id
 """
 
@@ -257,12 +315,14 @@ async def fetch_project_transforms(db: Any, project_id: str) -> dict[str, Drawin
     out: dict[str, DrawingTransform] = {}
     for r in rows:
         conf = _column(r, "confidence")
+        label_conf = _column(r, "label_confidence")
         out[str(r["drawing_id"])] = DrawingTransform(
             scale_m_pt=float(r["scale_m_pt"]),
             origin_x=float(r["origin_x"]),
             origin_y=float(r["origin_y"]),
             page_h=float(r["page_h"]),
             confidence=float(conf) if conf is not None else None,
+            label_confidence=float(label_conf) if label_conf is not None else None,
             # **落了库要读得回来** —— 上一轮加了列与 SELECT 却漏了这两行赋值，
             # 于是下游（包络/校验）从来看不到「该方向原点是兜底的」。
             origin_x_estimated=bool(_column(r, "origin_x_estimated", False)),
