@@ -1862,6 +1862,18 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     stats["reconstruction"] = model_elements.reconstruction_mode(floors)
     stats["buildings"] = 0  # 占位，下方 buildings 组装后回填
     stats["unclassified_drawings"] = len(normalization.unclassified_drawings)
+    # 未分层不产出楼层（见 `_build_floors`）→ 落在未分层图纸上的标记没有楼层
+    # 可落，前端按 floor_key 找不到楼层就跳过（`fragmentsMarkers` 那条记
+    # skipped，`sceneBuilder` 那条是静默 continue）。**数量必须可见**，否则
+    # 「红点少了」会成为新的谜；这些图本就在待人工标注队列里等归层，归层后
+    # 重建即回到楼层上。
+    # 实测大歌剧院：1500 个标记里 719 个（48%）没有楼层落脚 —— 712 个来自
+    # 未分层图纸；另 7 个的 floor_key 是问题 levels 解析出的**不存在楼层**
+    # （F64/B9/B8/F69），与未分层无关，那 7 个一直在静默丢，本计数顺带照出。
+    _floor_keys = {str(f["key"]) for f in floors}
+    stats["markers_without_floor"] = sum(
+        1 for marker in markers if marker["floor_key"] not in _floor_keys
+    )
     stats["quality_issues"] = len(normalization.issues)
     if yolo_total:
         stats["yolo_equipment"] = yolo_total
