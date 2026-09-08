@@ -44,6 +44,7 @@
       "gpt",
       "human"
      ],
+     "criteria": "CRITERIA.md#beams",
      "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
     }
    }
@@ -74,6 +75,7 @@
       "gpt",
       "human"
      ],
+     "criteria": "CRITERIA.md#beams",
      "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
     }
    }
@@ -114,6 +116,7 @@
       "gpt",
       "human"
      ],
+     "criteria": "CRITERIA.md#beams",
      "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
     }
    }
@@ -152,6 +155,7 @@
       "gpt",
       "human"
      ],
+     "criteria": "CRITERIA.md#beams",
      "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
     }
    }
@@ -196,6 +200,7 @@
       "gpt",
       "human"
      ],
+     "criteria": "CRITERIA.md#beams",
      "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
     }
    }
@@ -236,6 +241,7 @@
       "gpt",
       "human"
      ],
+     "criteria": "CRITERIA.md#beams",
      "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
     }
    }
@@ -268,6 +274,7 @@
       "gpt",
       "human"
      ],
+     "criteria": "CRITERIA.md#beams",
      "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
     }
    }
@@ -309,6 +316,7 @@
       "gpt",
       "human"
      ],
+     "criteria": "CRITERIA.md#beams",
      "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
     }
    }
@@ -353,6 +361,7 @@
       "gpt",
       "human"
      ],
+     "criteria": "CRITERIA.md#beams",
      "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
     }
    }
@@ -388,6 +397,7 @@
       "gpt",
       "human"
      ],
+     "criteria": "CRITERIA.md#beams",
      "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
     }
    }
@@ -428,6 +438,7 @@
       "gpt",
       "human"
      ],
+     "criteria": "CRITERIA.md#beams",
      "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
     }
    }
@@ -469,6 +480,7 @@
       "gpt",
       "human"
      ],
+     "criteria": "CRITERIA.md#beams",
      "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
     }
    }
@@ -509,6 +521,7 @@
       "gpt",
       "human"
      ],
+     "criteria": "CRITERIA.md#beams",
      "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
     }
    }
@@ -546,6 +559,7 @@
       "gpt",
       "human"
      ],
+     "criteria": "CRITERIA.md#beams",
      "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
     }
    }
@@ -572,6 +586,7 @@
       "gpt",
       "human"
      ],
+     "criteria": "CRITERIA.md#beams",
      "note": "接触表逐候选裁决；人工预判 B1-11~18 为误检，判读确认 5 no + 3 unsure"
     }
    }
