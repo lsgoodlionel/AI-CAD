@@ -78,14 +78,81 @@ def compute_quantities(
 
 # ── 混凝土 + 模板（按构件）───────────────────────────────────
 
+# ── 轮廓规范化：朴素鞋带公式在自交环上会失效 ──────────────────────
+#
+# 存量 10170 个柱里 3166 个（31.1%）的轮廓是这个形状：
+#
+#     A(75.969,16.585) → B(75.769,16.585) → C(75.969,16.385) → D(75.769,16.385)
+#            上边              对角线             下边              对角线回
+#
+# 四角走成对角交叉的「蝴蝶结」，且带重复点（轮廓降点留下的）。
+# 两个三角形面积等值反号，鞋带和**恰好抵消为 0** —— 于是这些柱的混凝土量
+# 算出来是 0，而 QTO 汇总是三审审批人看的依据。周长同样受害：
+# 朴素周长会把两条对角线算进去，模板接触面积高估 21%。
+#
+# 兜底只在朴素公式失效（面积为 0）时介入，其余一律不动 ——
+# 存量另外 69% 的柱走原路，数字一个不变。兜底出来的值一律标 `estimated`，
+# 因为它是从点集重建的凸包，对异形柱（L 形）会偏大，这个偏差必须可见。
+
+
+def _dedup(outline) -> list[tuple[float, float]]:
+    """去掉重复顶点，保持原有顺序。"""
+    seen: list[tuple[float, float]] = []
+    for pt in outline or ():
+        p = (float(pt[0]), float(pt[1]))
+        if p not in seen:
+            seen.append(p)
+    return seen
+
+
+def _convex_hull(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Andrew monotone chain。返回逆时针环，点数不足或共线时返回原点集。"""
+    pts = sorted(set(points))
+    if len(pts) < 3:
+        return pts
+
+    def cross(o, a, b) -> float:
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    lower: list[tuple[float, float]] = []
+    for p in pts:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(p)
+    upper: list[tuple[float, float]] = []
+    for p in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(p)
+    return lower[:-1] + upper[:-1]
+
+
+def _ring_area(outline) -> tuple[float, bool]:
+    """(面积, 是否兜底而来)。面积算得出来就原样返回，算不出来才重建凸包。"""
+    area = _polygon_area(outline)
+    if area > 0.0:
+        return area, False
+    hull = _convex_hull(_dedup(outline))
+    return _polygon_area(hull), True
+
+
+def _ring_perimeter(outline) -> tuple[float, bool]:
+    """(周长, 是否兜底而来)。判据与面积一致 —— 面积失效说明环序不可信，
+    这时朴素周长同样不可信（它会把自交的对角线算进去）。"""
+    if _polygon_area(outline) > 0.0:
+        return _polygon_perimeter(outline), False
+    return _polygon_perimeter(_convex_hull(_dedup(outline))), True
+
+
 def _column_quantity(column: dict, height: float) -> ElementQuantity:
-    area = _polygon_area(column.get("outline"))
-    perimeter = _polygon_perimeter(column.get("outline"))
+    area, area_estimated = _ring_area(column.get("outline"))
+    perimeter, _ = _ring_perimeter(column.get("outline"))
     gross = area * height
     return _make(
         column, "column", gross, gross,
         contact=perimeter * height,          # 四周支模
         free=2 * area,                        # 顶/底（浇筑面）
+        estimated=area_estimated or None,     # 面积兜底了就一定是估算
     )
 
 
@@ -127,8 +194,11 @@ FALLBACK_SLAB_BASES = ("column_envelope", "axis_envelope")
 
 
 def _slab_quantity(slab: dict, graph, beam_index: dict) -> ElementQuantity:
-    area = _polygon_area(slab.get("outline"))
-    perimeter = _polygon_perimeter(slab.get("outline"))
+    # 板同样踩自交环：实测 514 块里 69 块（13.4%）鞋带面积为 0。
+    # 板比柱更可能是凹的（L 形楼板、带洞口），凸包兜底会偏大 —— 但兜底只在
+    # 原值已经是 0 时介入，此时凸包再不准也比 0 接近真值，且一律标 estimated。
+    area, area_estimated = _ring_area(slab.get("outline"))
+    perimeter, _ = _ring_perimeter(slab.get("outline"))
     thickness = float(slab.get("thickness") or 0.12)
     gross = area * thickness
     box = _bbox(slab.get("outline"))
@@ -148,12 +218,16 @@ def _slab_quantity(slab: dict, graph, beam_index: dict) -> ElementQuantity:
         slab, "slab", gross, net,
         contact=max(area - soffit_deduct, 0.0) + perimeter * thickness,  # 底模（扣梁顶）+ 侧边
         free=area,                                                        # 顶面
+        estimated=area_estimated or None,
     )
 
 
 def _make(element: dict, element_type: str, gross: float, net: float,
-          *, contact: float, free: float) -> ElementQuantity:
-    estimated = str(element.get("z_source") or "") != "measured"
+          *, contact: float, free: float,
+          estimated: bool | None = None) -> ElementQuantity:
+    # `estimated` 传 True 表示调用方另有理由判定它是估算（如面积走了兜底）；
+    # 传 None 就只看 z_source。两个理由是**或**的关系，不能互相抵消。
+    estimated = bool(estimated) or str(element.get("z_source") or "") != "measured"
     return ElementQuantity(
         element_id=str(element.get("id")),
         element_type=element_type,
