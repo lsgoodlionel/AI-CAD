@@ -84,6 +84,12 @@ jobs:
           print('Migrations applied.')
           "
 
+      # 金标准结构门禁：裁决数据被改动后，本步先于测试报出结构问题。
+      # 起因是 docs/GOLD_STANDARD_REVIEW.md 曾有三处数字与原始数据对不上，
+      # 三处根因相同 —— 数字是手抄进文档的。有了这一步，数字有现算的来源。
+      - name: 金标准结构校验（gold schema）
+        run: python scripts/model3d/gold_report.py --check-only
+
       - name: Run pytest with coverage
         env:
           DATABASE_URL: postgresql://cad_user:cad_pass@localhost:5432/cad_test
