@@ -248,6 +248,141 @@ def test_annotation_marker_in_the_xref_prefix_does_not_condemn_the_layer():
     assert is_annotation_layer("立柱桩标注")          # 无前缀时不受影响
 
 
+# --- 子串竞争：最长子串胜出（而非构件优先级先到先得）-------------------
+
+@pytest.mark.unit
+def test_longest_substring_wins_over_kind_order():
+    """含「风口」的图层是暖通末端设备，不该被通用短子串抢走。
+
+    **旧行为**：`_match_substring_or_pattern` 按 `_KIND_ORDER` 顺序返回
+    第一个命中的类型，于是 1 个字的通用子串赢过 2 个字的专指子串。
+    **新行为**：谁匹配得**长**谁胜出 ——「风口」明确指向送/回/排风口
+    这一类末端设备，而「墙」只说明图层名里出现过这个字
+    （`墙面`＝装修饰面，不是墙体）。
+
+    风口属设备有仓库内的判据：`data/model3d/gold/CRITERIA.md` 把风口列为
+    mep 末端符号；`data/review_protocol/disciplines.yaml` 把百叶风口列为
+    暖通部位级对象；09-04 那批独立判读里，10 个真设备的具体类型就包含风口。
+
+    全库 4108 张实测：`二层小歌剧厅$0$I—墙面—风口`（外参绑定形式，135 图元）
+    确实存在且确实由 wall 改判 equipment —— 这正是本条要修的那个 case。
+    另有 `暖通-排烟-风口`（1071 图元）此前**判不出**（None），现判 equipment。
+
+    注意 `0M-通风管风口`（707 图元）**不动**：它同时含 pipe 的「风管」与
+    equipment 的「风口」，两者等长 ⇒ 回落 `_KIND_ORDER` 判 pipe。
+    等长即维持现状，是这套规则的设计意图，不是遗漏。
+    """
+    assert lc.classify_by_layer("I—墙面—风口") == "equipment"
+    assert lc.classify_by_layer("I-墙面-送风口") == "equipment"
+
+
+@pytest.mark.unit
+def test_longest_substring_wins_across_pipe_and_equipment():
+    """`0M-风机盘管` 是风机盘管机组（设备），不是管道。
+
+    旧行为：pipe 的「管」（1 字）先命中，因为 pipe 在 `_KIND_ORDER`
+    里排在 equipment 之前。新行为：equipment 的「风机」（2 字）更长。
+
+    `0M-空调管风口` 同理 —— 实测那张图是**空调通风设备表**，该图层画的是
+    19788 条**表格线**；判成 pipe 时这些表格线全是管线候选（正是
+    「识别器不是管线识别器，是每一条够长的线」那个失效模式）。
+    """
+    assert lc.classify_by_layer("0M-风机盘管") == "equipment"
+    assert lc.classify_by_layer("0M-空调管风口") == "equipment"
+
+
+@pytest.mark.unit
+def test_equipment_shaft_layer_keeps_its_pipe_verdict():
+    """`A—设备管丼、主管符号` 画的是**管井**，不能因「设备」二字判成设备。
+
+    实测（522 张暖通/装修图）该图层族有 33.8 万图元、约 1613 个 poly。
+    **打开图看**：画面是标着「工艺管井」「弱电」「加压」的竖井房间轮廓
+    与引线文字 —— 既不是设备也不是管道。
+
+    若放任「设备」(2 字) 压过「管」(1 字)，这 1613 个竖井轮廓会被
+    `_find_equipment` 的「图层已明说是设备就放宽尺寸」通道全量收进来 ——
+    实测 +1004 个元素，而 equipment 的判读精确率只有 0.17。
+    所以把「管井/管丼」登记成 pipe 子串，与「设备」**等长**、
+    等长回落 `_KIND_ORDER`（pipe 在 equipment 之前）⇒ 维持现状。
+
+    这不是主张「竖井是管道」，而是**在没有竖井类别之前不改变既有判定**。
+    """
+    assert lc.classify_by_layer("A—设备管丼、主管符号") == "pipe"
+    assert lc.classify_by_layer("01-1F平面底图$0$A—设备管丼、主管符号") == "pipe"
+
+
+@pytest.mark.unit
+def test_generic_equipment_layers_are_not_lost():
+    """「设备」子串必须保留 —— 语料里 14 个真设备图层靠它命中。
+
+    曾评估过「干脆去掉过泛的『设备』子串」，实测代价是
+    `I—平面—机电设备`（32884 图元）等 14 个图层从 equipment 掉成 None。
+    """
+    assert lc.classify_by_layer("I—平面—机电设备") == "equipment"
+    assert lc.classify_by_layer("UX-PLAN-B1~B3|排水设备0P-DR-E") == "equipment"
+    assert lc.classify_by_layer("0M-设备表") == "equipment"
+    assert lc.classify_by_layer("设备") == "equipment"
+
+
+@pytest.mark.unit
+def test_equal_length_substrings_still_fall_back_to_kind_order():
+    """等长时仍按 `_KIND_ORDER` 决定 —— 保持结果确定，不依赖 yaml 书写顺序。
+
+    `墙柱纵筋` 里「墙」与「柱」都是 1 个字，column 在 wall 之前 → column
+    （既有契约，见 `test_bound_xref_form_is_unaffected`）。
+    `梁板` 同理 → beam。
+    """
+    assert lc.classify_by_layer("墙柱纵筋") == "column"
+    assert lc.classify_by_layer("梁板") == "beam"
+
+
+@pytest.mark.unit
+def test_patterns_still_apply_when_no_substring_matches():
+    """没有任何子串命中时，正则分支照旧按 `_KIND_ORDER` 生效。"""
+    assert lc.classify_by_layer("STR_COLUMN_MARK") == "column"
+    assert lc.classify_by_layer("A-GLAZ-WIND") == "window"
+
+
+@pytest.mark.unit
+def test_existing_substring_verdicts_are_unchanged():
+    """既有判定不因改规则而漂移（这些图层只有单一构件类的子串命中）。"""
+    assert lc.classify_by_layer("砌体填充墙") == "wall"
+    assert lc.classify_by_layer("给水管道平面") == "pipe"
+    assert lc.classify_by_layer("二层梁配筋图") == "beam"
+    assert lc.classify_by_layer("定位轴线网") == "axis"
+
+
+@pytest.mark.unit
+def test_library_wide_reclassifications_are_pinned():
+    """全库 4108 张实测出的 5 个改判，逐条钉住 —— 它们是这次改动的**全部**收益。
+
+    前两条来自「最长子串压过通用短子串」，后三条是意料之外的：
+      · `防火门监控系统设备` 此前被 **door** 的「门」抢走（door 在 `_KIND_ORDER`
+        里排在 equipment 之前），而它是防火门监控系统的**设备**
+      · `暖通-排烟-风口` 此前**判不出**（None）—— 纯增量，来自 yaml 加的「风口」
+      · `…$0$I—墙面—风口` 是外参绑定形式，剥离后仍含「墙面」
+
+    元素级代价（全库）：pipes −358（−0.10%）· equipment +207（+0.37%）·
+    columns / walls / beams / slabs 全部 0。
+    """
+    assert lc.classify_by_layer("0M-空调管风口") == "equipment"
+    assert lc.classify_by_layer("0M-风机盘管") == "equipment"
+    assert lc.classify_by_layer("防火门监控系统设备") == "equipment"
+    assert lc.classify_by_layer("暖通-排烟-风口") == "equipment"
+    assert lc.classify_by_layer("二层小歌剧厅$0$I—墙面—风口") == "equipment"
+
+
+@pytest.mark.unit
+def test_equal_length_rival_substrings_keep_the_status_quo():
+    """`0M-通风管风口` 同时含 pipe 的「风管」与 equipment 的「风口」，两者等长。
+
+    等长回落 `_KIND_ORDER`（pipe 在 equipment 之前）⇒ 判 pipe，维持现状。
+    **等长即不改判**是这套规则的设计意图 —— 也正是靠它，
+    pipe 的「管井/管丼」才能顶住 equipment 的「设备」。
+    """
+    assert lc.classify_by_layer("0M-通风管风口") == "pipe"
+
+
 # ── 非构件图层闸：图框 / 标题块 / 会签栏 ──────────────────────
 #
 # 这是**第一道**非构件闸（此前只有 `is_annotation_layer`，那是另一个问题：

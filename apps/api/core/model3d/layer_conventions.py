@@ -9,6 +9,9 @@
     3. 图层前缀（layer 的 prefixes）
     4. 图层子串 / 正则（layer 的 substrings / patterns）
 
+同一层级内**匹配得越长越优先**（前缀与子串都是），等长才按构件优先级
+``_KIND_ORDER`` 定序 —— 短子串常常只是撞上图层名里的一个字。
+
 设计约束：
 - 全部大小写不敏感（中文原样保留）。
 - lru_cache 缓存加载结果，避免重复 IO / 解析。
@@ -238,11 +241,40 @@ def _match_prefix(name: str, rules: tuple[_KindRule, ...]) -> str | None:
 
 
 def _match_substring_or_pattern(name: str, rules: tuple[_KindRule, ...]) -> str | None:
+    """最长子串优先（与 `_match_prefix` 同一判据）；等长按构件优先级。
+
+    **为什么不是「先到先得」**：旧写法按 `_KIND_ORDER` 返回第一个命中的
+    类型，于是 1 个字的通用子串能赢过 2 个字的专指子串。
+    **长子串信息量更大**：它约束到具体构件，短子串往往只是撞上图层名里的一个字。
+
+    全库实测（4108 张、14151 个图层名、7996 万图元）共 5 个图层改判，全部改对：
+        `0M-空调管风口`(24608)  pipe→equipment  那张图是空调通风**设备表**，画的是表格线
+        `0M-风机盘管`(22234)    pipe→equipment  风机盘管机组
+        `防火门监控系统设备`(8262) **door**→equipment  门的「门」(1) 原先抢先命中
+        `暖通-排烟-风口`(1071)   **None**→equipment  此前判不出
+        `…$0$I—墙面—风口`(135)   wall→equipment   墙面＝装修饰面，不是墙体
+    元素级：pipes −358（−0.10%）· equipment +207（+0.37%）· 柱墙梁板 0。
+
+    **但长不等于对** —— 穷举规则集，这一改会翻转 236 组子串组合，
+    其中 `砌体柱` 会变成 wall。所以 yaml 里必须为已知的反例登记同长子串
+    （见 pipe 的「管井/管丼」），让等长回落 `_KIND_ORDER` 兜住。
+
+    正则不参与长度竞争（无「匹配长度」这一自然口径），仅在**没有任何
+    子串命中**时按 `_KIND_ORDER` 兜底 —— 与旧行为一致。
+    """
     if not name:
         return None
+    best: tuple[int, int, str] | None = None  # (子串长度, -顺序, kind)
+    for order, rule in enumerate(rules):
+        matched = [len(sub) for sub in rule.substrings if sub and sub in name]
+        if not matched:
+            continue
+        candidate = (max(matched), -order, rule.kind)
+        if best is None or candidate > best:
+            best = candidate
+    if best is not None:
+        return best[2]
     for rule in rules:
-        if any(sub and sub in name for sub in rule.substrings):
-            return rule.kind
         if any(pattern.search(name) for pattern in rule.patterns):
             return rule.kind
     return None
