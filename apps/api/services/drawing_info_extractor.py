@@ -195,6 +195,39 @@ def _dedup(items: list[dict]) -> list[dict]:
     return out
 
 
+def ocr_texts_for_scale(ocr_result) -> list[tuple]:
+    """OCR 结果 → `(x, y, content)` 表，供 `scale_evidence` 读印刷比例。
+
+    **位置必须一起带出去。** 图上到处都有形如 `1:N` 的东西 —— 坡度 `i≤ 1:4`、
+    配筋 `板面T1:2Q@200`、电气回路号 `AL/M3/1/1-M1:4F`、能效比 `EER1: 4.12`。
+    全库实测：不带位置直接数票，小分母（1:1~1:6）误命中占 **14.6%**；
+    带上位置让 `TITLE_BLOCK_WEIGHT` 生效后降到 **5.4%**
+    （`1:2` 从 233 张图降到 41 张）。而 `printed_scale` 是权重 0.70 的最强证据，
+    喂错它比不喂更糟。
+
+    位置取 bbox 左上角。缺 bbox 的 token 仍把文本带出去（只是不参与加权）——
+    缺失不得阻断（`MODELING_PIPELINE_BLUEPRINT.md` §7）。
+    """
+    tokens = getattr(ocr_result, "tokens", None)
+    if tokens is None:
+        tokens = ocr_result if isinstance(ocr_result, (list, tuple)) else None
+    out: list[tuple] = []
+    for token in tokens or ():
+        content = getattr(token, "text", None)
+        if content is None and isinstance(token, dict):
+            content = token.get("text")
+        if not content:
+            continue
+        bbox = getattr(token, "bbox", None)
+        if bbox is None and isinstance(token, dict):
+            bbox = token.get("bbox")
+        if bbox and len(bbox) >= 2:
+            out.append((bbox[0], bbox[1], content))
+        else:
+            out.append((None, None, content))
+    return out
+
+
 def build_info_items(
     *,
     geom: DrawingGeometry | None,
@@ -265,7 +298,13 @@ def extract_drawing_info(
         transform = None
         if geom is not None:
             from services.drawing_transform import transform_from_geometry
-            transform = transform_from_geometry(geom)
+            # **把 OCR 文本接给比例证据**：`printed_scale` 是权重 0.70 的最强
+            # 证据，而它此前读的是 PDF 矢量文字 —— 实测那上面只有 5/56 有
+            # `1:N`（其中 4 条还是误命中）。同一个函数里 OCR 已经跑过了，
+            # 结果就在手边。全库实测能解析出合法分母的图：**2858/4109 = 69.6%**。
+            # 没有 OCR 时传 None，`transform_from_geometry` 回落 `geom.texts`。
+            printed = ocr_texts_for_scale(ocr_result) or None
+            transform = transform_from_geometry(geom, printed_texts=printed)
         return items, transform
     return items
 
