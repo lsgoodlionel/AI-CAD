@@ -21,14 +21,20 @@ from core.model3d.component_mark import parse_component_mark
 def build_mark_index(rows: Iterable[dict] | None) -> dict[str, dict]:
     """档案行 → `{编号: {kind, drawings, floors, titles}}`。
 
-    `rows` 每项需有 `content` 与 `drawing_id`，可选 `title` / `floor_key`。
-    非构件编号（材料牌号、说明文字）一律跳过 —— **判不出就不收**。
+    `rows` 每项需有 `content` 与 `drawing_id`，可选 `title` / `floor_key` /
+    `discipline`。非构件编号（材料牌号、说明文字）一律跳过 ——
+    **判不出就不收**。
+
+    **专业必须传下去**：机电图上有大量与平法代号同形的编号
+    （实测 `LN1`~`LN14` 共 1144 次全在配电系统图上，是照明回路号），
+    不传专业就会把它们统统收成「受扭非框架梁」。
     """
     index: dict[str, dict] = {}
     for row in rows or ():
         if not isinstance(row, dict):
             continue
-        mark = parse_component_mark(row.get("content"))
+        mark = parse_component_mark(row.get("content"),
+                                    discipline=row.get("discipline"))
         if mark is None:
             continue
         entry = index.setdefault(mark.raw, {

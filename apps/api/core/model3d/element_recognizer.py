@@ -8,9 +8,11 @@ from __future__ import annotations
 import logging
 import re
 
+from .dense_array_filter import find_dense_array_flags
 from .geometry_extractor import MAX_PRIMITIVES
 from .layer_conventions import (
     classify_by_layer, classify_system, is_annotation_layer,
+    is_non_component_layer,
 )
 from .true_extent import min_area_rect
 from .types import DrawingGeometry, FloorElements
@@ -256,10 +258,22 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     # 仍保留「图层明确为柱」的路径 —— 那是设计师的明确标注，
     # 比图名更强（墙图上确实可能画几根柱）。
     wall_drawing = is_wall_drawing(drawing_title) or _is_embedded_part_plan(drawing_title)
-    result.columns = _find_columns(
+    # **密排阵列不是柱**：座椅/吸声板/铺装单元的尺寸落在柱的窗口
+    # （0.2~1.5m）正中间，尺寸判据分不开；分开它们的是「间距≈自身尺寸」
+    # ——真柱之间隔着一个跨度。实测 60 格判读里 28 格是座椅
+    # （`data/model3d/gold/rule_vs_model_v1.json`），判据依据见
+    # `dense_array_filter` 模块文档。删除量记进日志，不静默。
+    _column_candidates = _find_columns(
         rects, rect_layers, rect_blocks, polys, poly_layers, poly_blocks, ctx,
         layer_only=wall_drawing,
     )
+    _array_flags = find_dense_array_flags(_column_candidates)
+    result.columns = [c for c, f in zip(_column_candidates, _array_flags) if not f]
+    result.dense_arrays = [c for c, f in zip(_column_candidates, _array_flags) if f]
+    if result.dense_arrays:
+        logger.info("[model3d] 密排阵列剔除(%s): 柱候选 %d → %d（-%d）",
+                    drawing_id, len(_column_candidates), len(result.columns),
+                    len(result.dense_arrays))
     # **图名对图种有否决权**：墙配筋图上的平行线对是墙不是梁
     # （实测 F4 层因此墙 0 梁 186）。
     pairs_are_beams = is_beam_drawing_effective(
@@ -648,7 +662,15 @@ def _find_parallel_pairs(
     for i, (x0, y0, x1, y1) in enumerate(lines):
         if i in axis_idx:
             continue
-        wall_layer = allow_wide_walls and classify_by_layer(_at(line_layers, i)) == "wall"
+        layer = _at(line_layers, i)
+        # 图框/标题块是一圈**双线边框**：间距恰在墙宽区间、重叠远超 1m，
+        # 完美符合本函数的墙判据。此前这里对图层不设任何拦截（图层只用来
+        # 放宽墙宽上限），实测大歌剧院「底板换撑平面布置图」
+        # `通用-图框C-SHET` 产出 11 面、`C-SHET-TTLB` 7 面，
+        # 「8F节点大样图」`A2|C—图框—标题块` 产出 72 面假墙。
+        if is_non_component_layer(layer):
+            continue
+        wall_layer = allow_wide_walls and classify_by_layer(layer) == "wall"
         if abs(y0 - y1) <= _LINE_STRAIGHT_TOL_PT:
             horizontal.append(((y0 + y1) / 2, min(x0, x1), max(x0, x1), wall_layer))
         elif abs(x0 - x1) <= _LINE_STRAIGHT_TOL_PT:

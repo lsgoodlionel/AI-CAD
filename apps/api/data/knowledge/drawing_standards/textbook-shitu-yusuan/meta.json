@@ -1,0 +1,34 @@
+{
+  "source": {
+    "key": "textbook-shitu-yusuan",
+    "filename": "建筑工程识图与预算快学一本通 (《建筑工程识图与预算快学一本通》编委会编, 《建筑工程识图与预算快学一本通》编委会编 etc.) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
+    "std_no": null,
+    "title": "建筑工程识图与预算快学一本通",
+    "kind": "textbook",
+    "discipline": "general",
+    "pages": 247,
+    "extract_method": "ocr",
+    "identified_by": "OCR 封面（PDF 无任何文本层）",
+    "priority": 3,
+    "supersedes": null,
+    "superseded_by": null,
+    "notes": "识图 + 算量，可与 QTO 模块相互印证。"
+  },
+  "evidence": {},
+  "stats": {
+    "extracted_pages": 247,
+    "declared_pages": 247,
+    "missing_pages": [],
+    "char_count": 201004,
+    "mean_confidence": 0.9849,
+    "low_confidence_pages": [
+      12
+    ],
+    "near_empty_pages": [
+      8,
+      135,
+      136
+    ],
+    "ocr_dpi": 200
+  }
+}

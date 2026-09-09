@@ -246,3 +246,121 @@ def test_annotation_marker_in_the_xref_prefix_does_not_condemn_the_layer():
         "S-南区-PLAN-1F - 板配筋(-3.5~0.0)$0$0S-COLS-HATCH")
     assert is_annotation_layer("S-S-WALL-1F$0$墙柱纵筋")
     assert is_annotation_layer("立柱桩标注")          # 无前缀时不受影响
+
+
+# ── 非构件图层闸：图框 / 标题块 / 会签栏 ──────────────────────
+#
+# 这是**第一道**非构件闸（此前只有 `is_annotation_layer`，那是另一个问题：
+# 标注依附于某个构件，图框不依附任何构件 —— 见 `is_non_component_layer` 文档）。
+#
+# 实测（大歌剧院）：`_find_parallel_pairs` 对图层不设任何拦截，
+# 图框层的双线边框被当成平行线对，直接产出假墙 ——
+#     「底板换撑平面布置图」  `通用-图框C-SHET` 11 面 + `C-SHET-TTLB` 7 面
+#     「8F节点大样图」        `A2|C—图框—标题块` 72 面
+
+@pytest.mark.unit
+@pytest.mark.parametrize("layer", [
+    "通用-图框C-SHET",      # 实测：产出 11 面假墙
+    "C-SHET-TTLB",          # 实测：产出 7 面假墙
+    "A2|C—图框—标题块",     # 实测：产出 72 面假墙（`|` 前是外参名 A2）
+    "图框",
+    "A-SHET-TTLB",
+    "G-TBLK",
+    "会签栏",
+    "图签",
+])
+def test_图框标题块图层判为非构件(layer):
+    assert lc.is_non_component_layer(layer)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("layer", [
+    "S-COLU", "A-WALL", "S-BEAM", "M-PIPE-SUPPLY", "地下室外墙",
+    "结构柱", "A-DOOR", "S-SLAB",
+])
+def test_真构件图层不被闸误杀(layer):
+    """闸的代价不对称：放行几条图框线只是多几面假墙，
+    误杀真构件层则让整层构件凭空消失（`S-COLS-HATCH` 那次 658 个柱候选归零）。"""
+    assert not lc.is_non_component_layer(layer)
+
+
+@pytest.mark.unit
+def test_裸C前缀不被当成图框():
+    """**`C-` 是 AIA 的 Civil 学科码**，不是图框专用。
+
+    yaml 里窗的 `C-` 前缀正是因为撞上它才被移除（把 `C-SHET-TTLB`
+    判成了窗）。这道闸若图省事写成裸 `C-`，会把整个 Civil 专业
+    （总图/道路/管网）全部当成图框拦掉 —— 判据必须落在
+    `SHET`/`TTLB` 这些**图框次级码**上，而不是学科码上。
+    """
+    assert not lc.is_non_component_layer("C-ROAD")
+    assert not lc.is_non_component_layer("C-STRM-PIPE")
+    assert not lc.is_non_component_layer("C-1")          # 窗编号 C-1
+    assert lc.is_non_component_layer("C-SHET-TTLB")      # 次级码命中才拦
+
+
+@pytest.mark.unit
+def test_外参前缀里的图框不牵连真图层():
+    """`|` 前是**来源图纸**的名字，不是这个图层的语义。
+
+    与 `test_annotation_marker_in_the_xref_prefix_does_not_condemn_the_layer`
+    同一条教训：那次前缀里的「配筋」让 658 个柱候选全被丢弃。
+    """
+    assert not lc.is_non_component_layer("图框A2$0$S-COLU")
+    assert not lc.is_non_component_layer("A2图框|S-COLU")
+
+
+@pytest.mark.unit
+def test_空输入安全():
+    assert not lc.is_non_component_layer(None)
+    assert not lc.is_non_component_layer("")
+
+
+@pytest.mark.unit
+def test_gate_survives_yaml_loss(monkeypatch):
+    """**YAML 丢了，闸必须还在。**
+
+    `load_conventions()` 对缺文件/无 pyyaml/损坏一律降级为空（上面四条降级
+    用例）。构件映射降级只是「少认几个构件」，而**非构件闸降级会反向放行
+    假构件** —— 代价方向相反，所以这道闸不能只活在 YAML 里。
+    """
+    monkeypatch.setattr(lc, "_CONVENTIONS_FILE", Path("/nonexistent/no.yaml"))
+    lc.load_conventions.cache_clear()
+    assert lc.load_conventions().kind_rules == ()        # 确认真的降级了
+    assert lc.is_non_component_layer("通用-图框C-SHET")
+    assert lc.is_non_component_layer("C-SHET-TTLB")
+    assert lc.is_non_component_layer("A2|C—图框—标题块")
+
+
+@pytest.mark.unit
+def test_兜底词表与yaml不漂移():
+    """两份词表的一致性 —— YAML 必须**覆盖**兜底词表的每一条。
+
+    HEAD 那次实测的教训：`layer_conventions.yaml`（生产唯一判据）与
+    `model3d/layer_class_map.yaml`（只用于数据集标注）互相分岔，
+    「灯具」在后者出现 4 次、前者 0 次，整套装修词汇到不了生产路径。
+    这条断言让同一个失效模式在闸上无法重演。
+    """
+    conv = lc.load_conventions()
+    assert conv.gate_groups, "真实 yaml 应加载出非构件闸分组"
+    for group, vocab in lc._DEFAULT_GATE_VOCAB.items():
+        rule = conv.gate_groups.get(group)
+        assert rule is not None, f"yaml 缺少兜底词表已有的闸分组: {group}"
+        assert set(vocab["substrings"]) <= set(rule.substrings), (
+            f"{group} 组：yaml 的 substrings 未覆盖兜底词表")
+        yaml_pats = {p.pattern for p in rule.patterns}
+        assert set(vocab["patterns"]) <= yaml_pats, (
+            f"{group} 组：yaml 的 patterns 未覆盖兜底词表")
+
+
+@pytest.mark.unit
+def test_图框闸与标注闸是两个问题():
+    """两道闸互不覆盖 —— 合并成一个正则就再也分不开开关。
+
+    `S-BEAM-TEXT` 是梁的文字标注：**依附于梁**，语义上属于 beam。
+    `C-SHET-TTLB` 是图框：**不依附任何构件**，与建筑实体零关系。
+    """
+    assert lc.is_annotation_layer("S-BEAM-TEXT")
+    assert not lc.is_non_component_layer("S-BEAM-TEXT")
+    assert lc.is_non_component_layer("C-SHET-TTLB")
+    assert not lc.is_annotation_layer("C-SHET-TTLB")

@@ -126,7 +126,14 @@ async def test_build_scene_emits_quality_payload_and_dynamic_building_units(fake
     assert scene["quality"]["unclassified_drawings"][0]["drawing_id"] == "detail-1"
     assert any(issue["issue_type"] == "story_spacing_too_small" for issue in scene["quality"]["issues"])
     unit_keys = {item["unit_key"] for item in scene["quality"]["building_units"]}
-    assert {"south", "building_2", "main"} <= unit_keys
+    assert {"south", "building_2"} <= unit_keys
+    # `main` **不该在这里** —— 这一套图里撑起 main 的只有 `楼梯节点详图` 一张，
+    # 详图跨单体复用、本就没有单体归属（单体角色闸，实测删 31/50 错误归属）。
+    # 旧断言写的是闸门接进来之前的行为：一个一层楼都没有的幻影单体。
+    assert "main" not in unit_keys
+    assert any(issue["issue_type"] == "building_unit_role_excluded"
+               and issue["drawing_id"] == "detail-1"
+               for issue in scene["quality"]["issues"])
     buildings = {item["key"]: item for item in scene["buildings"]}
     assert buildings["building_2"]["label"] == "2#楼"
     assert buildings["south"]["floors"][1]["elevation_m"] == pytest.approx(4.5)

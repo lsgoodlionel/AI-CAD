@@ -1,0 +1,31 @@
+{
+  "source": {
+    "key": "textbook-zhao-zhitu-shitu",
+    "filename": "建筑工程制图与识图 (赵建军) (z-library.sk, 1lib.sk, z-lib.sk).epub",
+    "std_no": null,
+    "title": "建筑工程制图与识图（赵建军）",
+    "kind": "textbook",
+    "discipline": "general",
+    "pages": 171,
+    "extract_method": "epub",
+    "identified_by": "EPUB OPF 元数据 + 171 个 HTML 章节",
+    "priority": 1,
+    "supersedes": null,
+    "superseded_by": null,
+    "notes": "结构化最好：171 HTML + 370 JPG，图文已配对。pages 记的是章节数。"
+  },
+  "evidence": {},
+  "stats": {
+    "extracted_pages": 171,
+    "declared_pages": 171,
+    "missing_pages": [],
+    "char_count": 115692,
+    "mean_confidence": null,
+    "low_confidence_pages": [],
+    "near_empty_pages": [
+      0,
+      6
+    ],
+    "ocr_dpi": 200
+  }
+}
