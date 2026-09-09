@@ -296,6 +296,14 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     #
     # 与墙图一样**只关猜测路径**：图层明说是柱的照留——那是设计师的明确标注。
     no_plan_sections = not shows_plan_cut_sections(view_type)
+    # **梁配筋图上的柱是支座参照，不是这张图要表达的构件**：它们真实存在
+    # （图层就是 `S-COLS`），但同层的结构平面图已经提供了同一批柱，而聚合
+    # 没有跨图去重 —— 留着就是重复计数。判据与风险面见
+    # `is_rebar_drawing_for_beams`。
+    beam_rebar_drawing = is_rebar_drawing_for_beams(drawing_title)
+    if beam_rebar_drawing:
+        # 降级必须可见
+        logger.info("[model3d] 梁配筋图不产柱(%s)：柱由同层结构平面图提供", drawing_id)
     if no_plan_sections:
         # **降级必须可见**：静默关掉一整条路径，日后查「这张图为什么没柱」
         # 会查不到任何痕迹。
@@ -308,7 +316,7 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     #
     # **两道闸串联**：图种闸改 `_find_columns` 的入参（关掉猜测路径），
     # 密排阵列闸筛它的输出——前者按图分、后者按框分，互不覆盖。
-    _column_candidates = _find_columns(
+    _column_candidates = [] if beam_rebar_drawing else _find_columns(
         rects, rect_layers, rect_blocks, polys, poly_layers, poly_blocks, ctx,
         layer_only=wall_drawing or no_plan_sections,
     )
@@ -824,6 +832,31 @@ _NOT_STRUCTURAL_WALL_RE = re.compile(r"幕墙")
 _WALL_WORD_RE = re.compile(r"(?<!幕)墙")
 _COLUMN_WORD_RE = re.compile(r"柱")
 _BEAM_WORD_RE = re.compile(r"梁")
+
+
+def is_rebar_drawing_for_beams(drawing_title: str | None) -> bool:
+    """这张图是不是**梁的配筋图**（其上的柱只是支座参照，不该产出）。
+
+    与 `is_beam_drawing_effective` 同一条规则的第三面：**图种声明优先于
+    几何猜测**。这里管的是「主题之外的构件不产出」。
+
+    **实测依据**：主梁配筋图上确实画着柱截面填充，图层名就是
+    `S-北区-F3-COLS$0$0S-COLS-HATCH`（`COLS` = 柱），它们是
+    `c67e512`「`填充`/`HATCH` 豁免保住构件填充截面」的预期结果 ——
+    **不是误检**。但它们不该进模型：实测同一楼层**同时**选用两类图
+    （歌剧院地下一层 23 张结构平面 + 14 张梁配筋，1 层 13 + 14），
+    而聚合**没有跨图纸去重**（去重只覆盖轴线与圆检测补柱），
+    `placed_drawings=0` 又没有世界坐标，空间上判不出重合 ——
+    于是同一根柱被算两次。抽样两张图实测：柱 0 → 218 与 0 → 320。
+
+    **关掉的风险面实测为零**：全库没有任何一层只靠配筋图提供柱，
+    同层必有结构平面图 / 墙柱平面图 / 柱平面图。
+
+    判据要求「梁」与「配筋」**同时**出现 —— 只看「配筋」会把板配筋图
+    也关掉，那不是本闸要管的。
+    """
+    title = str(drawing_title or "")
+    return "配筋" in title and "梁" in title
 
 
 def is_beam_drawing_effective(*, beam_like: bool,
