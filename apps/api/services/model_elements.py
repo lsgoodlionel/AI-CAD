@@ -445,6 +445,7 @@ def _recognize_sync(
     origin_override: tuple[float | None, float | None] | None = None,
     scale_override: float | None = None,
     drawing_title: str | None = None,
+    view_type: str | None = None,
 ) -> dict | None:
     """线程池内执行：几何提取 + 构件识别 + spotting 融合回灌 → {elements, axes}；失败返回 None。"""
     from core.model3d import extract_dxf_geometry, extract_pdf_geometry, recognize
@@ -460,7 +461,8 @@ def _recognize_sync(
     result = recognize(geom, discipline, drawing_id,
                        origin_override=origin_override,
                        scale_override=scale_override,
-                       drawing_title=drawing_title)
+                       drawing_title=drawing_title,
+                       view_type=view_type)
     elements = _reinject_fusion(result.as_dict(), geom, drawing_id)
     # E3/路径B：PDF 圆形桩/圆柱补识别——几何识别器只抓闭合近方多段线,抓不到
     # 圆(桩/钢立柱多画成圆)。栅格 HoughCircles 检圆 → 米坐标八边形柱,去重后并入。
@@ -1062,7 +1064,8 @@ async def _recognize_one(
     try:
         data = await loop.run_in_executor(executor, file_getter, file_key)
         # 圆检测仅对平面图开启(剖面/立面/详图里的圆多是钢筋/符号,非平面桩)
-        allow_circles = classify_view_type(drawing).view_type in ("plan", "unknown")
+        view_type = classify_view_type(drawing).view_type
+        allow_circles = view_type in ("plan", "unknown")
         # **识别器算不出原点时，用轴网路径已落库的原点**：两条路径各算各的，
         # 实测 S-0-20-102.04C 的 drawing_transform 修好后构件坐标纹丝不动
         # （F1 墙跨度仍 2207 米）—— 因为构件坐标压根不读那张表。
@@ -1076,6 +1079,8 @@ async def _recognize_one(
                 # **图名声明的图种优先于几何猜测**：墙配筋图上的填充截面
                 # 是墙不是柱（实测 1404 根假柱）。
                 str(drawing.get("title") or ""),
+                # 剖面/立面/无轴网详图上不猜柱（`shows_plan_cut_sections`）。
+                view_type,
             ),
             timeout=_RECOGNIZE_TIMEOUT_SEC,
         )

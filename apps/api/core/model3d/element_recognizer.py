@@ -9,6 +9,7 @@ import logging
 import re
 
 from .dense_array_filter import find_dense_array_flags
+from .drawing_conventions import shows_plan_cut_sections
 from .geometry_extractor import MAX_PRIMITIVES
 from .layer_conventions import (
     classify_by_layer, classify_system, is_non_component_layer,
@@ -39,6 +40,28 @@ _COLUMN_ABSURD_MIN_M = 0.1
 # 上限取启发式 1.5m 的两倍——大型公建的巨柱可到 3m，再大只可能是墙段/房间。
 _COLUMN_ABSURD_MAX_M = 3.0
 _COLUMN_LAYER_MAX_ASPECT = 8.0
+#: 柱截面轮廓的**顶点数上限**。超过它的填充路径不是构件截面。
+#:
+#: 柱的平面截面是个四边形（异形柱多几个角，圆柱在 PDF 里经贝塞尔折线化后
+#: 8 个点）。而**汉字笔画**是复杂路径——它们的尺寸判不开（3.5mm 字高在
+#: 1:100 下换算 0.35 米，正落在柱窗口 0.2~1.5m 当中），顶点数判得开：
+#: 图签栏内候选的顶点数中位 **96**，真柱 **4~6**、真构造柱 **4**。
+#:
+#: **阈值定在 48，是被一条既有实测顶回来的。** 我先按全库分布挑了 12
+#: （13~16 这一段恰好为空），它会删掉 `test_element_recognizer_layers.py::
+#: test_many_point_column_keeps_its_full_extent` 里那根 40 点的圆柱 ——
+#: 而那条用例记的是真事：实测图纸里 **51% 的多边形超过 8 个点**，某图
+#: 728 根柱有 124 根轮廓被砍成碎条。所以下限必须**高于 40**。
+#:
+#: 全库扫描（1257 张随机样本 = 30.6%，21339 个柱候选）的顶点数分布：
+#: ≤8 41.6% · 9~12 31.0% · 13~16 **0.2%** · 17~24 6.9% · 25~48 0.6% ·
+#: 49~96 0.7% · >96 3.1%（另有 15.9% 查不到：矩形分支或去重合并过）。
+#: 48 落在 25~48 这段稀疏区的上沿：既在 40 之上，又把 96 点那一大团挡在外面。
+#:
+#: 代价如实记：24~47 点的**标高符号小三角**因此仍会漏进来
+#: （`CRITERIA.md#columns` 明写它不算柱）——那要靠形状而不是点数来判，
+#: 本轮没做。
+MAX_COLUMN_OUTLINE_POINTS = 48
 _WALL_GAP = (0.1, 0.4)
 _BEAM_GAP = (0.15, 0.5)
 # 图层已确认为墙时放宽间距上限：地下室外墙/挡土墙/人防墙常达 0.3~0.8m（甚至更厚），
@@ -198,15 +221,20 @@ def recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
               origin_override: tuple[float | None, float | None] | None = None,
               scale_override: float | None = None,
               drawing_title: str | None = None,
+              view_type: str | None = None,
               ) -> FloorElements:
     """识别构件；任何异常返回空 FloorElements（scale=缺省）。
 
     图名判定约定：取 ``geom.texts`` 中的文本内容做关键词匹配
     （梁图=含「梁」，机电 system=按专业关键词），discipline 兜底。
+
+    ``view_type``：调用方（`services.drawing_view_classifier`）判出的图种。
+    **不传就不拦**——本模块不 import services（`drawing_view_classifier`
+    反过来 import 本模块，会成环）。
     """
     try:
         return _recognize(geom, discipline, drawing_id, origin_override,
-                          scale_override, drawing_title)
+                          scale_override, drawing_title, view_type)
     except Exception as exc:  # noqa: BLE001 — 识别失败降级空构件
         logger.warning("[model3d] 构件识别失败(%s): %s", drawing_id, exc)
         return FloorElements(scale=_DEFAULT_SCALE)
@@ -216,6 +244,7 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
                origin_override: tuple[float | None, float | None] | None = None,
                scale_override: float | None = None,
                drawing_title: str | None = None,
+               view_type: str | None = None,
                ) -> FloorElements:
     truncated = geom.primitive_count() > MAX_PRIMITIVES
     lines = geom.lines[:MAX_PRIMITIVES]
@@ -257,14 +286,30 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     # 仍保留「图层明确为柱」的路径 —— 那是设计师的明确标注，
     # 比图名更强（墙图上确实可能画几根柱）。
     wall_drawing = is_wall_drawing(drawing_title) or _is_embedded_part_plan(drawing_title)
+    # **剖面图上没有平面柱截面**——那里的近方块是地层填充格、立柱桩的横缀条、
+    # 竣工章与标高刻度（实测：地质剖面 338/338/198 根、围护体剖面 51/54 根，
+    # 逐张叠框核验，一根真柱都没有）。尺寸判据分不开它们：3.5mm 字高的汉字
+    # 在 1:100 下换算 0.35 米，正落在柱窗口（0.2~1.5m）当中。
+    # 判据与**立面/详图为何不在其内**见
+    # `drawing_conventions.shows_plan_cut_sections`（条款 `plan_cut_sections`）。
+    #
+    # 与墙图一样**只关猜测路径**：图层明说是柱的照留——那是设计师的明确标注。
+    no_plan_sections = not shows_plan_cut_sections(view_type)
+    if no_plan_sections:
+        # **降级必须可见**：静默关掉一整条路径，日后查「这张图为什么没柱」
+        # 会查不到任何痕迹。
+        logger.info("[model3d] 剖面图不产平面柱截面(%s)：关闭柱的猜测路径", drawing_id)
     # **密排阵列不是柱**：座椅/吸声板/铺装单元的尺寸落在柱的窗口
     # （0.2~1.5m）正中间，尺寸判据分不开；分开它们的是「间距≈自身尺寸」
     # ——真柱之间隔着一个跨度。实测 60 格判读里 28 格是座椅
     # （`data/model3d/gold/rule_vs_model_v1.json`），判据依据见
     # `dense_array_filter` 模块文档。删除量记进日志，不静默。
+    #
+    # **两道闸串联**：图种闸改 `_find_columns` 的入参（关掉猜测路径），
+    # 密排阵列闸筛它的输出——前者按图分、后者按框分，互不覆盖。
     _column_candidates = _find_columns(
         rects, rect_layers, rect_blocks, polys, poly_layers, poly_blocks, ctx,
-        layer_only=wall_drawing,
+        layer_only=wall_drawing or no_plan_sections,
     )
     _array_flags = find_dense_array_flags(_column_candidates)
     result.columns = [c for c, f in zip(_column_candidates, _array_flags) if not f]
@@ -565,6 +610,11 @@ def _find_columns(
         if len(columns) >= _CAPS["columns"]:
             return columns
     for i, poly in enumerate(polys):
+        # **形状闸接在两条路径前面**：字与符号在图层上、尺寸上都可能蒙混过关，
+        # 顶点数是它们唯一藏不住的地方（实测图签栏候选顶点数中位 96，
+        # 真柱 4~6）。
+        if not _is_component_outline(poly):
+            continue
         x, y, w, h = _poly_bbox(poly)
         # **非构件（标注/钢筋/饰面/图框）图层不产出构件**（与矩形分支同一条纪律）——
         # 我第一版只在矩形分支加了这道闸，而实测那 711 根假柱
@@ -592,6 +642,15 @@ def _find_columns(
         if len(columns) >= _CAPS["columns"]:
             break
     return columns
+
+
+def _is_component_outline(poly: list) -> bool:
+    """这条填充路径的**形状**像不像一个构件截面（而不是字/符号/格线）。
+
+    与 `_is_plausible_column` 同一条纪律：图层名与尺寸都答不出
+    「它是不是一个真构件」，得由形状本身答。见 `MAX_COLUMN_OUTLINE_POINTS`。
+    """
+    return len(poly) <= MAX_COLUMN_OUTLINE_POINTS
 
 
 def _is_plausible_column(w_m: float, h_m: float) -> bool:

@@ -321,6 +321,8 @@ Query:`target_kind`(topology/naming/compliance/element/symbol)、`discipline`、
 | 无图层构件识别 | PDF 无 CAD 图层 | 图层词表仅对 DXF 项目有效;PDF 靠几何+OCR |
 | 矢量文字取不到 | CAD PDF 正文为矢量字形 | 类型/标注信号只能来自档案 OCR |
 | 钢柱/桩靠圆检测 | 桩以圆/线段簇表达,非近方多段线 | 平面图有效,剖面不跑(防钢筋圆误检) |
+| 剖面图不产柱 | 水平剖切截面只出现在平面上 | 图种=section 时**只认图层柱**,不按尺寸猜(实测地质剖面单张 338 个假柱) |
+| 图签栏笔画不产柱 | 汉字轮廓顶点数中位 96,真柱 4~6 | 源多边形顶点数 >48 一律不产构件(`MAX_COLUMN_OUTLINE_POINTS`) |
 | 轴号/类型标签整机显效滞后 | 依赖 OCR 回填覆盖(289s/图)+ 变换质量(轴线多无标签) | 代码就绪,随回填铺开逐步显现;见 `docs/PHASE_E_E3_AUDIT.md` |
 | 板为数十块量级 | 楼层堆叠模型每层 1 板 + 桩包络补板 | 非缺陷;深度板恢复(线段闭合外轮廓)未做 |
 | 外立面/幕墙曲面/自由曲面外壳 | 方法论边界 | 不支持,禁止宣称「还原效果图」 |
@@ -675,6 +677,7 @@ Phase D 合并了多处同类入口(见 `docs/PHASE_D_BLUEPRINT.md` §0.3),前�
 | V1.2 | 2026-07-14 | Phase D(D-22 手册同步):新增第 16 章《事件编排层与管线建议》(D-08 两个建议类型/阈值、`engine_params scope=pipeline` 开关及其「无管理界面,只能直接写库」的已知缺口、前端消费现状——数据看板项目视图已接入)、第 17 章《路由迁移与重定向》(`/`→`/hub`、套图审查旧路由→`/review`,旧页面源码保留未删);§4 新增 4.6 Finding 统一聚合 API(`routers/findings.py`,migration 026)与 4.7 管线建议 API(`routers/pipeline.py`,migration 027),并在 4.1 补充 QTO 转创效提案端点当前无前端入口的说明;§12 补登 migration 025–027;§18(原§16)维护约定增补两条触发项 |
 | V1.3 | 2026-07-16 | Phase E:§6.3 新增「图纸信息档案层 + PDF 几何识别」能力与诚实边界——档案层(导入即抽取/人审 verified/单一真相源,migration 029-031)、围护桩圆检测(整机 columns 3089→5794)、构件类型标签(档案 OCR 反哺);纯 PDF 项目边界(无图层/矢量文字取不到/圆检测/OCR回填滞后/板数十块量级)。详见 `docs/PHASE_E_BLUEPRINT.md`、`docs/PHASE_E_E3_AUDIT.md` |
 | V1.4 | 2026-08-13 | Phase I/J:§4.8 新增轴网识别与定位状态 API(识别/分区确认/传播/**荐锚**/未分层分类),并补「坐标变换的来源与清理」(migration 047)——`drawing_transform` 一图一行而三条路径共写,`manual` 不被自动覆盖、清理只动同来源、两条路径各握一半时轴网路径借用已落库比例(仍过 §6.0.4 门禁) |
+| V1.6 | 2026-09-01 | 柱识别新增两道闸(§6.3 边界表):**图种 section 只认图层柱**(`drawing_conventions.shows_plan_cut_sections`,条款登记 `plan_cut_sections`)与**轮廓顶点数上限 48**(`MAX_COLUMN_OUTLINE_POINTS`,挡图签栏汉字笔画)。全库随机样本 30.6%(1257 张)实测合计删 **6.6%** 的柱候选(1417 个)、命中 52 张图,叠框核验无误伤。**立面与详图刻意不在闸内** —— 实测各有反例(图幅级图种 ≠ 图幅内每格的图种),详见 `docs/PROGRESS.md` 2026-09-01(二) |
 | V1.5 | 2026-08-14 | J7:§4.9 新增「坐标系与比例的四道兜底」——四条产出路径共用同一套门禁(漏掉的两条恰是决定构件坐标的)、三个关键阈值(`MAX_DRAWING_EXTENT_M`/`MAX_RENDER_MEGAPIXELS`/`_RECOGNIZE_TIMEOUT_SEC` 及其「假超时」性质)、线程池被僵尸占满的排查方法(判据是日志时间戳而非 CPU,定性用 py-spy)、层内坐标系矛盾机制(B1 6358→248 米,构件数不变) |
 | V1.6 | 2026-08-28 | 修掉「未分类图纸造出空幻影层」:`_build_floors` 不再为 UNZONED 记账桶产出楼层(实测第二工程该层挂 946 张图、构件 0 个,在三维里是个空层,还把 `stats.reconstruction` 从 elements 拖成 mixed);图纸不丢——`floor_of` 照旧覆盖每张图(下游按图纸取层是无条件取值),并照实进 `scene.annotation_queue` 与 `stats.unclassified_drawings`。副作用如实:`stats.floors` 少 1 层,只有未分类图的单体不再出现在 `buildings` 里 |
 | V1.7 | 2026-09-24 | 非构件图层闸补齐三组(sheet/annotation/finish + 组内 `exempt`),`is_non_component_layer()` 取并集并接到全部 7 个调用点(图框闸此前只接墙一处,柱/管/设备仍在吃图框);`is_gate_group_hit()` 提供分组开关;饰面层仍分类为 wall(返回 None 会掉进尺寸猜测路径,更糟);`填充`/`HATCH` 豁免保住构件填充截面;yaml 与兜底词表逐组取并集,降级不 fail-open。实测见 §3 与 `docs/PROGRESS.md`「2026-09-24」条目 |
