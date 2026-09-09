@@ -304,6 +304,13 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     if beam_rebar_drawing:
         # 降级必须可见
         logger.info("[model3d] 梁配筋图不产柱(%s)：柱由同层结构平面图提供", drawing_id)
+    # **总平面图画的是场地关系，不画构件截面**：实测一张「周边环境总平面图」
+    # 因比例 0.4 m/pt（≈1:1134）把 4pt 的景观符号换算成 1.6 米，产出 459 根
+    # 假柱与 266 面假墙。判据与风险面见 `is_site_plan`。
+    site_plan = is_site_plan(drawing_title)
+    if site_plan:
+        logger.info("[model3d] 总平面图不产构件(%s)：它画场地关系，不画构件截面",
+                    drawing_id)
     if no_plan_sections:
         # **降级必须可见**：静默关掉一整条路径，日后查「这张图为什么没柱」
         # 会查不到任何痕迹。
@@ -316,7 +323,7 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     #
     # **两道闸串联**：图种闸改 `_find_columns` 的入参（关掉猜测路径），
     # 密排阵列闸筛它的输出——前者按图分、后者按框分，互不覆盖。
-    _column_candidates = [] if beam_rebar_drawing else _find_columns(
+    _column_candidates = [] if (beam_rebar_drawing or site_plan) else _find_columns(
         rects, rect_layers, rect_blocks, polys, poly_layers, poly_blocks, ctx,
         layer_only=wall_drawing or no_plan_sections,
     )
@@ -352,7 +359,7 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     pairs_are_beams = is_beam_drawing_effective(
         beam_like=_is_beam_drawing(all_text, line_layers),
         drawing_title=drawing_title)
-    pairs = _find_parallel_pairs(
+    pairs = [] if site_plan else _find_parallel_pairs(
         lines, line_layers, axis_lines,
         _BEAM_GAP if pairs_are_beams else _WALL_GAP, ctx,
         allow_wide_walls=not pairs_are_beams,
@@ -832,6 +839,29 @@ _NOT_STRUCTURAL_WALL_RE = re.compile(r"幕墙")
 _WALL_WORD_RE = re.compile(r"(?<!幕)墙")
 _COLUMN_WORD_RE = re.compile(r"柱")
 _BEAM_WORD_RE = re.compile(r"梁")
+
+
+def is_site_plan(drawing_title: str | None) -> bool:
+    """这张图是不是**总平面图**（画场地关系，不画构件截面）。
+
+    与 `is_rebar_drawing_for_beams` / `is_beam_drawing_effective` 同属一条
+    规则：**图名对图种有否决权**。
+
+    **实测依据**：第二工程重建后柱 +3.2%，逐图诊断发现净增几乎全来自一张
+    「周边环境总平面图」（133 → 459，**+326**），而其余图大多在下降。
+    根因链每一环都可核对：该图比例被算成 **0.4 m/pt ≈ 1:1134**（不在
+    §6.0.4 表内）→ 图上 4pt 的景观符号（树、灯、井盖）换算成 **1.6 米**
+    → 落进柱窗口（尺寸最多的是 1.63×1.63 共 111 个、1.25×1.25 共 54 个）。
+
+    系统其实**已经标了** `scale_suspect=true`（459 根全带），但可疑构件仍
+    进模型。没有从那里下手，是因为全工程 `scale_suspect` 占比是
+    墙 60.7%、板 46.9%、柱 35.4% —— 一刀切会让墙少六成，那是另一个量级的
+    决策。从图种下手范围可控：全库仅 12 张总平面图。
+
+    判据认「总平面」这个**连续词**：「一层结构平面总图」是某一层的平面图，
+    只是叫「总图」，不能拆开匹配（已加测试）。
+    """
+    return "总平面" in str(drawing_title or "")
 
 
 def is_rebar_drawing_for_beams(drawing_title: str | None) -> bool:
