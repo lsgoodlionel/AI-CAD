@@ -107,3 +107,15 @@ gold_sheets/
 # 仓库里保留的是**管线代码 + 元数据 + 清单 + 数据卡**，那才是可复用的部分。
 apps/api/data/knowledge/drawing_standards/*/book.md
 apps/api/data/model3d/dataset/reference/symbols/
+
+# ── apps/api 根目录的一次性探针脚本 ─────────────────────────
+# 探索期的临时脚本（probe_*/mk_*/单字母名）**不进版本库**：
+# 它们依赖当时的库状态与临时路径，隔天就跑不通，却会一直出现在
+# `git status` 里，把真正的改动淹掉（清理时实测已跟踪 78 个 + 未跟踪 91 个）。
+# 值得复用的探针要**正式化**到 `apps/api/scripts/model3d/` 并配文档与判据，
+# 例如 `verify_scale_bar.py`（原分辨率复核）、`gold_report.py`（金标准报表）。
+# 已删的那批可从 git 历史取回：`git log --diff-filter=D -- 'apps/api/probe_*.py'`
+apps/api/*.py
+apps/api/*.sh
+!apps/api/main.py
+!apps/api/dependencies.py
