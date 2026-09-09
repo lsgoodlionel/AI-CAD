@@ -2,17 +2,21 @@
 
 覆盖：基础分类器主判据、置信度分级、label_source 定位、补充映射表回退、
 机电系统判定、未知图层降级 None、空文档不抛异常、质量报告统计、
-补充映射表加载（无效正则跳过 / 缺失文件降级 / 越界 taxonomy 跳过）。
+补充映射表加载（无效正则跳过 / 缺失文件降级 / 越界 taxonomy 跳过 /
+随包配置非空且覆盖全 taxonomy——防配置被搬走后只留一行 warning）。
 """
 from __future__ import annotations
 
 from pathlib import Path
 
 from core.model3d.dataset.auto_label import (
+    _MAP_FILE,  # 仅用于断言失败信息里点名是哪个文件没加载上
     CONF_ALIAS,
     CONF_BLOCK,
     CONF_LAYER,
     CONF_MAP,
+    VALID_CATEGORIES,
+    VALID_SYSTEMS,
     AutoLabelResult,
     LabeledPrimitive,
     LayerClassMap,
@@ -201,10 +205,29 @@ def test_missing_map_file_degrades_to_empty(tmp_path: Path) -> None:
 
 
 def test_shipped_map_loads_non_empty() -> None:
-    # 默认随包 layer_class_map.yaml 应可加载且非空
+    """默认补充映射表必须真的加载出规则，而不是降级成空表。
+
+    ``load_layer_class_map`` 在文件缺失时只 ``logger.warning`` 并返回空表 ——
+    配置文件一旦被移动/改名/合并走而 ``_MAP_FILE`` 没跟着改，
+    ``label_source == "layer_class_map"`` 这条回退路径会**恒不命中**，
+    而全量测试照样全绿。这条断言就是让那种情况直接变红。
+    """
     mapping = load_layer_class_map()
-    assert len(mapping.category_rules) > 0
-    assert len(mapping.system_rules) > 0
+    assert len(mapping.category_rules) > 0, f"补充映射表加载为空：{_MAP_FILE}"
+    assert len(mapping.system_rules) > 0, f"补充映射表加载为空：{_MAP_FILE}"
+
+
+def test_shipped_map_covers_full_taxonomy() -> None:
+    """覆盖断言：9 个构件类别与 4 个机电系统各至少一条规则。
+
+    比「非空」更难被半吊子配置糊弄 —— 留个占位 YAML 也能过 ``> 0``，
+    但过不了这条。数字不写死成魔数，直接对齐 taxonomy 常量。
+    """
+    mapping = load_layer_class_map()
+    assert {r.key for r in mapping.category_rules} == VALID_CATEGORIES
+    assert {r.key for r in mapping.system_rules} == VALID_SYSTEMS
+    assert len(mapping.category_rules) >= len(VALID_CATEGORIES)
+    assert len(mapping.system_rules) >= len(VALID_SYSTEMS)
 
 
 # ── 质量报告统计 ─────────────────────────────────────────────────
