@@ -69,6 +69,14 @@ class FloorElements:
     #: 从另一个门回到模型里。留着是为了让剔除可核验：删掉的东西
     #: 一旦无痕，误伤就成了看不见的损失。判据见 `dense_array_filter`。
     dense_arrays: list[dict] = field(default_factory=list)
+    #: 被判为**图面标注/非实体**（引线、尺寸斜线、门扇、标高刻度）
+    #: 而从柱候选里剔除的框。与 `dense_arrays` 同一条纪律：诊断可见、
+    #: **不进 `as_dict`**。判据见 `annotation_filter`。
+    #:
+    #: 为什么它抓不到标高符号：`∨` 是整个符号作为一个多边形进来的，
+    #: 真实范围 0.32×0.32m 近方形，与真柱同尺寸 —— 放宽到能删它就会
+    #: 同时删掉真柱。那一档要另找判据，不能靠尺寸窗口。
+    annotations: list[dict] = field(default_factory=list)
 
     def as_dict(self) -> dict:
         return {

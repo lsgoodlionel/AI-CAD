@@ -313,12 +313,32 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
         layer_only=wall_drawing or no_plan_sections,
     )
     _array_flags = find_dense_array_flags(_column_candidates)
-    result.columns = [c for c, f in zip(_column_candidates, _array_flags) if not f]
+    _kept = [c for c, f in zip(_column_candidates, _array_flags) if not f]
     result.dense_arrays = [c for c, f in zip(_column_candidates, _array_flags) if f]
     if result.dense_arrays:
         logger.info("[model3d] 密排阵列剔除(%s): 柱候选 %d → %d（-%d）",
-                    drawing_id, len(_column_candidates), len(result.columns),
+                    drawing_id, len(_column_candidates), len(_kept),
                     len(result.dense_arrays))
+
+    # **图面标注为什么没有单独一道闸**：`annotation_filter` 的 `thin_stroke`
+    # 判据（真实短边 <0.10m 且长宽比 ≥8）与上面 `_is_plausible_column` 用的
+    # 是**同一对阈值**（`_COLUMN_ABSURD_MIN_M` / `_COLUMN_LAYER_MAX_ASPECT`）
+    # —— 那两个数本就是它回指本文件取的。而本文件现在已用
+    # `true_extent.min_area_rect` 的**真实尺寸**喂那道判据，于是：
+    #
+    #     凡满足 thin_stroke（short<0.10）的候选，必然已被
+    #     _is_plausible_column（short≥0.1）或 _is_column_size（short≥0.2）拒绝
+    #
+    # 这是恒等关系、与图纸无关，所以在这里再接一道闸额外删除量恒为 0。
+    # 工作包 C 交付后，`true_extent` 那次改造用**更根本的办法**（改量法而不是
+    # 加过滤器）解决了同一个问题。
+    #
+    # `annotation_filter` 仍有一条**未被覆盖**的判据 `stroke_cluster`：它量
+    # 去重共线后的**真实角点**（>24），而 `_is_component_outline` 量的是
+    # **原始点数**（≤48）—— 两者不等价。要启用它得让 `_find_columns` 一并带出
+    # 未降点的多边形（构件字典里的轮廓已被 `_downsample_ring` 压到 8 点，
+    # 角点判据在那上面恒不成立，实测 0/2497）。见 `docs/GOLD_STANDARD_REVIEW.md` §四。
+    result.columns = _kept
     # **图名对图种有否决权**：墙配筋图上的平行线对是墙不是梁
     # （实测 F4 层因此墙 0 梁 186）。
     pairs_are_beams = is_beam_drawing_effective(
