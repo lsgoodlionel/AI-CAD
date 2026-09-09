@@ -11,8 +11,7 @@ import re
 from .dense_array_filter import find_dense_array_flags
 from .geometry_extractor import MAX_PRIMITIVES
 from .layer_conventions import (
-    classify_by_layer, classify_system, is_annotation_layer,
-    is_non_component_layer,
+    classify_by_layer, classify_system, is_non_component_layer,
 )
 from .types import DrawingGeometry, FloorElements
 
@@ -537,11 +536,12 @@ def _find_columns(
     """
     columns: list[dict] = []
     for i, (x, y, w, h, filled) in enumerate(rects):
-        # **标注图层不产出构件**：实测「立柱桩标注」一层造出 3410 根假柱。
+        # **非构件图层不产出构件**：实测「立柱桩标注」一层造出 3410 根假柱；
+        # 闸后来从「标注」扩到「标注 ∪ 图框 ∪ 饰面」，判据同在 yaml。
         _layer = _at(rect_layers, i)
-        annotation = is_annotation_layer(_layer)
+        non_component = is_non_component_layer(_layer)
         _kind = classify_by_layer(_layer, _at(rect_blocks, i))
-        is_column_layer = not annotation and _kind == "column"
+        is_column_layer = not non_component and _kind == "column"
         other_kind = _kind is not None and _kind != "column"
         # 图层/块名明确为柱时，即使未填充也识别（修复「柱必须 filled 才识别」漏检）
         if not filled and not is_column_layer:
@@ -550,7 +550,7 @@ def _find_columns(
         if is_column_layer:
             if not _is_plausible_column(w_m, h_m):
                 continue
-        elif (annotation or other_kind or layer_only
+        elif (non_component or other_kind or layer_only
               or not _is_column_size(w_m, h_m)):
             continue
         columns.append(_rect_element(x, y, w, h, ctx))
@@ -558,7 +558,7 @@ def _find_columns(
             return columns
     for i, poly in enumerate(polys):
         x, y, w, h = _poly_bbox(poly)
-        # **标注/钢筋图层不产出构件**（与矩形分支同一条纪律）——
+        # **非构件（标注/钢筋/饰面/图框）图层不产出构件**（与矩形分支同一条纪律）——
         # 我第一版只在矩形分支加了这道闸，而实测那 711 根假柱
         # 全部来自**多边形**（`墙柱纵筋` 图层），修了一半等于没修。
         _pl = _at(poly_layers, i)
@@ -566,9 +566,9 @@ def _find_columns(
         # 于是标注层的多边形照样能从 `_is_column_size` 这条**猜测路径**
         # 混进来 —— 注释说的是「标注图层不产出构件」，代码做的是
         # 「标注图层不走图层路径」。
-        annotation = is_annotation_layer(_pl)
+        non_component = is_non_component_layer(_pl)
         _kind = classify_by_layer(_pl, _at(poly_blocks, i))
-        is_column_layer = not annotation and _kind == "column"
+        is_column_layer = not non_component and _kind == "column"
         # **图层已明说是别的构件就不再猜**：实测装修/景观图上的「柱」
         # 落在 `A—门窗`(door)/`A-GLAZ`(window)/`A—设备管丼`(pipe)/
         # `景-平面-红线`(slab) 上——分类器答得出，识别器却不听。
@@ -577,7 +577,7 @@ def _find_columns(
         if is_column_layer:
             if not _is_plausible_column(w_m, h_m):
                 continue
-        elif (annotation or other_kind or layer_only
+        elif (non_component or other_kind or layer_only
               or not _is_column_size(w_m, h_m)):
             continue
         columns.append({"outline": [ctx.to_m(px, py) for px, py in _downsample_ring(poly, 8)], "src": ctx.src})
@@ -642,11 +642,14 @@ def _find_parallel_pairs(
         if i in axis_idx:
             continue
         layer = _at(line_layers, i)
-        # 图框/标题块是一圈**双线边框**：间距恰在墙宽区间、重叠远超 1m，
-        # 完美符合本函数的墙判据。此前这里对图层不设任何拦截（图层只用来
-        # 放宽墙宽上限），实测大歌剧院「底板换撑平面布置图」
-        # `通用-图框C-SHET` 产出 11 面、`C-SHET-TTLB` 7 面，
-        # 「8F节点大样图」`A2|C—图框—标题块` 产出 72 面假墙。
+        # 此前这里对图层**不设任何拦截**（图层只用来放宽墙宽上限），而这
+        # 三类东西的几何全都完美符合本函数的墙判据（两条同向线、间距在
+        # 墙宽区间、重叠 >1m）：
+        #   图框/标题块 —— 一圈双线边框。「底板换撑平面布置图」
+        #     `通用-图框C-SHET` 11 面 + `C-SHET-TTLB` 7 面假墙
+        #   标注/文字   —— 1:100 下 1~4 毫米的笔画间距正好是 10~40 厘米。
+        #     同一张图 `TEXT` 层两两配对造出 278 面、`Dim` 12 面
+        #   装修饰面   —— 「8F节点大样图」`I—装饰—细线/中线/中粗` 互配 269 面
         if is_non_component_layer(layer):
             continue
         wall_layer = allow_wide_walls and classify_by_layer(layer) == "wall"
@@ -778,7 +781,7 @@ def _is_beam_drawing(all_text: str, line_layers: list | None = None) -> bool:
     """
     if line_layers:
         beam_lines = sum(1 for layer in line_layers
-                         if layer and not is_annotation_layer(layer)
+                         if layer and not is_non_component_layer(layer)
                          and classify_by_layer(layer) == "beam")
         if beam_lines >= MIN_BEAM_LINES_FOR_BEAM_DRAWING:
             return True
@@ -972,7 +975,7 @@ def _find_pipes(
         # 于是每一条墙线、梁线、尺寸线都成了管。实测该图层闸删掉 41.2%；
         # 余下 57.5% 图层判不出，闸管不到 —— 那部分仍无真值（见 _RULE_CONFIDENCE_BY_KIND）。
         _lay = _at(line_layers, i)
-        if is_annotation_layer(_lay):
+        if is_non_component_layer(_lay):
             continue
         _kind = classify_by_layer(_lay)
         if _kind is not None and _kind != "pipe":
@@ -1000,7 +1003,7 @@ def _find_equipment(
         _kind = classify_by_layer(_lay, _at(rect_blocks, i))
         # **图层闸**：60 个设备候选独立判读只有 10 个是设备，误检 42 个是柱墙 ——
         # 柱和墙的尺寸正落在设备尺寸带里，光靠尺寸分不开
-        if is_annotation_layer(_lay) or (_kind is not None and _kind != "equipment"):
+        if is_non_component_layer(_lay) or (_kind is not None and _kind != "equipment"):
             continue
         is_equip_layer = _kind == "equipment"
         # 图层/块名明确为设备时，放宽尺寸阈值（具名设备块常不规则）
@@ -1015,7 +1018,7 @@ def _find_equipment(
         x, y, w, h = _poly_bbox(poly)
         _lay = _at(poly_layers, i)
         _kind = classify_by_layer(_lay, _at(poly_blocks, i))
-        if is_annotation_layer(_lay) or (_kind is not None and _kind != "equipment"):
+        if is_non_component_layer(_lay) or (_kind is not None and _kind != "equipment"):
             continue
         is_equip_layer = _kind == "equipment"
         if not is_equip_layer and not _is_equipment_size(ctx.len_m(w), ctx.len_m(h)):

@@ -14,7 +14,7 @@ from core.config import settings
 from core.model3d.gold.batch_codes import make_codes
 from core.model3d.element_recognizer import recognize
 from core.model3d.geometry_extractor import extract_pdf_geometry
-from core.model3d.layer_conventions import classify_by_layer, is_annotation_layer
+from core.model3d.layer_conventions import classify_by_layer, is_non_component_layer
 from core.model3d.yolo_export import meters_to_page
 from core.storage import get_file_bytes
 
@@ -70,7 +70,7 @@ async def main():
             items.append(("poly", p, lay))
         random.shuffle(items)
         for shape, g, lay in items[:400]:
-            if is_annotation_layer(lay):
+            if is_non_component_layer(lay):
                 continue
             k = classify_by_layer(lay)
             key = k or ("_unknown" if lay.strip() else None)

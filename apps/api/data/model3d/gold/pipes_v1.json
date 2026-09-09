@@ -37,6 +37,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -74,6 +75,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -111,6 +113,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -148,6 +151,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -185,6 +189,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -222,6 +227,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -259,6 +265,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -296,6 +303,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -333,6 +341,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -370,6 +379,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -407,6 +417,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -444,6 +455,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -481,6 +493,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -506,6 +519,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -543,6 +557,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -580,6 +595,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -617,6 +633,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -654,6 +671,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -691,6 +709,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }
@@ -728,6 +747,7 @@
      "verified_by": [
       "gpt"
      ],
+     "criteria": "CRITERIA.md#pipes",
      "note": "管线候选逐个判读，**无一是管线**：墙 30 / 结构线 21 / 标注线 7。当时 `_find_pipes` 唯一判据是「够长且不是轴线」，于是每条墙线梁线尺寸线都成了管。"
     }
    }

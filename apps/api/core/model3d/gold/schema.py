@@ -76,6 +76,11 @@ class ObjectClass:
     confidence: float = 0.0
     verified_by: tuple = ()
     excluded: str | None = None
+    #: 判据回指，形如 `CRITERIA.md#columns`。
+    #: **判据不固定，数字就不可比**，而不可比的差异看起来和真实退化一模一样
+    #: （实测柱被算出过 0.59 / 0.22 / 68% / 22% 四个不可比的数）。
+    #: 前 CRITERIA 时代的批次补不出判据，标 `UNFIXED: 理由` 如实声明。
+    criteria: str | None = None
     note: str = ""
 
     @property
@@ -152,7 +157,8 @@ def _object_class(name: str, raw: dict) -> ObjectClass:
         text=raw.get("text"), fields=dict(raw.get("fields") or {}),
         confidence=float(raw.get("confidence") or 0.0),
         verified_by=tuple(raw.get("verified_by") or ()),
-        excluded=raw.get("excluded"), note=raw.get("note", ""),
+        excluded=raw.get("excluded"), criteria=raw.get("criteria"),
+        note=raw.get("note", ""),
     )
 
 

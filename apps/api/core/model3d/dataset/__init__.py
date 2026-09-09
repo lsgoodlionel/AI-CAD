@@ -9,6 +9,8 @@
     - ``auto_label(doc, *, extra_map=None)``：逐图元弱标注
     - ``weak_label_report(labeled)``：弱标注质量报告
     - ``LayerClassMap`` / ``load_layer_class_map``：补充映射表（YAML，可维护）
+      缺省读**单一真相源** ``data/layer_conventions.yaml``（原独立的
+      ``layer_class_map.yaml`` 已并入，勿再新建第二份）
 """
 from __future__ import annotations
 

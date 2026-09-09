@@ -5,6 +5,8 @@
 import pytest
 
 from core.economic.rebar_calculator import BarItem, optimize_cutting
+from services import model_qto
+from services.model_topology import build_topology_graph
 from services.model_qto import (
     compute_quantities,
     compute_rebar_quantities,
@@ -227,3 +229,76 @@ def test_the_summary_reports_how_much_volume_came_from_fallbacks():
     s = summarize(compute_quantities(elements))
     assert s["fallback"]["gross_volume_m3"] == pytest.approx(20.0)
     assert s["fallback"]["share"] == pytest.approx(20.0 / 23.2, rel=1e-3)
+
+
+# ── 自交轮廓的面积与周长（存量 31% 的柱踩在这上面）────────────────
+
+def test_self_intersecting_ring_area_is_not_silently_zero():
+    """顶点序成「蝴蝶结」时，鞋带面积恰好抵消为 0 —— 不能当成 0 报出去。
+
+    实测存量 10170 个柱里 3166 个（31.1%）是这个形状：轮廓降点后带重复点，
+    且四角走成 A→B→C→D 的对角交叉序，两个三角形面积等值反号。
+    这些柱的混凝土量因此算成 0，而 QTO 汇总是三审审批人看的依据。
+    """
+    # 一个 0.2×0.2 的柱，顶点序被写成对角交叉，且带重复点（存量真实样例）
+    butterfly = [[75.969, 16.585], [75.769, 16.585], [75.769, 16.585],
+                 [75.969, 16.385], [75.969, 16.385], [75.969, 16.385],
+                 [75.769, 16.385]]
+    assert model_qto._polygon_area(butterfly) == 0.0, "前提：朴素鞋带公式确实得 0"
+
+    area, estimated = model_qto._ring_area(butterfly)
+    assert area == pytest.approx(0.04, abs=1e-6), "0.2×0.2 = 0.04 m²"
+    assert estimated is True, "兜底算出来的面积必须标成 estimated —— 降级要可见"
+
+
+def test_self_intersecting_ring_perimeter_excludes_diagonals():
+    """同一个环，朴素周长会把两条对角线算进去，模板接触面积高估 21%。"""
+    butterfly = [[75.969, 16.585], [75.769, 16.585], [75.769, 16.585],
+                 [75.969, 16.385], [75.969, 16.385], [75.969, 16.385],
+                 [75.769, 16.385]]
+    perimeter, estimated = model_qto._ring_perimeter(butterfly)
+    assert perimeter == pytest.approx(0.8, abs=1e-6), "0.2×4，不含对角线"
+    assert estimated is True
+
+
+def test_valid_ring_is_left_untouched():
+    """面积算得出来的轮廓一律不动 —— 兜底只在朴素公式失效时介入。
+
+    这条是回归安全的保证：存量 69% 的柱走的是这条路，数字必须一个不变。
+    """
+    square = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
+    area, estimated = model_qto._ring_area(square)
+    assert area == pytest.approx(1.0)
+    assert estimated is False
+    perimeter, estimated_p = model_qto._ring_perimeter(square)
+    assert perimeter == pytest.approx(4.0)
+    assert estimated_p is False
+
+
+def test_degenerate_ring_reports_zero_but_flags_it():
+    """真的退化（共线/点数不足）时仍是 0，但要标出来，不能与真 0 混为一谈。"""
+    collinear = [[0.0, 0.0], [1.0, 0.0], [2.0, 0.0]]
+    area, estimated = model_qto._ring_area(collinear)
+    assert area == 0.0
+    assert estimated is True
+
+
+def test_column_quantity_flags_estimated_when_area_fell_back():
+    """兜底要一路传到 ElementQuantity —— 汇总的 estimated_ratio 才看得见它。"""
+    column = {"id": "c1", "z_source": "measured",
+              "outline": [[0.0, 0.0], [0.4, 0.0], [0.4, 0.0],
+                          [0.0, 0.4], [0.0, 0.4], [0.0, 0.4], [0.4, 0.4]]}
+    q = model_qto._column_quantity(column, 3.0)
+    assert q.gross_volume_m3 == pytest.approx(0.16 * 3.0, abs=1e-4)
+    assert q.estimated is True, "z_source 是 measured，但面积是兜底来的，仍须标 estimated"
+
+
+def test_slab_quantity_also_falls_back_on_self_intersecting_ring():
+    """板同样踩自交环（实测 514 块里 69 块），凸包兜底对凹板会偏大，故必标 estimated。"""
+    slab = {"id": "s1", "z_source": "measured", "thickness": 0.12,
+            "outline": [[0.0, 0.0], [4.0, 0.0], [4.0, 0.0],
+                        [0.0, 3.0], [0.0, 3.0], [4.0, 3.0]]}
+    graph = build_topology_graph([], [], [], [slab], [])
+    q = model_qto._slab_quantity(slab, graph, {})
+    assert q.gross_volume_m3 == pytest.approx(12.0 * 0.12, abs=1e-4)
+    assert q.estimated is True
