@@ -5,7 +5,15 @@
 
 判据链（主判据必须复用基础分类器，绝不重造）：
     1. 基础分类器 ``layer_conventions.classify_by_layer`` / ``classify_system``（主判据）。
-    2. 未命中时回退补充映射表 ``LayerClassMap``（``data/model3d/layer_class_map.yaml``）。
+    2. 未命中时回退补充映射表 ``LayerClassMap``（缺省即 ``data/layer_conventions.yaml``
+       本身 —— 见下）。
+
+**单一真相源**：补充映射表原先是独立的 ``data/model3d/layer_class_map.yaml``，
+与生产判据 ``data/layer_conventions.yaml`` 互相分岔（实测「灯具」在前者 4 次、
+后者 0 次，装修/吊顶/饰面 的整套词汇到不了生产路径）。两份已合并进
+``data/layer_conventions.yaml``，本模块的缺省补充表随之改读同一份 ——
+于是**弱标注与生产判据永远同源**，缺省下第 2 步不会再多判出任何东西。
+``extra_map`` 参数仍在，那是院/专业域自带映射的扩展点（见 ``load_layer_class_map``）。
 
 置信度分级（诚实反映噪声，供 C-06 精修排序）：
     - 精确别名命中           → 0.9（高）   label_source = "layer"/"block"
@@ -30,6 +38,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from .. import layer_conventions
 from ..layer_conventions import classify_by_layer, classify_system, load_conventions
 from ..preprocess.schema import Primitive, PrimitiveDoc
 
@@ -56,8 +65,9 @@ CONF_MAP = 0.6     # 补充映射表命中（低）
 
 LabelSource = Literal["layer", "block", "layer_class_map", "none"]
 
-# auto_label.py 位于 core/model3d/dataset/ → parents[3] 为 apps/api 根。
-_MAP_FILE = Path(__file__).parents[3] / "data" / "model3d" / "layer_class_map.yaml"
+#: 缺省补充映射表 = **生产判据同一个文件**（合并后的单一真相源）。
+#: 直接引用兄弟模块的常量而不是再拼一次路径 —— 拼第二次就是分岔的开始。
+_MAP_FILE = layer_conventions._CONVENTIONS_FILE
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -305,7 +315,7 @@ def auto_label(
     """对整张图纸的图元文档逐图元打弱标签。
 
     - ``doc``：C-03 ``expand_blocks`` 产出的图元文档（含 layer + block 溯源字段）。
-    - ``extra_map``：可选补充映射表；缺省用 ``data/model3d/layer_class_map.yaml``。
+    - ``extra_map``：可选补充映射表；缺省用单一真相源 ``data/layer_conventions.yaml``。
 
     返回 ``AutoLabelResult``（弱标签元组 + 质量报告）。任何异常优雅降级为空结果，
     绝不抛异常，保证批处理不因单图中断。
