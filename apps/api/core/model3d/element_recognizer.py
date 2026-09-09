@@ -13,6 +13,7 @@ from .geometry_extractor import MAX_PRIMITIVES
 from .layer_conventions import (
     classify_by_layer, classify_system, is_non_component_layer,
 )
+from .ring_order import repair_ring
 from .types import DrawingGeometry, FloorElements
 
 
@@ -471,10 +472,17 @@ def _downsample_ring(poly: list, limit: int) -> list:
     的包围盒，所以碎条能一路通过检查进到模型里，3D 渲染与算量吃的都是它。
 
     做法：均匀取点保形状，并**强制保留四个极值点**保范围。
+
+    **降点前提是入参已是环序，而 `path_points` 不保证**：
+    `geometry_extractor` 按线段绘制顺序累加两端点，路径由多段拼成时
+    该顺序不是环序 —— 极端情况矩形柱画成两条对边得 8 字形，鞋带面积
+    **恰好为 0**，`model_qto` 据此算出的混凝土量就是 0。按索引顺序保点
+    只会把坏环原样传下去，故出口统一过 `repair_ring`（只修自交的，
+    正常环一个点不动，包围盒与点数均不变）。
     """
     count = len(poly)
     if count <= limit:
-        return list(poly)
+        return repair_ring(list(poly))
     xs = [p[0] for p in poly]
     ys = [p[1] for p in poly]
     keep = {xs.index(min(xs)), xs.index(max(xs)),
@@ -486,7 +494,7 @@ def _downsample_ring(poly: list, limit: int) -> list:
         while len(keep) < limit and cursor < count:
             keep.add(int(cursor))
             cursor += step
-    return [poly[i] for i in sorted(keep)[:limit]]
+    return repair_ring([poly[i] for i in sorted(keep)[:limit]])
 
 
 #: 做去重的类别。**板不在其内**：`_slab_from_columns` 造的包络板本就
@@ -862,7 +870,7 @@ def _find_slabs(
             continue
         is_raft = _is_raft_layer(layer, block)
         layered.append({
-            "outline": [ctx.to_m(x, y) for x, y in poly],
+            "outline": [ctx.to_m(x, y) for x, y in repair_ring(poly)],
             "thickness": _RAFT_THICKNESS_M if is_raft else _SLAB_THICKNESS_M,
             "kind": "raft" if is_raft else "slab",
             "basis": SLAB_BASIS_RECOGNISED,
@@ -884,7 +892,7 @@ def _find_slabs(
     fallback = pick_fallback_slab_polygons(
         polys, area_of=_area_m2, min_area=_SLAB_MIN_AREA_M2)
     if fallback:
-        return [{"outline": [ctx.to_m(x, y) for x, y in poly],
+        return [{"outline": [ctx.to_m(x, y) for x, y in repair_ring(poly)],
                  "thickness": _SLAB_THICKNESS_M,
                  "basis": SLAB_BASIS_LARGEST_POLYGON, "src": ctx.src}
                 for poly in fallback]

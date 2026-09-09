@@ -132,6 +132,13 @@ def _collect_pdf_drawings(page, geom: DrawingGeometry) -> None:
                 _add_line(geom, a[0], a[1], b[0], b[1], layer)
                 path_points.extend([a, b])
         # 填充路径且首尾闭合 → 记为多边形（柱等实体填充识别依赖）
+        #
+        # ⚠ **`path_points` 的点序不保证是多边形环序**：它按线段的**绘制
+        # 顺序**逐段累加两端点。路径首尾相接一路画下来时它恰好等于环序，
+        # 但子段乱序/反向时就不是 —— 极端情况矩形柱画成「底边 + 顶边」
+        # 两条线段，得 [A, B, D, C] 这个 8 字形，鞋带面积**恰好为 0**。
+        # 消费方（构件轮廓 → `model_qto` 的鞋带面积）必须先过
+        # `ring_order.repair_ring`，不能假定这里给的是环序。
         if filled and len(path_points) >= 3:
             _add_poly(geom, path_points, layer)
 
