@@ -1,5 +1,21 @@
 # Phase B（算量级）详细任务分解
 
+> **⚠ 本文里的 migration 编号是当时的**规划**编号，与实际落地编号不同**
+> （规划时按任务顺序预留，落地时被其他分支先占了号）。对照如下，
+> 照编号找文件请以右列为准：
+>
+> | 本文写的（规划） | 实际落地 |
+> |---|---|
+> | `017_model_story_levels.sql` | `019_model_z_recovery_levels.sql` |
+> | `018_model_component_sections.sql` | `020_model_component_sections.sql` |
+> | `019_model_topology.sql` | `021_model_topology.sql` |
+> | `020_model_quantities.sql` | `022_model_quantities.sql` |
+> | `017_symbol_spotting.sql` | `023_symbol_spotting.sql` |
+> | `018_semantic_review_actions.sql` | `024_review_actions.sql` |
+> | `019_review_metrics.sql` | **未单独建表** —— C-17 度量看板复用 `024_review_actions.sql` 的埋点表 |
+>
+
+
 > 版本 V1.0 | 2026-07-10 | 面向排期开发的可执行任务清单
 >
 > 上游依据：`docs/AI_READING_TO_3D_MODEL.md` 第四章 Phase B、`docs/MODEL_PRECISION_BLUEPRINT.md`

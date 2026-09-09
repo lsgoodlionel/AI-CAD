@@ -266,7 +266,7 @@ floor.axes = { "x": [{"label":"1","coord":0.0},...], "y": [{"label":"A","coord":
 新增 2 个顶层类别:`curtain_wall`(幕墙)、`steel_member`(钢构件)。协同改动(摸底已列全):
 1. `core/model3d/dataset/auto_label.py:46` VALID_CATEGORIES;
 2. `core/model3d/layer_conventions.py` `_KIND_ORDER` + `data/layer_conventions.yaml`(幕墙:MQ/幕墙/CURTAIN/GLAZ;钢构:GG/钢/STEEL/S-STL/型钢/桁架/网架/劲性——按 E3-0 审计的真实图层名补,写进通用 YAML);
-3. `data/model3d/layer_class_map.yaml` 同步;
+3. `data/layer_conventions.yaml`（**2026-09-09 起为图层配置单一真相源**；原 `layer_class_map.yaml` 已由 `5815b91` 并入并删除） 同步;
 4. `core/model3d/element_recognizer.py`:`_find_curtain_wall`(图层强命中的线链→立面板带)、`_find_steel_members`(图层命中的线/多段线→型钢中线,截面查 `model_component_sections`);
 5. `core/model3d/types.py::FloorElements` + `services/model_elements.py`(EMPTY_ELEMENTS/_KIND_TO_CATEGORY/tasks 路由);
 6. 下游:`model_qto*.py`(新类别不计混凝土量,幕墙计面积/钢构计长度)、`model_ifc_builder.py`(IfcCurtainWall/IfcMember)、前端 `elementFilterOptions` + `elementsBuilder` 渲染(幕墙半透明蓝、钢构深灰)。

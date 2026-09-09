@@ -90,6 +90,13 @@ jobs:
       - name: 金标准结构校验（gold schema）
         run: python scripts/model3d/gold_report.py --check-only
 
+      # 文档里的文件路径引用是否还指向真实文件。起因：CLAUDE.md 把两个早在
+      # f58159d 就删掉的前端组件列为 Phase C 关键文件，两个月没人发现 ——
+      # 因为没有任何机制会去核对。只判**新增**失效（存量在 baseline 里，
+      # 其中多数是「说明某文件已删」的正当写法，语法上分不开）。
+      - name: 文档路径引用校验（doc refs）
+        run: python scripts/check_doc_refs.py
+
       - name: Run pytest with coverage
         env:
           DATABASE_URL: postgresql://cad_user:cad_pass@localhost:5432/cad_test

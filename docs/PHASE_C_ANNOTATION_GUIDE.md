@@ -4,7 +4,7 @@
 >
 > 上位：`docs/PHASE_C_TASKS.md` C-06；输入契约 `docs/PHASE_C_PREPROCESS_SCHEMA.md`（C-02/C-03）
 > 类别锚点：`apps/api/core/model3d/layer_conventions.py`；子类体系以 `docs/PHASE_C_DATASET_SPEC.md`（C-05）为准
-> 标注工具：`apps/web/src/pages/model/ProjectModel/DrawingAnnotationQueue.tsx`（C-16 深化，一套两用）
+> 标注工具：图纸标注队列（组件已于 `f58159d` 重构，现入口 `apps/web/src/pages/model/ProjectModel/ModelWorkspace.tsx`）（C-16 深化，一套两用）
 > 配套模板：`docs/PHASE_C_ANNOTATION_QC_TEMPLATE.md`
 >
 > 定位：把 **C-04 弱标签**（图层/块规则自动产出、含噪声）精修为**金标签**（可训练/可评测的真值），
@@ -114,7 +114,7 @@
 
 ### 3.1 首选：复用/扩展前端审校工作台（C-16 深化）
 
-**决策**：标注工具**复用**现有前端 `apps/web/src/pages/model/ProjectModel/DrawingAnnotationQueue.tsx`，
+**决策**：标注工具**复用**现有前端 图纸标注队列（组件已于 `f58159d` 重构，现入口 `apps/web/src/pages/model/ProjectModel/ModelWorkspace.tsx`），
 由 **C-16** 将其从当前的「图纸级归属标注（单体/楼层/图种）」深化为**符号级标注**：
 在 SVG 底图上叠加符号候选框 + 置信度，支持 §2.2 的四个动作与 §2.3 的框编辑。
 
@@ -224,7 +224,7 @@ A/B 一致性 IoU/Kappa 数值、分歧样本清单、仲裁结论、通过/驳�
 3. **收敛度量对齐 C-17**：动作类型（accept/reject/reclass/add）埋点喂 C-17 看板，量化返工点随迭代下降，
    为「AI 出初模 + 人工审改效率提升 25–30%」提供可度量证据。
 4. **弱标签映射养护**：改类/自定义图层的登记回流图层配置**单一真相源**
-   `apps/api/data/layer_conventions.yaml`（原 `layer_class_map.yaml` 已并入并删除），降低下批弱标签噪声，
+   `apps/api/data/layer_conventions.yaml`（原 `data/layer_conventions.yaml`（**2026-09-09 起为图层配置单一真相源**；原 `layer_class_map.yaml` 已由 `5815b91` 并入并删除） 已并入并删除），降低下批弱标签噪声，
    形成「弱标签更准 → 人审更省 → 金标签更多」的正循环。
 
 ---

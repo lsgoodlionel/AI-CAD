@@ -1,6 +1,6 @@
 # CAD — 图纸深化全过程管理平台
 
-> 最后更新：2026-08-06 | 实现进度：Phase 0~4B 全部完成；会审审查 V4（方法论）已并入 AI 审图；Phase 5 批量读图与整套审图完成；Phase 6 工程 3D 模型基座完成（模型成为全平台成果展示主通道之一）；超级工程建模 Phase A（AI 读图→IFC/Fragments）已合并 main；超级工程建模 Phase B（算量级：跨视图 z 恢复 + 构件拓扑 + IFC-QTO 算量 + 创效打通）完成（B-01~B-24）；**Phase C（BIM 级）离线可交付部分全部完成：泳道 A 合规门禁（C-01 许可审计 + 人工审核双通道门禁 + C-11 隔离）、泳道 B 数据关键路径（C-02~C-07）、泳道 C 模型（契约基座 + C-08/C-10/C-12/C-13）、泳道 D 审校（C-15/C-16/C-17）、C-14 评测基座、C-18 验收 Demo，累计 227 测试全绿、双门禁 PASS；里程碑 M2（审校收敛返工点）达成，M1（符号识别超纯规则）基座就绪、终评数字待 C-09 真实微调（卡 GPU/脱敏数据/权重）**；**分支 `fix/model-3d-quality`（PR #11）：上海大歌剧院实测驱动的建模致命修复（渲染/幻影层/标高/sprawl/贴图/红点/未分层）+ 模型页 UX + 楼层标高人工录入通道（migration 025）+ Web 帮助中心 `/help` + 工程模型页内存优化 1.1GB→115MB（队列分页/折叠卸载/按需渲染/InstancedMesh）+ 图纸全文 OCR **真实推理落地**（RapidOCR aarch64 回退 + 大图分块识别，歌剧院剖面图实测 13 标高候选置信 0.96~1.00，`core/model3d/ocr`，34 单测，`docs/MODEL_OCR.md`）；并复核更正「compose build 坏了」误判（实为漏 `--profile app`/`up` 不带 `--build`，见 `infra/DEV.md`）**；**分支 `feat/phase-e`（22 提交，蓝图 `docs/PHASE_E_BLUEPRINT.md` V2）：确立「图纸信息档案层」为全平台数据主线（抽取一次·单一真相源·人审在环·分层消费）。E0 健康看板 500 修复 + OCR 后端随镜像交付（RapidOCR）；E1 工程信息模块（migration 029 档案表 + 抽取编排 + 聚合 API + 前端页 + 全站图纸预览）；E1.5 档案层升级（migration 030 人审 verified 层「auto/verified 分离，supersedes_key 跨重抽抑制复活」+ 导入即建档 + 档案读取契约 API + 工程信息页人审修正 UI）；E2 工程模型「轴网」显示层 + E2-consume 建模 section-z 改读档案标高（去重复 OCR，建模不再自跑 OCR）；E3-0 缺口审计（`docs/PHASE_E_E3_AUDIT.md`；**其中「无图层」结论已于 2026-08-18 被推翻——实测 path 100% 带 layer 字段，当时只查了 OCG 定义、没查 path 的 layer 属性，见蓝图 §8.6**）；**E3-B 围护桩圆检测（栅格 HoughCircles，`core/model3d/circle_detector.py`，双闸防误检，整机 columns 3089→5794 +2705 桩，真实有效）**；路径C（A1 每图坐标变换持久化 migration 031 + A2 档案轴号→3D + C-下一步档案 OCR 文字→构件类型标签 `component_labels`，代码/测试完成，整机显效受 OCR 回填覆盖 + 变换质量门控）。累计约 90 新单测全绿。待续（已入蓝图/任务）：E-末 OCR 回填提速、E3-4 板恢复+降噪、E3-5 收口文档**；**Phase F/G（扫描进度页 + 双向追溯）已合并 main**；**Phase H（实体中心装配 + 人审收敛，H1~H26，蓝图 `docs/PHASE_H_BLUEPRINT.md`）与 Phase I（建筑制图标准驱动的识别，蓝图 `docs/PHASE_I_BLUEPRINT.md`）+ 本轮系统化能力（编号无关角色判别/部分图纸建模/单体归属兜底/标高配对/档案原地重分类/分幅识别/变换比例门禁）已提交分支 `feat/phase-hij`，migration 033~044，后端 2708 passed / 0 failed**；**下阶段蓝图 `docs/PHASE_J_BLUEPRINT.md`：主线是「世界坐标规模化」（实测仅 11 张图有世界锚点 = 0.5%，`placed_drawings=0`），一个月回顾见 `docs/DEV_REVIEW_2026-07.md`。整体完成度 ≈62%，「PDF 路线准确识别 ≥90%」门槛未达 ⇒ 不启动 DWG 路线**；**本轮（2026-08-20）：①规范知识库「人机双读」三层落地——31 本通用规范入库（3607 条文 / 3606 图节点 / 3607 强条，0 失败），新增 PDF 原件 + 识别全文两层（migration 048，`extract_method` 记录来路），前端 `BookReader` 三层对照阅读；**KG 引擎图谱推理第一次真正执行**（此前四层脱节：读取端 SQL 语法错、查的标签没人建、图名不同、写入端标签不同，而 `else: SQL 降级` 让失效完全无声）；②图纸说明成篇重建 891 块 / 56.4 万字入档案（判据全部来自实测分布），人审闭环通（改→重跑→仍生效）；③说明×规范库比对产出「必须下载」清单（大歌剧院缺 161 本、第二工程缺 47 本）；④第二工程模型失真三根因已修——低置信变换门禁（633 张置信 0.02 却被当权威）、离群图不污染包络（场景被 2 张图撑到 4.8 公里而真实内容 760 米）、建筑/装修平面图不再被整张丢弃（81 张，墙与门窗的主要来源）。诊断见蓝图 §8.33~§8.35。**遗留**：`placed_drawings=0` 无世界配准（Phase J 主线）；规范 NLP 无模型配置只靠正则降级；Chroma 默认嵌入是英文模型故向量层留空**
+> 最后更新：2026-09-09 | 实现进度：Phase 0~4B 全部完成；会审审查 V4（方法论）已并入 AI 审图；Phase 5 批量读图与整套审图完成；Phase 6 工程 3D 模型基座完成（模型成为全平台成果展示主通道之一）；超级工程建模 Phase A（AI 读图→IFC/Fragments）已合并 main；超级工程建模 Phase B（算量级：跨视图 z 恢复 + 构件拓扑 + IFC-QTO 算量 + 创效打通）完成（B-01~B-24）；**Phase C（BIM 级）离线可交付部分全部完成：泳道 A 合规门禁（C-01 许可审计 + 人工审核双通道门禁 + C-11 隔离）、泳道 B 数据关键路径（C-02~C-07）、泳道 C 模型（契约基座 + C-08/C-10/C-12/C-13）、泳道 D 审校（C-15/C-16/C-17）、C-14 评测基座、C-18 验收 Demo，累计 227 测试全绿、双门禁 PASS；里程碑 M2（审校收敛返工点）达成，M1（符号识别超纯规则）基座就绪、终评数字待 C-09 真实微调（卡 GPU/脱敏数据/权重）**；**分支 `fix/model-3d-quality`（PR #11）：上海大歌剧院实测驱动的建模致命修复（渲染/幻影层/标高/sprawl/贴图/红点/未分层）+ 模型页 UX + 楼层标高人工录入通道（migration 025）+ Web 帮助中心 `/help` + 工程模型页内存优化 1.1GB→115MB（队列分页/折叠卸载/按需渲染/InstancedMesh）+ 图纸全文 OCR **真实推理落地**（RapidOCR aarch64 回退 + 大图分块识别，歌剧院剖面图实测 13 标高候选置信 0.96~1.00，`core/model3d/ocr`，34 单测，`docs/MODEL_OCR.md`）；并复核更正「compose build 坏了」误判（实为漏 `--profile app`/`up` 不带 `--build`，见 `infra/DEV.md`）**；**分支 `feat/phase-e`（22 提交，蓝图 `docs/PHASE_E_BLUEPRINT.md` V2）：确立「图纸信息档案层」为全平台数据主线（抽取一次·单一真相源·人审在环·分层消费）。E0 健康看板 500 修复 + OCR 后端随镜像交付（RapidOCR）；E1 工程信息模块（migration 029 档案表 + 抽取编排 + 聚合 API + 前端页 + 全站图纸预览）；E1.5 档案层升级（migration 030 人审 verified 层「auto/verified 分离，supersedes_key 跨重抽抑制复活」+ 导入即建档 + 档案读取契约 API + 工程信息页人审修正 UI）；E2 工程模型「轴网」显示层 + E2-consume 建模 section-z 改读档案标高（去重复 OCR，建模不再自跑 OCR）；E3-0 缺口审计（`docs/PHASE_E_E3_AUDIT.md`；**其中「无图层」结论已于 2026-08-18 被推翻——实测 path 100% 带 layer 字段，当时只查了 OCG 定义、没查 path 的 layer 属性，见蓝图 §8.6**）；**E3-B 围护桩圆检测（栅格 HoughCircles，`core/model3d/circle_detector.py`，双闸防误检，整机 columns 3089→5794 +2705 桩，真实有效）**；路径C（A1 每图坐标变换持久化 migration 031 + A2 档案轴号→3D + C-下一步档案 OCR 文字→构件类型标签 `component_labels`，代码/测试完成，整机显效受 OCR 回填覆盖 + 变换质量门控）。累计约 90 新单测全绿。待续（已入蓝图/任务）：E-末 OCR 回填提速、E3-4 板恢复+降噪、E3-5 收口文档**；**Phase F/G（扫描进度页 + 双向追溯）已合并 main**；**Phase H（实体中心装配 + 人审收敛，H1~H26，蓝图 `docs/PHASE_H_BLUEPRINT.md`）与 Phase I（建筑制图标准驱动的识别，蓝图 `docs/PHASE_I_BLUEPRINT.md`）+ 本轮系统化能力（编号无关角色判别/部分图纸建模/单体归属兜底/标高配对/档案原地重分类/分幅识别/变换比例门禁）已提交分支 `feat/phase-hij`，migration 033~044，后端 2708 passed / 0 failed**；**下阶段蓝图 `docs/PHASE_J_BLUEPRINT.md`：主线是「世界坐标规模化」（实测仅 11 张图有世界锚点 = 0.5%，`placed_drawings=0`），一个月回顾见 `docs/DEV_REVIEW_2026-07.md`。整体完成度 ≈62%，「PDF 路线准确识别 ≥90%」门槛未达 ⇒ 不启动 DWG 路线**；**本轮（2026-08-20）：①规范知识库「人机双读」三层落地——31 本通用规范入库（3607 条文 / 3606 图节点 / 3607 强条，0 失败），新增 PDF 原件 + 识别全文两层（migration 048，`extract_method` 记录来路），前端 `BookReader` 三层对照阅读；**KG 引擎图谱推理第一次真正执行**（此前四层脱节：读取端 SQL 语法错、查的标签没人建、图名不同、写入端标签不同，而 `else: SQL 降级` 让失效完全无声）；②图纸说明成篇重建 891 块 / 56.4 万字入档案（判据全部来自实测分布），人审闭环通（改→重跑→仍生效）；③说明×规范库比对产出「必须下载」清单（大歌剧院缺 161 本、第二工程缺 47 本）；④第二工程模型失真三根因已修——低置信变换门禁（633 张置信 0.02 却被当权威）、离群图不污染包络（场景被 2 张图撑到 4.8 公里而真实内容 760 米）、建筑/装修平面图不再被整张丢弃（81 张，墙与门窗的主要来源）。诊断见蓝图 §8.33~§8.35。**遗留**：`placed_drawings=0` 无世界配准（Phase J 主线）；规范 NLP 无模型配置只靠正则降级；Chroma 默认嵌入是英文模型故向量层留空**
 
 > **金标准实测数字（2026-09，20 类，`apps/api/data/model3d/gold/`）**
 >
@@ -16,7 +16,8 @@
 > | 设备 | 0.17 | 前 CRITERIA 时代 |
 > | 板 | 0.10 | 能验的那 94%；扛 84% 混凝土量的兜底板**无从验起**（src 是合成标记）|
 > | 管线 | **0%（有把握口径）** | 加图层闸后 `leader` 误检 12%→0%，但墙与结构线仍占 85% |
-> | **比例** | **30%** | 杠杆最大；**置信度携带负信息**（1.00 → 24%，<1.00 → 37%）|
+> | **比例** | ~~30%~~ **存疑** | **这个数不可当精确率引用**（2026-09-09 推翻，见下）；
+> | | | 但**置信度携带负信息**这一条站得住（1.00 → 24%，<1.00 → 37%，梁批独立同向佐证）|
 > | 楼层归属 | 76% | 角色闸删掉 8/19 错误、零误伤 |
 > | 单体归属 | **62% 无意义** | 图纸本就无空间范围或只是局部 |
 > | 轴网有无 | **92%** | 首个全库泛化数字；`axis_count=0` 的 2045 张里约 204 张实际有轴网 |
@@ -32,6 +33,17 @@
 > 只把量错的尺寸量对）。同时**证伪了 2026-08-28 的「三顶点多边形占 0%」**：
 > 那是 `outline` 原始点数口径 —— 三角形由 3 条线段画成、端点两两重复恒为 6 点，
 > 按位置去重后落库 24717 根柱里 **55.1% 是三角形**。
+>
+> **「比例只有 30%」为何被推翻**（2026-09-09）：比例批的接触表把 1872×1324 的裁图
+> 缩到 **420 像素**，而判据要求拿门（1m）、楼梯踏步（0.3m）比长度 —— 在 1:150 的图上
+> 它们缩完只剩 **7 像素**和 **2 像素**，判读者要用的参照物根本看不见。
+> 按原分辨率复核 5 张（`scripts/model3d/verify_scale_bar.py`，同样的裁法与红线，只是不缩小）：
+> M4YE 用图上尺寸链量得 7.7m、9WH3 用墙厚 7.5m、Y4CX 与 REAV 吻合 8m —— **这四张判读判错**；
+> 4HNR 实测仅 2.4~4.4m —— **这张判读判对**（其比例 1:350 本就不在 GB/T 50001 §6.0.4 表内）。
+> 所以**不是金标准坏了，是真信号与伪影混在一起**；而两者与 scale **共线**
+> （红线占画面比例 = 8m ÷ 裁格覆盖米数，覆盖米数正比于 scale，单独预测 AUC 0.688），
+> 在这 56 条上分不开。重测前 30% 只能当「比例确有问题」的存在性证据。
+> 存疑标注已写进 `drawing_scale_v1.json` 每个 unit 的 `note`。
 >
 > **四条反复出现的教训**：① 渲染分辨率要匹配问题所在的尺度；
 > ② 分层抽样必然放大稀有类，样本内占比≠语料占比；
@@ -55,6 +67,32 @@
 >    差别只在专业，不在字形；
 > ③ **加新能力时最大的收益常来自顺带发现的旧缺陷** —— 本轮新代号只净增 121 次识别，
 >    而专业闸挡掉了 2368 次一直存在的误收。
+
+> **本轮（2026-09-09）：金标准驱动的四个并行工作包 —— 其中三个推翻了自己的简报**
+>
+> | 包 | 状态 | 推翻了什么 |
+> |---|---|---|
+> | **A** 图纸级准入闸 `services/drawing_gate.py` | ✅ | `unknown_role` 原设计为降级。36 张样本误伤 0%，扩到 **295 张**并逐判据对齐各自真值维度后误伤 **75%**，而该维度基线只有 37% —— 是**反信号**，已移除 |
+> | **B** 比例可信度 `core/model3d/scale_evidence.py` | ⚠️ 硬指标未达成 | 靶子本身有伪影（见上）。要「通过」验收就得把「裁格覆盖≈10 米」编进分数，那是编码仪器缺陷，没有这么做。旧 confidence 改名 `label_confidence`（migration 051） |
+> | **C** 标注过滤器 `core/model3d/annotation_filter.py` | ✅ 删 13.0%、判读误删 0 | 简报说「标高符号是最大误检来源、本闸该管它」→ **打不中，且不该为打中放宽阈值**：`∨` 整体进来是 0.32×0.32m 近方形，与真柱同尺寸 |
+> | **D** 金标准整理 `core/model3d/gold/` | ✅ | `patch_verdicts_v1.json` 是结构缺陷 → 它是**原始答卷**，按简报改会让总数虚增到 1216。`gold_report.py --check-only` 已进 CI |
+>
+> **计划外修掉的**：QTO 面积在自交轮廓上恒为 0 —— 轮廓四角走成对角交叉的「蝴蝶结」，
+> 鞋带面积等值反号**恰好抵消**，存量 **3166/10170 个柱（31.1%）**、69/514 块板混凝土量算成零。
+> 影响范围要说准：`raw_saving_est` 来自钢筋测算**不经过 QTO**，提案金额没直接算错，
+> 错的是**三审审批人看的那份量**。根因侧（`core/model3d/ring_order.py`）与下游兜底
+> （`services/model_qto.py:_ring_area`）都已落地，互补。
+>
+> **下一步（最高优先）—— 三件做完了但没到达用户**：
+> ① C 的过滤器**未接线**进 `element_recognizer.py`；
+> ② B 的最强证据**未接线**：`services/drawing_info_extractor.py:268` 加 `printed_texts=<档案 OCR>`，
+> 可得性从 ~9%（矢量文字）变 ~90%（档案 OCR）；
+> ③ 存量场景比当前代码多 46%/82% 的柱，模型需重建。
+> 详见 `docs/GOLD_STANDARD_REVIEW.md` §四 N1~N4。
+>
+> **仓库卫生**：本轮清理后分支只剩 `main`（本地+远端各一），`apps/api` 根目录的
+> 一次性探针脚本（`probe_*`/`mk_*`）已全部移除并加 `.gitignore` —— 值得复用的探针
+> 要正式化到 `apps/api/scripts/model3d/` 并配文档与判据。
 
 ## 项目概述
 
@@ -116,7 +154,7 @@
 | Phase C 泳道 B｜数据（C-03）：块 INSERT 递归展开（嵌套/缩放旋转/MINSERT 阵列）+ 每图元保留块名·图层弱标签（修 C-02 线段丢块名缺口）+ 坐标等比归一化到 [0,1] | ✅ | `core/model3d/preprocess/{block_expander,normalize}.py`、`tests/test_block_expander.py`、`tests/test_normalize.py` |
 | Phase C 泳道 B｜数据（C-04，关键路径）：图层/块属性 → 弱标签自动标注引擎（复用 layer_conventions 基础分类器 + 补充映射表，9 类/4 系统硬约束，弱标注质量报告）| ✅ | `core/model3d/dataset/auto_label.py`、`data/layer_conventions.yaml`（**2026-09-14 起为图层配置单一真相源**，原 `data/model3d/layer_class_map.yaml` 已并入并删除）、`tests/test_auto_label.py` |
 | Phase C 泳道 B｜数据（C-05）：中文专业域数据集冷启动规范（symbol taxonomy 精化 9 类 + 采集/脱敏规范 + 分专业目标样本量 + FloorPlanCAD 交叉参照）| ✅ | `docs/PHASE_C_DATASET_SPEC.md`、`data/model3d/dataset/{README.md,.gitkeep}` |
-| Phase C 泳道 B｜数据（C-06）：人工精标注规范 + 质检（双人交叉+仲裁，IoU/Kappa≥0.8 硬门槛，复用 DrawingAnnotationQueue 工具，金标签回流数据飞轮）| ✅ | `docs/PHASE_C_ANNOTATION_GUIDE.md`、`docs/PHASE_C_ANNOTATION_QC_TEMPLATE.md` |
+| Phase C 泳道 B｜数据（C-06）：人工精标注规范 + 质检（双人交叉+仲裁，IoU/Kappa≥0.8 硬门槛，复用图纸标注队列工具（组件已于 `f58159d` 重构，入口见 `ModelWorkspace.tsx`），金标签回流数据飞轮）| ✅ | `docs/PHASE_C_ANNOTATION_GUIDE.md`、`docs/PHASE_C_ANNOTATION_QC_TEMPLATE.md` |
 | Phase C 泳道 B｜数据（C-07）：数据集版本/切分（**按项目切分防泄漏** + 固定种子可复现 + test 集冻结 + 数据卡）| ✅ | `scripts/model3d/dataset_split.py`、`data/model3d/dataset/DATASHEET.md`、`tests/test_dataset_split.py` |
 | Phase C 泳道 C｜模型契约基座：符号候选契约 + 后端 Protocol + 离线 mock（复用 auto_label 让无 GPU 链路端到端可跑）| ✅ | `core/model3d/spotting/{__init__,types,mock_backend}.py` |
 | Phase C 泳道 C｜模型（C-08）：CADTransformer(MIT) 推理封装 PoC（adapter 纯函数可测 + torch/dgl 懒加载 + 无权重/GPU 优雅降级 + 依赖锁定/Dockerfile 片段）| ✅ | `core/model3d/spotting/cadtransformer/*`、`requirements-spotting.txt`、`tests/test_cadtransformer_backend.py` |
@@ -209,7 +247,7 @@ CAD/
 ├── apps/
 │   ├── web/                   # 前端 UmiJS Max 应用（已实现）
 │   │   ├── package.json       # UmiJS Max + Ant Design 5 + ProComponents
-│   │   ├── .umirc.ts          # UmiJS 配置（代理/标题/布局）
+│   │   ├── config/config.ts   # UmiJS 配置（代理/标题/布局）
 │   │   ├── config/
 │   │   │   └── routes.ts      # 路由配置（图纸/激励/管理后台/404）
 │   │   └── src/
