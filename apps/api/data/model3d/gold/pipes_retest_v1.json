@@ -1,0 +1,340 @@
+{
+ "version": 1,
+ "object_classes": [
+  "pipes_retest"
+ ],
+ "units": [
+  {
+   "unit": "P2-blank_control",
+   "source": {
+    "group": "blank_control"
+   },
+   "classes": {
+    "pipes_retest": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "KVNM",
+       "ok": true,
+       "note": "空白对照；判读 beam_or_grid"
+      },
+      {
+       "ref": "ANP9",
+       "ok": true,
+       "note": "空白对照；判读 beam_or_grid"
+      },
+      {
+       "ref": "4HRV",
+       "ok": true,
+       "note": "空白对照；判读 beam_or_grid"
+      },
+      {
+       "ref": "3XYM",
+       "ok": true,
+       "note": "空白对照；判读 beam_or_grid"
+      },
+      {
+       "ref": "ALAL",
+       "ok": true,
+       "note": "空白对照；判读 beam_or_grid"
+      },
+      {
+       "ref": "JFR9",
+       "ok": true,
+       "note": "空白对照；判读 beam_or_grid"
+      },
+      {
+       "ref": "YN4F",
+       "ok": true,
+       "note": "空白对照；判读 hatch"
+      },
+      {
+       "ref": "MK4U",
+       "ok": true,
+       "note": "空白对照；判读 beam_or_grid"
+      },
+      {
+       "ref": "W3L4",
+       "ok": true,
+       "note": "空白对照；判读 nothing"
+      },
+      {
+       "ref": "MWX3",
+       "ok": true,
+       "note": "空白对照；判读 beam_or_grid"
+      },
+      {
+       "ref": "XPFM",
+       "ok": true,
+       "note": "空白对照；判读 nothing"
+      },
+      {
+       "ref": "J9JN",
+       "ok": true,
+       "note": "空白对照；判读 beam_or_grid"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "criteria": "CRITERIA.md#pipes",
+     "note": "管线复测：**验证已发出的图层闸**。判据与 `pipes_v1` 逐字相同（固化于 `CRITERIA.md#pipes` v6），抽样改为**当前代码**（含标注层 + 别类层双闸）。**主对照通过**：12 格红线画在墨迹稀疏处，**0 格被判成管线**。（细节：其中 9 格被答成 `beam_or_grid` 而非 `nothing` —— 稀疏处常有轴线，所以这组是「稀疏且带轴线」而非纯空白，对本问题仍是有效对照。）**结果 6/40 = 15%，第一版 0/58 = 0%**。**但这 6 格判读全部标了「没把握」**；只看判读有把握的 29 格，**是管线的 0 格 = 0%**。所以 15% 完全建立在不确定判断之上。**闸确实生效的最直接证据在误检构成里**：`leader`（引出线／标注线）**从 12% 降到 0%** —— 那正是标注层闸要挡的东西。但墙与结构线仍占误检的 85%（wall 41% · beam_or_grid 44%），图层闸挡不到它们（实测 57.5% 的线段图层判不出）。**另注**：`judge_sanity` 报了 `stratum_blind`（两层众数同为 beam_or_grid），与主对照的结论不一致 —— 前者看的是类别标签，后者看的是 is_pipe，如实并记。"
+    }
+   }
+  },
+  {
+   "unit": "P2-pipe",
+   "source": {
+    "group": "pipe"
+   },
+   "classes": {
+    "pipes_retest": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "V3EU",
+       "ok": false,
+       "what": "wall",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "UPUW",
+       "ok": false,
+       "what": "wall",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "VHC4",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "43MF",
+       "ok": false,
+       "what": "wall",
+       "note": "**判读没把握**"
+      },
+      {
+       "ref": "FANU",
+       "ok": false,
+       "what": "wall",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "JYUV",
+       "ok": true,
+       "note": "**判读没把握**"
+      },
+      {
+       "ref": "UCEX",
+       "ok": false,
+       "what": "hatch",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "W4UH",
+       "ok": true,
+       "note": "**判读没把握**"
+      },
+      {
+       "ref": "FV9X",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "A3YV",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "XNKP",
+       "ok": false,
+       "what": "hatch",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "9WH3",
+       "ok": false,
+       "what": "wall",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "YHCC",
+       "ok": false,
+       "what": "wall",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "JLAU",
+       "ok": false,
+       "what": "hatch",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "EKFR",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": "**判读没把握**"
+      },
+      {
+       "ref": "W34N",
+       "ok": false,
+       "what": "hatch",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "MHAU",
+       "ok": false,
+       "what": "wall",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "MXCH",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "LCKW",
+       "ok": true,
+       "note": "**判读没把握**"
+      },
+      {
+       "ref": "LY3A",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "PCJY",
+       "ok": true,
+       "note": "**判读没把握**"
+      },
+      {
+       "ref": "U4KY",
+       "ok": false,
+       "what": "wall",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "4MU4",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "XC9X",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": "**判读没把握**"
+      },
+      {
+       "ref": "UYEP",
+       "ok": false,
+       "what": "wall",
+       "note": "**判读没把握**"
+      },
+      {
+       "ref": "YFYX",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "UUPW",
+       "ok": false,
+       "what": "wall",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "KEMY",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "4XK9",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "R4N4",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "AAHH",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "CWF4",
+       "ok": true,
+       "note": "**判读没把握**"
+      },
+      {
+       "ref": "RNEE",
+       "ok": false,
+       "what": "hatch",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "HXYX",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "UJXU",
+       "ok": false,
+       "what": "wall",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "URKN",
+       "ok": false,
+       "what": "wall",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "F3PP",
+       "ok": false,
+       "what": "wall",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "ECJM",
+       "ok": false,
+       "what": "wall",
+       "note": "**判读没把握**"
+      },
+      {
+       "ref": "CWJA",
+       "ok": true,
+       "note": "**判读没把握**"
+      },
+      {
+       "ref": "CHYC",
+       "ok": false,
+       "what": "beam_or_grid",
+       "note": "判读有把握"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "criteria": "CRITERIA.md#pipes",
+     "note": "管线复测：**验证已发出的图层闸**。判据与 `pipes_v1` 逐字相同（固化于 `CRITERIA.md#pipes` v6），抽样改为**当前代码**（含标注层 + 别类层双闸）。**主对照通过**：12 格红线画在墨迹稀疏处，**0 格被判成管线**。（细节：其中 9 格被答成 `beam_or_grid` 而非 `nothing` —— 稀疏处常有轴线，所以这组是「稀疏且带轴线」而非纯空白，对本问题仍是有效对照。）**结果 6/40 = 15%，第一版 0/58 = 0%**。**但这 6 格判读全部标了「没把握」**；只看判读有把握的 29 格，**是管线的 0 格 = 0%**。所以 15% 完全建立在不确定判断之上。**闸确实生效的最直接证据在误检构成里**：`leader`（引出线／标注线）**从 12% 降到 0%** —— 那正是标注层闸要挡的东西。但墙与结构线仍占误检的 85%（wall 41% · beam_or_grid 44%），图层闸挡不到它们（实测 57.5% 的线段图层判不出）。**另注**：`judge_sanity` 报了 `stratum_blind`（两层众数同为 beam_or_grid），与主对照的结论不一致 —— 前者看的是类别标签，后者看的是 is_pipe，如实并记。"
+    }
+   }
+  }
+ ]
+}

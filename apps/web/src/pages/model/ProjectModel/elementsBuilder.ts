@@ -131,6 +131,19 @@ export function resolveEquipmentPick(
   return picks.length ? picks[picks.length - 1] : null
 }
 
+/**
+ * 几何三角形数——必须与 three.js raycaster 的 `faceIndex` 口径一致:
+ * 索引几何(BoxGeometry,用于墙/梁)按 index 计数,非索引几何(ExtrudeGeometry,
+ * 用于柱/板/设备)按 position 计数。此前一律按 position 计算,导致墙/梁每段
+ * 少算 1/3 三角形(24/3=8 vs 实际 36/3=12),faceEnd 边界逐段漂移,
+ * 反向追溯会反查到**错误的构件/来源图纸**。
+ */
+export function geometryTriangleCount(geometry: THREE.BufferGeometry): number {
+  if (geometry.index) return geometry.index.count / 3
+  const position = geometry.getAttribute('position')
+  return position ? position.count / 3 : 0
+}
+
 /** 由命中的 faceIndex 反查是哪个构件（通用版：区间按 faceEnd 升序,取首个 faceIndex < faceEnd） */
 export function resolveItemPick(
   picks: ElementItemPick[],
@@ -282,8 +295,7 @@ function mergedMeshWithPicks(
   for (const group of itemGroups) {
     let hasGeom = false
     for (const geometry of group.geoms) {
-      const position = geometry.getAttribute('position')
-      faceAcc += position ? position.count / 3 : 0
+      faceAcc += geometryTriangleCount(geometry)
       allGeoms.push(geometry)
       hasGeom = true
     }
@@ -327,8 +339,7 @@ function buildEquipmentMergedMesh(
 function triangleCount(meshes: THREE.Mesh[]): number {
   let total = 0
   for (const mesh of meshes) {
-    const position = mesh.geometry.getAttribute('position')
-    if (position) total += position.count / 3
+    total += geometryTriangleCount(mesh.geometry)
   }
   return total
 }

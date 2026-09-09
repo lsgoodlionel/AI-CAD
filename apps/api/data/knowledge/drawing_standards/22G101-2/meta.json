@@ -1,0 +1,31 @@
+{
+  "source": {
+    "key": "22G101-2",
+    "filename": "平法图集/22G101-2.pdf",
+    "std_no": "22G101-2",
+    "title": "混凝土结构施工图平面整体表示方法制图规则和构造详图（现浇混凝土板式楼梯）",
+    "kind": "atlas",
+    "discipline": "structure",
+    "pages": 83,
+    "extract_method": "ocr",
+    "identified_by": "OCR 封面",
+    "priority": 1,
+    "supersedes": null,
+    "superseded_by": null,
+    "notes": "楼梯代号 AT~FT 等在此定义。金标准实测「墙」最大误检源正是楼梯（31%），现有 _MARK_KINDS 完全没有楼梯代号。"
+  },
+  "evidence": {},
+  "stats": {
+    "extracted_pages": 83,
+    "declared_pages": 83,
+    "missing_pages": [],
+    "char_count": 48937,
+    "mean_confidence": 0.9711,
+    "low_confidence_pages": [],
+    "near_empty_pages": [
+      8,
+      23
+    ],
+    "ocr_dpi": 200
+  }
+}

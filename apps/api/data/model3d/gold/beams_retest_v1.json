@@ -1,0 +1,289 @@
+{
+ "version": 1,
+ "object_classes": [
+  "beams_retest"
+ ],
+ "units": [
+  {
+   "unit": "B2-beam",
+   "source": {
+    "group": "beam"
+   },
+   "classes": {
+    "beams_retest": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "YW3L",
+       "ok": true,
+       "note": "scale=0.05292 conf=1.00"
+      },
+      {
+       "ref": "HRE3",
+       "ok": true,
+       "note": "scale=0.01058 conf=1.00"
+      },
+      {
+       "ref": "KVVU",
+       "ok": false,
+       "what": "空白",
+       "note": "scale=0.01058 conf=1.00"
+      },
+      {
+       "ref": "43LE",
+       "ok": true,
+       "note": "scale=0.05292 conf=1.00"
+      },
+      {
+       "ref": "V3PA",
+       "ok": false,
+       "what": "单线",
+       "note": "scale=0.03528 conf=1.00"
+      },
+      {
+       "ref": "MP93",
+       "ok": true,
+       "note": "scale=? conf=?"
+      },
+      {
+       "ref": "XLJL",
+       "ok": true,
+       "note": "scale=? conf=?"
+      },
+      {
+       "ref": "FUKC",
+       "ok": false,
+       "what": "单线",
+       "note": "scale=? conf=?"
+      },
+      {
+       "ref": "4MKU",
+       "ok": true,
+       "note": "scale=? conf=?"
+      },
+      {
+       "ref": "4V9P",
+       "ok": false,
+       "what": "图框",
+       "note": "scale=0.01058 conf=1.00"
+      },
+      {
+       "ref": "EVKC",
+       "ok": true,
+       "note": "scale=? conf=?"
+      },
+      {
+       "ref": "RLVR",
+       "ok": true,
+       "note": "scale=? conf=?"
+      },
+      {
+       "ref": "3FXX",
+       "ok": true,
+       "note": "scale=? conf=?"
+      },
+      {
+       "ref": "FLEU",
+       "ok": false,
+       "what": "标注线",
+       "note": "scale=0.01058 conf=1.00"
+      },
+      {
+       "ref": "3RP4",
+       "ok": true,
+       "note": "scale=? conf=?"
+      },
+      {
+       "ref": "3WM9",
+       "ok": true,
+       "note": "scale=? conf=?"
+      },
+      {
+       "ref": "YNLU",
+       "ok": true,
+       "note": "scale=? conf=?"
+      },
+      {
+       "ref": "N3FN",
+       "ok": false,
+       "what": "钢筋线",
+       "note": "scale=? conf=?"
+      },
+      {
+       "ref": "UJE9",
+       "ok": true,
+       "note": "scale=? conf=?"
+      },
+      {
+       "ref": "CYKF",
+       "ok": true,
+       "note": "scale=? conf=?"
+      },
+      {
+       "ref": "YELJ",
+       "ok": true,
+       "note": "scale=? conf=?"
+      },
+      {
+       "ref": "3CYW",
+       "ok": false,
+       "what": "单线",
+       "note": "scale=0.01058 conf=1.00"
+      },
+      {
+       "ref": "NH9U",
+       "ok": false,
+       "what": "标注线",
+       "note": "scale=0.01058 conf=1.00"
+      },
+      {
+       "ref": "NH4R",
+       "ok": false,
+       "what": "图框",
+       "note": "scale=0.01058 conf=1.00"
+      },
+      {
+       "ref": "FHHR",
+       "ok": false,
+       "what": "标注线",
+       "note": "scale=? conf=?"
+      },
+      {
+       "ref": "PXAJ",
+       "ok": true,
+       "note": "scale=? conf=?"
+      },
+      {
+       "ref": "VF3V",
+       "ok": false,
+       "what": "图框",
+       "note": "scale=0.01058 conf=1.00"
+      },
+      {
+       "ref": "AK3F",
+       "ok": false,
+       "what": "空白",
+       "note": "scale=0.03528 conf=1.00"
+      },
+      {
+       "ref": "9VYM",
+       "ok": true,
+       "note": "scale=? conf=?"
+      },
+      {
+       "ref": "JANW",
+       "ok": false,
+       "what": "标注线",
+       "note": "scale=? conf=?"
+      },
+      {
+       "ref": "NYNW",
+       "ok": true,
+       "note": "scale=0.05292 conf=1.00"
+      },
+      {
+       "ref": "XEC4",
+       "ok": true,
+       "note": "scale=0.03528 conf=1.00"
+      },
+      {
+       "ref": "MV49",
+       "ok": true,
+       "note": "scale=0.01058 conf=1.00"
+      },
+      {
+       "ref": "XKAC",
+       "ok": true,
+       "note": "scale=0.01058 conf=1.00"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "criteria": "CRITERIA.md#beams",
+     "note": "梁的复测：判据与 `beams_v1` 逐字相同（固化于 `CRITERIA.md#beams` v7，含 KL/L/WKL/XL 国标梁代号与「配筋数字不是梁本身」这条），抽样改为**当前代码**。**有效性检查通过**：12 格空白对照 **0 格**被判成梁。**结果 21/34 = 62%**，第一版 28/50 = 56%，差 +6%，**落在判读者 74% 重测信度之内 —— 同一水平**。误检构成：标注线 4 · 单线 3 · 图框 3 · 空白 2 · 钢筋线 1。**交叉验证「误检是否跟着比例走」**（本批把每格的 scale/confidence 记进 manifest）：**有**变换记录（置信全是 1.00）的 7/16 = **44%**；**无**变换记录的 14/18 = **78%**；差 **+34%** —— **带着「满分置信」变换记录的图，梁反而更差**。其中 `scale=0.01058`（≈1:30）conf=1.00 一组 3/10 = 30%，正是早先「6 张图 100% 全错」那条发现标记的组合。**口径**：n 小（16 vs 18，各 6 张图），两组图纸本身可能不同，相关不等于因果；但方向与比例批**独立**测得的「confidence=1.00 合理率 24%、<1.00 反而 37%」一致。误检确实按图纸聚集：12 张图里 2 张 ≥2 格且全错。"
+    }
+   }
+  },
+  {
+   "unit": "B2-blank_control",
+   "source": {
+    "group": "blank_control"
+   },
+   "classes": {
+    "beams_retest": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "NYYC",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "LE3K",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "EURJ",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "NVFJ",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "XRYE",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "HELV",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "ML9W",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "HMFX",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "PAL3",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "4ARN",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "4XCW",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "PCM9",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "criteria": "CRITERIA.md#beams",
+     "note": "梁的复测：判据与 `beams_v1` 逐字相同（固化于 `CRITERIA.md#beams` v7，含 KL/L/WKL/XL 国标梁代号与「配筋数字不是梁本身」这条），抽样改为**当前代码**。**有效性检查通过**：12 格空白对照 **0 格**被判成梁。**结果 21/34 = 62%**，第一版 28/50 = 56%，差 +6%，**落在判读者 74% 重测信度之内 —— 同一水平**。误检构成：标注线 4 · 单线 3 · 图框 3 · 空白 2 · 钢筋线 1。**交叉验证「误检是否跟着比例走」**（本批把每格的 scale/confidence 记进 manifest）：**有**变换记录（置信全是 1.00）的 7/16 = **44%**；**无**变换记录的 14/18 = **78%**；差 **+34%** —— **带着「满分置信」变换记录的图，梁反而更差**。其中 `scale=0.01058`（≈1:30）conf=1.00 一组 3/10 = 30%，正是早先「6 张图 100% 全错」那条发现标记的组合。**口径**：n 小（16 vs 18，各 6 张图），两组图纸本身可能不同，相关不等于因果；但方向与比例批**独立**测得的「confidence=1.00 合理率 24%、<1.00 反而 37%」一致。误检确实按图纸聚集：12 张图里 2 张 ≥2 格且全错。"
+    }
+   }
+  }
+ ]
+}

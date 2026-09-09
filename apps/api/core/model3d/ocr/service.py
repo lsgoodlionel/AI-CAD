@@ -90,8 +90,22 @@ def _select_backend(warnings: list[str]) -> OcrBackend | None:
     return None
 
 
+def effective_dpi(*, page_longest_pt: float, dpi: int) -> float:
+    """实际渲染 DPI —— 大图会被降采样，换算坐标必须用这个而不是标称 dpi。
+
+    实测：档案 bbox 在有文本层的页面上 **90% 落空**，偏移倍数**每张图不同**
+    （1.50 / 1.57 / 1.63 / 1.84）—— 正是因为降采样比例依赖图幅。
+    """
+    if page_longest_pt <= 0:
+        return float(dpi)
+    longest_px = page_longest_pt * dpi / _POINTS_PER_INCH
+    if longest_px <= _MAX_RENDER_PX:
+        return float(dpi)
+    return dpi * _MAX_RENDER_PX / longest_px
+
+
 def _render_first_page(file_bytes: bytes, file_ext: str, warnings: list[str], dpi: int):
-    """返回 (image_rgb 或 None, page_size_pt)。best-effort，失败降级。"""
+    """返回 (image_rgb 或 None, page_size_pt, eff_dpi)。best-effort，失败降级。"""
     ext = (file_ext or "").lower().lstrip(".")
     if ext == "pdf" or file_bytes[:5] == b"%PDF-":
         try:
@@ -100,22 +114,24 @@ def _render_first_page(file_bytes: bytes, file_ext: str, warnings: list[str], dp
             doc = fitz.open(stream=file_bytes, filetype="pdf")
             if doc.page_count == 0:
                 warnings.append("PDF 无页面")
-                return None, (0.0, 0.0)
+                return None, (0.0, 0.0), float(dpi)
             page = doc[0]
             page_size = (float(page.rect.width), float(page.rect.height))
             # 自适应降 DPI(E-末 提速):A0/A1 图 200dpi 近万像素 → 35 块 × ~8s ≈ 280s。
             # 限渲染最长边 ≤ _MAX_RENDER_PX,大图按需降 dpi,块数减 ~3x,标签级文字
             # (标高/轴号/房间)在等效 ~120dpi 仍清晰(实测标高 97% 高置信不受损)。
-            longest_px = max(page.rect.width, page.rect.height) * dpi / 72.0
-            eff_dpi = dpi if longest_px <= _MAX_RENDER_PX else dpi * _MAX_RENDER_PX / longest_px
+            eff_dpi = effective_dpi(
+                page_longest_pt=max(page.rect.width, page.rect.height), dpi=dpi)
             pix = page.get_pixmap(dpi=int(eff_dpi))
             from PIL import Image
 
             image = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
-            return image, page_size
+            # **实际渲染 DPI 必须一并返回**：调用方按它换算像素→点，
+            # 用标称 dpi 会让每张大图的坐标各按自己的降采样比例偏小。
+            return image, page_size, float(eff_dpi)
         except Exception as exc:  # noqa: BLE001
             warnings.append(f"PDF 渲染失败: {exc}")
-            return None, (0.0, 0.0)
+            return None, (0.0, 0.0), float(dpi)
     # 位图
     try:
         import io
@@ -125,10 +141,10 @@ def _render_first_page(file_bytes: bytes, file_ext: str, warnings: list[str], dp
         image = Image.open(io.BytesIO(file_bytes)).convert("RGB")
         # 位图无"点"概念，按 dpi 折算等效页面点尺寸
         page_size = (image.width * _POINTS_PER_INCH / dpi, image.height * _POINTS_PER_INCH / dpi)
-        return image, page_size
+        return image, page_size, float(dpi)   # 位图不降采样
     except Exception as exc:  # noqa: BLE001
         warnings.append(f"图像打开失败: {exc}")
-        return None, (0.0, 0.0)
+        return None, (0.0, 0.0), float(dpi)
 
 
 def run_ocr(
@@ -151,7 +167,7 @@ def run_ocr(
         warnings.append(f"OCR 后端 {name} 均不可用，跳过（none）")
         return OcrResult(backend="none", dpi=dpi, warnings=tuple(warnings))
 
-    image, page_size = _render_first_page(file_bytes, file_ext, warnings, dpi)
+    image, page_size, eff_dpi = _render_first_page(file_bytes, file_ext, warnings, dpi)
     # mock 后端不依赖 image；paddle 需要 image
     if image is None and getattr(active, "name", "") != "mock":
         warnings.append("无可识别位图，跳过（none）")
@@ -162,7 +178,7 @@ def run_ocr(
         if image is not None
         else active.recognize(image, warnings)  # mock 不依赖 image
     )
-    scale = _POINTS_PER_INCH / dpi  # 像素 → 点
+    scale = _POINTS_PER_INCH / eff_dpi  # 像素 → 点（用**实际**渲染 DPI）
     tokens: list[TextToken] = []
     for text, bbox_px, conf in raw:
         if conf < min_confidence:

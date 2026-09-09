@@ -1,0 +1,403 @@
+{
+ "version": 1,
+ "object_classes": [
+  "drawing_scale"
+ ],
+ "units": [
+  {
+   "unit": "SC-1",
+   "source": {
+    "stratum": "中等置信"
+   },
+   "classes": {
+    "drawing_scale": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "CXXR",
+       "ok": false,
+       "what": "too_long",
+       "note": "scale_m_pt=0.03528 confidence=0.50"
+      },
+      {
+       "ref": "NLNJ",
+       "ok": true,
+       "note": "scale_m_pt=0.01180 confidence=0.50"
+      },
+      {
+       "ref": "UWV9",
+       "ok": true,
+       "note": "scale_m_pt=0.06228 confidence=0.50"
+      },
+      {
+       "ref": "XHPN",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.17639 confidence=0.33"
+      },
+      {
+       "ref": "LRUP",
+       "ok": true,
+       "note": "scale_m_pt=0.02604 confidence=0.50"
+      },
+      {
+       "ref": "MAWE",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.06211 confidence=0.25"
+      },
+      {
+       "ref": "F9KM",
+       "ok": false,
+       "what": "too_long",
+       "note": "scale_m_pt=0.86970 confidence=0.50"
+      },
+      {
+       "ref": "3U3K",
+       "ok": true,
+       "note": "scale_m_pt=0.00231 confidence=0.50"
+      },
+      {
+       "ref": "WMY4",
+       "ok": true,
+       "note": "scale_m_pt=0.00086 confidence=0.50"
+      },
+      {
+       "ref": "NWPV",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=1.71496 confidence=0.50"
+      },
+      {
+       "ref": "VPCH",
+       "ok": false,
+       "what": "way_off",
+       "note": "scale_m_pt=1.07187 confidence=0.50"
+      },
+      {
+       "ref": "XYEV",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.06228 confidence=0.50"
+      },
+      {
+       "ref": "3CYW",
+       "ok": true,
+       "note": "scale_m_pt=0.00343 confidence=0.50"
+      },
+      {
+       "ref": "NMC4",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.03992 confidence=0.50"
+      },
+      {
+       "ref": "XXPA",
+       "ok": false,
+       "what": "too_long",
+       "note": "scale_m_pt=0.00130 confidence=0.50"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "criteria": "CRITERIA.md#drawing_scale",
+     "note": "比例验证：每格画一条**系统认为是 8 米**的红线，判读者拿门（1m）、楼梯踏步（0.3m）、车位（2.5×5m）、座椅排距（1m）、柱距（6~9m）去比 —— **纯比较，不读尺寸数字**（字符转写是已知不可靠的能力边界）。裁剪用固定的页面比例、与 scale 无关，只有红线长度依赖 scale，所以比例错了红线就会横贯整格或缩成一点。**能判的 56 格里比例合理的只有 17 = 30%。**错向以 `too_short` 为主（26/39）—— 红线由 8米/scale 换算，太短即 scale 偏大，**意味着构件尺寸与工程量被整体放大**。**置信度携带负信息**：confidence=1.00 的合理率 24%，<1.00 的反而 37%。混淆已排除：判读与「红线占画面多大」相关（中位 1.39 / 0.80 / 0.15），但 too_short 组里 **81%** 的占比落在 ok 组区间内 —— 同占比下仍能分开，不是纯假象。"
+    }
+   }
+  },
+  {
+   "unit": "SC-2",
+   "source": {
+    "stratum": "满分置信·**离谱比例**"
+   },
+   "classes": {
+    "drawing_scale": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "K9YC",
+       "ok": true,
+       "note": "scale_m_pt=0.00529 confidence=1.00"
+      },
+      {
+       "ref": "3XMA",
+       "ok": false,
+       "what": "too_long",
+       "note": "scale_m_pt=0.00353 confidence=1.00"
+      },
+      {
+       "ref": "YR4J",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.00353 confidence=1.00"
+      },
+      {
+       "ref": "FLPA",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.00212 confidence=1.00"
+      },
+      {
+       "ref": "FYLK",
+       "ok": true,
+       "note": "scale_m_pt=0.00353 confidence=1.00"
+      },
+      {
+       "ref": "KLWL",
+       "ok": true,
+       "note": "scale_m_pt=0.00529 confidence=1.00"
+      },
+      {
+       "ref": "VFMH",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.00353 confidence=1.00"
+      },
+      {
+       "ref": "YK4A",
+       "ok": false,
+       "what": "too_long",
+       "note": "scale_m_pt=0.00353 confidence=1.00"
+      },
+      {
+       "ref": "KH9N",
+       "ok": false,
+       "what": "too_long",
+       "note": "scale_m_pt=0.00353 confidence=1.00"
+      },
+      {
+       "ref": "E4AA",
+       "ok": false,
+       "what": "too_long",
+       "note": "scale_m_pt=0.00353 confidence=1.00"
+      },
+      {
+       "ref": "ENRE",
+       "ok": true,
+       "note": "scale_m_pt=0.00106 confidence=1.00"
+      },
+      {
+       "ref": "JAFM",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.21167 confidence=1.00"
+      },
+      {
+       "ref": "YKWY",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.52917 confidence=1.00"
+      },
+      {
+       "ref": "RAM9",
+       "ok": true,
+       "note": "scale_m_pt=0.00529 confidence=1.00"
+      },
+      {
+       "ref": "AEUW",
+       "ok": false,
+       "what": "too_long",
+       "note": "scale_m_pt=0.00353 confidence=1.00"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "criteria": "CRITERIA.md#drawing_scale",
+     "note": "比例验证：每格画一条**系统认为是 8 米**的红线，判读者拿门（1m）、楼梯踏步（0.3m）、车位（2.5×5m）、座椅排距（1m）、柱距（6~9m）去比 —— **纯比较，不读尺寸数字**（字符转写是已知不可靠的能力边界）。裁剪用固定的页面比例、与 scale 无关，只有红线长度依赖 scale，所以比例错了红线就会横贯整格或缩成一点。**能判的 56 格里比例合理的只有 17 = 30%。**错向以 `too_short` 为主（26/39）—— 红线由 8米/scale 换算，太短即 scale 偏大，**意味着构件尺寸与工程量被整体放大**。**置信度携带负信息**：confidence=1.00 的合理率 24%，<1.00 的反而 37%。混淆已排除：判读与「红线占画面多大」相关（中位 1.39 / 0.80 / 0.15），但 too_short 组里 **81%** 的占比落在 ok 组区间内 —— 同占比下仍能分开，不是纯假象。"
+    }
+   }
+  },
+  {
+   "unit": "SC-3",
+   "source": {
+    "stratum": "满分置信·常用比例"
+   },
+   "classes": {
+    "drawing_scale": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "Y4CX",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.05292 confidence=1.00"
+      },
+      {
+       "ref": "CYJE",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.05292 confidence=1.00"
+      },
+      {
+       "ref": "HUXR",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.03528 confidence=1.00"
+      },
+      {
+       "ref": "4HNR",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.12347 confidence=1.00"
+      },
+      {
+       "ref": "FK3K",
+       "ok": true,
+       "note": "scale_m_pt=0.05292 confidence=1.00"
+      },
+      {
+       "ref": "3N4H",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.00706 confidence=1.00"
+      },
+      {
+       "ref": "9WH3",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.05292 confidence=1.00"
+      },
+      {
+       "ref": "3HJK",
+       "ok": true,
+       "note": "scale_m_pt=0.05292 confidence=1.00"
+      },
+      {
+       "ref": "M4YE",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.01764 confidence=1.00"
+      },
+      {
+       "ref": "WWVC",
+       "ok": false,
+       "what": "too_long",
+       "note": "scale_m_pt=0.05292 confidence=1.00"
+      },
+      {
+       "ref": "VJRN",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.05292 confidence=1.00"
+      },
+      {
+       "ref": "REAV",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.05292 confidence=1.00"
+      },
+      {
+       "ref": "YL9E",
+       "ok": false,
+       "what": "too_long",
+       "note": "scale_m_pt=0.01058 confidence=1.00"
+      },
+      {
+       "ref": "39VN",
+       "ok": false,
+       "what": "too_long",
+       "note": "scale_m_pt=0.03528 confidence=1.00"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "criteria": "CRITERIA.md#drawing_scale",
+     "note": "比例验证：每格画一条**系统认为是 8 米**的红线，判读者拿门（1m）、楼梯踏步（0.3m）、车位（2.5×5m）、座椅排距（1m）、柱距（6~9m）去比 —— **纯比较，不读尺寸数字**（字符转写是已知不可靠的能力边界）。裁剪用固定的页面比例、与 scale 无关，只有红线长度依赖 scale，所以比例错了红线就会横贯整格或缩成一点。**能判的 56 格里比例合理的只有 17 = 30%。**错向以 `too_short` 为主（26/39）—— 红线由 8米/scale 换算，太短即 scale 偏大，**意味着构件尺寸与工程量被整体放大**。**置信度携带负信息**：confidence=1.00 的合理率 24%，<1.00 的反而 37%。混淆已排除：判读与「红线占画面多大」相关（中位 1.39 / 0.80 / 0.15），但 too_short 组里 **81%** 的占比落在 ok 组区间内 —— 同占比下仍能分开，不是纯假象。"
+    }
+   }
+  },
+  {
+   "unit": "SC-4",
+   "source": {
+    "stratum": "零置信"
+   },
+   "classes": {
+    "drawing_scale": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "W49R",
+       "ok": true,
+       "note": "scale_m_pt=0.02822 confidence=0.00"
+      },
+      {
+       "ref": "ARVH",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.03528 confidence=0.00"
+      },
+      {
+       "ref": "4UKY",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.89744 confidence=0.00"
+      },
+      {
+       "ref": "NRWW",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.01764 confidence=0.00"
+      },
+      {
+       "ref": "C9LL",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.03528 confidence=0.00"
+      },
+      {
+       "ref": "3J9C",
+       "ok": true,
+       "note": "scale_m_pt=0.00706 confidence=0.00"
+      },
+      {
+       "ref": "AWME",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.00106 confidence=0.00"
+      },
+      {
+       "ref": "KRXU",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.17639 confidence=0.00"
+      },
+      {
+       "ref": "9WNE",
+       "ok": true,
+       "note": "scale_m_pt=0.01764 confidence=0.00"
+      },
+      {
+       "ref": "3AVP",
+       "ok": false,
+       "what": "too_long",
+       "note": "scale_m_pt=0.21167 confidence=0.00"
+      },
+      {
+       "ref": "9FHK",
+       "ok": true,
+       "note": "scale_m_pt=0.05292 confidence=0.00"
+      },
+      {
+       "ref": "A4MK",
+       "ok": false,
+       "what": "too_short",
+       "note": "scale_m_pt=0.03528 confidence=0.00"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "criteria": "CRITERIA.md#drawing_scale",
+     "note": "比例验证：每格画一条**系统认为是 8 米**的红线，判读者拿门（1m）、楼梯踏步（0.3m）、车位（2.5×5m）、座椅排距（1m）、柱距（6~9m）去比 —— **纯比较，不读尺寸数字**（字符转写是已知不可靠的能力边界）。裁剪用固定的页面比例、与 scale 无关，只有红线长度依赖 scale，所以比例错了红线就会横贯整格或缩成一点。**能判的 56 格里比例合理的只有 17 = 30%。**错向以 `too_short` 为主（26/39）—— 红线由 8米/scale 换算，太短即 scale 偏大，**意味着构件尺寸与工程量被整体放大**。**置信度携带负信息**：confidence=1.00 的合理率 24%，<1.00 的反而 37%。混淆已排除：判读与「红线占画面多大」相关（中位 1.39 / 0.80 / 0.15），但 too_short 组里 **81%** 的占比落在 ok 组区间内 —— 同占比下仍能分开，不是纯假象。"
+    }
+   }
+  }
+ ]
+}

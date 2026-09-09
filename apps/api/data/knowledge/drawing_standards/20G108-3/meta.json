@@ -1,0 +1,28 @@
+{
+  "source": {
+    "key": "20G108-3",
+    "filename": "平法图集/20G108-3.pdf",
+    "std_no": "20G108-3",
+    "title": "《钢结构设计标准》图示",
+    "kind": "atlas",
+    "discipline": "structure",
+    "pages": 91,
+    "extract_method": "ocr",
+    "identified_by": "OCR 封面",
+    "priority": 2,
+    "supersedes": null,
+    "superseded_by": null,
+    "notes": "component_labels 的 steel 关键词目前是手写的，此书是其上游。"
+  },
+  "evidence": {},
+  "stats": {
+    "extracted_pages": 91,
+    "declared_pages": 91,
+    "missing_pages": [],
+    "char_count": 47506,
+    "mean_confidence": 0.9737,
+    "low_confidence_pages": [],
+    "near_empty_pages": [],
+    "ocr_dpi": 200
+  }
+}

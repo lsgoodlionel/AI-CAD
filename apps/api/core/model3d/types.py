@@ -63,6 +63,12 @@ class FloorElements:
     slabs: list[dict] = field(default_factory=list)
     pipes: list[dict] = field(default_factory=list)
     equipment: list[dict] = field(default_factory=list)
+    #: 被判为**密排阵列**（座椅/吸声板/铺装单元）而从柱候选里剔除的框。
+    #:
+    #: 诊断用，**不进 `as_dict`** —— 那是构件输出，混进去等于让座椅
+    #: 从另一个门回到模型里。留着是为了让剔除可核验：删掉的东西
+    #: 一旦无痕，误伤就成了看不见的损失。判据见 `dense_array_filter`。
+    dense_arrays: list[dict] = field(default_factory=list)
 
     def as_dict(self) -> dict:
         return {

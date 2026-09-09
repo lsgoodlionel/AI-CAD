@@ -85,3 +85,37 @@ def test_build_confirmed_transform_guards():
     from services.scale_candidates import build_confirmed_transform
     assert build_confirmed_transform(0, [], 1000.0) is None
     assert build_confirmed_transform(100, [], 0) is None
+
+
+# ── 按 GB/T 50001 §2 校订比例表（本轮）────────────────────
+
+def test_seventy_five_is_not_a_standard_scale():
+    """**修正记录**：旧表含 `75`，而 GB/T 50001 的常用表与可用表里都没有
+    1:75 —— 那是凭印象加进去的。原文见
+    `data/knowledge/drawing_standards/textbook-shitu-yusuan/book.md` 表 2-6。"""
+    from services.scale_candidates import STANDARD_DENOMINATORS
+
+    assert 75 not in STANDARD_DENOMINATORS
+
+
+def test_common_scales_match_the_standard_table():
+    """常用比例：1:1、1:2、1:5、1:10、1:20、1:50、1:100、1:150、
+    1:200、1:500、1:1000、1:2000（两本教材的表逐项一致，互相印证）。"""
+    from services.scale_candidates import COMMON_DENOMINATORS
+
+    assert COMMON_DENOMINATORS == (1, 2, 5, 10, 20, 50, 100, 150,
+                                   200, 500, 1000, 2000)
+
+
+def test_detail_and_large_site_scales_are_now_recognised():
+    """此前漏掉的两头：1:1~1:6 的详图档、1:60/80/600 与总图的大比例档。
+    实测全库 2142 个变换里，这些「此前被判非标准」的有 105 个。"""
+    for denominator in (1, 2, 3, 4, 6, 60, 80, 600, 5000, 25000):
+        assert snap_to_standard(denominator) == (denominator, True)
+
+
+def test_snapping_prefers_the_common_table():
+    """GB/T 50001 §2 明文「应优先用表中常用比例」。"""
+    assert snap_to_standard(98) == (100, True)      # 常用档
+    assert snap_to_standard(78) == (80, True)       # 常用档不命中 → 可用档
+    assert snap_to_standard(137)[1] is False        # 两档都不命中 → 不吸附

@@ -1,0 +1,28 @@
+{
+  "source": {
+    "key": "23G101-11",
+    "filename": "平法图集/23G101-11.pdf",
+    "std_no": "23G101-11",
+    "title": "G101 系列图集常见问题答疑图解",
+    "kind": "atlas",
+    "discipline": "structure",
+    "pages": 142,
+    "extract_method": "ocr",
+    "identified_by": "OCR 封面",
+    "priority": 2,
+    "supersedes": "17G101-11",
+    "superseded_by": null,
+    "notes": ""
+  },
+  "evidence": {},
+  "stats": {
+    "extracted_pages": 142,
+    "declared_pages": 142,
+    "missing_pages": [],
+    "char_count": 117670,
+    "mean_confidence": 0.9768,
+    "low_confidence_pages": [],
+    "near_empty_pages": [],
+    "ocr_dpi": 200
+  }
+}

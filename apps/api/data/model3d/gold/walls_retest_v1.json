@@ -1,0 +1,307 @@
+{
+ "version": 1,
+ "object_classes": [
+  "walls_retest"
+ ],
+ "units": [
+  {
+   "unit": "W2-blank_control",
+   "source": {
+    "group": "blank_control"
+   },
+   "classes": {
+    "walls_retest": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "EXA3",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "UXXE",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "N4KV",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "9RL3",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "YE93",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "YUKW",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "AFY9",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "AHNV",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "XENK",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "NN93",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "Y4NF",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      },
+      {
+       "ref": "MRJH",
+       "ok": true,
+       "note": "空白对照；判读 no/空白"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "criteria": "CRITERIA.md#walls",
+     "note": "墙的重测：**判据与 `walls_v1` 逐字相同**（已固化于 `CRITERIA.md#walls` v5），只把抽样源从存量场景换成**当前代码**逐张 `recognize()` —— 单变量对比。**有效性检查完美通过**：12 格红线画在墨迹稀疏处的对照，**12/12 全部被判为空白/单线，0 格判成墙**。结果 21/37 = **57%**，第一版 33/47 = 70%，差 −13%，**落在判读者 74% 重测信度之内 —— 可视为同一水平**，不能说变差了，也不能说没变差。误检构成：楼梯 5 · 标注 4 · 单线 2 · 家具设备 2 · 柱 2 · 空白 1。**楼梯是最大的单一误检源**（5/16 = 31%）—— 楼梯踏步是平行细线，而墙的判据正是「两条平行细线之间的条带」，几何上本就相近，与柱把剧院座椅认成柱网是同一类问题。"
+    }
+   }
+  },
+  {
+   "unit": "W2-wall",
+   "source": {
+    "group": "wall"
+   },
+   "classes": {
+    "walls_retest": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "PNRP",
+       "ok": false,
+       "what": "标注",
+       "note": "判读 no"
+      },
+      {
+       "ref": "VW9K",
+       "ok": false,
+       "what": "楼梯",
+       "note": "判读 no"
+      },
+      {
+       "ref": "WE9X",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "KKXL",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "EREX",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "NXCJ",
+       "ok": false,
+       "what": "单线",
+       "note": "判读 no"
+      },
+      {
+       "ref": "KXFH",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "9PCP",
+       "ok": false,
+       "what": "标注",
+       "note": "判读 no"
+      },
+      {
+       "ref": "V9K4",
+       "ok": false,
+       "what": "楼梯",
+       "note": "判读 no"
+      },
+      {
+       "ref": "MJK9",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "EK3J",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "WRRY",
+       "ok": false,
+       "what": "家具设备",
+       "note": "判读 no"
+      },
+      {
+       "ref": "MVJK",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "LELY",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "JXNN",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "WE4W",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "E9NP",
+       "ok": false,
+       "what": "单线",
+       "note": "判读 no"
+      },
+      {
+       "ref": "W43N",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "MF9P",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "WL34",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "W3UF",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "MCN4",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "LPPL",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "LVMM",
+       "ok": false,
+       "what": "楼梯",
+       "note": "判读 no"
+      },
+      {
+       "ref": "3LPW",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "9YCY",
+       "ok": false,
+       "what": "柱",
+       "note": "判读 no"
+      },
+      {
+       "ref": "YXUF",
+       "ok": false,
+       "what": "标注",
+       "note": "判读 no"
+      },
+      {
+       "ref": "AJXA",
+       "ok": false,
+       "what": "楼梯",
+       "note": "判读 no"
+      },
+      {
+       "ref": "YXRE",
+       "ok": false,
+       "what": "柱",
+       "note": "判读 no"
+      },
+      {
+       "ref": "W3NA",
+       "ok": false,
+       "what": "标注",
+       "note": "判读 no"
+      },
+      {
+       "ref": "9ENP",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "WCWN",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "RRPU",
+       "ok": false,
+       "what": "空白",
+       "note": "判读 no"
+      },
+      {
+       "ref": "VEYR",
+       "ok": true,
+       "note": "判读 yes"
+      },
+      {
+       "ref": "LNKE",
+       "ok": false,
+       "what": "家具设备",
+       "note": "判读 no"
+      },
+      {
+       "ref": "PXCK",
+       "ok": false,
+       "what": "楼梯",
+       "note": "判读 no"
+      },
+      {
+       "ref": "MHWK",
+       "ok": true,
+       "note": "判读 yes"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "criteria": "CRITERIA.md#walls",
+     "note": "墙的重测：**判据与 `walls_v1` 逐字相同**（已固化于 `CRITERIA.md#walls` v5），只把抽样源从存量场景换成**当前代码**逐张 `recognize()` —— 单变量对比。**有效性检查完美通过**：12 格红线画在墨迹稀疏处的对照，**12/12 全部被判为空白/单线，0 格判成墙**。结果 21/37 = **57%**，第一版 33/47 = 70%，差 −13%，**落在判读者 74% 重测信度之内 —— 可视为同一水平**，不能说变差了，也不能说没变差。误检构成：楼梯 5 · 标注 4 · 单线 2 · 家具设备 2 · 柱 2 · 空白 1。**楼梯是最大的单一误检源**（5/16 = 31%）—— 楼梯踏步是平行细线，而墙的判据正是「两条平行细线之间的条带」，几何上本就相近，与柱把剧院座椅认成柱网是同一类问题。"
+    }
+   }
+  }
+ ]
+}

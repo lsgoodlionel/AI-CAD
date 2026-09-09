@@ -1,0 +1,378 @@
+{
+ "version": 1,
+ "object_classes": [
+  "columns_final"
+ ],
+ "units": [
+  {
+   "unit": "C2-blank_control",
+   "source": {
+    "group": "blank_control"
+   },
+   "classes": {
+    "columns_final": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "JHCP",
+       "ok": true,
+       "note": "空白对照；判读 nothing"
+      },
+      {
+       "ref": "MF3M",
+       "ok": true,
+       "note": "空白对照；判读 nothing"
+      },
+      {
+       "ref": "MXFK",
+       "ok": true,
+       "note": "空白对照；判读 hatch"
+      },
+      {
+       "ref": "VWU9",
+       "ok": true,
+       "note": "空白对照；判读 nothing"
+      },
+      {
+       "ref": "UK4Y",
+       "ok": true,
+       "note": "空白对照；判读 dimension"
+      },
+      {
+       "ref": "WR9H",
+       "ok": true,
+       "note": "空白对照；判读 nothing"
+      },
+      {
+       "ref": "NFUH",
+       "ok": true,
+       "note": "空白对照；判读 beam"
+      },
+      {
+       "ref": "RJYU",
+       "ok": true,
+       "note": "空白对照；判读 nothing"
+      },
+      {
+       "ref": "REFY",
+       "ok": true,
+       "note": "空白对照；判读 nothing"
+      },
+      {
+       "ref": "MLPJ",
+       "ok": true,
+       "note": "空白对照；判读 nothing"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "criteria": "CRITERIA.md#columns",
+     "note": "柱的定案复测 + **密排阵列闸（座椅闸）验证**。判据从 `CRITERIA.md#columns` 整段照抄（含「带叉方块算柱」「柱编号算柱」—— 此前 0.59 vs 0.22 不可比的根源）。三组混发，判读者不知道每格来源；样本分散在 32 张图、单图最多 4 格。**有效性检查通过**：空白对照 0/10 被判成柱。**闸删对了**：被删的 22 格里**误删 0 格**（无一是柱），其中座椅 6 · 文字 5 · 梁 5 · 尺寸 2 · 空白 2 · 墙 2。**保留组 3/26 = 12%**（有把握口径 3/21）—— 这是当前代码在完整固定判据下的定案值。**保留组最大的误检来源是标高符号 7/26 = 27%**；标注类合计（标高符号 + 尺寸 + 文字 + 填充）**16/26 = 62%**，构件类误检（梁 + 窗 + 设备）7/26。口径提醒：此前的 0.59 / 0.22 / 68% / 22% 各自判据与抽样源不同，**与本值不可比**；本值是首个「固定判据 + 当前代码 + 干净对照 + 分散抽样」下的数字。"
+    }
+   }
+  },
+  {
+   "unit": "C2-dropped_by_gate",
+   "source": {
+    "group": "dropped_by_gate"
+   },
+   "classes": {
+    "columns_final": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "NRKK",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 text"
+      },
+      {
+       "ref": "YPMW",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 dimension"
+      },
+      {
+       "ref": "JNME",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 seat"
+      },
+      {
+       "ref": "MKUK",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 seat"
+      },
+      {
+       "ref": "FUNH",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 nothing"
+      },
+      {
+       "ref": "VAWL",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 text"
+      },
+      {
+       "ref": "CCLN",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 seat"
+      },
+      {
+       "ref": "UMMM",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 text"
+      },
+      {
+       "ref": "YWN9",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 wall"
+      },
+      {
+       "ref": "C4FE",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 beam"
+      },
+      {
+       "ref": "WHYW",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 beam"
+      },
+      {
+       "ref": "EPMA",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 text"
+      },
+      {
+       "ref": "F3HH",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 wall"
+      },
+      {
+       "ref": "RFYP",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 beam"
+      },
+      {
+       "ref": "PCVH",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 beam"
+      },
+      {
+       "ref": "MHWK",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 seat"
+      },
+      {
+       "ref": "MPRN",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 seat"
+      },
+      {
+       "ref": "3YFY",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 dimension"
+      },
+      {
+       "ref": "R4FU",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 beam"
+      },
+      {
+       "ref": "FVNJ",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 nothing"
+      },
+      {
+       "ref": "YHCC",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 text"
+      },
+      {
+       "ref": "3LYA",
+       "ok": true,
+       "note": "被密排阵列闸删掉；实为 seat"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "criteria": "CRITERIA.md#columns",
+     "note": "柱的定案复测 + **密排阵列闸（座椅闸）验证**。判据从 `CRITERIA.md#columns` 整段照抄（含「带叉方块算柱」「柱编号算柱」—— 此前 0.59 vs 0.22 不可比的根源）。三组混发，判读者不知道每格来源；样本分散在 32 张图、单图最多 4 格。**有效性检查通过**：空白对照 0/10 被判成柱。**闸删对了**：被删的 22 格里**误删 0 格**（无一是柱），其中座椅 6 · 文字 5 · 梁 5 · 尺寸 2 · 空白 2 · 墙 2。**保留组 3/26 = 12%**（有把握口径 3/21）—— 这是当前代码在完整固定判据下的定案值。**保留组最大的误检来源是标高符号 7/26 = 27%**；标注类合计（标高符号 + 尺寸 + 文字 + 填充）**16/26 = 62%**，构件类误检（梁 + 窗 + 设备）7/26。口径提醒：此前的 0.59 / 0.22 / 68% / 22% 各自判据与抽样源不同，**与本值不可比**；本值是首个「固定判据 + 当前代码 + 干净对照 + 分散抽样」下的数字。"
+    }
+   }
+  },
+  {
+   "unit": "C2-kept",
+   "source": {
+    "group": "kept"
+   },
+   "classes": {
+    "columns_final": {
+     "method": "verdicts",
+     "verdicts": [
+      {
+       "ref": "FK9M",
+       "ok": false,
+       "what": "elevation_mark",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "YWFV",
+       "ok": true,
+       "note": "判读有把握"
+      },
+      {
+       "ref": "3L3C",
+       "ok": false,
+       "what": "dimension",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "93AY",
+       "ok": false,
+       "what": "elevation_mark",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "XKLM",
+       "ok": false,
+       "what": "equipment",
+       "note": "判读没把握"
+      },
+      {
+       "ref": "3FCC",
+       "ok": true,
+       "note": "判读有把握"
+      },
+      {
+       "ref": "H4Y4",
+       "ok": false,
+       "what": "dimension",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "4KAH",
+       "ok": false,
+       "what": "beam",
+       "note": "判读没把握"
+      },
+      {
+       "ref": "AJHN",
+       "ok": false,
+       "what": "beam",
+       "note": "判读没把握"
+      },
+      {
+       "ref": "3KUX",
+       "ok": false,
+       "what": "window",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "VJRN",
+       "ok": false,
+       "what": "elevation_mark",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "3YCW",
+       "ok": false,
+       "what": "dimension",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "YAUM",
+       "ok": false,
+       "what": "beam",
+       "note": "判读没把握"
+      },
+      {
+       "ref": "4YWM",
+       "ok": false,
+       "what": "elevation_mark",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "XMJM",
+       "ok": false,
+       "what": "text",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "RCUH",
+       "ok": true,
+       "note": "判读有把握"
+      },
+      {
+       "ref": "E9WX",
+       "ok": false,
+       "what": "elevation_mark",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "M9VA",
+       "ok": false,
+       "what": "hatch",
+       "note": "判读没把握"
+      },
+      {
+       "ref": "ARWJ",
+       "ok": false,
+       "what": "text",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "ECPV",
+       "ok": false,
+       "what": "dimension",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "4YCX",
+       "ok": false,
+       "what": "text",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "WKJJ",
+       "ok": false,
+       "what": "elevation_mark",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "RN33",
+       "ok": false,
+       "what": "text",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "EAFJ",
+       "ok": false,
+       "what": "window",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "UHHA",
+       "ok": false,
+       "what": "elevation_mark",
+       "note": "判读有把握"
+      },
+      {
+       "ref": "AYE4",
+       "ok": false,
+       "what": "beam",
+       "note": "判读有把握"
+      }
+     ],
+     "confidence": 1.0,
+     "verified_by": [
+      "gpt"
+     ],
+     "criteria": "CRITERIA.md#columns",
+     "note": "柱的定案复测 + **密排阵列闸（座椅闸）验证**。判据从 `CRITERIA.md#columns` 整段照抄（含「带叉方块算柱」「柱编号算柱」—— 此前 0.59 vs 0.22 不可比的根源）。三组混发，判读者不知道每格来源；样本分散在 32 张图、单图最多 4 格。**有效性检查通过**：空白对照 0/10 被判成柱。**闸删对了**：被删的 22 格里**误删 0 格**（无一是柱），其中座椅 6 · 文字 5 · 梁 5 · 尺寸 2 · 空白 2 · 墙 2。**保留组 3/26 = 12%**（有把握口径 3/21）—— 这是当前代码在完整固定判据下的定案值。**保留组最大的误检来源是标高符号 7/26 = 27%**；标注类合计（标高符号 + 尺寸 + 文字 + 填充）**16/26 = 62%**，构件类误检（梁 + 窗 + 设备）7/26。口径提醒：此前的 0.59 / 0.22 / 68% / 22% 各自判据与抽样源不同，**与本值不可比**；本值是首个「固定判据 + 当前代码 + 干净对照 + 分散抽样」下的数字。"
+    }
+   }
+  }
+ ]
+}
