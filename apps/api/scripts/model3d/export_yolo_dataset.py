@@ -8,8 +8,13 @@ from collections import defaultdict
 import databases as databases_lib
 from core.config import settings
 from dependencies import DatabaseAdapter
+from core.model3d.render_budget import dpi_for_scale
 from core.model3d.yolo_export import CLASS_NAMES, class_id, outline_to_yolo_box
 
+#: 兜底 DPI。**实际渲染分辨率按每张图自己的比例算**（`dpi_for_scale`）——
+#: 一个全库常数对主力比例不够：1:150（实测 1068 张，全库最多）下
+#: 0.6m 的柱在 DPI=100 时只有 **15.7px**，压在 YOLO 检测下限上。
+#: 推导与像素预算见 `core/model3d/render_budget.py`。
 DPI = 100
 OUT = "/tmp/yolo_ds3"
 # **只用闭合轮廓类**：管线/梁是折线，轴对齐包围盒对它们无意义——
@@ -62,9 +67,19 @@ async def main():
             if not t or not fk or len(elems) < 10: continue
             if not PLAN.search(title) or BAD.search(title): continue
             if disc not in ("structure", "architecture", "decoration"): continue
+            # **按这张图自己的比例定分辨率**：`t` 是 drawing_transform 的
+            # scale_m_pt（米/点），换算成比例分母 = scale_m_pt / (25.4/72) * 1000。
             try:
                 page = fitz.open(stream=get_file_bytes(fk), filetype="pdf")[0]
-                pix = page.get_pixmap(dpi=DPI)
+                _scale_m_pt = float(t[0]) if isinstance(t, (list, tuple)) else float(t)
+                _denom = _scale_m_pt * 1000.0 / (25.4 / 72.0) if _scale_m_pt > 0 else None
+                page_dpi, _capped = dpi_for_scale(
+                    _denom, page_w_pt=page.rect.width, page_h_pt=page.rect.height,
+                    return_capped=True)
+                if _capped:
+                    # 降级必须可见
+                    print(f"  [dpi] {title[:24]} 触像素预算，降到 {page_dpi}")
+                pix = page.get_pixmap(dpi=page_dpi)
             except Exception:
                 continue
             # **直接调识别器**：构件坐标不走 `drawing_transform`，
@@ -81,7 +96,7 @@ async def main():
             if sc_m <= 0: continue
             ox, oy = getattr(fe, "origin_pt", (0.0, 0.0))
             ph = float(getattr(fe, "page_h", 0) or page.rect.height)
-            k = DPI / 72.0
+            k = page_dpi / 72.0
             def to_px(p):
                 xp, yp = meters_to_page(p[0], p[1], sc_m, (ox, oy), ph)
                 return (xp * k, yp * k)
