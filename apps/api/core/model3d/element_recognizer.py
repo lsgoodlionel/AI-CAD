@@ -1015,7 +1015,8 @@ def _bbox_contains(outer: tuple, inner: tuple) -> bool:
 
 
 def pick_fallback_slab_polygons(polys: list, *, area_of, min_area: float = 0.0,
-                                cap: int = _FALLBACK_SLAB_CAP) -> list:
+                                cap: int = _FALLBACK_SLAB_CAP,
+                                layers: list | None = None) -> list:
     """无图层命中时，挑出可当楼板的多边形（**多块**，不只最大那一块）。
 
     **为什么要多块**：三条兜底原先各只返回 1 块，而大歌剧院图层命中率
@@ -1024,8 +1025,27 @@ def pick_fallback_slab_polygons(polys: list, *, area_of, min_area: float = 0.0,
     **互不包含**是关键：结构平面图上大轮廓常层层嵌套
     （外墙轮廓套房间轮廓套洞口），全收会把同一块楼板数很多遍。
     按面积降序取，后来者若被已选中的套住就跳过。
+
+    **图框先出局**（`layers`，可选）：它画的是纸不是楼，却恒是全图面积
+    最大的那个，且套住图上**一切** —— 上面那条「互不包含」于是把所有
+    真候选一个不剩地跳过，只留图框自己。实测 12 张平面图、8 张走兜底，
+    **8/8** 的最大多边形都在 `C-SHET-TTLB` 上（占图幅 0.97~1.00 的 4 点
+    矩形），次大是同层 48 点内框（图框是双线框）。最极端一张挑中
+    **581,023 m²** 当楼板，而一整层实际只有 2000~8000 m²。
+
+    判据不新造，用既有的 `is_non_component_layer`（GB/T 50001 第 4 章
+    通用制图用语 + AIA 次级码 SHET/TTLB）—— 墙那边早已接过同一道闸
+    （图框双线间距恰在墙宽区间，曾造出成排假墙），板这边一直漏着。
+
+    **排除必须发生在入选之前**：被排除的框若还参与包含判定，候选照样
+    被它套没，改了等于没改。
+
+    `layers` 与 `polys` 索引对齐（`geometry_extractor` 的并行列表）。
+    不传就不拦 —— 无图层的图（大歌剧院部分 PDF）路径一字不变。
     """
-    scored = [(float(area_of(poly)), poly) for poly in polys or []]
+    gated = layers or []
+    scored = [(float(area_of(poly)), poly) for i, poly in enumerate(polys or [])
+              if not is_non_component_layer(_at(gated, i))]
     scored = [(area, poly) for area, poly in scored if area >= min_area]
     scored.sort(key=lambda item: -item[0])
 
@@ -1085,7 +1105,8 @@ def _find_slabs(
         return ctx.len_m(w) * ctx.len_m(h)
 
     fallback = pick_fallback_slab_polygons(
-        polys, area_of=_area_m2, min_area=_SLAB_MIN_AREA_M2)
+        polys, area_of=_area_m2, min_area=_SLAB_MIN_AREA_M2,
+        layers=poly_layers)
     if fallback:
         return [{"outline": [ctx.to_m(x, y) for x, y in repair_ring(poly)],
                  "thickness": _SLAB_THICKNESS_M,
