@@ -247,7 +247,16 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
                drawing_title: str | None = None,
                view_type: str | None = None,
                ) -> FloorElements:
-    truncated = geom.primitive_count() > MAX_PRIMITIVES
+    # **与收集侧用同一个比较符**：`geometry_extractor` 在
+    # `primitive_count() >= MAX_PRIMITIVES` 时停止收集，所以被截断的图
+    # 恰好**等于**上限、一个也不会超过。这里原本写的是严格大于，
+    # 于是标记永远打不出来 —— 实测抽查 120 张参与建模的图，
+    # **120 张全部触到上限**，而 `axes.truncated` 一个都没标上。
+    #
+    # 后果不只是少个标记：截断位置依赖 PDF 遍历顺序，同一张图两次重建
+    # 可以给出不同的构件数（实测某照明图 v8 管线 119、v10 为 0，
+    # 而单张识别跑出 518）。不标出来，这种波动看起来就像「修复生效了」。
+    truncated = geom.primitive_count() >= MAX_PRIMITIVES
     lines = geom.lines[:MAX_PRIMITIVES]
     rects = geom.rects[:MAX_PRIMITIVES]
     polys = geom.polys[:MAX_PRIMITIVES]
