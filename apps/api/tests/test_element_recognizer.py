@@ -152,8 +152,17 @@ def test_recognize_mep_equipment_with_label():
 
 @pytest.mark.unit
 def test_recognize_truncates_over_limit():
+    """超过配额要标 truncated。
+
+    **数量从配额表现算**，不写死 —— 原来写死 25000（对着当时 2 万的总量
+    上限）。配额改为按类分配后（线 6 万，见 `PRIMITIVE_BUDGET`），
+    25000 条线根本没超限，这条测试就会变成断言一个假前提。
+    """
+    from core.model3d.geometry_extractor import budget_for
+
+    cap = budget_for("lines")
     geom = DrawingGeometry(page_w=PAGE_W, page_h=PAGE_H)
-    geom.lines = [(0.0, float(i % 500), 10.0, float(i % 500)) for i in range(25000)]
+    geom.lines = [(0.0, float(i % 500), 10.0, float(i % 500)) for i in range(cap)]
     result = recognize(geom, "structure", "d1")
     assert result.axes.get("truncated") is True
 

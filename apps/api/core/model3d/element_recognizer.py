@@ -10,7 +10,7 @@ import re
 
 from .dense_array_filter import find_dense_array_flags
 from .drawing_conventions import shows_plan_cut_sections
-from .geometry_extractor import MAX_PRIMITIVES
+from .geometry_extractor import MAX_PRIMITIVES, budget_for
 from .layer_conventions import (
     classify_by_layer, classify_system, is_non_component_layer,
 )
@@ -256,15 +256,21 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     # 后果不只是少个标记：截断位置依赖 PDF 遍历顺序，同一张图两次重建
     # 可以给出不同的构件数（实测某照明图 v8 管线 119、v10 为 0，
     # 而单张识别跑出 518）。不标出来，这种波动看起来就像「修复生效了」。
-    truncated = geom.primitive_count() >= MAX_PRIMITIVES
-    lines = geom.lines[:MAX_PRIMITIVES]
-    rects = geom.rects[:MAX_PRIMITIVES]
-    polys = geom.polys[:MAX_PRIMITIVES]
-    line_layers = geom.line_layers[:MAX_PRIMITIVES]
-    rect_layers = geom.rect_layers[:MAX_PRIMITIVES]
-    rect_blocks = geom.rect_blocks[:MAX_PRIMITIVES]
-    poly_layers = geom.poly_layers[:MAX_PRIMITIVES]
-    poly_blocks = geom.poly_blocks[:MAX_PRIMITIVES]
+    # **抽取侧按类配额，这里是识别侧的处理上限** —— 两者约束的是不同的东西：
+    # 配额管「抽多少进来」（取舍，见 `PRIMITIVE_BUDGET`），
+    # 这里管「一次处理多少」（耗时）。读同一张表，避免两处各写一遍而漂移。
+    #
+    # 实测这道上限对多边形其实不起作用（一张典型图 17,120 个 < 配额），
+    # 起作用的是线（382,882 个）—— 而线的平行对匹配是耗时大头。
+    truncated = _is_truncated(geom)
+    lines = geom.lines[:budget_for("lines")]
+    rects = geom.rects[:budget_for("rects")]
+    polys = geom.polys[:budget_for("polys")]
+    line_layers = geom.line_layers[:budget_for("lines")]
+    rect_layers = geom.rect_layers[:budget_for("rects")]
+    rect_blocks = geom.rect_blocks[:budget_for("rects")]
+    poly_layers = geom.poly_layers[:budget_for("polys")]
+    poly_blocks = geom.poly_blocks[:budget_for("polys")]
 
     all_text = "；".join(t[2] for t in geom.texts)
     axis_x, axis_y, axis_lines = _detect_axes(
@@ -551,6 +557,20 @@ def _axes_dict(
     if truncated:
         axes["truncated"] = True
     return axes
+
+
+def _is_truncated(geom) -> bool:
+    """任何一类触到配额，就说明这张图被截断了。
+
+    与抽取侧用同一张配额表。此前这里写的是
+    `geom.primitive_count() > MAX_PRIMITIVES`，而收集侧停在 `>=`，
+    两边比较符不一致 —— 于是被截断的图 `primitive_count()` 恰好等于上限、
+    一个也不会超过，标记**永远打不出来**（实测 120/120 张被截断的图，
+    `axes.truncated` 全是 False）。
+    """
+    return (len(geom.lines) >= budget_for("lines")
+            or len(geom.rects) >= budget_for("rects")
+            or len(geom.polys) >= budget_for("polys"))
 
 
 def _downsample_ring(poly: list, limit: int) -> list:

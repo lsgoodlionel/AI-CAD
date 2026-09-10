@@ -13,7 +13,60 @@ from .types import DrawingGeometry
 logger = logging.getLogger(__name__)
 
 # 单页几何原语上限（超出截断，识别层记 truncated）
+#
+# **保留它是为了兼容**：识别层仍用它作每类的处理上限（那是耗时的约束，
+# 与抽取的取舍无关）。抽取侧改用 `PRIMITIVE_BUDGET` 按类分配，见下。
 MAX_PRIMITIVES = 20_000
+
+#: 抽取阶段**按类**的图元配额。
+#:
+#: 旧写法是一个总量上限、先到先得，实测后果是**线把配额吃光**：
+#:
+#:     抽取 2 万（旧）      线 19,752（98.8%）· 多边形    248
+#:     抽取 40 万           线 382,882        · 多边形 17,120
+#:
+#: 而柱与板来自**多边形**、墙与梁来自**线的平行对**。让线先到先得，
+#: 等于用墙的原料换掉了柱的原料 —— 同一张图，2 万配额下识别出柱 **3** 根，
+#: 放开后 **42** 根。
+#:
+#: 全库规模（抽查 120 张参与建模的图）：**120 张全部**触到旧上限，
+#: 真实图元数中位 **377,686**，旧配额只覆盖 5.5%。
+#:
+#: **为什么不是分块**：实测同一张图，全量整图识别 9.7s、4×4 分块 117.9s
+#: （分块每块都要遍历全量图元，是 O(块数×n)），而全量整图相对旧上限
+#: 只慢 0.7s —— 因为识别层还有每类上限顶着。分块是错的方向。
+#:
+#: 配额取值：多边形/矩形按实测量级（1.7 万）留三倍余量；线给到六万，
+#: 远超识别层每类 2 万的处理上限，够用且不浪费内存。
+PRIMITIVE_BUDGET: dict[str, int] = {
+    "lines": 60_000,
+    "rects": 60_000,
+    "polys": 60_000,
+    "texts": 20_000,
+}
+
+#: 未登记类别的兜底 —— 缺失不得阻断，不抛异常。
+_DEFAULT_BUDGET = 20_000
+
+
+def budget_for(kind: str) -> int:
+    """某类图元的抽取配额。抽取侧与识别侧**读同一张表**。
+
+    两处各写一遍必然漂移 —— `truncated` 标记就栽在这上面：
+    收集侧用 `>=`、标记侧用 `>`，比较符不一致，标记永远打不出来。
+    """
+    return PRIMITIVE_BUDGET.get(kind, _DEFAULT_BUDGET)
+
+
+def _budget_exhausted(geom) -> bool:
+    """三类**都**满了才停止收集 —— 只要还有一类没满就继续。
+
+    这正是与旧写法的区别：旧写法一个总数满了就整体停，于是量大的类
+    （线）把量少但关键的类（多边形）挤了出去。
+    """
+    return (len(geom.lines) >= budget_for("lines")
+            and len(geom.rects) >= budget_for("rects")
+            and len(geom.polys) >= budget_for("polys"))
 
 
 # --- 图层/块对齐 append 辅助 ----------------------------------------------
@@ -91,7 +144,7 @@ def _collect_pdf_drawings(page, geom: DrawingGeometry) -> None:
     # 页面旋转 → 图元变换到显示坐标系（见 `_apply_rotation`）
     rot = page.rotation_matrix if getattr(page, "rotation", 0) else None
     for drawing in page.get_drawings():
-        if geom.primitive_count() >= MAX_PRIMITIVES:
+        if _budget_exhausted(geom):
             return
         filled = drawing.get("fill") is not None
         path_points: list[tuple[float, float]] = []
@@ -192,7 +245,7 @@ def _sniff_ext(data: bytes) -> str:
 
 def _collect_dxf_entities(msp, geom: DrawingGeometry) -> None:
     for entity in msp:
-        if geom.primitive_count() >= MAX_PRIMITIVES:
+        if _budget_exhausted(geom):
             return
         _process_dxf_entity(entity, geom, block="")
 
@@ -253,7 +306,7 @@ def _expand_insert(entity, geom: DrawingGeometry) -> None:
     except Exception:  # noqa: BLE001 — virtual_entities 不可用 → 降级跳过
         return
     for sub in virtuals:
-        if geom.primitive_count() >= MAX_PRIMITIVES:
+        if _budget_exhausted(geom):
             return
         _process_dxf_entity(sub, geom, block=block_name)
 

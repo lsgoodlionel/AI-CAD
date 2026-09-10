@@ -17,6 +17,9 @@
 
 两边的比较符不一致，标记就永远打不出来。本文件把这个边界钉死。
 
+（配额此后改为**按类**分配，见 `test_primitive_budget.py`；
+本文件的断言随之改读 `budget_for("lines")`。）
+
 **注意本修复不改变识别结果** —— 它只让「这张图被截断了」这个事实
 出现在 `axes.truncated` 里。上限本身该不该提高是另一个问题
 （提高会成倍增加渲染与识别耗时），需要单独实测。
@@ -26,7 +29,7 @@ from __future__ import annotations
 import pytest
 
 from core.model3d import DrawingGeometry, recognize
-from core.model3d.geometry_extractor import MAX_PRIMITIVES
+from core.model3d.geometry_extractor import budget_for
 
 
 def _geometry_with(n_lines: int) -> DrawingGeometry:
@@ -47,8 +50,9 @@ def test_exactly_at_the_cap_is_reported_as_truncated():
     恰好等于 `MAX_PRIMITIVES`，一个也不会超过。标记若要求严格大于，
     就永远打不出来（实测 120/120 张被截断的图，标记全是 False）。
     """
-    geom = _geometry_with(MAX_PRIMITIVES)
-    assert geom.primitive_count() == MAX_PRIMITIVES, "前提：构造恰好触到上限"
+    cap = budget_for("lines")
+    geom = _geometry_with(cap)
+    assert len(geom.lines) == cap, "前提：构造恰好触到线的配额"
 
     result = recognize(geom, "structure", "d-cap")
     assert result.axes.get("truncated") is True, (
@@ -58,7 +62,7 @@ def test_exactly_at_the_cap_is_reported_as_truncated():
 @pytest.mark.unit
 def test_below_the_cap_is_not_flagged():
     """反向对照：没触到上限的图不该被标，否则这个标记就没有信息量。"""
-    geom = _geometry_with(MAX_PRIMITIVES - 100)
+    geom = _geometry_with(budget_for("lines") - 100)
     result = recognize(geom, "structure", "d-small")
     assert result.axes.get("truncated") is not True
 
@@ -77,7 +81,7 @@ def test_collector_and_flag_use_the_same_comparison():
     collector = inspect.getsource(geometry_extractor)
     flagger = inspect.getsource(element_recognizer)
 
-    assert "primitive_count() >= MAX_PRIMITIVES" in collector, (
-        "收集侧的停止条件变了，请同步本测试与标记侧")
-    assert "primitive_count() >= MAX_PRIMITIVES" in flagger, (
-        "标记侧必须与收集侧用同一个比较符，否则标记永远打不出来")
+    assert "budget_for(" in collector, (
+        "收集侧必须按类配额停止（`_budget_exhausted`），不能用总数上限")
+    assert "budget_for(" in flagger, (
+        "标记侧必须与收集侧读同一张配额表，否则标记会再次永远打不出来")
