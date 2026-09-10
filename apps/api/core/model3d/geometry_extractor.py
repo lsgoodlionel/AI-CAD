@@ -48,6 +48,9 @@ PRIMITIVE_BUDGET: dict[str, int] = {
 #: 未登记类别的兜底 —— 缺失不得阻断，不抛异常。
 _DEFAULT_BUDGET = 20_000
 
+#: 总量硬顶：三类配额之和。防止「某类天然为 0 导致永不停止遍历」。
+_TOTAL_HARD_CAP = 180_000
+
 
 def budget_for(kind: str) -> int:
     """某类图元的抽取配额。抽取侧与识别侧**读同一张表**。
@@ -59,11 +62,18 @@ def budget_for(kind: str) -> int:
 
 
 def _budget_exhausted(geom) -> bool:
-    """三类**都**满了才停止收集 —— 只要还有一类没满就继续。
+    """还值不值得继续遍历 —— 这只是**优化**，真正的上限在 `_add_*` 里。
 
-    这正是与旧写法的区别：旧写法一个总数满了就整体停，于是量大的类
-    （线）把量少但关键的类（多边形）挤了出去。
+    与旧写法的区别：旧写法一个总数满了就整体停，量大的类（线）把量少
+    但关键的类（多边形）挤了出去。这里只有**每一类都到顶**才停。
+
+    **不能只写「三类都满」**：实测很多图 `rects` 恒为 0（PDF 里矩形被
+    当作四点多边形收），那一类永远不满，遍历就永不停止 —— 实测线因此
+    收到 1,019,796 条。所以判据是「每类要么满了、要么这一页根本没有」，
+    而后者由 `_add_*` 各自的上限兜底，这里用总量硬顶防失控。
     """
+    if len(geom.lines) + len(geom.rects) + len(geom.polys) >= _TOTAL_HARD_CAP:
+        return True
     return (len(geom.lines) >= budget_for("lines")
             and len(geom.rects) >= budget_for("rects")
             and len(geom.polys) >= budget_for("polys"))
@@ -76,12 +86,19 @@ def _budget_exhausted(geom) -> bool:
 
 def _add_line(geom: DrawingGeometry, x0: float, y0: float, x1: float, y1: float,
               layer: str = "") -> None:
+    # **每类各自把关**。整体停止条件（`_budget_exhausted`）只是优化，
+    # 真正的上限在这里 —— 实测某图矩形恒为 0，若只靠「三类都满才停」，
+    # 矩形永远不满，线会一直收到 **1,019,796** 条（配额 6 万）。
+    if len(geom.lines) >= budget_for("lines"):
+        return
     geom.lines.append((x0, y0, x1, y1))
     geom.line_layers.append(layer)
 
 
 def _add_rect(geom: DrawingGeometry, x: float, y: float, w: float, h: float,
               filled: bool, layer: str = "", block: str = "") -> None:
+    if len(geom.rects) >= budget_for("rects"):
+        return
     geom.rects.append((x, y, w, h, filled))
     geom.rect_layers.append(layer)
     geom.rect_blocks.append(block)
@@ -89,6 +106,8 @@ def _add_rect(geom: DrawingGeometry, x: float, y: float, w: float, h: float,
 
 def _add_poly(geom: DrawingGeometry, pts: list[tuple[float, float]],
               layer: str = "", block: str = "") -> None:
+    if len(geom.polys) >= budget_for("polys"):
+        return
     geom.polys.append(pts)
     geom.poly_layers.append(layer)
     geom.poly_blocks.append(block)

@@ -84,3 +84,30 @@ def test_配额表是单一真相源():
         "识别侧必须用 `budget_for` 取配额，不能自己写死 MAX_PRIMITIVES")
     assert isinstance(PRIMITIVE_BUDGET, dict) and PRIMITIVE_BUDGET, (
         "配额表要是可读的单一来源")
+
+
+@pytest.mark.unit
+def test_一类天然为零时其他类不会失控():
+    """**每类各自把关**，而不是「三类都满才停」。
+
+    实测踩过的坑：很多 PDF 里 `rects` 恒为 0（矩形被当作四点多边形收），
+    若停止条件写成「三类都满」，矩形永远不满，遍历就永不停止 ——
+    实测线因此收到 **1,019,796** 条，而配额是 6 万。
+    识别结果当时看着正常（识别侧另有切片），但抽取阶段内存无限增长。
+    """
+    from core.model3d.geometry_extractor import _add_line, _add_poly
+    from core.model3d.types import DrawingGeometry
+
+    geom = DrawingGeometry(page_w=842.0, page_h=595.0)
+    cap = budget_for("lines")
+    # 只喂线与多边形，一个矩形也不给 —— 复现「rects 恒为 0」
+    for i in range(cap + 5_000):
+        _add_line(geom, 0.0, float(i % 500), 10.0, float(i % 500))
+    assert len(geom.rects) == 0, "前提：这一页没有矩形"
+    assert len(geom.lines) == cap, (
+        f"线必须停在自己的配额上，实得 {len(geom.lines):,} —— "
+        "每类各自把关，不能等别人满")
+
+    for i in range(200):
+        _add_poly(geom, [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0)])
+    assert len(geom.polys) == 200, "多边形没到配额，不该被线的满额连累"
