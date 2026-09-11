@@ -91,3 +91,26 @@ def test_降级要可见():
                                       return_capped=True)
     assert not_capped is False
     assert plain > 0 and dpi > 0
+
+
+# ── 真的能渲染出来 ──────────────────────────────────────────────
+
+@pytest.mark.unit
+@pytest.mark.parametrize("dpi", [288, 288.0, 437.3, 152.4])
+def test_render_clip_accepts_float_dpi_and_hits_exact_size(dpi):
+    """`dpi_for_scale` / `render_dpi_for_crop` 返回的是**浮点** DPI。
+
+    PyMuPDF 的 `get_pixmap(dpi=…)` 只收整数，给浮点直接抛 TypeError ——
+    而金标准生成器与 YOLO 导出都把渲染包在宽泛 `except` 里，于是**每一格都
+    静默失败**：col3 批扫了 7520 个候选、出 0 格、退出码 0。
+
+    改用缩放矩阵渲染：浮点照收，且尺寸就是算出来的那个，不被取整。
+    """
+    import fitz
+
+    from core.model3d.render_budget import render_clip
+
+    doc = fitz.open()
+    page = doc.new_page(width=842, height=595)
+    pix = render_clip(page, fitz.Rect(0, 0, 120, 120), dpi)
+    assert abs(pix.width - 120 / 72 * dpi) <= 1, f"宽 {pix.width}，应为 {120 / 72 * dpi:.1f}"

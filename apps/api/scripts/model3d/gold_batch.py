@@ -42,6 +42,7 @@ from core.config import settings
 from core.model3d.element_recognizer import recognize
 from core.model3d.geometry_extractor import extract_pdf_geometry
 from core.model3d.gold.batch_codes import make_codes
+from core.model3d.render_budget import render_clip
 from core.model3d.gold.batch_design import (
     Candidate, crop_box_pt, criteria_section, plan_duplicates,
     render_dpi_for_crop, stratify,
@@ -68,6 +69,11 @@ PER_DRAWING_TIMEOUT_SEC = 120
 
 #: 每张图至多取几格 —— YOLO 批出过「一张图占 15 格」的集中。
 PER_DRAWING = 2
+
+#: 渲染失败按异常类型计数。**单格失败可以跳过，但不能静默** ——
+#: 曾因 PyMuPDF 不收浮点 DPI，每一格都抛 TypeError 被吞掉，
+#: 整批出 0 格、退出码 0。
+RENDER_FAILURES: dict[str, int] = {}
 
 #: 空白对照画的框：0.6 米见方，典型柱截面 —— 与被测组同形。
 BLANK_BOX_M = 0.6
@@ -151,9 +157,10 @@ def _render_cell(page, crop, mark_box) -> tuple[Image.Image, bool] | None:
     x0, y0, x1, y1 = crop
     dpi, capped = render_dpi_for_crop(x1 - x0, y1 - y0, cell_px=CELL_PX)
     try:
-        pix = page.get_pixmap(dpi=dpi, clip=fitz.Rect(x0, y0, x1, y1))
+        pix = render_clip(page, fitz.Rect(x0, y0, x1, y1), dpi)
         im = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
-    except Exception:  # noqa: BLE001 - 单格失败不影响整批
+    except Exception as exc:  # noqa: BLE001 - 单格失败不影响整批，但必须计数
+        RENDER_FAILURES[type(exc).__name__] = RENDER_FAILURES.get(type(exc).__name__, 0) + 1
         return None
     canvas = Image.new("RGB", (CELL_PX, CELL_PX), "white")
     canvas.paste(im.crop((0, 0, min(im.width, CELL_PX), min(im.height, CELL_PX))), (0, 0))
@@ -175,7 +182,7 @@ def _find_blank(page, fe, rng) -> tuple | None:
         box = (cx - side_pt / 2, cy - side_pt / 2, cx + side_pt / 2, cy + side_pt / 2)
         crop = crop_box_pt(box, fe.scale, page_w=pr.width, page_h=pr.height)
         try:
-            pix = page.get_pixmap(dpi=40, clip=fitz.Rect(*crop))
+            pix = render_clip(page, fitz.Rect(*crop), 40)
             gray = Image.frombytes("RGB", (pix.width, pix.height), pix.samples).convert("L")
         except Exception:  # noqa: BLE001
             continue
@@ -412,6 +419,11 @@ async def main() -> int:
     weights = _weights(strata, scanned)
     n, meta = _write_outputs(out, sheets, strata, scanned, weights,
                              args.kind, spec, args.host_dir, args)
+    if RENDER_FAILURES:
+        print(f"  ⚠ 渲染失败（按异常类型）：{RENDER_FAILURES}")
+    if not kept:
+        print(f"\n✗ 被测组 0 格 —— 批次无效，不输出。渲染失败：{RENDER_FAILURES or '无'}")
+        return 1
     print(f"\n出 {len(sheets)} 页 {n} 格：{meta['groups']}")
     capped = sum(1 for sh in sheets for c in sh if c.capped)
     if capped:

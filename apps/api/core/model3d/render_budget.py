@@ -106,3 +106,19 @@ def dpi_for_scale(
 
     dpi = round(dpi, 1)
     return (dpi, capped) if return_capped else dpi
+
+
+def render_clip(page, clip, dpi: float):
+    """按任意（浮点）DPI 渲染页面的一块，返回 `fitz.Pixmap`。
+
+    **不要用 `page.get_pixmap(dpi=…)`**：它只收整数，而本模块与
+    `gold.batch_design.render_dpi_for_crop` 算出来的都是浮点。传浮点直接抛
+    `TypeError`，外面若有宽泛 `except`，失败就是静默的 —— col3 批扫了
+    7520 个候选、出 0 格、退出码 0，就是这样发生的。
+
+    缩放矩阵收浮点，渲染尺寸也就是算出来的那个，不被取整。
+    """
+    import fitz  # type: ignore[import-untyped]  # 懒加载：本模块其余部分是纯函数
+
+    zoom = float(dpi) / 72.0
+    return page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), clip=clip)

@@ -65,7 +65,9 @@ def _export_tiles(page, fe, did, tag, tile_dpi, verified, meters_to_page):
         if not labels and rng.random() > NEG_RATE:
             continue
         clip = fitz.Rect(tx / k, ty / k, (tx + TILE) / k, (ty + TILE) / k)
-        pix = page.get_pixmap(dpi=tile_dpi, clip=clip)
+        # 浮点 DPI 必须走缩放矩阵 —— get_pixmap(dpi=) 只收整数（见 render_clip）
+        from core.model3d.render_budget import render_clip
+        pix = render_clip(page, clip, tile_dpi)
         name = f"{tag}_{did[:8]}_{i:03d}"
         pix.save(f"{OUT}/images/{name}.png")
         open(f"{OUT}/labels/{name}.txt", "w").write(
