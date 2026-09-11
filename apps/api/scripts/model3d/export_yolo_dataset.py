@@ -27,6 +27,63 @@ PLAN = re.compile(r"平面")
 BAD = re.compile(r"防雷|接地|照明|插座|弱电|消防报警|喷淋|通风|空调|给排水|电气")
 VERIFY_N = int(os.environ.get("VERIFY_N", "3"))
 
+#: 瓦片边长 = 训练 imgsz。瓦片间重叠 20%，跨缝的构件至少在一块里完整。
+TILE = 1024
+#: 没有任何框的瓦片按这个比例留作负样本 —— 全扔掉模型会把「有东西」
+#: 当成默认，全留下正负样本严重失衡（大图上九成瓦片是空白）。
+NEG_RATE = 0.05
+
+
+def _export_tiles(page, fe, did, tag, tile_dpi, verified, meters_to_page):
+    """整页像素框 → 按瓦片切 → 每块写一张图和一份 YOLO 标注。"""
+    import random as _random
+    from core.model3d.tiling import boxes_in_tile, tile_origins
+    k = tile_dpi / 72.0
+    ox, oy = getattr(fe, "origin_pt", (0.0, 0.0))
+    ph = float(getattr(fe, "page_h", 0) or page.rect.height)
+    boxes = []
+    for kind, items, key in (("columns", fe.columns, "outline"),
+                             ("walls", fe.walls, "path"),
+                             ("slabs", fe.slabs, "outline")):
+        cid = class_id(kind)
+        if cid is None:
+            continue
+        for el in items:
+            pts = [meters_to_page(p[0], p[1], fe.scale, (ox, oy), ph)
+                   for p in (el.get(key) or []) if isinstance(p, (list, tuple)) and len(p) >= 2]
+            if len(pts) < 2:
+                continue
+            xs = [x * k for x, _ in pts]; ys = [y * k for _, y in pts]
+            boxes.append((cid, (min(xs), min(ys), max(xs), max(ys))))
+    if len(boxes) < 10:
+        return 0, 0, verified
+    rng = _random.Random(did)
+    W, H = page.rect.width * k, page.rect.height * k
+    n_tiles = n_boxes = 0
+    for i, (tx, ty) in enumerate(tile_origins(W, H, tile=TILE, overlap=0.2)):
+        labels = boxes_in_tile(boxes, origin=(tx, ty), tile=TILE)
+        if not labels and rng.random() > NEG_RATE:
+            continue
+        clip = fitz.Rect(tx / k, ty / k, (tx + TILE) / k, (ty + TILE) / k)
+        pix = page.get_pixmap(dpi=tile_dpi, clip=clip)
+        name = f"{tag}_{did[:8]}_{i:03d}"
+        pix.save(f"{OUT}/images/{name}.png")
+        open(f"{OUT}/labels/{name}.txt", "w").write(
+            "\n".join(f"{c} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}" for c, cx, cy, w, h in labels))
+        n_tiles += 1; n_boxes += len(labels)
+        if labels and verified < VERIFY_N:
+            img = Image.open(f"{OUT}/images/{name}.png").convert("RGB")
+            d = ImageDraw.Draw(img)
+            colors = ["#e00", "#0a0", "#00e", "#e80", "#a0a", "#0aa"]
+            for c, cx, cy, w, h in labels:
+                d.rectangle([(cx - w / 2) * img.width, (cy - h / 2) * img.height,
+                             (cx + w / 2) * img.width, (cy + h / 2) * img.height],
+                            outline=colors[c % 6], width=2)
+            img.save(f"{OUT}/verify/{name}_boxes.png")
+            verified += 1
+    return n_tiles, n_boxes, verified
+
+
 async def main():
     raw = databases_lib.Database(settings.database_url); await raw.connect()
     db = DatabaseAdapter(raw)
@@ -67,23 +124,18 @@ async def main():
             if not t or not fk or len(elems) < 10: continue
             if not PLAN.search(title) or BAD.search(title): continue
             if disc not in ("structure", "architecture", "decoration"): continue
-            # **按这张图自己的比例定分辨率**：`t` 是 drawing_transform 的
-            # scale_m_pt（米/点），换算成比例分母 = scale_m_pt / (25.4/72) * 1000。
+            # **按这张图自己的比例定分辨率，再切成 TILE 见方的瓦片**。
+            # 旧做法是整页渲染：现役模型 imgsz=800 训整张图，A0 压到长边 800px
+            # 等效只有 17 DPI，1:150 下 0.6m 的柱只有 2.7px —— 模型从没见过柱，
+            # mAP50 = 0.049。切块后每块只渲染自己那一小片（clip），所以不受整页
+            # 像素预算约束，DPI 可以按比例取足（柱 ≥24px，见 render_budget）。
             try:
                 page = fitz.open(stream=get_file_bytes(fk), filetype="pdf")[0]
                 _scale_m_pt = float(t[0]) if isinstance(t, (list, tuple)) else float(t)
                 _denom = _scale_m_pt * 1000.0 / (25.4 / 72.0) if _scale_m_pt > 0 else None
-                page_dpi, _capped = dpi_for_scale(
-                    _denom, page_w_pt=page.rect.width, page_h_pt=page.rect.height,
-                    return_capped=True)
-                if _capped:
-                    # 降级必须可见
-                    print(f"  [dpi] {title[:24]} 触像素预算，降到 {page_dpi}")
-                pix = page.get_pixmap(dpi=page_dpi)
+                tile_dpi = dpi_for_scale(_denom)
             except Exception:
                 continue
-            # **直接调识别器**：构件坐标不走 `drawing_transform`，
-            # 用那张表反算页面坐标会整体错位（实测真柱一个没框上）。
             from core.model3d.geometry_extractor import extract_pdf_geometry
             from core.model3d.element_recognizer import recognize
             from core.model3d.yolo_export import meters_to_page
@@ -94,41 +146,9 @@ async def main():
                 continue
             sc_m = float(getattr(fe, "scale", 0) or 0)
             if sc_m <= 0: continue
-            ox, oy = getattr(fe, "origin_pt", (0.0, 0.0))
-            ph = float(getattr(fe, "page_h", 0) or page.rect.height)
-            k = page_dpi / 72.0
-            def to_px(p):
-                xp, yp = meters_to_page(p[0], p[1], sc_m, (ox, oy), ph)
-                return (xp * k, yp * k)
-            elems = ([{"kind": "columns", "pts": c.get("outline") or []} for c in fe.columns]
-                     + [{"kind": "walls", "pts": w.get("path") or []} for w in fe.walls]
-                     + [{"kind": "slabs", "pts": s.get("outline") or []} for s in fe.slabs])
-            lines = []
-            boxes = []
-            for el in elems:
-                cid = class_id(el["kind"])
-                if cid is None: continue
-                px_pts = [to_px(p) for p in el["pts"]
-                          if isinstance(p, (list, tuple)) and len(p) >= 2]
-                box = outline_to_yolo_box(px_pts, pix.width, pix.height)
-                if box is None: continue
-                lines.append(f"{cid} " + " ".join(f"{v:.6f}" for v in box))
-                boxes.append((cid, box))
-            if len(lines) < 10: continue
-            name = f"{tag}_{did[:8]}"
-            pix.save(f"{OUT}/images/{name}.png")
-            open(f"{OUT}/labels/{name}.txt", "w").write("\n".join(lines))
-            total_img += 1; total_box += len(lines)
-            if verified < VERIFY_N:
-                img = Image.open(f"{OUT}/images/{name}.png").convert("RGB")
-                d = ImageDraw.Draw(img)
-                colors = ["#e00", "#0a0", "#00e", "#e80", "#a0a", "#0aa"]
-                for cid, (cx, cy, w, h) in boxes:
-                    x0 = (cx - w/2) * img.width; y0 = (cy - h/2) * img.height
-                    x1 = (cx + w/2) * img.width; y1 = (cy + h/2) * img.height
-                    d.rectangle([x0, y0, x1, y1], outline=colors[cid % 6], width=2)
-                img.save(f"{OUT}/verify/{name}_boxes.png")
-                verified += 1
+            n_tiles, n_boxes, verified = _export_tiles(
+                page, fe, did, tag, tile_dpi, verified, meters_to_page)
+            total_img += n_tiles; total_box += n_boxes
     print(f"导出 {total_img} 张图 / {total_box} 个框 → {OUT}", flush=True)
     print(f"核验图 {verified} 张 → {OUT}/verify", flush=True)
     await raw.disconnect()
