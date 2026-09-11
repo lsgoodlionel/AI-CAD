@@ -38,6 +38,10 @@ docs/PHASE_C_TASKS.md	apps/api/migrations/018_semantic_review_actions.sql
 docs/PHASE_C_TASKS.md	apps/api/migrations/019_review_metrics.sql
 docs/PHASE_C_TASKS.md	apps/web/src/pages/model/ProjectModel/DrawingAnnotationQueue.tsx
 docs/PHASE_C_TASKS.md	apps/web/src/pages/model/ProjectModel/SemanticReviewQueue.tsx
+docs/PHASE_D_D20_MAC_TRAINING.md	model.py
+docs/PHASE_D_D20_MAC_TRAINING.md	research/cadtx/smoke_train.py
+docs/PHASE_D_D20_MAC_TRAINING.md	train_cad_ddp.py
+docs/PHASE_D_D20_MAC_TRAINING.md	vit.py
 docs/PHASE_E_BLUEPRINT.md	layer_class_map.yaml
 docs/PHASE_E_BLUEPRINT.md	scripts/model3d/audit_element_coverage.py
 docs/PHASE_E_BLUEPRINT.md	services/model_facade.py
