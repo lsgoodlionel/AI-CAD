@@ -29,6 +29,8 @@ import gc
 import json
 import math
 import random
+import signal
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -57,6 +59,12 @@ PER_SHEET = COLS * ROWS
 
 #: 每层最多扫这么多张图（识别一张 5~10 秒，不设上限会扫几千张跑不完）。
 SCAN_PER_STRATUM = 10
+
+#: 单图抽取+识别的时限（秒）。配额按类分配后单图可达 6 万线 + 6 万多边形，
+#: 一张病态图就能卡住整批 —— 建模流程有 `_RECOGNIZE_TIMEOUT_SEC`，这里照做。
+#: 用 SIGALRM 而不是线程池：线程超时后仍在后台吃 CPU（建模那边实测过僵尸
+#: 线程占满线程池），信号会在主线程里直接打断。
+PER_DRAWING_TIMEOUT_SEC = 120
 
 #: 每张图至多取几格 —— YOLO 批出过「一张图占 15 格」的集中。
 PER_DRAWING = 2
@@ -93,6 +101,22 @@ class Cell:
 
 
 # ── 取样本 ───────────────────────────────────────────────────────
+
+class _DrawingTimeout(Exception):
+    pass
+
+
+@contextmanager
+def _time_limit(seconds: int):
+    def _raise(_signum, _frame):
+        raise _DrawingTimeout()
+    old = signal.signal(signal.SIGALRM, _raise)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old)
 
 async def _eligible_drawings(db) -> dict[str, list[dict]]:
     """按「工程·专业」分层的候选图（平面类，排除示范工程）。"""
@@ -174,11 +198,16 @@ async def _scan(db, strata, spec, args, rng):
         for row in rows[:SCAN_PER_STRATUM]:
             did = str(row["id"])
             try:
-                data = get_file_bytes(row["file_key"])
-                geom = extract_pdf_geometry(data)
-                fe = recognize(geom, row["discipline"], did, drawing_title=row["title"],
-                               scale_override=row["scale_m_pt"], view_type="plan")
+                with _time_limit(PER_DRAWING_TIMEOUT_SEC):
+                    data = get_file_bytes(row["file_key"])
+                    geom = extract_pdf_geometry(data)
+                    fe = recognize(geom, row["discipline"], did, drawing_title=row["title"],
+                                   scale_override=row["scale_m_pt"], view_type="plan")
                 doc = fitz.open(stream=data, filetype="pdf")
+            except _DrawingTimeout:
+                # 降级必须可见：超时的图记下来，不静默跳过
+                print(f"    ⏱ 超时跳过 {row['title'][:30]}（>{PER_DRAWING_TIMEOUT_SEC}s）", flush=True)
+                continue
             except Exception:  # noqa: BLE001
                 continue
             try:
