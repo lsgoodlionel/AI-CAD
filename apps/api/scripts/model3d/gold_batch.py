@@ -114,12 +114,18 @@ class _DrawingTimeout(Exception):
 
 @contextmanager
 def _time_limit(seconds: int):
+    """超时后 `fired[0]` 为 True。**不能只靠异常冒泡**：`recognize` 自己有
+    「任何异常返回空 FloorElements」的宽泛 except，会把超时吞掉、返回空结果 ——
+    col3 批里一张图就这样被当成「0 个候选」计进了分层权重，而不是被跳过。"""
+    fired = [False]
+
     def _raise(_signum, _frame):
-        raise _DrawingTimeout()
+        fired[0] = True
+        raise _DrawingTimeout(f"超过 {seconds}s")
     old = signal.signal(signal.SIGALRM, _raise)
     signal.alarm(seconds)
     try:
-        yield
+        yield fired
     finally:
         signal.alarm(0)
         signal.signal(signal.SIGALRM, old)
@@ -205,11 +211,13 @@ async def _scan(db, strata, spec, args, rng):
         for row in rows[:SCAN_PER_STRATUM]:
             did = str(row["id"])
             try:
-                with _time_limit(PER_DRAWING_TIMEOUT_SEC):
+                with _time_limit(PER_DRAWING_TIMEOUT_SEC) as fired:
                     data = get_file_bytes(row["file_key"])
                     geom = extract_pdf_geometry(data)
                     fe = recognize(geom, row["discipline"], did, drawing_title=row["title"],
                                    scale_override=row["scale_m_pt"], view_type="plan")
+                if fired[0]:
+                    raise _DrawingTimeout("recognize 吞掉了超时")
                 doc = fitz.open(stream=data, filetype="pdf")
             except _DrawingTimeout:
                 # 降级必须可见：超时的图记下来，不静默跳过
