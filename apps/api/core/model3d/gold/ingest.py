@@ -47,6 +47,30 @@ def _resolve(answers: list[dict], issued: set[str], field: str):
     return resolved, counts
 
 
+def _cell_weights(manifest: list[dict]) -> tuple[dict[str, float], bool]:
+    """每个被测格的层内权重 = 所在图纸候选数 ÷ 从该图取的格数。
+
+    生成器每图至多取 2 格、不论这张图有多少候选：只有 3 个 logo 字母被当成
+    柱的图，与有 800 根柱的图各贡献 2 格 —— 不加权的话，稀疏图在层内被严重
+    高估，而用户看到的是**候选量**，由大图主导。
+
+    **有一格缺候选数就整批退回等权**（返回 False）—— 一半加权一半不加，
+    量出来的数哪个口径都不是。
+    """
+    kept = [r for r in manifest if r.get("group") == "kept"]
+    per_drawing: collections.Counter = collections.Counter(r.get("drawing_id") for r in kept)
+    weights: dict[str, float] = {}
+    for r in kept:
+        try:
+            n = int(r.get("drawing_candidates") or -1)
+        except (TypeError, ValueError):
+            n = -1
+        if n <= 0:
+            return {}, False
+        weights[r["code"]] = n / per_drawing[r.get("drawing_id")]
+    return weights, bool(kept)
+
+
 def summarize(
     manifest: list[dict],
     answers: list[dict],
@@ -59,7 +83,9 @@ def summarize(
     resolved, counts = _resolve(answers, issued, field)
 
     per: dict[str, list[int]] = {}
+    per_w: dict[str, list[float]] = {}
     fp_labels: collections.Counter = collections.Counter()
+    cell_weight, within = _cell_weights(manifest)
     blank_neg = blank_n = 0
     pairs: list[tuple[str, str]] = []
     for row in manifest:
@@ -77,6 +103,10 @@ def summarize(
             ok_n = per.setdefault(row["stratum"], [0, 0])
             ok_n[0] += int(verdict)
             ok_n[1] += 1
+            w = cell_weight.get(code, 1.0)
+            ok_w = per_w.setdefault(row["stratum"], [0.0, 0.0])
+            ok_w[0] += w * int(verdict)
+            ok_w[1] += w
             if not verdict:
                 raw = str(ans.get("what") or "").strip()
                 fp_labels[canonical_what(raw) or f"未登记:{raw or '空'}"] += 1
@@ -84,7 +114,8 @@ def summarize(
     per_stratum = {s: (v[0], v[1]) for s, v in per.items()}
     total_ok = sum(v[0] for v in per_stratum.values())
     total_n = sum(v[1] for v in per_stratum.values())
-    wp, coverage = weighted_precision(per_stratum, weights)
+    per_stratum_w = {s: (v[0], v[1]) for s, v in per_w.items()}
+    wp, coverage = weighted_precision(per_stratum_w, weights)
     verdicts = {code: v for code, (v, _a) in resolved.items()}
     issues = check_batch([{"id": c, "what": a.get("what") or str(v)}
                           for c, (v, a) in resolved.items()])
@@ -95,6 +126,9 @@ def summarize(
         "per_stratum": per_stratum,
         "raw_precision": (total_ok / total_n) if total_n else None,
         "weighted_precision": wp,
+        # 层内是否按候选量加权；False = 有格缺候选数，整批退回等权
+        "within_stratum_weighted": within,
+        "per_stratum_weighted": per_stratum_w,
         "coverage": coverage,
         "blank": (blank_neg, blank_n),
         "pair_agreement": pair_agreement(verdicts, pairs),

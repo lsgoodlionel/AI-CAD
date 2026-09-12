@@ -132,6 +132,22 @@ class Cell:
     image: Image.Image = field(repr=False)
     dup_of: str = ""
     capped: bool = False
+    #: 所在图纸的候选总数 —— 层内加权要用（见 `ingest._cell_weights`）；-1 = 未知
+    drawing_candidates: int = -1
+
+
+#: manifest 列。`drawing_candidates` 让回收端能按候选量加权，
+#: 不必像 col3 那样事后重跑识别去回填。
+MANIFEST_HEADER = ("code\tgroup\tstratum\tdrawing_id\tdrawing_candidates\tsheet"
+                   "\tdup_of\tcapped\tcrop_pt\ttitle")
+
+
+def manifest_row(cell: "Cell", sheet_no: int) -> str:
+    """一格 → manifest 的一行（`sheet_no` 从 1 起）。"""
+    crop = ",".join(f"{v:.1f}" for v in cell.crop_pt)
+    return (f"{cell.code}\t{cell.group}\t{cell.stratum}\t{cell.drawing_id}\t"
+            f"{cell.drawing_candidates}\tS{sheet_no}\t{cell.dup_of}\t{int(cell.capped)}"
+            f"\t{crop}\t{cell.title}")
 
 
 # ── 取样本 ───────────────────────────────────────────────────────
@@ -289,7 +305,8 @@ async def _scan(db, strata, spec, args, rng):
                         continue
                     pool.append(Candidate(stratum, did, f"{did}:{i}", {
                         "box": box, "crop": crop, "title": row["title"],
-                        "image": rendered[0], "capped": rendered[1]}))
+                        "image": rendered[0], "capped": rendered[1],
+                        "n_cands": len(elems)}))
                 if fe.scale and got_blank < per_blank_stratum and len(blanks) < args.blank:
                     found = _find_blank(page, fe, rng, spec)
                     if found:
@@ -341,7 +358,8 @@ def _layout(cells: list[Cell], kept_codes: list[str], seed: int, codes_iter) -> 
                                         fraction=DUP_FRACTION, n_sheets=n_sheets, seed=seed):
         src = by_code[orig]
         dup = Cell(next(codes_iter), "dup", src.stratum, src.drawing_id, src.title,
-                   src.crop_pt, src.image, dup_of=orig, capped=src.capped)
+                   src.crop_pt, src.image, dup_of=orig, capped=src.capped,
+                   drawing_candidates=src.drawing_candidates)
         order = [target] + [i for i in range(n_sheets) if i not in (target, sheet_of[orig])]
         for i in order:
             if len(sheets[i]) < PER_SHEET:
@@ -414,13 +432,10 @@ def _write_outputs(out: Path, sheets, strata, scanned, weights, kind, spec, host
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 26)
     except Exception:  # noqa: BLE001
         font = ImageFont.load_default()
-    rows = ["code\tgroup\tstratum\tdrawing_id\tsheet\tdup_of\tcapped\tcrop_pt\ttitle"]
+    rows = [MANIFEST_HEADER]
     for i, sh in enumerate(sheets):
         _draw_sheet(sh, font).save(out / f"S{i + 1}.png")
-        for c in sh:
-            crop = ",".join(f"{v:.1f}" for v in c.crop_pt)
-            rows.append(f"{c.code}\t{c.group}\t{c.stratum}\t{c.drawing_id}\tS{i + 1}\t"
-                        f"{c.dup_of}\t{int(c.capped)}\t{crop}\t{c.title}")
+        rows.extend(manifest_row(c, i + 1) for c in sh)
     (out / "manifest.tsv").write_text("\n".join(rows) + "\n", encoding="utf-8")
     n_cells = sum(len(s) for s in sheets)
     (out / "BATCH.txt").write_text(_batch_text(kind, spec, host_dir, sheets, n_cells),
@@ -464,7 +479,8 @@ async def main() -> int:
                       seed=args.seed)
     codes = iter(make_codes(len(picked) + len(blanks) + 64, seed=args.seed))
     kept = [Cell(next(codes), "kept", c.stratum, c.drawing_id, c.payload["title"],
-                 c.payload["crop"], c.payload["image"], capped=c.payload["capped"])
+                 c.payload["crop"], c.payload["image"], capped=c.payload["capped"],
+                 drawing_candidates=c.payload["n_cands"])
             for c in picked]
     for b in blanks:
         b.code = next(codes)
