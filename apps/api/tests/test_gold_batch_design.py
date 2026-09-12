@@ -283,3 +283,38 @@ def test_every_generator_kind_has_real_criteria():
     for kind in KIND_SPEC:
         criteria_section(CRITERIA, kind)          # 抽不到会抛 KeyError
     assert {"walls", "beams", "pipes"} <= set(KIND_SPEC), "线状三类要登记"
+
+
+# ── 板：多边形标记 ──────────────────────────────────────────────
+
+@pytest.mark.unit
+def test_outline_can_be_marked_as_polygon():
+    """板要画**真实边界**，不能画包络框。
+
+    第一版判为板的 5 块里 4 块是「圈大了」—— 用包络框画，圈大了与圈对了
+    看起来一模一样，判读者无从判断。所以板的标记必须是原多边形。
+    """
+    from core.model3d.gold.batch_design import element_mark
+
+    ring = [[0, 0], [4, 0], [4, 3], [2, 3], [2, 1], [0, 1]]      # L 形板
+    mark = element_mark({"outline": ring}, to_page=lambda x, y: (x, y), as_poly=True)
+    assert mark.shape == "poly"
+    assert mark.poly == tuple(tuple(p) for p in ring)
+    assert mark.bbox == (0, 0, 4, 3)
+
+
+@pytest.mark.unit
+def test_polygon_mark_is_opt_in():
+    """默认仍画框 —— 柱与设备的批次不受影响。"""
+    from core.model3d.gold.batch_design import element_mark
+
+    mark = element_mark({"outline": [[0, 0], [1, 0], [1, 1]]}, to_page=lambda x, y: (x, y))
+    assert mark.shape == "box"
+
+
+@pytest.mark.unit
+def test_slabs_are_registered_with_polygon_marks():
+    from scripts.model3d.gold_batch import KIND_SPEC
+
+    assert KIND_SPEC["slabs"]["mark"] == "poly"
+    assert KIND_SPEC["slabs"]["attr"] == "slabs"

@@ -79,6 +79,8 @@ RENDER_FAILURES: dict[str, int] = {}
 #: 线状画 3 米横线（候选长度分布很宽，3 米不构成可辨认的特征）。
 BLANK_BOX_M = 0.6
 BLANK_LINE_M = 3.0
+#: 板的空白对照：6×4 米的矩形多边形（一块小板的量级）。
+BLANK_SLAB_M = (6.0, 4.0)
 
 #: 批内重测对占被测格的比例。
 DUP_FRACTION = 0.10
@@ -101,6 +103,11 @@ KIND_SPEC = {
               "field": "is_pipe", "mark": "line", "mark_word": "红线", "attr": "pipes",
               "rel": 1.6,
               "what": "wall / beam_or_grid / leader / hatch / frame / nothing / other"},
+    "slabs": {"question": "红线圈出的是不是**一块楼板的边界**（圈大了也算错）？",
+              "field": "is_slab", "mark": "poly", "mark_word": "红色多边形",
+              "attr": "slabs", "rel": 1.3,
+              "what": ("room / wall_or_beam / building_outline / opening / sliver / "
+                       "section_view / oversized / nothing / other")},
     "equipment": {"question": "框住的是不是一台机电设备（或末端设备符号）？",
                   "field": "is_equipment", "mark": "box", "mark_word": "红色方框",
                   "attr": "equipment", "rel": 4.0,
@@ -170,10 +177,10 @@ async def _eligible_drawings(db) -> dict[str, list[dict]]:
     return strata
 
 
-def _mark_of(fe, el) -> Mark | None:
+def _mark_of(fe, el, *, as_poly: bool = False) -> Mark | None:
     if not fe.scale:
         return None
-    return element_mark(el, to_page=lambda x, y: meters_to_page(
+    return element_mark(el, as_poly=as_poly, to_page=lambda x, y: meters_to_page(
         x, y, fe.scale, fe.origin_pt, fe.page_h))
 
 
@@ -195,6 +202,10 @@ def _render_cell(page, crop, mark: Mark) -> tuple[Image.Image, bool] | None:
         (ax, ay), (bx, by) = mark.line
         draw.line([((ax - x0) * k, (ay - y0) * k), ((bx - x0) * k, (by - y0) * k)],
                   fill=(255, 0, 0), width=4)
+    elif mark.shape == "poly":
+        # 闭合折线而不是 polygon(width=)：后者的线宽参数要 Pillow ≥ 9.1
+        pts = [((x - x0) * k, (y - y0) * k) for x, y in mark.poly]
+        draw.line(pts + pts[:1], fill=(255, 0, 0), width=4, joint="curve")
     else:
         bx0, by0, bx1, by1 = mark.bbox
         draw.rectangle([(bx0 - x0) * k, (by0 - y0) * k, (bx1 - x0) * k, (by1 - y0) * k],
@@ -212,6 +223,10 @@ def _find_blank(page, fe, rng, spec) -> tuple | None:
             half = BLANK_LINE_M / fe.scale / 2
             box = Mark("line", (cx - half, cy, cx + half, cy),
                        line=((cx - half, cy), (cx + half, cy)))
+        elif spec["mark"] == "poly":
+            hw, hh = BLANK_SLAB_M[0] / fe.scale / 2, BLANK_SLAB_M[1] / fe.scale / 2
+            ring = ((cx - hw, cy - hh), (cx + hw, cy - hh), (cx + hw, cy + hh), (cx - hw, cy + hh))
+            box = Mark("poly", (cx - hw, cy - hh, cx + hw, cy + hh), poly=ring)
         else:
             half = BLANK_BOX_M / fe.scale / 2
             box = Mark("box", (cx - half, cy - half, cx + half, cy + half))
@@ -262,7 +277,9 @@ async def _scan(db, strata, spec, args, rng):
                 # **每图先抽再渲染**：配额按类分配后一张图能有上千根柱，全渲染
                 # 就是上千张 480×480 图（一张图 690MB）。`stratify` 本就每图
                 # 至多取 PER_DRAWING 格，先在这里抽等价，且只渲染要用的。
-                marks = {i: m for i, el in enumerate(elems) if (m := _mark_of(fe, el))}
+                as_poly = spec["mark"] == "poly"
+                marks = {i: m for i, el in enumerate(elems)
+                         if (m := _mark_of(fe, el, as_poly=as_poly))}
                 for i in rng.sample(sorted(marks), min(PER_DRAWING, len(marks))):
                     box = marks[i]
                     crop = crop_box_pt(box.bbox, fe.scale, page_w=page.rect.width,

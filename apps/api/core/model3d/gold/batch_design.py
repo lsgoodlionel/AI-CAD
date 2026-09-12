@@ -42,22 +42,28 @@ class Candidate:
 
 @dataclass(frozen=True)
 class Mark:
-    """格子里要画的标记（页面点）。框状构件画框，线状构件（墙/梁/管）画线。"""
-    shape: str                                   # "box" | "line"
+    """格子里要画的标记（页面点）。框状构件画框，线状构件（墙/梁/管）画线，
+    板画**原多边形** —— 用包络框画，「圈大了」与「圈对了」看起来一模一样。"""
+    shape: str                                   # "box" | "line" | "poly"
     bbox: tuple[float, float, float, float]
     line: tuple | None = None
+    poly: tuple | None = None
 
 
-def element_mark(el: dict, *, to_page) -> Mark | None:
+def element_mark(el: dict, *, to_page, as_poly: bool = False) -> Mark | None:
     """构件 → 标记。`to_page(x_m, y_m) -> (x_pt, y_pt)` 由调用方给（它知道比例与原点）。
 
+    `as_poly=True` 时 outline 画成原多边形（板要判边界圈得对不对）；默认画包络框。
     点数不够就返回 None，由调用方跳过 —— 画不出的标记不假装画了。
     """
     outline = el.get("outline") or []
     if len(outline) >= 3:
-        pts = [to_page(x, y) for x, y in outline]
+        pts = [tuple(to_page(x, y)) for x, y in outline]
         xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
-        return Mark("box", (min(xs), min(ys), max(xs), max(ys)))
+        bbox = (min(xs), min(ys), max(xs), max(ys))
+        if as_poly:
+            return Mark("poly", bbox, poly=tuple(pts))
+        return Mark("box", bbox)
     path = el.get("path") or []
     if len(path) >= 2:
         a = tuple(to_page(*path[0])); b = tuple(to_page(*path[-1]))
