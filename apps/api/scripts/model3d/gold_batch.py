@@ -44,7 +44,8 @@ from core.model3d.geometry_extractor import extract_pdf_geometry
 from core.model3d.gold.batch_codes import make_codes
 from core.model3d.render_budget import render_clip
 from core.model3d.gold.batch_design import (
-    Candidate, Mark, crop_box_pt, criteria_section, element_mark, plan_duplicates,
+    Candidate, Mark, crop_box_pt, criteria_section, element_mark, inset_for_mark,
+    plan_duplicates,
     render_dpi_for_crop, stratify,
 )
 from core.model3d.yolo_export import meters_to_page
@@ -204,6 +205,7 @@ def _render_cell(page, crop, mark: Mark) -> tuple[Image.Image, bool] | None:
     """按原生分辨率渲染裁框，画红框。贴到定尺寸画布上 —— 贴，不缩放。"""
     x0, y0, x1, y1 = crop
     dpi, capped = render_dpi_for_crop(x1 - x0, y1 - y0, cell_px=CELL_PX)
+    dpi *= inset_for_mark(mark.bbox, crop)      # 贴边的大标记四周留白
     try:
         pix = render_clip(page, fitz.Rect(x0, y0, x1, y1), dpi)
         im = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
@@ -211,9 +213,14 @@ def _render_cell(page, crop, mark: Mark) -> tuple[Image.Image, bool] | None:
         RENDER_FAILURES[type(exc).__name__] = RENDER_FAILURES.get(type(exc).__name__, 0) + 1
         return None
     canvas = Image.new("RGB", (CELL_PX, CELL_PX), "white")
-    canvas.paste(im.crop((0, 0, min(im.width, CELL_PX), min(im.height, CELL_PX))), (0, 0))
+    # 居中贴：裁框可以不是正方形（大标记两向各自封顶），加上贴边留白，
+    # 渲染结果常比格子小 —— 贴在中间，四周白边，不缩放
+    im = im.crop((0, 0, min(im.width, CELL_PX), min(im.height, CELL_PX)))
+    ox, oy = (CELL_PX - im.width) // 2, (CELL_PX - im.height) // 2
+    canvas.paste(im, (ox, oy))
     k = dpi / 72.0
     draw = ImageDraw.Draw(canvas)
+    x0, y0 = x0 - ox / k, y0 - oy / k           # 标记坐标随贴图偏移
     if mark.shape == "line":
         (ax, ay), (bx, by) = mark.line
         draw.line([((ax - x0) * k, (ay - y0) * k), ((bx - x0) * k, (by - y0) * k)],

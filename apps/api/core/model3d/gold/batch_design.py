@@ -100,13 +100,36 @@ def crop_box_pt(
     elem_side = max(x1 - x0, y1 - y0, 0.0)
     ctx_pt = ctx_m / scale_m_pt if scale_m_pt and scale_m_pt > 0 else 0.0
     side = max(elem_side * rel, ctx_pt, min_pt)
-    side = min(side, float(page_w), float(page_h))
-    half = side / 2.0
-    bx0, by0 = cx - half, cy - half
+    # **两个方向各自封顶**：原来整体以页面短边封顶、恒为正方形 —— 横向页面上
+    # 与页面一样大的多边形（整层外轮廓/图框）会被从中间切掉左右两段
+    # （slab3 实测：页面 2384×1684、裁框 1684 见方，只剩上下两条边）。
+    side_x = min(side, float(page_w))
+    side_y = min(side, float(page_h))
+    bx0, by0 = cx - side_x / 2.0, cy - side_y / 2.0
     # 伸出页面的部分渲染出来是空白，会误导判读 —— 整体平移回来
-    bx0 = min(max(bx0, 0.0), float(page_w) - side)
-    by0 = min(max(by0, 0.0), float(page_h) - side)
-    return (bx0, by0, bx0 + side, by0 + side)
+    bx0 = min(max(bx0, 0.0), float(page_w) - side_x)
+    by0 = min(max(by0, 0.0), float(page_h) - side_y)
+    return (bx0, by0, bx0 + side_x, by0 + side_y)
+
+
+#: 标记贴边时的渲染缩放系数：四周留出约 6% 白边，整条轮廓落在格子里。
+MARK_INSET = 0.88
+
+
+def inset_for_mark(mark_bbox, crop, *, tol: float = 0.01) -> float:
+    """标记贴着或伸出裁框边时返回 `MARK_INSET`，否则 1.0。
+
+    与页面一样大的板（整层外轮廓/图框）红线正好落在格子边框上，判读者看不见，
+    答成 `nothing` —— 仍算「不是板」，但**误检标签就错了**，而整层外轮廓/圈大了
+    正是板最需要量的错法。贴边时把 DPI 乘上它、居中贴进格子，四周留白。
+    仍是矢量按新 DPI 渲染，不是位图缩放 —— 原生分辨率的原则不破。
+    """
+    mx0, my0, mx1, my1 = mark_bbox
+    cx0, cy0, cx1, cy1 = crop
+    pad_x, pad_y = tol * (cx1 - cx0), tol * (cy1 - cy0)
+    touches = (mx0 <= cx0 + pad_x or my0 <= cy0 + pad_y
+               or mx1 >= cx1 - pad_x or my1 >= cy1 - pad_y)
+    return MARK_INSET if touches else 1.0
 
 
 def render_dpi_for_crop(

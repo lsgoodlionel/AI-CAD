@@ -318,3 +318,50 @@ def test_slabs_are_registered_with_polygon_marks():
 
     assert KIND_SPEC["slabs"]["mark"] == "poly"
     assert KIND_SPEC["slabs"]["attr"] == "slabs"
+
+
+# ── 标记贴边：大多边形的红线会和格子边框重合 ──────────────────────────
+
+@pytest.mark.unit
+def test_mark_well_inside_needs_no_inset():
+    from core.model3d.gold.batch_design import inset_for_mark
+
+    assert inset_for_mark((40, 40, 60, 60), (0, 0, 100, 100)) == 1.0
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("mark", [
+    (0, 0, 100, 100),          # 与裁框重合：整层外轮廓 / 图框
+    (-20, 10, 120, 90),        # 伸出裁框（裁框被页面封顶，标记比页面还大）
+    (0.5, 30, 70, 70),         # 只贴一条边
+])
+def test_mark_touching_the_crop_edge_gets_an_inset(mark):
+    """板的标记大到与页面一样大时，红线正好落在格子边框上 —— 判读者看不见。
+
+    slab3 目检：9YE3 / XF93 / V3HW 三格的红线沿格子上下边走。答成 `nothing`
+    仍算「不是板」，但**误检标签就错了** —— 而「整层外轮廓 / 圈大了」正是板
+    最主要、最需要量的错法（第一版误检 18%、判为板的 5 块里 4 块圈大了）。
+
+    贴边就把渲染 DPI 乘一个小于 1 的系数、居中贴进格子，四周留白让整条轮廓
+    落在格子里。仍是矢量按新 DPI 渲染，不是位图缩放 —— 原生分辨率的原则不破。
+    """
+    from core.model3d.gold.batch_design import inset_for_mark
+
+    k = inset_for_mark(mark, (0, 0, 100, 100))
+    assert 0.8 <= k < 1.0
+
+
+@pytest.mark.unit
+def test_page_sized_mark_on_landscape_page_gets_the_whole_page():
+    """裁框原来恒为正方形、边长以页面短边封顶。横向页面上与页面一样大的
+    多边形（整层外轮廓/图框）就被正方形裁框**从中间切掉左右两段** ——
+    slab3 的 9YE3/XF93/V3HW 实测：页面 2384×1684、裁框边长 1684，只剩上下两条边。
+
+    封顶时两个方向各自封顶，裁框可以不是正方形 —— 整页都要在里面。
+    """
+    page_w, page_h = 2384.0, 1684.0
+    mark = (20.0, 15.0, page_w - 20.0, page_h - 15.0)
+    x0, y0, x1, y1 = crop_box_pt(mark, 0.0529, page_w=page_w, page_h=page_h, rel=1.3)
+    assert x0 <= mark[0] and x1 >= mark[2], f"左右被切掉了：裁框 x {x0:.0f}~{x1:.0f}"
+    assert y0 <= mark[1] and y1 >= mark[3]
+    assert x1 <= page_w and y1 <= page_h
