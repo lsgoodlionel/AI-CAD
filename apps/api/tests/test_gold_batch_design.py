@@ -219,19 +219,26 @@ def test_unknown_criteria_section_raises():
 # ── 判据守卫：只有指针、没有判据的小节不能发出去 ─────────────────────
 
 @pytest.mark.unit
-@pytest.mark.parametrize("key", ["equipment", "slabs"])
-def test_pointer_only_criteria_are_rejected(key):
-    """`equipment` 的小节只有一行「见对应 json 的 note」，`slabs` 只有一句要点。
+def test_pointer_only_criteria_are_rejected(tmp_path):
+    """只有指路、没有判据的小节不能发出去。
 
-    不拦的话，生成器会发出一份**没有判据**的批次 —— 判读者自己猜标准，
-    量出来的数与任何一批都不可比，而这正是 CRITERIA.md 要防的病。
+    曾经的 `equipment` 小节只有一行「见对应 json 的 note」、`slabs` 只有一句
+    要点 —— 不拦的话，生成器会发出一份**没有判据**的批次，判读者自己猜标准。
+
+    用合成文件测，不绑真实数据：真实小节会被补全（v10 已补），
+    绑着它们，测试会在判据写好的那一刻反过来变红。
     """
-    with pytest.raises(KeyError, match="判据"):
-        criteria_section(CRITERIA, key)
+    doc = tmp_path / "CRITERIA.md"
+    doc.write_text("## gadgets —— 见对应 `gadgets_v1.json` 的 note\n\n"
+                   "## widgets —— 什么算小部件\n\n一行要点。\n\n"
+                   "## next —— 下一节\n", encoding="utf-8")
+    for key in ("gadgets", "widgets"):
+        with pytest.raises(KeyError, match="判据"):
+            criteria_section(doc, key)
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("key", ["columns", "walls", "beams", "pipes"])
+@pytest.mark.parametrize("key", ["columns", "walls", "beams", "pipes", "equipment", "slabs"])
 def test_substantive_criteria_still_extract(key):
     """有实质判据的小节照常抽取 —— 守卫不能误伤。"""
     assert len(criteria_section(CRITERIA, key).splitlines()) >= 8

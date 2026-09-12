@@ -101,6 +101,11 @@ KIND_SPEC = {
               "field": "is_pipe", "mark": "line", "mark_word": "红线", "attr": "pipes",
               "rel": 1.6,
               "what": "wall / beam_or_grid / leader / hatch / frame / nothing / other"},
+    "equipment": {"question": "框住的是不是一台机电设备（或末端设备符号）？",
+                  "field": "is_equipment", "mark": "box", "mark_word": "红色方框",
+                  "attr": "equipment", "rel": 4.0,
+                  "what": ("column / wall / beam / door / window / furniture / sanitary / "
+                           "legend / dimension / text / frame / single_line / nothing / other")},
     "columns": {"question": "框住的是不是一根柱子？", "field": "is_column",
                 "mark": "box", "mark_word": "红色方框", "attr": "columns", "rel": 4.0,
                 "what": ("wall / beam / door / window / stair / furniture / seat / "
