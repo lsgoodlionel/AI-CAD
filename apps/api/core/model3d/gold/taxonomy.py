@@ -42,6 +42,10 @@ BUCKETS = {
     "annotation": "图面标注/非实体",
     "judge_answer": "判读侧答案（非误检物）",
     "unspecified": "未具名",
+    # 对象认对了、范围圈错了（板「圈大了」）。修法是边界切分，与构件辨识、
+    # 图纸级闸、标注过滤都不是同一件事 —— 桶按「该由谁去修」分，所以单列。
+    # 板第一版判为板的 5 块里 4 块错在这里。
+    "extent": "对象对、范围错",
 }
 
 #: 原始写法 → (归一标签, 桶)。
@@ -131,6 +135,23 @@ _TABLE: dict[str, tuple[str, str]] = {
 
     # ── 未具名 ─────────────────────────────────────────────────────
     "unsure": ("unsure", "unspecified"),
+    # ── 生成器（`scripts/model3d/gold_batch.py` KIND_SPEC）发出去的英文写法 ──
+    # 由 `tests/test_gold_vocab.py` 锁住：生成器说的每个词，回收端都必须认得。
+    "column": ("column", "real_component"),
+    "stair": ("stair_ramp", "real_component"),
+    "rebar": ("rebar", "real_component"),
+    "frame": ("frame_titleblock", "annotation"),
+    "single_line": ("blank_or_single_line", "annotation"),
+    "other": ("other", "unspecified"),
+    # 新标签 —— 此前没有对应的归一名
+    "pipe": ("pipe", "real_component"),
+    "slab": ("slab", "real_component"),
+    # CRITERIA v10 明确「洁具不算设备」：单列，不并进 furniture_equipment，
+    # 否则那条决定在误检统计里就看不见了
+    "sanitary": ("sanitary", "real_component"),
+    # 图例/设备表里的示例符号是说明，不是布置
+    "legend": ("legend", "annotation"),
+    "oversized": ("oversized", "extent"),
     "no_other": ("other", "unspecified"),
 }
 
