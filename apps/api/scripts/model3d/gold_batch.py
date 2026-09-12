@@ -44,7 +44,7 @@ from core.model3d.geometry_extractor import extract_pdf_geometry
 from core.model3d.gold.batch_codes import make_codes
 from core.model3d.render_budget import render_clip
 from core.model3d.gold.batch_design import (
-    Candidate, crop_box_pt, criteria_section, plan_duplicates,
+    Candidate, Mark, crop_box_pt, criteria_section, element_mark, plan_duplicates,
     render_dpi_for_crop, stratify,
 )
 from core.model3d.yolo_export import meters_to_page
@@ -75,8 +75,10 @@ PER_DRAWING = 2
 #: 整批出 0 格、退出码 0。
 RENDER_FAILURES: dict[str, int] = {}
 
-#: 空白对照画的框：0.6 米见方，典型柱截面 —— 与被测组同形。
+#: 空白对照与被测组同形：框状画 0.6 米见方（典型柱截面），
+#: 线状画 3 米横线（候选长度分布很宽，3 米不构成可辨认的特征）。
 BLANK_BOX_M = 0.6
+BLANK_LINE_M = 3.0
 
 #: 批内重测对占被测格的比例。
 DUP_FRACTION = 0.10
@@ -84,9 +86,23 @@ DUP_FRACTION = 0.10
 PROJECT_SHORT = {"上海大歌剧院": "歌剧院", "轨道交通工程(第二工程交叉验证)": "第二工程"}
 
 #: 每类要问的问题与答案字段。只列已用过的类，别处按需再加（YAGNI）。
+#: `rel`：裁框边长 = 构件尺寸 × rel。框状取 4（看得清构件与周边）；线状取 1.6 ——
+#: 旧的墙/管生成器按固定 5 米裁，**长墙会被裁到自己的裁框外面**。
 KIND_SPEC = {
+    "walls": {"question": "红线压的是不是一面墙？", "field": "is_wall",
+              "mark": "line", "mark_word": "红线", "attr": "walls", "rel": 1.6,
+              "what": ("column / door / window / stair / pipe / furniture / equipment / "
+                       "dimension / axis / text / frame / single_line / nothing / other")},
+    "beams": {"question": "红线压的是不是一根梁？", "field": "is_beam",
+              "mark": "line", "mark_word": "红线", "attr": "beams", "rel": 1.6,
+              "what": ("column / wall / slab / dimension / axis / rebar / text / frame / "
+                       "single_line / nothing / other")},
+    "pipes": {"question": "红线画在的位置，是不是一根机电管线／风管／桥架？",
+              "field": "is_pipe", "mark": "line", "mark_word": "红线", "attr": "pipes",
+              "rel": 1.6,
+              "what": "wall / beam_or_grid / leader / hatch / frame / nothing / other"},
     "columns": {"question": "框住的是不是一根柱子？", "field": "is_column",
-                "mark": "box", "attr": "columns",
+                "mark": "box", "mark_word": "红色方框", "attr": "columns", "rel": 4.0,
                 "what": ("wall / beam / door / window / stair / furniture / seat / "
                          "equipment / axis / dimension / text / hatch / frame / "
                          "elevation_mark / nothing / other")},
@@ -149,16 +165,14 @@ async def _eligible_drawings(db) -> dict[str, list[dict]]:
     return strata
 
 
-def _elem_box_pt(fe, el) -> tuple | None:
-    pts = el.get("outline") or []
-    if len(pts) < 3 or not fe.scale:
+def _mark_of(fe, el) -> Mark | None:
+    if not fe.scale:
         return None
-    px = [meters_to_page(mx, my, fe.scale, fe.origin_pt, fe.page_h) for mx, my in pts]
-    xs = [p[0] for p in px]; ys = [p[1] for p in px]
-    return (min(xs), min(ys), max(xs), max(ys))
+    return element_mark(el, to_page=lambda x, y: meters_to_page(
+        x, y, fe.scale, fe.origin_pt, fe.page_h))
 
 
-def _render_cell(page, crop, mark_box) -> tuple[Image.Image, bool] | None:
+def _render_cell(page, crop, mark: Mark) -> tuple[Image.Image, bool] | None:
     """按原生分辨率渲染裁框，画红框。贴到定尺寸画布上 —— 贴，不缩放。"""
     x0, y0, x1, y1 = crop
     dpi, capped = render_dpi_for_crop(x1 - x0, y1 - y0, cell_px=CELL_PX)
@@ -171,22 +185,33 @@ def _render_cell(page, crop, mark_box) -> tuple[Image.Image, bool] | None:
     canvas = Image.new("RGB", (CELL_PX, CELL_PX), "white")
     canvas.paste(im.crop((0, 0, min(im.width, CELL_PX), min(im.height, CELL_PX))), (0, 0))
     k = dpi / 72.0
-    bx0, by0, bx1, by1 = mark_box
-    ImageDraw.Draw(canvas).rectangle(
-        [(bx0 - x0) * k, (by0 - y0) * k, (bx1 - x0) * k, (by1 - y0) * k],
-        outline=(255, 0, 0), width=3)
+    draw = ImageDraw.Draw(canvas)
+    if mark.shape == "line":
+        (ax, ay), (bx, by) = mark.line
+        draw.line([((ax - x0) * k, (ay - y0) * k), ((bx - x0) * k, (by - y0) * k)],
+                  fill=(255, 0, 0), width=4)
+    else:
+        bx0, by0, bx1, by1 = mark.bbox
+        draw.rectangle([(bx0 - x0) * k, (by0 - y0) * k, (bx1 - x0) * k, (by1 - y0) * k],
+                       outline=(255, 0, 0), width=3)
     return canvas, capped
 
 
-def _find_blank(page, fe, rng) -> tuple | None:
-    """找一处墨迹稀疏（非全白）的地方放同形红框，作空白对照。"""
-    side_pt = BLANK_BOX_M / fe.scale
+def _find_blank(page, fe, rng, spec) -> tuple | None:
+    """找一处墨迹稀疏（非全白）的地方放**同形**标记，作空白对照。"""
     pr = page.rect
     for _ in range(15):
         cx = rng.uniform(pr.x0 + 0.15 * pr.width, pr.x0 + 0.70 * pr.width)
         cy = rng.uniform(pr.y0 + 0.15 * pr.height, pr.y0 + 0.70 * pr.height)
-        box = (cx - side_pt / 2, cy - side_pt / 2, cx + side_pt / 2, cy + side_pt / 2)
-        crop = crop_box_pt(box, fe.scale, page_w=pr.width, page_h=pr.height)
+        if spec["mark"] == "line":
+            half = BLANK_LINE_M / fe.scale / 2
+            box = Mark("line", (cx - half, cy, cx + half, cy),
+                       line=((cx - half, cy), (cx + half, cy)))
+        else:
+            half = BLANK_BOX_M / fe.scale / 2
+            box = Mark("box", (cx - half, cy - half, cx + half, cy + half))
+        crop = crop_box_pt(box.bbox, fe.scale, page_w=pr.width, page_h=pr.height,
+                           rel=spec["rel"])
         try:
             pix = render_clip(page, fitz.Rect(*crop), 40)
             gray = Image.frombytes("RGB", (pix.width, pix.height), pix.samples).convert("L")
@@ -232,11 +257,11 @@ async def _scan(db, strata, spec, args, rng):
                 # **每图先抽再渲染**：配额按类分配后一张图能有上千根柱，全渲染
                 # 就是上千张 480×480 图（一张图 690MB）。`stratify` 本就每图
                 # 至多取 PER_DRAWING 格，先在这里抽等价，且只渲染要用的。
-                idx = [i for i, el in enumerate(elems) if _elem_box_pt(fe, el)]
-                for i in rng.sample(idx, min(PER_DRAWING, len(idx))):
-                    box = _elem_box_pt(fe, elems[i])
-                    crop = crop_box_pt(box, fe.scale, page_w=page.rect.width,
-                                       page_h=page.rect.height)
+                marks = {i: m for i, el in enumerate(elems) if (m := _mark_of(fe, el))}
+                for i in rng.sample(sorted(marks), min(PER_DRAWING, len(marks))):
+                    box = marks[i]
+                    crop = crop_box_pt(box.bbox, fe.scale, page_w=page.rect.width,
+                                       page_h=page.rect.height, rel=spec["rel"])
                     rendered = _render_cell(page, crop, box)
                     if rendered is None:
                         continue
@@ -244,7 +269,7 @@ async def _scan(db, strata, spec, args, rng):
                         "box": box, "crop": crop, "title": row["title"],
                         "image": rendered[0], "capped": rendered[1]}))
                 if fe.scale and got_blank < per_blank_stratum and len(blanks) < args.blank:
-                    found = _find_blank(page, fe, rng)
+                    found = _find_blank(page, fe, rng, spec)
                     if found:
                         rendered = _render_cell(page, found[1], found[0])
                         if rendered:
@@ -327,9 +352,9 @@ def _batch_text(kind: str, spec: dict, host_dir: str, sheets, n_cells: int) -> s
 这是中国建筑施工图（平面图）的局部放大，共 {n_cells} 格。
 每格左上角有一个**四位随机编号**（如 NRKK、YPMW），请照抄。
 
-每格里有一个**红色方框**。请判断：**{spec['question']}**
+每格里有一个**{spec['mark_word']}**。请判断：**{spec['question']}**
 
-**每格的放大倍数不同** —— 上下文按红框自身大小取；每格都是按原生分辨率
+**每格的放大倍数不同** —— 上下文按标记自身大小取；每格都是按原生分辨率
 渲染的，没有经过缩放。
 
 --------------- 判据（逐字取自 CRITERIA.md，务必照用）---------------
@@ -347,7 +372,7 @@ confident   true / false
 --------------- 重要 ---------------
 
 **这批格子来自几种不同的来源，我不告诉你哪格来自哪种** ——
-请只按图面判断，不要试图推测。其中确实混了一些红框画在空白处的格子，
+请只按图面判断，不要试图推测。其中确实混了一些{spec['mark_word']}画在空白处的格子，
 判 `nothing` 是正常且必要的结果。**有少数格子会出现不止一次**（编号不同），
 请各自独立判断，不要回头对照。
 

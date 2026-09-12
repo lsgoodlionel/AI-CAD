@@ -214,3 +214,65 @@ def test_unknown_criteria_section_raises():
     """找不到判据就报错 —— 绝不能静默发出一份没有判据的批次。"""
     with pytest.raises(KeyError):
         criteria_section(CRITERIA, "no_such_class")
+
+
+# ── 判据守卫：只有指针、没有判据的小节不能发出去 ─────────────────────
+
+@pytest.mark.unit
+@pytest.mark.parametrize("key", ["equipment", "slabs"])
+def test_pointer_only_criteria_are_rejected(key):
+    """`equipment` 的小节只有一行「见对应 json 的 note」，`slabs` 只有一句要点。
+
+    不拦的话，生成器会发出一份**没有判据**的批次 —— 判读者自己猜标准，
+    量出来的数与任何一批都不可比，而这正是 CRITERIA.md 要防的病。
+    """
+    with pytest.raises(KeyError, match="判据"):
+        criteria_section(CRITERIA, key)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("key", ["columns", "walls", "beams", "pipes"])
+def test_substantive_criteria_still_extract(key):
+    """有实质判据的小节照常抽取 —— 守卫不能误伤。"""
+    assert len(criteria_section(CRITERIA, key).splitlines()) >= 8
+
+
+# ── 线状构件（墙/梁/管）的标记 ─────────────────────────────────────
+
+@pytest.mark.unit
+def test_outline_element_marks_as_box():
+    from core.model3d.gold.batch_design import element_mark
+
+    mark = element_mark({"outline": [[0, 0], [2, 0], [2, 1], [0, 1]]}, to_page=lambda x, y: (x, y))
+    assert mark.shape == "box"
+    assert mark.bbox == (0, 0, 2, 1)
+
+
+@pytest.mark.unit
+def test_path_element_marks_as_line_with_covering_bbox():
+    """墙/梁/管是两点 `path`：画红线，裁框取两端点的包络。"""
+    from core.model3d.gold.batch_design import element_mark
+
+    mark = element_mark({"path": [[1, 5], [9, 2]]}, to_page=lambda x, y: (x, y))
+    assert mark.shape == "line"
+    assert mark.line == ((1, 5), (9, 2))
+    assert mark.bbox == (1, 2, 9, 5)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("el", [{}, {"outline": [[0, 0], [1, 1]]}, {"path": [[0, 0]]}])
+def test_degenerate_elements_have_no_mark(el):
+    """点数不够的构件画不出标记 —— 返回 None，由调用方跳过，不假装画了。"""
+    from core.model3d.gold.batch_design import element_mark
+
+    assert element_mark(el, to_page=lambda x, y: (x, y)) is None
+
+
+@pytest.mark.unit
+def test_every_generator_kind_has_real_criteria():
+    """生成器登记的每一类都必须抽得到实质判据 —— 挡住「先加类、判据以后再补」。"""
+    from scripts.model3d.gold_batch import KIND_SPEC
+
+    for kind in KIND_SPEC:
+        criteria_section(CRITERIA, kind)          # 抽不到会抛 KeyError
+    assert {"walls", "beams", "pipes"} <= set(KIND_SPEC), "线状三类要登记"

@@ -40,6 +40,32 @@ class Candidate:
     payload: dict = field(default_factory=dict, compare=False, hash=False)
 
 
+@dataclass(frozen=True)
+class Mark:
+    """格子里要画的标记（页面点）。框状构件画框，线状构件（墙/梁/管）画线。"""
+    shape: str                                   # "box" | "line"
+    bbox: tuple[float, float, float, float]
+    line: tuple | None = None
+
+
+def element_mark(el: dict, *, to_page) -> Mark | None:
+    """构件 → 标记。`to_page(x_m, y_m) -> (x_pt, y_pt)` 由调用方给（它知道比例与原点）。
+
+    点数不够就返回 None，由调用方跳过 —— 画不出的标记不假装画了。
+    """
+    outline = el.get("outline") or []
+    if len(outline) >= 3:
+        pts = [to_page(x, y) for x, y in outline]
+        xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
+        return Mark("box", (min(xs), min(ys), max(xs), max(ys)))
+    path = el.get("path") or []
+    if len(path) >= 2:
+        a = tuple(to_page(*path[0])); b = tuple(to_page(*path[-1]))
+        return Mark("line", (min(a[0], b[0]), min(a[1], b[1]),
+                             max(a[0], b[0]), max(a[1], b[1])), line=(a, b))
+    return None
+
+
 # ── 裁框与渲染分辨率 ──────────────────────────────────────────────
 
 #: 裁框至少这么多页面点 —— 比例错到离谱时（全库只有 68.6% 的系统比例
@@ -164,6 +190,11 @@ def plan_duplicates(
 
 _HEADING = re.compile(r"^##\s+(.*)$")
 
+#: 一节判据正文至少这么多个非空行才算「有判据」。`equipment` 的小节只有
+#: 一行「见对应 json 的 note」、`slabs` 只有一句要点 —— 放行的话，生成器
+#: 会发出一份没有判据的批次，判读者自己猜标准。
+MIN_CRITERIA_LINES = 4
+
 
 def _heading_keys(title: str) -> list[str]:
     """`## columns / column_outline —— 什么算「柱」` → ['columns', 'column_outline']"""
@@ -172,6 +203,19 @@ def _heading_keys(title: str) -> list[str]:
 
 
 def criteria_section(path: Path | str, key: str) -> str:
+    """取 `CRITERIA.md` 中 `key` 那一节的原文，并确认它**真有判据**。
+
+    只有指针（「见某某」）没有正文的小节同样抛 `KeyError` —— 先写判据再出批次。
+    """
+    text = _raw_section(path, key)
+    body = [ln for ln in text.splitlines()[1:] if ln.strip()]
+    if len(body) < MIN_CRITERIA_LINES:
+        raise KeyError(f"CRITERIA.md 的「{key}」一节只有指针、没有判据"
+                       f"（正文 {len(body)} 行）—— 先写判据再出批次")
+    return text
+
+
+def _raw_section(path: Path | str, key: str) -> str:
     """取 `CRITERIA.md` 中 `key` 那一节的原文（含标题，到下一个 `##` 为止）。
 
     找不到就抛 `KeyError` —— 绝不静默发出一份没有判据的批次。
