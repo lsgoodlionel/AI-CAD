@@ -186,6 +186,7 @@ def resolve_detection_frame(
     origin_override: tuple[float | None, float | None] | None = None,
     page_w_pt: float | None = None,
     detected_is_guess: bool = False,
+    printed_scale: float | None = None,
 ) -> tuple[float, tuple[float | None, float | None]]:
     """圆检测的比例/原点，与识别器**同口径**。
 
@@ -200,7 +201,8 @@ def resolve_detection_frame(
     from .element_recognizer import resolve_scale
 
     scale = resolve_scale(detected_scale, scale_override, page_w_pt,
-                          detected_is_guess=detected_is_guess)
+                          detected_is_guess=detected_is_guess,
+                          printed_scale=printed_scale)
     override = origin_override or (None, None)
     origin = (
         detected_origin[0] if detected_origin[0] is not None else override[0],
@@ -215,6 +217,7 @@ def detect_pile_columns(
     param2: int = DEFAULT_PARAM2, src: str = "",
     scale_override: float | None = None,
     origin_override: tuple[float | None, float | None] | None = None,
+    printed_scale: float | None = None,
 ) -> list[dict]:
     """栅格化 PDF → HoughCircles → 米坐标八边形柱(shape=circle)。
 
@@ -240,7 +243,7 @@ def detect_pile_columns(
             detected,
             _origin_pt(axis_x, axis_y, geom.page_h),
             scale_override, origin_override, geom.page_w,
-            detected_is_guess=is_guess,
+            detected_is_guess=is_guess, printed_scale=printed_scale,
         )
         if scale <= 0:
             return []

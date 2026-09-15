@@ -106,6 +106,7 @@ A4 短边 210mm × 1:1 = 0.21 米；A0 长边 1189mm × 1:2000 = 2378 米。
 """
 from __future__ import annotations
 
+import json
 import math
 import re
 from collections import Counter
@@ -243,6 +244,56 @@ def printed_denominators(
             if denominator in STANDARD_DENOMINATORS:
                 votes[denominator] += weight
     return votes
+
+
+def printed_scale_from_archive(
+    items: Iterable[dict] | None,
+    extent: tuple[float | None, float | None] | None = None,
+) -> float | None:
+    """档案 OCR 条目 → 图上印刷的**主比例**（m/pt）；读不出或平票返回 ``None``。
+
+    ``items`` 形如 ``{"content", "location_json": {"bbox": [x0,y0,x1,y1]}}``；
+    ``extent`` 是本图**全部** OCR 词条的最大 x / y。
+
+    位置按 ``extent`` 归一化成页面比例再判「在不在图框带」，与坐标框无关。
+    必须这样做：2026-08-31（`ce05751`）之前写入的档案 bbox **不是页面点** ——
+    大图按「最长边 2160」缩放过，图框里的 `1: 150` 落在 x≈2034，
+    按页面点看是 3370 宽页面的 60%，会被当成图面中部的详图比例。
+
+    平票不猜：两个比例各一票时说不出哪个是主比例。
+    """
+    texts: list[Any] = []
+    for item in items or ():
+        content = str(item.get("content") or "")
+        bbox = _bbox_of(item.get("location_json"))
+        if bbox and extent and (extent[0] or 0) > 0 and (extent[1] or 0) > 0:
+            cx = (bbox[0] + bbox[2]) / 2.0 / float(extent[0])
+            cy = (bbox[1] + bbox[3]) / 2.0 / float(extent[1])
+            texts.append((cx, cy, content))
+        else:
+            texts.append(content)
+    ranked = printed_denominators(texts, page_w=1.0, page_h=1.0).most_common(2)
+    if not ranked or (len(ranked) > 1 and ranked[0][1] == ranked[1][1]):
+        return None
+    return ranked[0][0] * PT_TO_MM / 1000.0
+
+
+def _bbox_of(location: Any) -> tuple[float, float, float, float] | None:
+    """``location_json`` → bbox；JSON 字符串、缺字段、非数值一律当没有位置。"""
+    if isinstance(location, str):
+        try:
+            location = json.loads(location)
+        except ValueError:
+            return None
+    if not isinstance(location, dict):
+        return None
+    bbox = location.get("bbox")
+    if not isinstance(bbox, Sequence) or len(bbox) != 4:
+        return None
+    try:
+        return tuple(float(v) for v in bbox)  # type: ignore[return-value]
+    except (TypeError, ValueError):
+        return None
 
 
 def evaluate(

@@ -91,6 +91,51 @@ def assess_capability(role_counts: Mapping[str, int]) -> SetCapability:
                          degradations=degradations)
 
 
+_RANK = {CAPABILITY_NONE: 0, CAPABILITY_PARTIAL: 1, CAPABILITY_FULL: 2}
+
+
+def _has_elements(floor: Mapping) -> bool:
+    return any(items for items in (floor.get("elements") or {}).values())
+
+
+def reconcile_capability(capability: Mapping, floors: list[dict]) -> dict:
+    """按**建模结果**校正能力档位 —— 只往下校、不往上抬；返回新 dict。
+
+    `assess_capability` 只数角色：有 1 张坐标基准图就判世界坐标 full，
+    有 1 张立面/剖面就判标高 full。实测大歌剧院两项都显示「图纸实测」，
+    而 12 层里 11 层标高是估的、有构件的楼层大多没有一张图按工程坐标定位。
+    **输入具备不等于结果达成**，所以要拿楼层的实际结果再校一遍。
+    """
+    degradations = list(capability.get("degradations") or [])
+    elevations = capability.get("elevations", CAPABILITY_NONE)
+    world = capability.get("world_coords", CAPABILITY_NONE)
+
+    # 分母只数**有这个字段**的楼层 —— 未分层之类没有标高结论的不该摊薄比例
+    rated = [f for f in floors if "elevation_estimated" in f]
+    estimated = [f for f in rated if f.get("elevation_estimated")]
+    if estimated and elevations == CAPABILITY_FULL:
+        # 全是估的 ⇒ 结果上一层也没从图纸读出来，与世界坐标同一口径判「缺依据」
+        elevations = (CAPABILITY_NONE if len(estimated) == len(rated)
+                      else CAPABILITY_PARTIAL)
+        degradations.append(
+            f"{len(estimated)}/{len(rated)} 层标高是估算值、不是从图纸读出的"
+            "——竖向尺寸只作参考")
+
+    with_elements = [f for f in floors if _has_elements(f)]
+    if with_elements and world != CAPABILITY_NONE:
+        placed = [f for f in with_elements if int(f.get("placed_drawings") or 0) > 0]
+        outcome = (CAPABILITY_FULL if len(placed) == len(with_elements)
+                   else CAPABILITY_PARTIAL if placed else CAPABILITY_NONE)
+        if _RANK[outcome] < _RANK.get(world, 0):
+            world = outcome
+            degradations.append(
+                f"只有 {len(placed)}/{len(with_elements)} 个有构件的楼层有图按工程坐标定位"
+                "——其余是图纸间相对拼接，位置不能当测量成果用")
+
+    return {**capability, "elevations": elevations, "world_coords": world,
+            "degradations": degradations}
+
+
 def plan_stages(role_counts: Mapping[str, int]) -> list[dict]:
     """按**依赖顺序**排出要跑的阶段。缺的阶段直接跳过，**不阻断**后面的。
 

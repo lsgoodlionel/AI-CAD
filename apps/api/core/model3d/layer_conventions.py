@@ -345,9 +345,17 @@ _DEFAULT_GATE_VOCAB: dict[str, dict[str, tuple[str, ...]]] = {
     "annotation": {
         "substrings": ("标注", "文字", "说明", "编号", "尺寸标", "标高标", "注释",
                        "图例", "纵筋", "箍筋", "配筋", "钢筋", "拉筋", "分布筋"),
-        "patterns": (r"(?:^|-)(?:TEXT|DIMS?|NOTE|IDEN|ANNO|TAG|LABEL|REBAR|REIN)(?:-|$)",),
+        # `RBAR` 是 AIA 的钢筋次级码 —— 实测 `0S-SLAB-RBAR` 因含 SLAB 造出 52 块假板。
+        "patterns": (r"(?:^|-)(?:TEXT|DIMS?|NOTE|IDEN|ANNO|TAG|LABEL|REBAR|REIN|RBAR)(?:-|$)",),
         # 「钢筋混凝土」是材料名（GB/T 50083），不是钢筋图层。
         "exempt": (r"钢筋(?:混凝土|砼)",),
+    },
+    # 开洞：画的是**没有**构件的地方（AIA 次级码 HOLE / OPNG）。
+    # 实测 `0S-SLAB-HOLE` / `-HOLE-2` 因含 SLAB 造出 87 块假板（S-0-20-102.04C）。
+    # 分隔符认 `-` `_` `—`（下划线与全角破折号在本库图层名里都出现过）。
+    "opening": {
+        "substrings": (),
+        "patterns": (r"(?:^|[-_—])(?:HOLE|OPNG)(?:[-_—]|$)",),
     },
     # 装修饰面 / 图案 —— 被 wall 的通用子串「墙」判成结构墙的那批
     # （`I—平面—墙面材料` / `I—平面—外墙装饰面层线` / `I—隔墙—地面阴影`）。

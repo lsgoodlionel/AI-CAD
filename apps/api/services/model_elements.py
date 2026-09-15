@@ -16,6 +16,8 @@ from typing import Any, Callable
 
 from services.drawing_view_classifier import classify_view_type
 from services.model_story import detect_building_unit
+from services.printed_scale import PRINTED_SCALE_KEY
+from services.sheet_series import drop_superseded_overviews
 
 logger = logging.getLogger(__name__)
 
@@ -282,12 +284,24 @@ def pick_element_drawings(
         rest = [d for d in ordered if d not in has_world]
         return has_world + rest[:limit]
 
-    return {
-        "structure": take(structure, _MAX_STRUCTURE_PLANS),
-        "beam": take(beams, _MAX_BEAM_PLANS),
-        "mep": take(mep, _MAX_MEP_PLANS),
-        "architecture": take(architecture, _MAX_ARCHITECTURE_PLANS),
+    # **总图与它的分图不同时取**（见 services.sheet_series）：同一批构件会被
+    # 算几遍、摆成几片。先丢被替代的总图再按配额取 —— 空出的名额留给分图。
+    buckets = {
+        "structure": (structure, _MAX_STRUCTURE_PLANS),
+        "beam": (beams, _MAX_BEAM_PLANS),
+        "mep": (mep, _MAX_MEP_PLANS),
+        "architecture": (architecture, _MAX_ARCHITECTURE_PLANS),
     }
+    picked: dict[str, list[dict]] = {}
+    superseded: list[dict] = []
+    for key, (items, limit) in buckets.items():
+        kept, dropped = drop_superseded_overviews(
+            items, max_parts=limit,
+            # 有工程坐标定位的总图不丢 —— 它的位置是绝对可信的
+            is_protected=lambda d: _transform_rank(d, transforms, placements) < 0)
+        picked[key] = take(kept, limit)
+        superseded = [*superseded, *dropped]
+    return {**picked, "superseded": superseded}
 
 
 #: 参与**轴网聚合**的图纸上限。与构件选图上限分开——
@@ -446,6 +460,7 @@ def _recognize_sync(
     scale_override: float | None = None,
     drawing_title: str | None = None,
     view_type: str | None = None,
+    printed_scale: float | None = None,
 ) -> dict | None:
     """线程池内执行：几何提取 + 构件识别 + spotting 融合回灌 → {elements, axes}；失败返回 None。"""
     from core.model3d import extract_dxf_geometry, extract_pdf_geometry, recognize
@@ -462,7 +477,8 @@ def _recognize_sync(
                        origin_override=origin_override,
                        scale_override=scale_override,
                        drawing_title=drawing_title,
-                       view_type=view_type)
+                       view_type=view_type,
+                       printed_scale=printed_scale)
     elements = _reinject_fusion(result.as_dict(), geom, drawing_id)
     # E3/路径B：PDF 圆形桩/圆柱补识别——几何识别器只抓闭合近方多段线,抓不到
     # 圆(桩/钢立柱多画成圆)。栅格 HoughCircles 检圆 → 米坐标八边形柱,去重后并入。
@@ -471,7 +487,7 @@ def _recognize_sync(
     if allow_circles and ext == "pdf" and discipline in ("structure", "general"):
         elements["columns"] = _augment_circle_columns(
             data, geom, elements.get("columns") or [], drawing_id,
-            scale_override, origin_override,
+            scale_override, origin_override, printed_scale,
         )
         # E3-4:桩增强后若无板,用桩包络补底板(基坑楼层得到板参与体量/算量)
         elements["slabs"] = ensure_slab_from_columns(
@@ -525,6 +541,7 @@ def _augment_circle_columns(
     data: bytes, geom, existing_columns: list[dict], drawing_id: str,
     scale_override: float | None = None,
     origin_override: tuple[float | None, float | None] | None = None,
+    printed_scale: float | None = None,
 ) -> list[dict]:
     """圆检测补柱并去重（失败返回原柱,绝不阻断）。
 
@@ -535,7 +552,8 @@ def _augment_circle_columns(
         from core.model3d.circle_detector import dedupe_against, detect_pile_columns
         circles = detect_pile_columns(
             data, geom, src=drawing_id,
-            scale_override=scale_override, origin_override=origin_override)
+            scale_override=scale_override, origin_override=origin_override,
+            printed_scale=printed_scale)
         if not circles:
             return existing_columns
         fresh = dedupe_against(circles, existing_columns)
@@ -1081,6 +1099,8 @@ async def _recognize_one(
                 str(drawing.get("title") or ""),
                 # 剖面/立面/无轴网详图上不猜柱（`shows_plan_cut_sections`）。
                 view_type,
+                # 图框上印的比例（档案 OCR，见 services.printed_scale）
+                drawing.get(PRINTED_SCALE_KEY),
             ),
             timeout=_RECOGNIZE_TIMEOUT_SEC,
         )
@@ -1138,6 +1158,10 @@ async def build_floor_elements(
     # 传入 transforms:选图要按**定位可靠度**排序、且**不跨单体混取**
     # ——这是同层两图构件中心差 83~103 米的根因(见 pick_element_drawings)
     picked = pick_element_drawings(floor_drawings, transforms, placements)
+    superseded_ids = [str(d.get("id")) for d in picked["superseded"]]
+    if superseded_ids:
+        logger.info("[ModelElements] 楼层 %s：%d 张总图被同层分图替代，不参与构件识别",
+                    floor_key, len(superseded_ids))
     # **层内坐标系矛盾检测**（用户第 3 项）：既有绝对摆放又有相对配准时，
     # 两组构件会落在相距数千米的两个坐标系里（实测 B1/F2/RF 虚报 6300+ 米）。
     # 无法自动统一到世界坐标 —— 工程坐标与图纸有 70.29° 旋转，而 scene 的
@@ -1293,6 +1317,8 @@ async def build_floor_elements(
         # placed = 按工程坐标绝对定位的图数;与 registered(相对配准)并列报出,
         # 这一层到底有多少图是真定位、多少是相对贴合,一眼可见
         "placed": placed,
+        # 被同层分图替代的总图 —— 丢了哪张要看得见（降级必须可见）
+        "superseded_overviews": superseded_ids,
         # 超时数 = 池健康度：超时的图仍占着线程，多了就是池被侵蚀
         "timeouts": len(timeouts),
         # 轴网**不受构件选图上限约束**:构件识别每图 10~40 秒所以限 2 张，

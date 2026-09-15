@@ -167,9 +167,18 @@ MAX_DRAWING_EXTENT_M = 3000.0
 PLAN_EXTENT_RANGE_M = (10.0, 300.0)
 
 
+def _fits_a_plan(scale: float, page_w_pt: float | None) -> bool:
+    """图幅按这个比例换算出的实际宽度，是不是一张平面图说得通的范围。"""
+    if page_w_pt is None:
+        return True
+    lo, hi = PLAN_EXTENT_RANGE_M
+    return lo <= page_w_pt * scale <= hi
+
+
 def resolve_scale(detected: float, scale_override: float | None = None,
                   page_w_pt: float | None = None,
-                  detected_is_guess: bool = False) -> float:
+                  detected_is_guess: bool = False,
+                  printed_scale: float | None = None) -> float:
     """识别出的比例过 §6.0.4 门禁；不合理且有落库比例时改用后者。
 
     **实测**（`S-0-20-102.04C`，图幅 3370×2384pt）：识别器算出 **1:4222**
@@ -188,8 +197,20 @@ def resolve_scale(detected: float, scale_override: float | None = None,
     的 1:5000 余量内、也在 `MAX_DRAWING_EXTENT_M` 之内，两道闸全部放行，
     而真值 1:50 就躺在 `drawing_transform` 里没被用。
 
-    优先级：**明文比例 > 可信落库值 > 轴距猜测**。
+    **`printed_scale`：图框上印的比例（档案 OCR 读出）。** 这批 PDF 的文字是
+    轮廓化的，矢量文字几乎读不到比例，于是明文这一档此前形同虚设 ——
+    实测南区一层结构平面图 .03C/.05C 图框印 `1:150`，识别器却落到缺省 1:100。
+    全库对照：印刷值与可信落库值一致 92%（大歌剧院），缺省 1:100 只有 7%。
+    同样要过门禁，且换算的图宽要像一张平面图（挡掉 `1:2` 这类读数）。
+
+    **与可信落库值冲突时让位**：该图的轴线、档案标签与工程坐标定位都按
+    `drawing_transform`（落库值）换算，识别器单独改用印刷值会让同一张图的
+    构件与它自己的轴线落在两套比例上。所以印刷值只在「没有可信落库值」
+    或「两者一致」时采用 —— 前者正是 .03C/.05C（落库 1:10/1:15 被门禁挡掉）。
+
+    优先级：**矢量明文 > 图框印刷（无冲突时）> 可信落库值 > 轴距猜测**。
     """
+    from core.model3d.scale_evidence import PRINTED_TOLERANCE
     from services.drawing_transform import is_scale_plausible
 
     def usable(value: float) -> bool:
@@ -201,6 +222,10 @@ def resolve_scale(detected: float, scale_override: float | None = None,
     if usable(detected) and not detected_is_guess:
         return detected
     stored = float(scale_override) if usable(scale_override or 0.0) else None
+    if (printed_scale and usable(printed_scale) and _fits_a_plan(printed_scale, page_w_pt)
+            and (stored is None
+                 or abs(printed_scale - stored) <= PRINTED_TOLERANCE * printed_scale)):
+        return float(printed_scale)
     if detected_is_guess and stored is not None and usable(detected):
         # **猜测值换算说得通就用它**，只在它说不通时才借落库值。
         #
@@ -209,8 +234,7 @@ def resolve_scale(detected: float, scale_override: float | None = None,
         # 落库值 **1:15**（图宽 18 米），两者都在区间内于是选了落库，
         # 结果尺寸判据下候选从 658 个塌到 3 个，整块柱归零。
         # 1:15 在标准比例表里，标准性判不出来 —— 能判出来的是**图幅**。
-        lo, hi = PLAN_EXTENT_RANGE_M
-        if page_w_pt is None or lo <= page_w_pt * detected <= hi:
+        if _fits_a_plan(detected, page_w_pt):
             return detected
         return stored
     if stored is not None:
@@ -223,6 +247,7 @@ def recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
               scale_override: float | None = None,
               drawing_title: str | None = None,
               view_type: str | None = None,
+              printed_scale: float | None = None,
               ) -> FloorElements:
     """识别构件；任何异常返回空 FloorElements（scale=缺省）。
 
@@ -235,7 +260,8 @@ def recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     """
     try:
         return _recognize(geom, discipline, drawing_id, origin_override,
-                          scale_override, drawing_title, view_type)
+                          scale_override, drawing_title, view_type,
+                          printed_scale=printed_scale)
     except Exception as exc:  # noqa: BLE001 — 识别失败降级空构件
         logger.warning("[model3d] 构件识别失败(%s): %s", drawing_id, exc)
         return FloorElements(scale=_DEFAULT_SCALE)
@@ -246,6 +272,7 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
                scale_override: float | None = None,
                drawing_title: str | None = None,
                view_type: str | None = None,
+               printed_scale: float | None = None,
                ) -> FloorElements:
     # **与收集侧用同一个比较符**：`geometry_extractor` 在
     # `primitive_count() >= MAX_PRIMITIVES` 时停止收集，所以被截断的图
@@ -278,7 +305,7 @@ def _recognize(geom: DrawingGeometry, discipline: str, drawing_id: str,
     )
     detected, is_guess = _detect_scale(all_text, geom.page_w, axis_x, axis_y)
     scale = resolve_scale(detected, scale_override, geom.page_w,
-                          detected_is_guess=is_guess)
+                          detected_is_guess=is_guess, printed_scale=printed_scale)
     origin = _origin_pt(axis_x, axis_y, geom.page_h)
 
     ctx = _Ctx(geom.page_h, scale, origin, drawing_id,
@@ -1081,6 +1108,11 @@ def _find_slabs(
         if area < _SLAB_MIN_AREA_M2:
             continue
         layer, block = _at(poly_layers, i), _at(poly_blocks, i)
+        # **图层命中路径也要过非构件闸**（兜底路径早就过了）。实测 04C 的
+        # `0S-SLAB-RBAR`（配筋）与 `0S-SLAB-HOLE`（板洞）名字含 SLAB，
+        # 139 块「板」没有一块是板。
+        if is_non_component_layer(layer):
+            continue
         if classify_by_layer(layer, block) != "slab":
             continue
         is_raft = _is_raft_layer(layer, block)

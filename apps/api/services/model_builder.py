@@ -42,6 +42,7 @@ from services import (
 from services.drawing_semantics import extract_semantic_candidates
 from services.drawing_view_classifier import classify_view_type
 from services.floor_parser import UNZONED_FLOOR, parse_floor
+from services.printed_scale import load_printed_scales, with_printed_scales
 from services.model_lod import ModelScopeEvidence, aggregate_lod_modes, evaluate_lod_capability
 
 #: 未分层兜底楼层 key。**不是一个真楼层** —— 它是「这张图归不了层」的记账桶，
@@ -974,6 +975,8 @@ async def _attach_floor_elements(
         # 注意：`_attach_floor_elements` 里 meta 的字段是**显式挑选**写入
         # floor 的，算了不挑等于没算（本轮在这里栽过一次）。
         floor["consensus_aligned"] = int(meta.get("consensus_aligned") or 0)
+        # 被同层分图替代、没参与识别的总图（services.sheet_series）
+        floor["superseded_overviews"] = list(meta.get("superseded_overviews") or [])
         # 层内坐标系矛盾（用户第 3 项）：补上楼层名后挂到楼层，供 scene.quality
         # 汇总与前端展示 —— **降级必须可见**，不能默默退回局部。
         floor["_recognize_timeouts"] = int(meta.get("timeouts") or 0)
@@ -1803,8 +1806,12 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
     if recognized_axes_by_drawing:
         logger.info("[ModelBuilder] %d 张图有轴网识别轴号",
                     len(recognized_axes_by_drawing))
+    # 图框上印的比例（档案 OCR）挂到图纸上 —— 识别器排在猜测之前采用。
+    printed_scales = await load_printed_scales(db, project_id)
+    if printed_scales:
+        logger.info("[ModelBuilder] %d 张图读到图框印刷比例", len(printed_scales))
     yolo_total = await _attach_floor_elements(
-        floors, drawings, floor_of, progress_cb,
+        floors, with_printed_scales(drawings, printed_scales), floor_of, progress_cb,
         archive_axes_by_drawing, transforms, archive_text_by_drawing,
         recognized_axes_by_drawing=recognized_axes_by_drawing,
         db=db, project_id=project_id, placements=placements,
@@ -1951,7 +1958,7 @@ async def build_scene(db, project_id: str, progress_cb=None) -> tuple[dict, dict
         # 缺坐标基准图 → 没有世界坐标；缺立面/剖面 → 层高是默认值。
         # 这些结论以前只存在于代码里，用户看不到。
         "set_capability": build_set_capability_payload(
-            drawings, evidence_by_drawing=role_evidence, key="id"),
+            drawings, evidence_by_drawing=role_evidence, key="id", floors=floors),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -2139,6 +2146,7 @@ def build_set_capability_payload(
     drawings: list[dict], *,
     evidence_by_drawing: dict | None = None,
     key: str = "id",
+    floors: list[dict] | None = None,
 ) -> dict:
     """图纸角色统计 + 建模能力评估 → scene 载荷（纯函数，离线可测）。
 
@@ -2153,7 +2161,7 @@ def build_set_capability_payload(
     from services.drawing_role import (
         ROLE_UNKNOWN, classify_role, learn_number_patterns,
     )
-    from services.partial_set import assess_capability, plan_stages
+    from services.partial_set import assess_capability, plan_stages, reconcile_capability
 
     evidence_by_drawing = evidence_by_drawing or {}
 
@@ -2171,6 +2179,17 @@ def build_set_capability_payload(
         counts[result.role] = counts.get(result.role, 0) + 1
 
     capability = assess_capability(counts)
+    capability_payload = {
+        "world_coords": capability.world_coords,
+        "floors": capability.floors,
+        "elevations": capability.elevations,
+        "can_build": capability.can_build,
+        "degradations": capability.degradations,
+    }
+    # **按楼层结果再校一遍**：只数角色会把「有 1 张剖面」说成标高全是图纸实测
+    # （实测 12 层里 11 层是估的），见 `partial_set.reconcile_capability`。
+    if floors:
+        capability_payload = reconcile_capability(capability_payload, floors)
     # 单体归属拆解:**把「本就没有单体」与「该有却没有」分开**。
     # 混在一起报「80.8% 未分配」会让人去优化一个不存在的问题——
     # 实测 1866 张里 959 张是目录/说明/详图/围护图，本就无单体归属。
@@ -2179,13 +2198,7 @@ def build_set_capability_payload(
         "roles": counts,
         "unit_assignment": summarize_assignments(list(drawings)),
         "learned_patterns": patterns,
-        "capability": {
-            "world_coords": capability.world_coords,
-            "floors": capability.floors,
-            "elevations": capability.elevations,
-            "can_build": capability.can_build,
-            "degradations": capability.degradations,
-        },
+        "capability": capability_payload,
         "stages": plan_stages(counts),
     }
 
