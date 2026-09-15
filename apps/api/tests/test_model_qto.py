@@ -247,6 +247,10 @@ def test_fallback_slabs_are_reported_but_not_counted():
     s = summarize(compute_quantities(elements))
     assert s["concrete"]["gross_m3"] == pytest.approx(0.8), "只剩图层识别出的那块"
     assert s["by_type"]["slab"]["count"] == 1
+    # 页面「覆盖率 实测/总数」的分母不能含被排除的兜底板（实测 v85：2681/15056，
+    # 多出的 299 正是兜底板）
+    assert s["element_count"] == 1
+    assert s["measured_count"] + s["estimated_count"] == s["element_count"]
     assert s["fallback"]["count"] == 2
     assert s["fallback"]["gross_volume_m3"] == pytest.approx(23.2)
     assert s["fallback"]["excluded_from_totals"] is True

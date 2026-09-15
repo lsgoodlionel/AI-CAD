@@ -67,7 +67,9 @@ def summarize(quantities: list[ElementQuantity]) -> dict[str, Any]:
         "concrete": {"gross_m3": round(gross, 4), "net_m3": round(net, 4)},
         "formwork": {"contact_m2": round(contact, 4), "free_m2": round(free, 4)},
         "by_type": by_type,
-        "element_count": len(quantities),
+        # 与 measured/estimated/uncovered 同一口径：只数计入合计的构件，
+        # 兜底板在 fallback.count 里单列（否则「实测/总数」的分母含着被排除的板）
+        "element_count": len(counted),
         "measured_count": measured,
         "estimated_count": estimated,
         "uncovered_count": uncovered,
