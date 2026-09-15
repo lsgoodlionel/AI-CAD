@@ -22,6 +22,7 @@ from services import (
     model_story,
     model_story_manual,
 )
+from services.element_validation import element_validation
 from services.model_qto import compute_rebar_quantities
 from services.model_semantics import SemanticHierarchyError, SemanticVersionConflict
 from tasks.model_build import build_project_model
@@ -188,6 +189,8 @@ async def get_project_model(
         "building_units": _model_building_units_from_scene(scene),
         # 构建实时进度（migration 014；building 状态时前端展示）
         "progress": _parse_jsonb(record.get("progress"), None),
+        # 没通过金标准的构件类（管线/设备 0%）—— 前端默认隐藏并标「未验证」
+        "element_validation": element_validation(),
     }
 
 

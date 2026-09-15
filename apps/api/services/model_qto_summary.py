@@ -18,17 +18,21 @@ _DEFAULT_STORY_HEIGHT_M = 4.5
 
 
 def summarize(quantities: list[ElementQuantity]) -> dict[str, Any]:
-    # **兜底来源的量单列** —— 实测大歌剧院板混凝土的 84% 只来自 15 块
-    # 柱包络兜底板，与实测的板混在一起呈现会误导下游（算量喂创效提案）。
+    """把一组构件量汇总为混凝土/模板合计 + 分类型 + 实测/估算/未覆盖计数。
+
+    **兜底板不计入合计，只单列**（2026-09-15）。此前是「标出来、照样计入」——
+    实测大歌剧院板混凝土的 84% 只来自 15 块柱包络兜底板；金标准 slab3 又量出
+    兜底板精确率 3.9%（48 格里 21 格是整层外轮廓）。计入的是错量，而算量喂创效提案。
+    """
     fb = [q for q in quantities if getattr(q, "fallback_basis", None)]
     fb_gross = round(sum(q.gross_volume_m3 for q in fb), 4)
     all_gross = sum(q.gross_volume_m3 for q in quantities)
-    """把一组构件量汇总为混凝土/模板合计 + 分类型 + 实测/估算/未覆盖计数。"""
+    counted = [q for q in quantities if not getattr(q, "fallback_basis", None)]
     by_type: dict[str, dict[str, Any]] = {}
     gross = net = contact = free = 0.0
     measured = estimated = uncovered = 0
 
-    for quantity in quantities:
+    for quantity in counted:
         gross += quantity.gross_volume_m3
         net += quantity.net_volume_m3
         contact += quantity.formwork_contact_m2
@@ -53,6 +57,8 @@ def summarize(quantities: list[ElementQuantity]) -> dict[str, Any]:
 
     return {
         "fallback": {
+            # 兜底板**不在**下面的合计里 —— 单列在这，看得见扣掉了多少
+            "excluded_from_totals": True,
             "count": len(fb),
             "gross_volume_m3": fb_gross,
             "share": round(fb_gross / all_gross, 6) if all_gross else 0.0,

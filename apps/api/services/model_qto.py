@@ -17,6 +17,7 @@ import logging
 from dataclasses import dataclass
 
 from core.economic.rebar_calculator import BarItem, optimize_cutting
+from core.model3d.element_recognizer import SLAB_FALLBACK_BASES
 from services.model_topology import build_topology_graph
 
 logger = logging.getLogger(__name__)
@@ -188,9 +189,10 @@ def _beam_quantity(beam: dict, graph, column_boxes: dict) -> ElementQuantity:
     )
 
 
-#: 哪些 `basis` 算兜底 —— 这两种都不是从图上认出来的板，
-#: 而是用别的构件的包络凑出来的。
-FALLBACK_SLAB_BASES = ("column_envelope", "axis_envelope")
+#: 哪些 `basis` 算兜底 —— **读识别器的定义，不另抄一份**。此前这里只抄了
+#: 柱包络/轴网包络两种，漏了数量最多的「最大多边形」（金标准 slab3：
+#: 48 格里 21 格是整层外轮廓），它就这样当真板进了混凝土量。
+FALLBACK_SLAB_BASES = tuple(SLAB_FALLBACK_BASES)
 
 
 def _slab_quantity(slab: dict, graph, beam_index: dict) -> ElementQuantity:

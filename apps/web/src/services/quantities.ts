@@ -35,6 +35,15 @@ export interface QtoRebar {
   total_t: number | null
 }
 
+/** 兜底板（最大多边形/轴网包络/柱包络）：**不计入**上面的合计，只在这里单列 */
+export interface QtoFallback {
+  excluded_from_totals?: boolean
+  count: number
+  gross_volume_m3: number
+  share: number
+  bases: string[]
+}
+
 /** 项目/楼层/单体三级复用的同一汇总结构；仅 project 级带 rebar */
 export interface QtoSummary {
   concrete: QtoConcrete
@@ -45,6 +54,7 @@ export interface QtoSummary {
   estimated_count: number
   uncovered_count: number
   rebar?: QtoRebar
+  fallback?: QtoFallback
 }
 
 export interface QtoFloorSummary extends QtoSummary {

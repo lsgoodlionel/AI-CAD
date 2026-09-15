@@ -516,6 +516,8 @@ export interface ProjectModelResponse {
   building_units?: Record<string, unknown> | null
   annotation_queue?: unknown[] | null
   lod_modes?: Record<string, Record<string, unknown>> | null
+  /** 没通过金标准的构件类（管线/设备 0%），前端默认隐藏并标「未验证」 */
+  element_validation?: { unverified: { kind: string; reason: string }[] } | null
 }
 
 export interface RebuildProjectModelResult {

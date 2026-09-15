@@ -42,6 +42,8 @@ interface BrowseModePanelsProps {
   viewScene: ModelScene | null
   elementFilter: string[] | undefined
   onElementFilterChange: (values: string[]) => void
+  /** 没通过金标准的构件类（服务端 element_validation），标「未验证」 */
+  unverifiedKinds?: string[]
   quality: ModelQualitySummary
   selectedScopeQuality: SemanticScopeLodView | null
 }
@@ -72,6 +74,7 @@ export default function BrowseModePanels({
   viewScene,
   elementFilter,
   onElementFilterChange,
+  unverifiedKinds = [],
   quality,
   selectedScopeQuality,
 }: BrowseModePanelsProps) {
@@ -234,10 +237,15 @@ export default function BrowseModePanels({
         <Card size="small" title="构件图层" style={{ marginBottom: 12 }}>
           <Checkbox.Group
             style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
-            value={elementFilter ?? elementFilterOptions(viewScene).map((o) => o.value)}
+            value={elementFilter ?? elementFilterOptions(viewScene, unverifiedKinds).map((o) => o.value)}
             onChange={(values) => onElementFilterChange(values as string[])}
-            options={elementFilterOptions(viewScene)}
+            options={elementFilterOptions(viewScene, unverifiedKinds)}
           />
+          {unverifiedKinds.length > 0 ? (
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 6 }}>
+              标「未验证」的构件类没有通过金标准判读（精确率 0%），默认隐藏；勾选仍可查看。
+            </Text>
+          ) : null}
         </Card>
       ) : null}
 

@@ -118,6 +118,7 @@ export default function ModelWorkspace({ projectId, focusDrawingId }: ModelWorks
               viewScene={state.viewScene}
               elementFilter={state.elementFilter}
               onElementFilterChange={state.setElementFilter}
+              unverifiedKinds={state.unverifiedKinds}
               quality={state.quality}
               selectedScopeQuality={state.selectedScopeQuality}
             />
@@ -184,6 +185,7 @@ export default function ModelWorkspace({ projectId, focusDrawingId }: ModelWorks
                 viewScene={state.viewScene}
                 elementFilter={state.elementFilter}
                 onElementFilterChange={state.setElementFilter}
+                unverifiedKinds={state.unverifiedKinds}
               />
             ) : null}
           </Col>

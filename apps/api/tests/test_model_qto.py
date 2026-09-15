@@ -211,12 +211,28 @@ def test_a_slab_from_the_column_envelope_fallback_is_marked():
     ]}
     qs = {q.element_id: q for q in compute_quantities(elements)}
     assert qs["s1"].fallback_basis == "column_envelope"
-    assert qs["s2"].fallback_basis is None
+    # 契约变更（2026-09-15）：「最大多边形」同样是兜底（识别器 SLAB_FALLBACK_BASES
+    # 本就这么登记），此前算量只认两种，漏了数量最多的这一种。
+    assert qs["s2"].fallback_basis == "largest_polygon"
 
 
 @pytest.mark.unit
-def test_the_summary_reports_how_much_volume_came_from_fallbacks():
-    """汇总要给出兜底占比 —— 一个 84% 靠兜底的数字，不能和实测数字同等呈现。"""
+def test_every_recogniser_fallback_basis_is_a_qto_fallback():
+    """兜底依据只有一处定义 —— 算量抄一份子集，就漏了 largest_polygon。"""
+    from core.model3d.element_recognizer import SLAB_FALLBACK_BASES
+    from services.model_qto import FALLBACK_SLAB_BASES
+
+    assert set(FALLBACK_SLAB_BASES) == set(SLAB_FALLBACK_BASES)
+
+
+@pytest.mark.unit
+def test_fallback_slabs_are_reported_but_not_counted():
+    """**兜底板不进算量**（2026-09-15 决定）：金标准 slab3 实测兜底板精确率 3.9%，
+    48 格里 21 格是整层外轮廓 —— 它们进了混凝土量，再喂给创效提案。
+
+    此前的做法是「标出来、照样计入」，理由是删掉会让板量归零。有了金标准，
+    这条理由不再成立：计入的是错量。改为不计入总量，但**单列**，看得见扣掉了多少。
+    """
     from services.model_qto import compute_quantities
     from services.model_qto_summary import summarize
 
@@ -225,10 +241,16 @@ def test_the_summary_reports_how_much_volume_came_from_fallbacks():
          "thickness": 0.2, "basis": "column_envelope"},
         {"id": "s2", "outline": [[0, 0], [4, 0], [4, 4], [0, 4]],
          "thickness": 0.2, "basis": "largest_polygon"},
+        {"id": "s3", "outline": [[0, 0], [2, 0], [2, 2], [0, 2]],
+         "thickness": 0.2, "basis": "layer"},
     ]}
     s = summarize(compute_quantities(elements))
-    assert s["fallback"]["gross_volume_m3"] == pytest.approx(20.0)
-    assert s["fallback"]["share"] == pytest.approx(20.0 / 23.2, rel=1e-3)
+    assert s["concrete"]["gross_m3"] == pytest.approx(0.8), "只剩图层识别出的那块"
+    assert s["by_type"]["slab"]["count"] == 1
+    assert s["fallback"]["count"] == 2
+    assert s["fallback"]["gross_volume_m3"] == pytest.approx(23.2)
+    assert s["fallback"]["excluded_from_totals"] is True
+    assert s["fallback"]["share"] == pytest.approx(23.2 / 24.0, rel=1e-3)
 
 
 # ── 自交轮廓的面积与周长（存量 31% 的柱踩在这上面）────────────────

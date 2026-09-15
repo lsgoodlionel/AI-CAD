@@ -22,6 +22,8 @@ interface QuantityModePanelsProps {
   viewScene: ModelScene | null
   elementFilter: string[] | undefined
   onElementFilterChange: (values: string[]) => void
+  /** 没通过金标准的构件类（服务端 element_validation），标「未验证」 */
+  unverifiedKinds?: string[]
 }
 
 interface ByTypeRow extends QtoByTypeBucket {
@@ -38,6 +40,7 @@ export default function QuantityModePanels({
   viewScene,
   elementFilter,
   onElementFilterChange,
+  unverifiedKinds = [],
 }: QuantityModePanelsProps) {
   const [data, setData] = useState<ProjectQtoData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -111,6 +114,15 @@ export default function QuantityModePanels({
               </div>
             </div>
 
+            {data.project.fallback?.excluded_from_totals && data.project.fallback.count > 0 ? (
+              <Alert
+                type="info"
+                showIcon
+                message={`兜底板 ${data.project.fallback.count} 块、${data.project.fallback.gross_volume_m3.toFixed(1)} m³ 未计入上面的合计`}
+                description="兜底板不是从图上认出来的板（多为整层外轮廓），金标准判读精确率 3.9%，所以不进算量。"
+              />
+            ) : null}
+
             {rows.length > 0 ? (
               <Table
                 size="small"
@@ -157,9 +169,9 @@ export default function QuantityModePanels({
         <Card size="small" title="构件高亮">
           <Checkbox.Group
             style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
-            value={elementFilter ?? elementFilterOptions(viewScene).map((o) => o.value)}
+            value={elementFilter ?? elementFilterOptions(viewScene, unverifiedKinds).map((o) => o.value)}
             onChange={(values) => onElementFilterChange(values as string[])}
-            options={elementFilterOptions(viewScene)}
+            options={elementFilterOptions(viewScene, unverifiedKinds)}
           />
         </Card>
       ) : null}

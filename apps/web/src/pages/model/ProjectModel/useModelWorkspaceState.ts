@@ -35,6 +35,7 @@ import { activeLodMode, isNotBuiltError, mergeManualBuildingUnit, saveModelAnnot
 import { ALL_MARKER_TYPES, ALL_SEVERITIES, EMPTY_QUALITY, POLL_INTERVAL_MS } from './modelWorkspaceConstants'
 import { useFragmentSelection } from './useFragmentSelection'
 import { useSemanticOperations } from './useSemanticOperations'
+import { defaultElementFilter, elementFilterOptions } from './modes/elementFilterOptions'
 
 export type WorkspaceMode = 'browse' | 'review' | 'quantity'
 
@@ -66,6 +67,11 @@ export function useModelWorkspaceState(projectId: string, focusDrawingId?: strin
   const fragmentSelection = useFragmentSelection(viewMode)
 
   const scene: ModelScene | null = model?.scene ?? null
+  // 没通过金标准的构件类（服务端 element_validation，管线/设备 0%）
+  const unverifiedKinds = useMemo(
+    () => (model?.element_validation?.unverified ?? []).map((item) => item.kind),
+    [model?.element_validation],
+  )
   const isV2 = scene?.schema_version === 2
   const modelIfc = useMemo(() => (scene ? readModelIfc(scene) : null), [scene])
   const fragKey = modelIfc?.frag_key ?? null
@@ -98,6 +104,13 @@ export function useModelWorkspaceState(projectId: string, focusDrawingId?: strin
     setViewMode(pickDefaultViewMode(scene))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene?.project.id, fragKey, scene?.schema_version])
+
+  // 首次拿到模型时给构件图层一个默认值：未验证的构件类不勾选（用户改过就不覆盖）
+  useEffect(() => {
+    if (!scene || elementFilter !== undefined || unverifiedKinds.length === 0) return
+    setElementFilter(defaultElementFilter(elementFilterOptions(scene, unverifiedKinds), unverifiedKinds))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene?.project.id, unverifiedKinds.join(',')])
 
   useEffect(() => {
     if (!insights) {
@@ -334,6 +347,7 @@ export function useModelWorkspaceState(projectId: string, focusDrawingId?: strin
     ...fragmentSelection,
     elementFilter,
     setElementFilter,
+    unverifiedKinds,
     selectedBuildingKey,
     setSelectedBuildingKey,
     selectedSemanticNode,
