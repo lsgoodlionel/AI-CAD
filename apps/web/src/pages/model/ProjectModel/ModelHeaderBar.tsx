@@ -9,12 +9,9 @@ import type { ModelViewMode } from './sceneBuilder'
 import type { LodModeOption, ModelLodMode } from './types'
 import type { WorkspaceMode } from './useModelWorkspaceState'
 import { MODEL_STATUS_META, RECONSTRUCTION_LABEL, SEVERITY_META } from './modelWorkspaceConstants'
+import { formatElementTotals } from './elementTotals'
 
 const { Text } = Typography
-
-const ELEMENT_TYPE_LABEL: Record<string, string> = {
-  columns: '柱', walls: '墙', beams: '梁', slabs: '板', equipment: '设备',
-}
 
 const MODE_OPTIONS: { label: string; value: WorkspaceMode }[] = [
   { label: '浏览', value: 'browse' },
@@ -106,10 +103,7 @@ export default function ModelHeaderBar({
               {scene.schema_version === 2 && scene.stats.elements_total ? (
                 <Text type="secondary">
                   构件{' '}
-                  {Object.entries(scene.stats.elements_total)
-                    .filter(([, count]) => count > 0)
-                    .map(([kind, count]) => `${ELEMENT_TYPE_LABEL[kind] ?? '管线'}${count}`)
-                    .join(' / ') || '—'}
+                  {formatElementTotals(scene.stats.elements_total) || '—'}
                 </Text>
               ) : null}
               {Object.entries(scene.stats.by_severity).map(([severity, count]) => {
