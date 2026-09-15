@@ -1,0 +1,431 @@
+{
+  "version": 1,
+  "object_classes": [
+    "slabs_slab3"
+  ],
+  "units": [
+    {
+      "unit": "slab3-kept",
+      "source": {
+        "group": "kept"
+      },
+      "classes": {
+        "slabs_slab3": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "HUNJ",
+              "ok": false,
+              "what": "wall_or_beam",
+              "note": "红框圈住一条细长的梁或构件带"
+            },
+            {
+              "ref": "FYEC",
+              "ok": false,
+              "what": "wall_or_beam",
+              "note": "红框内是小型竖向结构构件，不是成片楼板"
+            },
+            {
+              "ref": "EJMX",
+              "ok": false,
+              "what": "sliver",
+              "note": "红框是狭长倾斜区域，未见完整板面"
+            },
+            {
+              "ref": "4XCW",
+              "ok": false,
+              "what": "room",
+              "note": "红框圈住带房间名称和设备布置的功能区"
+            },
+            {
+              "ref": "9YE3",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框覆盖整张灯具放大平面图的主要范围"
+            },
+            {
+              "ref": "XF93",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框覆盖一整层建筑平面"
+            },
+            {
+              "ref": "V3HW",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框覆盖完整的建筑平面区域"
+            },
+            {
+              "ref": "X9H4",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框圈住整块钢结构平面布置范围"
+            },
+            {
+              "ref": "VELE",
+              "ok": true,
+              "what": "",
+              "note": "红框内是基础分区中的大面积基础板区域"
+            },
+            {
+              "ref": "LKPF",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框覆盖一栋建筑的完整平面范围"
+            },
+            {
+              "ref": "9HNU",
+              "ok": false,
+              "what": "room",
+              "note": "红框圈住会议室内的长桌及座椅布置"
+            },
+            {
+              "ref": "MAN3",
+              "ok": false,
+              "what": "wall_or_beam",
+              "note": "红框圈住配筋图中的细长梁段"
+            },
+            {
+              "ref": "HAJN",
+              "ok": true,
+              "what": "",
+              "note": "红框内是一块规则的灰色成片区域，边界清晰"
+            },
+            {
+              "ref": "NHUJ",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框覆盖结构布置图的完整建筑范围"
+            },
+            {
+              "ref": "9JMU",
+              "ok": false,
+              "what": "section_view",
+              "note": "红框内是多个墙身和节点剖面图"
+            },
+            {
+              "ref": "AXAX",
+              "ok": false,
+              "what": "section_view",
+              "note": "红框内是带剖面填充和尺寸的构造详图"
+            },
+            {
+              "ref": "XNYA",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框圈住总平面中的完整场地和建筑范围"
+            },
+            {
+              "ref": "3P3H",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框覆盖总平面布置图的主要建筑区域"
+            },
+            {
+              "ref": "EVH9",
+              "ok": false,
+              "what": "text_or_table",
+              "note": "红框内主要是梁配筋文字和钢筋标注"
+            },
+            {
+              "ref": "3XAU",
+              "ok": false,
+              "what": "wall_or_beam",
+              "note": "红框圈住沿斜边布置的细长结构带"
+            },
+            {
+              "ref": "4YXN",
+              "ok": false,
+              "what": "section_view",
+              "note": "红框内是带剖面线、标高和尺寸的节点详图"
+            },
+            {
+              "ref": "E3A9",
+              "ok": false,
+              "what": "room",
+              "note": "红框圈住会议室内的桌椅和房间区域"
+            },
+            {
+              "ref": "CEFK",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框覆盖地下一层框架梁平面的完整范围"
+            },
+            {
+              "ref": "F3KK",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框覆盖完整的建筑平面和环形空间"
+            },
+            {
+              "ref": "WK33",
+              "ok": false,
+              "what": "wall_or_beam",
+              "note": "红框压在一条竖向粗长构件上"
+            },
+            {
+              "ref": "AN4L",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框覆盖完整的防火分区平面"
+            },
+            {
+              "ref": "3KLP",
+              "ok": false,
+              "what": "text_or_table",
+              "note": "红框内是修改通知表格"
+            },
+            {
+              "ref": "4XXM",
+              "ok": false,
+              "what": "room",
+              "note": "红框圈住带功能标注的房间和设备布置"
+            },
+            {
+              "ref": "4LW9",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框覆盖总平面中的完整建筑和场地范围"
+            },
+            {
+              "ref": "J9RX",
+              "ok": false,
+              "what": "wall_or_beam",
+              "note": "红框圈住结构平面底部的一条细长梁带"
+            },
+            {
+              "ref": "MWY4",
+              "ok": false,
+              "what": "other",
+              "note": "红框内是孤立的小方形结构符号，不是板面"
+            },
+            {
+              "ref": "LR4Y",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框覆盖完整的检修马道平面"
+            },
+            {
+              "ref": "E4LL",
+              "ok": false,
+              "what": "text_or_table",
+              "note": "红框内是修改通知表格"
+            },
+            {
+              "ref": "JCFN",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框覆盖钢结构平面布置的主要范围"
+            },
+            {
+              "ref": "VFWP",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框圈住总平面中的完整建筑区域"
+            },
+            {
+              "ref": "RKPL",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框覆盖两个完整的剧场平面"
+            },
+            {
+              "ref": "AF3A",
+              "ok": false,
+              "what": "nothing",
+              "note": "红框内只有零星短线，没有成片板面"
+            },
+            {
+              "ref": "WPRX",
+              "ok": false,
+              "what": "wall_or_beam",
+              "note": "红框圈住平面图中一条狭长构件带"
+            },
+            {
+              "ref": "LMMF",
+              "ok": true,
+              "what": "",
+              "note": "红框覆盖基础分区中的规则基础板区域"
+            },
+            {
+              "ref": "LFWH",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框圈住马道平面中的完整长条区域"
+            },
+            {
+              "ref": "H9CH",
+              "ok": false,
+              "what": "text_or_table",
+              "note": "红框内是成段的说明文字"
+            },
+            {
+              "ref": "AKJR",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框覆盖完整的绿化配置总平面"
+            },
+            {
+              "ref": "VRNV",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框覆盖完整的总平面和场地范围"
+            },
+            {
+              "ref": "UYFR",
+              "ok": true,
+              "what": "",
+              "note": "红框内是一块规则的灰色矩形板状区域"
+            },
+            {
+              "ref": "V4VH",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框覆盖完整的五层结构平面"
+            },
+            {
+              "ref": "3KVY",
+              "ok": false,
+              "what": "building_outline",
+              "note": "红框覆盖建筑平面的主要范围"
+            },
+            {
+              "ref": "9XRJ",
+              "ok": false,
+              "what": "wall_or_beam",
+              "note": "红框圈住斜向平面中的细长结构带"
+            },
+            {
+              "ref": "3WFW",
+              "ok": false,
+              "what": "other",
+              "note": "红框内是轴线交点上的带叉方形结构符号，不是成片楼板"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#slabs",
+          "note": "原生分辨率裁图 + 分层抽样（6 层）+ 批内重测对。原始精确率 0.083，语料加权 0.039（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 61 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "slab3-blank_control",
+      "source": {
+        "group": "blank_control"
+      },
+      "classes": {
+        "slabs_slab3": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "EXRM",
+              "ok": true,
+              "what": "",
+              "note": "红框内基本空白"
+            },
+            {
+              "ref": "M4YE",
+              "ok": true,
+              "what": "",
+              "note": "红框内只有空白和零星线条"
+            },
+            {
+              "ref": "C34Y",
+              "ok": true,
+              "what": "",
+              "note": "红框内基本空白"
+            },
+            {
+              "ref": "VWKV",
+              "ok": true,
+              "what": "",
+              "note": "红框内基本空白"
+            },
+            {
+              "ref": "3NFN",
+              "ok": true,
+              "what": "",
+              "note": "红框内只有零星细线"
+            },
+            {
+              "ref": "L4JP",
+              "ok": true,
+              "what": "",
+              "note": "红框内基本空白"
+            },
+            {
+              "ref": "VLEE",
+              "ok": true,
+              "what": "",
+              "note": "红框内只有极少的淡色线条"
+            },
+            {
+              "ref": "L9PY",
+              "ok": true,
+              "what": "",
+              "note": "红框区域大部分为空白，仅有淡色背景线"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#slabs",
+          "note": "原生分辨率裁图 + 分层抽样（6 层）+ 批内重测对。原始精确率 0.083，语料加权 0.039（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 61 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "slab3-retest_dup",
+      "source": {
+        "group": "retest_dup"
+      },
+      "classes": {
+        "slabs_slab3": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "W9CW",
+              "ok": false,
+              "what": "building_outline",
+              "note": "重测副本，原格 VFWP；红框圈住总平面中的完整建筑区域"
+            },
+            {
+              "ref": "W4YM",
+              "ok": false,
+              "what": "text_or_table",
+              "note": "重测副本，原格 E4LL；红框内是修改通知表格"
+            },
+            {
+              "ref": "FCNV",
+              "ok": false,
+              "what": "section_view",
+              "note": "重测副本，原格 4YXN；红框内是带剖面线、标高和尺寸的构造剖面"
+            },
+            {
+              "ref": "WRAJ",
+              "ok": false,
+              "what": "section_view",
+              "note": "重测副本，原格 AXAX；红框内是带剖面填充和尺寸的节点详图"
+            },
+            {
+              "ref": "EEEK",
+              "ok": false,
+              "what": "building_outline",
+              "note": "重测副本，原格 V4VH；红框覆盖五层结构平面的主要范围"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#slabs",
+          "note": "原生分辨率裁图 + 分层抽样（6 层）+ 批内重测对。原始精确率 0.083，语料加权 0.039（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 61 / 纠正 0 / 编造 0。"
+        }
+      }
+    }
+  ]
+}

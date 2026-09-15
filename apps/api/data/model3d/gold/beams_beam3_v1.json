@@ -1,0 +1,257 @@
+{
+  "version": 1,
+  "object_classes": [
+    "beams_beam3"
+  ],
+  "units": [
+    {
+      "unit": "beam3-kept",
+      "source": {
+        "group": "kept"
+      },
+      "classes": {
+        "beams_beam3": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "XNX9",
+              "ok": false,
+              "what": "text",
+              "note": "红线压在说明文字附近"
+            },
+            {
+              "ref": "VVFN",
+              "ok": true,
+              "what": "",
+              "note": "红线压在机房内的灰色长条构件上"
+            },
+            {
+              "ref": "E4LL",
+              "ok": true,
+              "what": "",
+              "note": "红线沿连续灰色水平条带"
+            },
+            {
+              "ref": "UE9V",
+              "ok": false,
+              "what": "axis",
+              "note": "红线位于细线和斜向轴线区域"
+            },
+            {
+              "ref": "V3XJ",
+              "ok": false,
+              "what": "wall",
+              "note": "红线沿房间边界的墙体条带"
+            },
+            {
+              "ref": "9H9E",
+              "ok": true,
+              "what": "",
+              "note": "红线连接柱网之间的竖向梁线"
+            },
+            {
+              "ref": "CVUK",
+              "ok": true,
+              "what": "",
+              "note": "红线压在粗灰色水平梁带上"
+            },
+            {
+              "ref": "MXW3",
+              "ok": false,
+              "what": "text",
+              "note": "红线落在配筋说明文字上"
+            },
+            {
+              "ref": "UAUH",
+              "ok": true,
+              "what": "",
+              "note": "红线压在房间之间的灰色水平构件上"
+            },
+            {
+              "ref": "NREE",
+              "ok": true,
+              "what": "",
+              "note": "红线沿柱网间的竖向梁线"
+            },
+            {
+              "ref": "L3UY",
+              "ok": true,
+              "what": "",
+              "note": "红线沿结构网格中的连续竖向构件"
+            },
+            {
+              "ref": "3N3F",
+              "ok": false,
+              "what": "other",
+              "note": "红线落在楼梯和楼梯间构造上"
+            },
+            {
+              "ref": "UERJ",
+              "ok": true,
+              "what": "",
+              "note": "红线沿平面边缘的竖向梁或墙梁构件"
+            },
+            {
+              "ref": "NKUL",
+              "ok": false,
+              "what": "wall",
+              "note": "红线沿楼梯间旁的墙体边界"
+            },
+            {
+              "ref": "3UHV",
+              "ok": true,
+              "what": "",
+              "note": "红线压在连续灰色水平梁带上"
+            },
+            {
+              "ref": "9YPJ",
+              "ok": true,
+              "what": "",
+              "note": "红线沿建筑平面中的灰色长条构件"
+            },
+            {
+              "ref": "KE3J",
+              "ok": false,
+              "what": "other",
+              "note": "红线落在楼梯踏步区域"
+            },
+            {
+              "ref": "AEFJ",
+              "ok": true,
+              "what": "",
+              "note": "红线沿柱与墙之间的竖向构件"
+            },
+            {
+              "ref": "ACMN",
+              "ok": true,
+              "what": "",
+              "note": "红线压在灰色渐变长条梁带上"
+            },
+            {
+              "ref": "K3NU",
+              "ok": false,
+              "what": "text",
+              "note": "红线落在钢筋文字标注上"
+            },
+            {
+              "ref": "VPMR",
+              "ok": true,
+              "what": "",
+              "note": "红线沿柱网之间的竖向构件"
+            },
+            {
+              "ref": "XPXA",
+              "ok": true,
+              "what": "",
+              "note": "红线压在灰色水平梁或墙梁上"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#beams",
+          "note": "原生分辨率裁图 + 分层抽样（3 层）+ 批内重测对。原始精确率 0.636，语料加权 0.665（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 32 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "beam3-blank_control",
+      "source": {
+        "group": "blank_control"
+      },
+      "classes": {
+        "beams_beam3": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "H3RU",
+              "ok": true,
+              "what": "",
+              "note": "红线位于空白区域，只有尺寸线"
+            },
+            {
+              "ref": "NV9C",
+              "ok": true,
+              "what": "",
+              "note": "红线处基本为空白"
+            },
+            {
+              "ref": "M49J",
+              "ok": true,
+              "what": "",
+              "note": "红线位于空白区域"
+            },
+            {
+              "ref": "3PXE",
+              "ok": true,
+              "what": "",
+              "note": "红线处没有明确构件"
+            },
+            {
+              "ref": "CVYP",
+              "ok": true,
+              "what": "",
+              "note": "红线位于空白和零星细线区域"
+            },
+            {
+              "ref": "HXVU",
+              "ok": true,
+              "what": "",
+              "note": "红线只跨过轴线和辅助线"
+            },
+            {
+              "ref": "KJXK",
+              "ok": true,
+              "what": "",
+              "note": "红线压在大面积斜向填充图案上"
+            },
+            {
+              "ref": "HXWV",
+              "ok": true,
+              "what": "",
+              "note": "红线位于空白区域"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#beams",
+          "note": "原生分辨率裁图 + 分层抽样（3 层）+ 批内重测对。原始精确率 0.636，语料加权 0.665（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 32 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "beam3-retest_dup",
+      "source": {
+        "group": "retest_dup"
+      },
+      "classes": {
+        "beams_beam3": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "HKHW",
+              "ok": true,
+              "what": "",
+              "note": "重测副本，原格 VVFN；红线沿粗灰色水平构件"
+            },
+            {
+              "ref": "VPPV",
+              "ok": true,
+              "what": "",
+              "note": "重测副本，原格 NREE；红线位于结构网格中的连续竖向梁线"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#beams",
+          "note": "原生分辨率裁图 + 分层抽样（3 层）+ 批内重测对。原始精确率 0.636，语料加权 0.665（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 32 / 纠正 0 / 编造 0。"
+        }
+      }
+    }
+  ]
+}

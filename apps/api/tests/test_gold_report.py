@@ -272,10 +272,10 @@ def test_real_gold_dir_passes_schema_check(real_files):
 
 @pytest.mark.unit
 def test_real_totals_match_the_blueprint(real_files):
-    """1096 条裁决 —— 盘点文档的总数，报表必须对得上。"""
+    """1358 条裁决 —— 盘点文档的总数（09-15 并入六类批次后；此前 22 个文件 / 1096 条）。"""
     rep = build_report(real_files)
-    assert rep.total_verdicts == 1096
-    assert rep.total_files == 22
+    assert rep.total_verdicts == 1358
+    assert rep.total_files == 28
 
 
 @pytest.mark.unit
@@ -303,6 +303,13 @@ def test_real_class_rates_match_the_blueprint(real_files):
     assert got["beams_retest"][2:] == (21, 34)               # 62%
     assert got["walls_retest"][2:] == (21, 37)               # 57%
     assert got["columns_final"][2:] == (3, 26)               # 12%（混算是 60%）
+    # 2026-09-15 六类批次（主组 = 被测 + 重测副本，去掉空白对照）
+    assert got["columns_col3"] == (3, 61, 2, 53)
+    assert got["walls_wall3"] == (3, 56, 24, 48)
+    assert got["beams_beam3"] == (3, 32, 16, 24)
+    assert got["pipes_pipe3"] == (3, 26, 0, 18)
+    assert got["equipment_equip3"] == (3, 26, 0, 18)
+    assert got["slabs_slab3"] == (3, 61, 4, 53)
 
 
 @pytest.mark.unit
@@ -313,15 +320,16 @@ def test_blueprint_table_is_missing_the_walls_v1_row(real_files):
     表是不全的。补表之前，任何按那张表求和的结论都会少 47 条。
     """
     rated = [r for r in class_reports(real_files) if r.has_rate]
-    assert sum(r.verdicts for r in rated) == 1096
-    assert sum(r.verdicts for r in rated if r.object_class != "walls") == 1049
+    # 09-15 并入六类批次后为 1358 / 1311（此前 1096 / 1049）
+    assert sum(r.verdicts for r in rated) == 1358
+    assert sum(r.verdicts for r in rated if r.object_class != "walls") == 1311
 
 
 @pytest.mark.unit
 def test_real_misdetection_total(real_files):
-    """559 条误检 —— 与盘点文档一致。"""
+    """727 条误检（09-15 并入六类批次后；此前 559）—— 与盘点文档一致。"""
     summary = taxonomy_summary(real_files)
-    assert summary.total == 559
+    assert summary.total == 727
     assert summary.unmapped == {}, f"未登记的 what 写法：{summary.unmapped}"
 
 
@@ -352,18 +360,18 @@ def test_markdown_report_renders_the_standing_metrics(real_files):
     md = render_markdown(build_report(real_files))
     for heading in ("分类汇总", "图纸级两极分化", "误检归一", "判据回指"):
         assert heading in md
-    assert "1096" in md
+    assert "1358" in md
 
 
 @pytest.mark.unit
 def test_patch_sheet_is_declared_and_not_double_counted(real_files):
     """`patch_verdicts_v1.json` 的 120 行已逐条并入 `verdicts_v1.json`。
 
-    把它当成金标准文件再数一遍，总数会从 1096 虚增到 1216。
+    把它当成金标准文件再数一遍，总数会从 1358 虚增到 1478。
     """
     raw = json.loads((gold_dir() / "patch_verdicts_v1.json").read_text("utf-8"))
     assert raw["kind"] == "raw_judgement_sheet"
     assert raw["materialized_in"] == "verdicts_v1.json"
     assert "patch_verdicts_v1.json" in RAW_SHEETS
     assert len(raw["results"]) == 120
-    assert build_report(real_files).total_verdicts == 1096
+    assert build_report(real_files).total_verdicts == 1358

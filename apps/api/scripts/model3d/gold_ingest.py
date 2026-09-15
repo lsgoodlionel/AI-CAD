@@ -48,9 +48,23 @@ def _full_weights(meta: dict) -> dict[str, float]:
     return weights
 
 
+#: 判读者判「否」却没写 what、或空白对照失手（判读者说那是构件）时记的误检类别。
+#: schema 规定判否必须写 what（否则拿不到误检分类）；原话留在 note 里。
+_UNLABELED_WHAT = "other"
+
+
 def _gold_doc(batch: str, kind: str, rows: list[dict], answers: dict, field: str,
               summary: dict, blank_detail: str) -> dict:
-    units = {}
+    """→ 与既有复测批同一约定的金标准文档（见 `walls_retest_v1.json`）。
+
+    - 类名表头与单元一致：`{kind}_{batch}`（此前表头写 `kind`、单元写
+      `{kind}_{batch}`，全目录校验报 object_classes_mismatch）；
+    - 判否必写 `what`；
+    - `verified_by=['gpt'] / confidence=1.0` —— 此前写 `independent_judge / 0.0`，
+      按 `ObjectClass.counts_toward_metrics` 整批**不计入指标**。
+    """
+    cls_name = f"{kind}_{batch}"
+    units: dict[str, list[dict]] = {}
     for row in rows:
         ans = answers.get(row["code"])
         if ans is None:
@@ -60,21 +74,25 @@ def _gold_doc(batch: str, kind: str, rows: list[dict], answers: dict, field: str
         group = {"kept": "kept", "blank": "blank_control", "dup": "retest_dup"}[row["group"]]
         # 空白对照组沿用 columns_final 的约定：ok = 仪器表现正确（判为「不是」）
         ok = (not judged) if group == "blank_control" else judged
-        note = ans.get("what") or ans.get("saw") or ""
+        raw_what = str(ans.get("what") or "").strip()
+        what = "" if ok else (raw_what if raw_what and group != "blank_control"
+                              else _UNLABELED_WHAT)
+        note = str(ans.get("saw") or ans.get("note") or "")
         if row.get("dup_of"):
             note = f"重测副本，原格 {row['dup_of']}；{note}"
-        units.setdefault(group, []).append({"ref": row["code"], "ok": ok, "note": note})
+        units.setdefault(group, []).append(
+            {"ref": row["code"], "ok": ok, "what": what, "note": note})
     sp = summary
     note = (f"原生分辨率裁图 + 分层抽样（{len(sp['per_stratum'])} 层）+ 批内重测对。"
             f"原始精确率 {sp['raw_precision']:.3f}，语料加权 {sp['weighted_precision']:.3f}"
             f"（覆盖语料 {sp['coverage']:.0%}）；{blank_detail}；"
             f"重测一致率 {sp['pair_agreement']}；编号 匹配 {sp['matched']} / "
             f"纠正 {sp['repaired']} / 编造 {sp['fabricated']}。")
-    return {"version": 1, "object_classes": [kind], "units": [
+    return {"version": 1, "object_classes": [cls_name], "units": [
         {"unit": f"{batch}-{g}", "source": {"group": g},
-         "classes": {f"{kind}_{batch}": {
-             "method": "verdicts", "verdicts": v, "confidence": 0.0,
-             "verified_by": ["independent_judge"], "criteria": f"CRITERIA.md#{kind}",
+         "classes": {cls_name: {
+             "method": "verdicts", "verdicts": v, "confidence": 1.0,
+             "verified_by": ["gpt"], "criteria": f"CRITERIA.md#{kind}",
              "note": note}}} for g, v in units.items()]}
 
 

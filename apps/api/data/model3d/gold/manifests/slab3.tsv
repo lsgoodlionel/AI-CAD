@@ -1,0 +1,62 @@
+code	group	stratum	drawing_id	drawing_candidates	sheet	dup_of	capped	crop_pt	title
+HUNJ	kept	歌剧院·structure	17b4efcb-1b6f-4029-9342-ecd34c96b820	6	S1		0	1761.9,1446.0,1950.4,1634.4	结构-竣工图--北区（小歌剧厅）地下一层主梁配筋分区图（二）
+FYEC	kept	第二工程·structure	541e3e73-4ccb-45e0-bc39-8de32744f6f0	30	S1		1	1890.2,631.7,1930.2,671.7	钢立柱及立柱桩平面布置图
+EJMX	kept	歌剧院·architecture	6b446732-1ded-4e95-bc5f-38c93cc029de	2	S1		0	2040.9,367.3,2191.7,518.1	建筑-竣工图--一层完整平面图
+EXRM	blank	第二工程·mep	ee7052b4-90a9-4dae-a878-f35b2f5f51ab	-1	S1		0	2170.4,422.1,2295.6,547.3	六层给排水平面图
+4XCW	kept	第二工程·decoration	36e98389-7efc-47c5-9185-590881c46830	3	S1		0	933.4,296.0,1247.6,610.2	2F平面布置图
+9YE3	kept	第二工程·general	e3875c84-33b6-46f6-b4ef-3826124c3a78	1	S1		0	0.0,0.0,2384.0,1684.0	灯具放大平面图三
+XF93	kept	歌剧院·architecture	761b327e-a9df-4ad5-bef1-2f8e37e46cd5	12	S1		0	338.1,0.0,2841.7,2384.0	建筑-竣工图--地下二层平面图(二)
+V3HW	kept	第二工程·general	9c2d458f-7c24-4180-843a-8638642ce379	1	S1		0	0.0,0.0,2384.0,1684.0	灯具放大平面图二
+X9H4	kept	歌剧院·structure	d2856f40-2eeb-40e1-af89-bd31d9f35622	2	S1		0	160.9,0.0,982.8,821.8	结构-竣工图--南区（大、中歌剧厅）舞台钢结构平面布置图（二）
+W9CW	dup	第二工程·architecture	a2d0626b-ede8-448e-af61-9bcd93fe0737	12	S1	VFWP	0	555.5,555.7,1711.7,1712.0	基地总平面图
+VELE	kept	歌剧院·structure	1fc56cbf-b039-474c-9c7f-50e0ef727905	2	S1		0	1598.4,1345.4,2210.3,1957.3	结构-竣工图--基础分区平面图（一）
+LKPF	kept	第二工程·general	a2961455-ab8d-4206-880b-f2f40b49dcde	1	S2		0	0.0,0.0,2384.0,1684.0	定位放大平面图一
+M4YE	blank	第二工程·general	6ddc6b8c-f614-4089-8ea9-b733c67d4ab1	-1	S2		1	871.1,865.4,911.1,905.4	绿化配置总平面图
+9HNU	kept	第二工程·decoration	7411241d-8d55-4010-91e2-5de62536a685	1	S2		0	423.2,16.4,1852.7,1445.9	五层会议室放大平面图
+MAN3	kept	歌剧院·structure	17b4efcb-1b6f-4029-9342-ecd34c96b820	6	S2		0	448.5,184.4,607.3,343.3	结构-竣工图--北区（小歌剧厅）地下一层主梁配筋分区图（二）
+W4YM	dup	第二工程·architecture	80311035-37c4-465d-8450-7b25e693dbca	1	S2	E4LL	0	997.4,9.9,1191.0,203.5	S--四层平面图
+FCNV	dup	第二工程·architecture	7e7cad1c-5713-4ac3-bba7-b2258d3d722f	5	S2	4YXN	0	439.2,608.7,613.6,783.1	二层埋件布置图
+HAJN	kept	第二工程·decoration	5cfb1748-109a-4b01-9e8c-84359b38f426	12	S2		1	457.0,883.1,497.0,923.1	9F调度大厅上空平面图
+NHUJ	kept	第二工程·architecture	d6eb3ea5-969f-4d4d-b0cc-b24a8cf19004	1	S2		0	116.7,0.0,959.8,842.0	八层夹层埋件布置图
+9JMU	kept	第二工程·decoration	bd0b3217-92fe-43e3-a428-b8103b3b3c9f	1	S2		0	45.2,0.0,1830.9,1684.0	3F男-女卫平面放大图
+AXAX	kept	第二工程·architecture	7e7cad1c-5713-4ac3-bba7-b2258d3d722f	5	S2		0	680.9,625.1,822.6,766.8	二层埋件布置图
+XNYA	kept	第二工程·general	419ebf3e-03bc-45a4-8030-894810a3abac	1	S2		0	0.0,0.0,2384.0,1684.0	上木配置平面图
+3P3H	kept	第二工程·general	fc6682f7-d7a6-4a9d-8eba-3d0790b1c743	1	S2		0	0.0,0.0,2384.0,1684.0	总平面灯具布置图
+EVH9	kept	第二工程·structure	d2a04f9d-27c9-4a60-96ce-6962bb3b2d9e	43	S3		0	463.3,769.7,527.2,833.6	五层次梁平面整体配筋图
+3XAU	kept	歌剧院·structure	fd3b158d-50ae-4add-8c43-d50b8281f7ff	12	S3		0	686.7,76.5,1635.4,1025.1	07 第四阶段工况平面图
+4YXN	kept	第二工程·architecture	7e7cad1c-5713-4ac3-bba7-b2258d3d722f	5	S3		0	439.2,608.7,613.6,783.1	二层埋件布置图
+E3A9	kept	第二工程·decoration	cb8ac229-59c9-4aa9-8fe0-1a5a8d8efba2	5	S3		0	2479.6,541.0,2965.0,1026.3	5F平面布置图
+CEFK	kept	第二工程·structure	8e3e3e01-5faa-4457-99c6-079aacc29b88	12	S3		0	2189.3,407.5,3113.3,1331.5	地下一层框架梁平面整体配筋图
+F3KK	kept	歌剧院·architecture	1979c05c-f037-4b8c-a640-2d10c92f613c	1	S3		0	0.0,0.0,3370.0,2384.0	建筑-竣工图--二层隔声隔振平面图（一）
+WK33	kept	第二工程·decoration	1902f697-ac0c-4434-bbf3-35731463b4c0	12	S3		0	343.6,28.5,1004.1,689.0	负3F转换梯门厅平面放大图2
+C34Y	blank	歌剧院·mep	db09c600-d973-41d6-9475-f72cd1d96d44	-1	S3		0	496.7,341.4,717.8,562.5	给排水-竣工图--地下一层给排水及消火栓平面图（三）
+AN4L	kept	第二工程·architecture	1bec5679-092a-4c03-850e-8c0a42e13675	4	S3		0	518.8,0.0,2834.6,1712.0	四层防火分区平面图
+3KLP	kept	第二工程·architecture	c9b3ffcd-d4fc-43d1-8465-124e223032c8	1	S4		0	997.4,9.9,1191.0,203.5	S--九层夹层平面图
+4XXM	kept	第二工程·decoration	cb8ac229-59c9-4aa9-8fe0-1a5a8d8efba2	5	S4		0	899.0,316.0,1245.0,662.1	5F平面布置图
+VWKV	blank	第二工程·structure	541e3e73-4ccb-45e0-bc39-8de32744f6f0	-1	S4		1	1358.9,1122.4,1398.9,1162.4	钢立柱及立柱桩平面布置图
+4LW9	kept	歌剧院·architecture	caa6886c-0a9e-4160-9fd1-7b646fd4a2dc	7	S4		0	0.0,0.0,2834.7,2384.0	建筑-竣工图--四层隔声隔振平面图（三）
+3NFN	blank	第二工程·decoration	5cfb1748-109a-4b01-9e8c-84359b38f426	-1	S4		1	594.6,975.2,634.6,1015.2	9F调度大厅上空平面图
+J9RX	kept	第二工程·structure	8e3e3e01-5faa-4457-99c6-079aacc29b88	12	S4		0	431.5,632.0,1492.0,1692.4	地下一层框架梁平面整体配筋图
+MWY4	kept	第二工程·structure	729c4656-cd07-4760-bd52-28ef0b897561	76	S4		1	527.7,500.5,567.7,540.5	0标高结构平面图
+LR4Y	kept	第二工程·architecture	332334de-2a27-455a-8d39-fab79851b2d6	1	S4		0	0.0,0.0,4241.0,2412.0	七层检修马道平面图
+E4LL	kept	第二工程·architecture	80311035-37c4-465d-8450-7b25e693dbca	1	S4		0	997.4,9.9,1191.0,203.5	S--四层平面图
+WRAJ	dup	第二工程·architecture	7e7cad1c-5713-4ac3-bba7-b2258d3d722f	5	S4	AXAX	0	680.9,625.1,822.6,766.8	二层埋件布置图
+JCFN	kept	歌剧院·structure	d2856f40-2eeb-40e1-af89-bd31d9f35622	2	S5		0	1071.3,0.0,1893.1,821.8	结构-竣工图--南区（大、中歌剧厅）舞台钢结构平面布置图（二）
+VFWP	kept	第二工程·architecture	a2d0626b-ede8-448e-af61-9bcd93fe0737	12	S5		0	555.5,555.7,1711.7,1712.0	基地总平面图
+RKPL	kept	歌剧院·architecture	4cf1d549-9726-4ec5-8abe-2a96d374b07e	1	S5		0	0.0,0.0,3370.0,2384.0	建筑-竣工图--六层（设备层）平面图
+EEEK	dup	第二工程·structure	d1cc9d5e-add5-4cd5-b844-46ca50e2bfae	1	S5	V4VH	0	1600.0,1105.7,2171.4,1677.1	五层结构平面图
+L4JP	blank	歌剧院·structure	fd3b158d-50ae-4add-8c43-d50b8281f7ff	-1	S5		0	600.5,767.1,821.6,988.2	07 第四阶段工况平面图
+AF3A	kept	第二工程·structure	25b20a96-9b16-4b39-b487-12a59c9418be	30	S5		1	1462.2,421.9,1502.2,461.9	底板换撑平面布置图
+WPRX	kept	歌剧院·architecture	caa6886c-0a9e-4160-9fd1-7b646fd4a2dc	7	S5		0	1946.6,457.0,2973.8,1484.2	建筑-竣工图--四层隔声隔振平面图（三）
+LMMF	kept	歌剧院·structure	1fc56cbf-b039-474c-9c7f-50e0ef727905	2	S5		0	1598.4,1345.4,2210.3,1957.3	结构-竣工图--基础分区平面图（一）
+LFWH	kept	歌剧院·structure	df9535b5-d0c5-4ee6-970b-6afe435e0fd5	16	S5		0	214.7,583.5,410.5,779.2	结构-竣工图--北区（小歌剧厅) 马道平面布置图
+VLEE	blank	歌剧院·architecture	9ac531e8-7a9c-45ec-a0ed-1a9679328e14	-1	S5		1	2172.4,739.9,2212.4,779.9	建筑-竣工图--扇形屋盖排水组织平面图（二）
+H9CH	kept	歌剧院·architecture	b1ab4de1-cfbc-4d06-9894-2b024b73b271	2	S6		0	3081.2,0.0,3354.4,273.2	建筑-竣工图--四层机房吸声平面图
+AKJR	kept	第二工程·general	2d548e18-bbb2-4602-8f79-88bb97ec57d3	1	S6		0	0.0,0.0,2384.0,1684.0	下木配置平面图
+VRNV	kept	第二工程·general	6ddc6b8c-f614-4089-8ea9-b733c67d4ab1	1	S6		0	0.0,0.0,2384.0,1684.0	绿化配置总平面图
+L9PY	blank	第二工程·architecture	a2d0626b-ede8-448e-af61-9bcd93fe0737	-1	S6		0	1186.7,250.4,1407.8,471.5	基地总平面图
+UYFR	kept	第二工程·decoration	5cfb1748-109a-4b01-9e8c-84359b38f426	12	S6		1	1114.3,974.5,1154.3,1014.5	9F调度大厅上空平面图
+V4VH	kept	第二工程·structure	d1cc9d5e-add5-4cd5-b844-46ca50e2bfae	1	S6		0	1600.0,1105.7,2171.4,1677.1	五层结构平面图
+3KVY	kept	第二工程·general	376379fa-a86f-4e38-bf2b-e287498b3ee8	1	S6		0	0.0,0.0,2384.0,1684.0	灯具放大平面图一
+9XRJ	kept	歌剧院·architecture	6b446732-1ded-4e95-bc5f-38c93cc029de	2	S6		0	1823.9,86.5,1995.7,258.2	建筑-竣工图--一层完整平面图
+3WFW	kept	第二工程·structure	d2a04f9d-27c9-4a60-96ce-6962bb3b2d9e	43	S6		1	344.0,690.0,384.0,730.0	五层次梁平面整体配筋图

@@ -1,0 +1,401 @@
+{
+  "version": 1,
+  "object_classes": [
+    "walls_wall3"
+  ],
+  "units": [
+    {
+      "unit": "wall3-kept",
+      "source": {
+        "group": "kept"
+      },
+      "classes": {
+        "walls_wall3": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "W49R",
+              "ok": true,
+              "what": "",
+              "note": "红线压在两条平行线之间的墙体条带上"
+            },
+            {
+              "ref": "3J9C",
+              "ok": true,
+              "what": "",
+              "note": "红线沿平面外围的连续墙体边界"
+            },
+            {
+              "ref": "4A93",
+              "ok": false,
+              "what": "single_line",
+              "note": "红线只压在一条细线附近"
+            },
+            {
+              "ref": "4XFY",
+              "ok": false,
+              "what": "single_line",
+              "note": "红线位于粗构件旁的单条竖线处"
+            },
+            {
+              "ref": "JFEP",
+              "ok": true,
+              "what": "",
+              "note": "红线落在连续灰色长条边界上"
+            },
+            {
+              "ref": "3HJK",
+              "ok": false,
+              "what": "dimension",
+              "note": "红线沿尺寸或定位辅助线"
+            },
+            {
+              "ref": "W3CU",
+              "ok": true,
+              "what": "",
+              "note": "红线压在房间分隔的双线墙体上"
+            },
+            {
+              "ref": "YKUW",
+              "ok": false,
+              "what": "dimension",
+              "note": "红线位于尺寸标注区域"
+            },
+            {
+              "ref": "MFFW",
+              "ok": true,
+              "what": "",
+              "note": "红线沿卫生间分隔墙的水平条带"
+            },
+            {
+              "ref": "HVNK",
+              "ok": false,
+              "what": "hatch",
+              "note": "红线压在斜向填充图案上"
+            },
+            {
+              "ref": "39VN",
+              "ok": true,
+              "what": "",
+              "note": "红线压在灰色水平墙体条带上"
+            },
+            {
+              "ref": "VJRN",
+              "ok": true,
+              "what": "",
+              "note": "红线沿房间或楼梯边界的墙线"
+            },
+            {
+              "ref": "HUXR",
+              "ok": false,
+              "what": "frame",
+              "note": "红线落在图框或整图边缘"
+            },
+            {
+              "ref": "KH9N",
+              "ok": false,
+              "what": "single_line",
+              "note": "红线只跨过细线和空白区域"
+            },
+            {
+              "ref": "M3XA",
+              "ok": false,
+              "what": "single_line",
+              "note": "红线位于文字和细线附近"
+            },
+            {
+              "ref": "YL9E",
+              "ok": true,
+              "what": "",
+              "note": "红线沿房间边界的连续墙线"
+            },
+            {
+              "ref": "XMVY",
+              "ok": true,
+              "what": "",
+              "note": "红线压在灰色墙体或边界条带上"
+            },
+            {
+              "ref": "3J4A",
+              "ok": true,
+              "what": "",
+              "note": "红线沿房间分隔构件的水平边界"
+            },
+            {
+              "ref": "FYLK",
+              "ok": true,
+              "what": "",
+              "note": "红线沿楼梯间旁的墙体边界"
+            },
+            {
+              "ref": "NMC4",
+              "ok": true,
+              "what": "",
+              "note": "红线压在粗灰色墙体条带上"
+            },
+            {
+              "ref": "KXFH",
+              "ok": false,
+              "what": "nothing",
+              "note": "红线位于空白平面区域"
+            },
+            {
+              "ref": "N4MX",
+              "ok": false,
+              "what": "dimension",
+              "note": "红线位于竖向尺寸和定位线处"
+            },
+            {
+              "ref": "XCVN",
+              "ok": true,
+              "what": "",
+              "note": "红线压在灰色水平墙体上"
+            },
+            {
+              "ref": "YKWY",
+              "ok": false,
+              "what": "stair",
+              "note": "红线落在楼梯踏步区域"
+            },
+            {
+              "ref": "NLNJ",
+              "ok": true,
+              "what": "",
+              "note": "红线沿建筑外围连续墙体边界"
+            },
+            {
+              "ref": "UJ9Y",
+              "ok": true,
+              "what": "",
+              "note": "红线压在灰色水平墙条带上"
+            },
+            {
+              "ref": "HWMK",
+              "ok": true,
+              "what": "",
+              "note": "红线沿粗灰色墙体或梁墙边界"
+            },
+            {
+              "ref": "FRAW",
+              "ok": false,
+              "what": "single_line",
+              "note": "红线只压在细小线性符号上"
+            },
+            {
+              "ref": "K9YC",
+              "ok": true,
+              "what": "",
+              "note": "红线压在粗黑色水平墙体上"
+            },
+            {
+              "ref": "9WH3",
+              "ok": true,
+              "what": "",
+              "note": "红线沿连续粗墙体边界"
+            },
+            {
+              "ref": "VPCH",
+              "ok": true,
+              "what": "",
+              "note": "红线位于两个洁具之间的墙体分隔处"
+            },
+            {
+              "ref": "AWME",
+              "ok": false,
+              "what": "frame",
+              "note": "红线落在整张图纸缩略图边缘"
+            },
+            {
+              "ref": "KRXU",
+              "ok": false,
+              "what": "nothing",
+              "note": "红线位于空白区域和虚线旁"
+            },
+            {
+              "ref": "FLPA",
+              "ok": false,
+              "what": "nothing",
+              "note": "红线处只有空白和零星细线"
+            },
+            {
+              "ref": "P3LW",
+              "ok": false,
+              "what": "hatch",
+              "note": "红线压在配筋或填充图案上"
+            },
+            {
+              "ref": "FK3K",
+              "ok": false,
+              "what": "door",
+              "note": "红线落在门洞和门扇开启区域"
+            },
+            {
+              "ref": "ENRE",
+              "ok": false,
+              "what": "hatch",
+              "note": "红线位于填充图案和细线区域"
+            },
+            {
+              "ref": "C9LL",
+              "ok": true,
+              "what": "",
+              "note": "红线沿连续灰色墙体条带"
+            },
+            {
+              "ref": "HW4Y",
+              "ok": true,
+              "what": "",
+              "note": "红线压在粗灰色水平墙体上"
+            },
+            {
+              "ref": "LRUP",
+              "ok": false,
+              "what": "nothing",
+              "note": "红线位于空白轴线区域"
+            },
+            {
+              "ref": "JAFM",
+              "ok": false,
+              "what": "furniture",
+              "note": "红线附近是家具或不规则布置内容"
+            },
+            {
+              "ref": "HEV9",
+              "ok": false,
+              "what": "furniture",
+              "note": "红线落在洁具和家具布置区域"
+            },
+            {
+              "ref": "URCH",
+              "ok": true,
+              "what": "",
+              "note": "红线沿房间和楼梯区域的墙体边界"
+            },
+            {
+              "ref": "HAJN",
+              "ok": false,
+              "what": "nothing",
+              "note": "红线位于空白和细线区域"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#walls",
+          "note": "原生分辨率裁图 + 分层抽样（6 层）+ 批内重测对。原始精确率 0.500，语料加权 0.575（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 56 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "wall3-blank_control",
+      "source": {
+        "group": "blank_control"
+      },
+      "classes": {
+        "walls_wall3": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "XJ33",
+              "ok": true,
+              "what": "",
+              "note": "红线压在轴线和轴号圈附近"
+            },
+            {
+              "ref": "3U3K",
+              "ok": true,
+              "what": "",
+              "note": "红线处没有明确墙体"
+            },
+            {
+              "ref": "LXAE",
+              "ok": true,
+              "what": "",
+              "note": "红线与尺寸数字和辅助线重合"
+            },
+            {
+              "ref": "4UKY",
+              "ok": true,
+              "what": "",
+              "note": "红线处基本为空白"
+            },
+            {
+              "ref": "9HCH",
+              "ok": true,
+              "what": "",
+              "note": "红线位于空白和轴线区域"
+            },
+            {
+              "ref": "MAWE",
+              "ok": true,
+              "what": "",
+              "note": "红线处没有明确实体"
+            },
+            {
+              "ref": "XXPA",
+              "ok": true,
+              "what": "",
+              "note": "红线位于空白处"
+            },
+            {
+              "ref": "MAFR",
+              "ok": true,
+              "what": "",
+              "note": "红线处只有空白和细线"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#walls",
+          "note": "原生分辨率裁图 + 分层抽样（6 层）+ 批内重测对。原始精确率 0.500，语料加权 0.575（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 56 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "wall3-retest_dup",
+      "source": {
+        "group": "retest_dup"
+      },
+      "classes": {
+        "walls_wall3": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "YK4A",
+              "ok": false,
+              "what": "dimension",
+              "note": "重测副本，原格 HAJN；红线位于尺寸标注线附近"
+            },
+            {
+              "ref": "FJAM",
+              "ok": true,
+              "what": "",
+              "note": "重测副本，原格 9WH3；红线沿曲线构造的连续墙体边缘"
+            },
+            {
+              "ref": "3XHY",
+              "ok": false,
+              "what": "beam",
+              "note": "重测副本，原格 FRAW；红线压在独立的工字形或梁状构件上"
+            },
+            {
+              "ref": "UWFN",
+              "ok": true,
+              "what": "",
+              "note": "重测副本，原格 XCVN；红线压在粗灰色水平墙体条带上"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#walls",
+          "note": "原生分辨率裁图 + 分层抽样（6 层）+ 批内重测对。原始精确率 0.500，语料加权 0.575（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 56 / 纠正 0 / 编造 0。"
+        }
+      }
+    }
+  ]
+}

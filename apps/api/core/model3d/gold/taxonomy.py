@@ -116,6 +116,8 @@ _TABLE: dict[str, tuple[str, str]] = {
     "text": ("text", "annotation"),
     "文字": ("text", "annotation"),
     "no_text": ("text", "annotation"),
+    # slab3 判读者自创的写法（修改通知表格、成段说明文字）—— 仍是图面标注
+    "text_or_table": ("text", "annotation"),
     "hatch": ("hatch", "annotation"),
     "no_hatch": ("hatch", "annotation"),
     "填充线": ("hatch", "annotation"),

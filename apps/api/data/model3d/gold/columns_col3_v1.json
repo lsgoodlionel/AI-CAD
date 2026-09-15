@@ -1,0 +1,431 @@
+{
+  "version": 1,
+  "object_classes": [
+    "columns_col3"
+  ],
+  "units": [
+    {
+      "unit": "col3-kept",
+      "source": {
+        "group": "kept"
+      },
+      "classes": {
+        "columns_col3": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "HUYU",
+              "ok": true,
+              "what": "",
+              "note": "红框套在带有300KZ-D2标注的灰色方块上"
+            },
+            {
+              "ref": "WCUL",
+              "ok": false,
+              "what": "hatch",
+              "note": "红框落在大面积配筋填充区域"
+            },
+            {
+              "ref": "L4JP",
+              "ok": false,
+              "what": "elevation_mark",
+              "note": "红框内是标高三角符号"
+            },
+            {
+              "ref": "X3WK",
+              "ok": false,
+              "what": "other",
+              "note": "红框套在带方向箭头的大型黑色布置符号上"
+            },
+            {
+              "ref": "YVP9",
+              "ok": false,
+              "what": "other",
+              "note": "红框围住倾斜的小型构件符号"
+            },
+            {
+              "ref": "NXPW",
+              "ok": false,
+              "what": "text",
+              "note": "红框压在排水文字和灰色区域上"
+            },
+            {
+              "ref": "YJ34",
+              "ok": false,
+              "what": "other",
+              "note": "红框内是旋转的灰色小块，缺少柱网依据"
+            },
+            {
+              "ref": "YJVW",
+              "ok": false,
+              "what": "nothing",
+              "note": "红框处只有空白和细线"
+            },
+            {
+              "ref": "4UN9",
+              "ok": false,
+              "what": "other",
+              "note": "红框围住墙身和剖面构造区域"
+            },
+            {
+              "ref": "39PK",
+              "ok": false,
+              "what": "wall",
+              "note": "红框压在灰色墙体条带上"
+            },
+            {
+              "ref": "9ARP",
+              "ok": false,
+              "what": "text",
+              "note": "红框落在大型文字笔画上"
+            },
+            {
+              "ref": "MMRL",
+              "ok": false,
+              "what": "elevation_mark",
+              "note": "红框内是标高三角符号"
+            },
+            {
+              "ref": "NKVM",
+              "ok": false,
+              "what": "text",
+              "note": "红框压在设计院或图签文字上"
+            },
+            {
+              "ref": "YAYU",
+              "ok": false,
+              "what": "hatch",
+              "note": "红框位于斜向填充区域"
+            },
+            {
+              "ref": "PXFM",
+              "ok": false,
+              "what": "dimension",
+              "note": "红框位于尺寸和结构标注区域"
+            },
+            {
+              "ref": "LXPU",
+              "ok": false,
+              "what": "equipment",
+              "note": "红框围住清洁间内的洁具符号"
+            },
+            {
+              "ref": "E3HF",
+              "ok": false,
+              "what": "room",
+              "note": "红框覆盖房间和家具布置区域"
+            },
+            {
+              "ref": "EPL9",
+              "ok": false,
+              "what": "text",
+              "note": "红框压在大号标高数字上"
+            },
+            {
+              "ref": "RYMX",
+              "ok": false,
+              "what": "other",
+              "note": "红框位于连续黑色小块布置中，未见独立柱网"
+            },
+            {
+              "ref": "WUWA",
+              "ok": false,
+              "what": "text",
+              "note": "红框压在手写或说明文字上"
+            },
+            {
+              "ref": "RE3P",
+              "ok": false,
+              "what": "hatch",
+              "note": "红框落在大面积剖面填充和文字区域"
+            },
+            {
+              "ref": "N49K",
+              "ok": false,
+              "what": "hatch",
+              "note": "红框围住基础剖面填充图案"
+            },
+            {
+              "ref": "4MYE",
+              "ok": true,
+              "what": "",
+              "note": "红框套在独立的灰色近方形块上"
+            },
+            {
+              "ref": "J9HM",
+              "ok": false,
+              "what": "equipment",
+              "note": "红框落在暖通设备或门厅布置区域"
+            },
+            {
+              "ref": "4X3P",
+              "ok": false,
+              "what": "text",
+              "note": "红框内主要是标高数字和说明文字"
+            },
+            {
+              "ref": "N9JV",
+              "ok": false,
+              "what": "other",
+              "note": "红框落在结构网格中的细线区域"
+            },
+            {
+              "ref": "XKMN",
+              "ok": false,
+              "what": "wall",
+              "note": "红框压在连续粗黑色墙体上"
+            },
+            {
+              "ref": "M93H",
+              "ok": false,
+              "what": "elevation_mark",
+              "note": "红框围住标高三角符号"
+            },
+            {
+              "ref": "CEX4",
+              "ok": false,
+              "what": "other",
+              "note": "红框落在圆形设备或符号内部"
+            },
+            {
+              "ref": "MCJW",
+              "ok": false,
+              "what": "beam",
+              "note": "红框压在长条形灰色构件上"
+            },
+            {
+              "ref": "LACM",
+              "ok": false,
+              "what": "equipment",
+              "note": "红框位于圆形设备符号附近"
+            },
+            {
+              "ref": "AEY4",
+              "ok": false,
+              "what": "wall",
+              "note": "红框压在房间边界的粗墙体上"
+            },
+            {
+              "ref": "JRVN",
+              "ok": false,
+              "what": "nothing",
+              "note": "红框内只有空白和细线"
+            },
+            {
+              "ref": "NXJN",
+              "ok": false,
+              "what": "elevation_mark",
+              "note": "红框套在标高三角符号上"
+            },
+            {
+              "ref": "JH4L",
+              "ok": false,
+              "what": "text",
+              "note": "红框压在标高数字和文字上"
+            },
+            {
+              "ref": "JVHE",
+              "ok": false,
+              "what": "hatch",
+              "note": "红框内是斜向填充图案"
+            },
+            {
+              "ref": "RRPU",
+              "ok": false,
+              "what": "hatch",
+              "note": "红框落在景观或填充图案中"
+            },
+            {
+              "ref": "PLPL",
+              "ok": false,
+              "what": "equipment",
+              "note": "红框位于电梯或设备间布置内"
+            },
+            {
+              "ref": "N9CN",
+              "ok": false,
+              "what": "dimension",
+              "note": "红框压在尺寸链和标注线区域"
+            },
+            {
+              "ref": "9RAP",
+              "ok": false,
+              "what": "wall",
+              "note": "红框套在粗灰色墙体转角上"
+            },
+            {
+              "ref": "VUU3",
+              "ok": false,
+              "what": "elevation_mark",
+              "note": "红框内是标高三角符号"
+            },
+            {
+              "ref": "EFCK",
+              "ok": false,
+              "what": "dimension",
+              "note": "红框位于尺寸标注和斜向辅助线处"
+            },
+            {
+              "ref": "HCAJ",
+              "ok": false,
+              "what": "nothing",
+              "note": "红框内基本为空白"
+            },
+            {
+              "ref": "WKNN",
+              "ok": false,
+              "what": "dimension",
+              "note": "红框压在标高和尺寸数字附近"
+            },
+            {
+              "ref": "W4RF",
+              "ok": false,
+              "what": "furniture",
+              "note": "红框落在家具或不规则布置符号上"
+            },
+            {
+              "ref": "CJKU",
+              "ok": false,
+              "what": "beam",
+              "note": "红框压在连续黑色长条构件上"
+            },
+            {
+              "ref": "MAUA",
+              "ok": false,
+              "what": "other",
+              "note": "红框围住细小不规则符号，未见柱体"
+            },
+            {
+              "ref": "KXJK",
+              "ok": false,
+              "what": "room",
+              "note": "红框覆盖整张平面局部而非单根柱"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#columns",
+          "note": "原生分辨率裁图 + 分层抽样（6 层）+ 批内重测对。原始精确率 0.042，语料加权 0.046（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 61 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "col3-blank_control",
+      "source": {
+        "group": "blank_control"
+      },
+      "classes": {
+        "columns_col3": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "EVUL",
+              "ok": true,
+              "what": "",
+              "note": "红框内基本为空白"
+            },
+            {
+              "ref": "KWPP",
+              "ok": true,
+              "what": "",
+              "note": "红框内只有稀疏轴线和空白"
+            },
+            {
+              "ref": "YHKK",
+              "ok": true,
+              "what": "",
+              "note": "红框处基本为空白"
+            },
+            {
+              "ref": "UAFX",
+              "ok": true,
+              "what": "",
+              "note": "红框内没有明确实体"
+            },
+            {
+              "ref": "F4NP",
+              "ok": true,
+              "what": "",
+              "note": "红框处为空白，仅有轴线"
+            },
+            {
+              "ref": "9AKJ",
+              "ok": true,
+              "what": "",
+              "note": "红框位于空白区域"
+            },
+            {
+              "ref": "HCJP",
+              "ok": true,
+              "what": "",
+              "note": "红框处没有明确构件"
+            },
+            {
+              "ref": "4PR9",
+              "ok": true,
+              "what": "",
+              "note": "红框位于空白轴线区域"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#columns",
+          "note": "原生分辨率裁图 + 分层抽样（6 层）+ 批内重测对。原始精确率 0.042，语料加权 0.046（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 61 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "col3-retest_dup",
+      "source": {
+        "group": "retest_dup"
+      },
+      "classes": {
+        "columns_col3": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "WCVM",
+              "ok": false,
+              "what": "other",
+              "note": "重测副本，原格 W4RF；红框落在家具或不规则小构件上"
+            },
+            {
+              "ref": "LKVK",
+              "ok": false,
+              "what": "other",
+              "note": "重测副本，原格 N9JV；红框落在卫生间布置和小型设备附近"
+            },
+            {
+              "ref": "3LV3",
+              "ok": false,
+              "what": "wall",
+              "note": "重测副本，原格 9RAP；红框落在墙体转角的灰色条带上"
+            },
+            {
+              "ref": "4MLV",
+              "ok": false,
+              "what": "wall",
+              "note": "重测副本，原格 MAUA；红框压在粗黑色竖向墙体上"
+            },
+            {
+              "ref": "JYAC",
+              "ok": false,
+              "what": "dimension",
+              "note": "重测副本，原格 39PK；红框落在标高文字和辅助线附近"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#columns",
+          "note": "原生分辨率裁图 + 分层抽样（6 层）+ 批内重测对。原始精确率 0.042，语料加权 0.046（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 61 / 纠正 0 / 编造 0。"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,221 @@
+{
+  "version": 1,
+  "object_classes": [
+    "pipes_pipe3"
+  ],
+  "units": [
+    {
+      "unit": "pipe3-blank_control",
+      "source": {
+        "group": "blank_control"
+      },
+      "classes": {
+        "pipes_pipe3": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "ELER",
+              "ok": true,
+              "what": "",
+              "note": "红线位于轴网和尺寸链附近"
+            },
+            {
+              "ref": "F434",
+              "ok": true,
+              "what": "",
+              "note": "红线位于空白区域，附近只有零星细线"
+            },
+            {
+              "ref": "3CXV",
+              "ok": true,
+              "what": "",
+              "note": "红线只跨过结构辅助线和细线"
+            },
+            {
+              "ref": "4XJ4",
+              "ok": true,
+              "what": "",
+              "note": "红线位于空白区域"
+            },
+            {
+              "ref": "NUCE",
+              "ok": true,
+              "what": "",
+              "note": "红线位于尺寸标注和引出线区域"
+            },
+            {
+              "ref": "JUJE",
+              "ok": true,
+              "what": "",
+              "note": "红线处基本为空白"
+            },
+            {
+              "ref": "4WFX",
+              "ok": true,
+              "what": "",
+              "note": "红线只有一个小短段，周围没有可辨认物体"
+            },
+            {
+              "ref": "94MJ",
+              "ok": true,
+              "what": "",
+              "note": "红线位于空白区域，未见明确构件"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#pipes",
+          "note": "原生分辨率裁图 + 分层抽样（2 层）+ 批内重测对。原始精确率 0.000，语料加权 0.000（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 26 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "pipe3-retest_dup",
+      "source": {
+        "group": "retest_dup"
+      },
+      "classes": {
+        "pipes_pipe3": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "WFXU",
+              "ok": false,
+              "what": "hatch",
+              "note": "重测副本，原格 AJ4F；红线压在密集斜向填充线中"
+            },
+            {
+              "ref": "E394",
+              "ok": false,
+              "what": "text",
+              "note": "重测副本，原格 MVVW；红线位于隔声说明文字区域"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#pipes",
+          "note": "原生分辨率裁图 + 分层抽样（2 层）+ 批内重测对。原始精确率 0.000，语料加权 0.000（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 26 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "pipe3-kept",
+      "source": {
+        "group": "kept"
+      },
+      "classes": {
+        "pipes_pipe3": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "AHEK",
+              "ok": false,
+              "what": "beam_or_grid",
+              "note": "红线沿结构平面中的灰色水平构件"
+            },
+            {
+              "ref": "HKM4",
+              "ok": false,
+              "what": "beam_or_grid",
+              "note": "红线沿屋面结构边界和细线"
+            },
+            {
+              "ref": "RWHN",
+              "ok": false,
+              "what": "beam_or_grid",
+              "note": "红线压在粗黑色斜向结构构件上"
+            },
+            {
+              "ref": "WUEM",
+              "ok": false,
+              "what": "beam_or_grid",
+              "note": "红线沿平面中的竖向结构边界"
+            },
+            {
+              "ref": "MVVW",
+              "ok": false,
+              "what": "text",
+              "note": "红线压在说明文字和隔声标注上"
+            },
+            {
+              "ref": "LWHJ",
+              "ok": false,
+              "what": "beam_or_grid",
+              "note": "红线沿大号编号框下方的结构线"
+            },
+            {
+              "ref": "HYKK",
+              "ok": false,
+              "what": "beam_or_grid",
+              "note": "红线压在粗灰色水平结构条带上"
+            },
+            {
+              "ref": "4FKL",
+              "ok": false,
+              "what": "beam_or_grid",
+              "note": "红线沿轴线方向延伸"
+            },
+            {
+              "ref": "4L3E",
+              "ok": false,
+              "what": "beam_or_grid",
+              "note": "红线位于平面中的细结构线区域"
+            },
+            {
+              "ref": "FPAV",
+              "ok": false,
+              "what": "beam_or_grid",
+              "note": "红线沿粗灰色斜向构件边界"
+            },
+            {
+              "ref": "FXYW",
+              "ok": false,
+              "what": "text",
+              "note": "红线压在管线说明文字和引出线附近"
+            },
+            {
+              "ref": "VHFA",
+              "ok": false,
+              "what": "beam_or_grid",
+              "note": "红线沿机房内的粗灰色结构条带"
+            },
+            {
+              "ref": "FF4H",
+              "ok": false,
+              "what": "beam_or_grid",
+              "note": "红线压在粗黑色斜向结构构件上"
+            },
+            {
+              "ref": "AJ4F",
+              "ok": false,
+              "what": "hatch",
+              "note": "红线位于密集的斜向填充图案中"
+            },
+            {
+              "ref": "CLJV",
+              "ok": false,
+              "what": "beam_or_grid",
+              "note": "红线只沿细线和轴线区域"
+            },
+            {
+              "ref": "VMAC",
+              "ok": false,
+              "what": "text",
+              "note": "红线落在大号结构编号文字附近"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#pipes",
+          "note": "原生分辨率裁图 + 分层抽样（2 层）+ 批内重测对。原始精确率 0.000，语料加权 0.000（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 26 / 纠正 0 / 编造 0。"
+        }
+      }
+    }
+  ]
+}

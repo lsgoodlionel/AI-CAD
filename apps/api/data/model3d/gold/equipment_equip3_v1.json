@@ -1,0 +1,221 @@
+{
+  "version": 1,
+  "object_classes": [
+    "equipment_equip3"
+  ],
+  "units": [
+    {
+      "unit": "equip3-retest_dup",
+      "source": {
+        "group": "retest_dup"
+      },
+      "classes": {
+        "equipment_equip3": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "KM4U",
+              "ok": false,
+              "what": "single_line",
+              "note": "重测副本，原格 U4HW；红框压在一条细长水平线条上，未见设备轮廓"
+            },
+            {
+              "ref": "9KAJ",
+              "ok": false,
+              "what": "nothing",
+              "note": "重测副本，原格 49YV；红色标记附近未见明确设备符号"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#equipment",
+          "note": "原生分辨率裁图 + 分层抽样（2 层）+ 批内重测对。原始精确率 0.000，语料加权 0.000（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 26 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "equip3-kept",
+      "source": {
+        "group": "kept"
+      },
+      "classes": {
+        "equipment_equip3": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "XRAK",
+              "ok": false,
+              "what": "nothing",
+              "note": "红框位于房间空地，周围只有家具线条"
+            },
+            {
+              "ref": "KP9X",
+              "ok": false,
+              "what": "furniture",
+              "note": "红框套住房间内一把椅子或座椅"
+            },
+            {
+              "ref": "YHFF",
+              "ok": false,
+              "what": "single_line",
+              "note": "红框内只有短线状图元"
+            },
+            {
+              "ref": "MYX9",
+              "ok": false,
+              "what": "single_line",
+              "note": "红框压在细长水平线条上"
+            },
+            {
+              "ref": "NPVU",
+              "ok": false,
+              "what": "text",
+              "note": "红框套在签名或文字笔画上"
+            },
+            {
+              "ref": "EPXL",
+              "ok": false,
+              "what": "furniture",
+              "note": "红框位于包含多个家具块的房间内，未见明确设备"
+            },
+            {
+              "ref": "C494",
+              "ok": false,
+              "what": "single_line",
+              "note": "红色标记压在一条水平线条上，未见设备轮廓"
+            },
+            {
+              "ref": "UURX",
+              "ok": false,
+              "what": "other",
+              "note": "红框套住一个不规则轮廓，无法辨认为机电设备"
+            },
+            {
+              "ref": "K9FM",
+              "ok": false,
+              "what": "furniture",
+              "note": "红框套住平面图中一个不规则布置块，未见设备特征"
+            },
+            {
+              "ref": "34NH",
+              "ok": false,
+              "what": "furniture",
+              "note": "红框套住重复座椅布置中的一个座位"
+            },
+            {
+              "ref": "PLFA",
+              "ok": false,
+              "what": "wall",
+              "note": "红框压在房间边界附近的细长构件上"
+            },
+            {
+              "ref": "49YV",
+              "ok": false,
+              "what": "nothing",
+              "note": "红色标记附近未见清晰设备符号"
+            },
+            {
+              "ref": "XFEA",
+              "ok": false,
+              "what": "text",
+              "note": "红框主要覆盖文字或标注笔画"
+            },
+            {
+              "ref": "U4HW",
+              "ok": false,
+              "what": "single_line",
+              "note": "红框压在细长线状图元上"
+            },
+            {
+              "ref": "XHA9",
+              "ok": false,
+              "what": "other",
+              "note": "红框内是一个小型不规则符号，但看不出明确设备类别"
+            },
+            {
+              "ref": "KVLK",
+              "ok": false,
+              "what": "nothing",
+              "note": "红框处未见可辨认设备"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#equipment",
+          "note": "原生分辨率裁图 + 分层抽样（2 层）+ 批内重测对。原始精确率 0.000，语料加权 0.000（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 26 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "equip3-blank_control",
+      "source": {
+        "group": "blank_control"
+      },
+      "classes": {
+        "equipment_equip3": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "X9NF",
+              "ok": true,
+              "what": "",
+              "note": "红框附近主要是房间文字标注，未见设备"
+            },
+            {
+              "ref": "AFFK",
+              "ok": true,
+              "what": "",
+              "note": "红框处基本空白，未见设备"
+            },
+            {
+              "ref": "KMRJ",
+              "ok": true,
+              "what": "",
+              "note": "红框处为空白区域，未见设备"
+            },
+            {
+              "ref": "EJCM",
+              "ok": true,
+              "what": "",
+              "note": "红框处只有零星线条，未见可辨认设备"
+            },
+            {
+              "ref": "CULA",
+              "ok": true,
+              "what": "",
+              "note": "红框位于空白区域"
+            },
+            {
+              "ref": "9CWW",
+              "ok": true,
+              "what": "",
+              "note": "红框处基本空白"
+            },
+            {
+              "ref": "MWCF",
+              "ok": true,
+              "what": "",
+              "note": "红框内未见明确设备，仅有零星背景线"
+            },
+            {
+              "ref": "XMVY",
+              "ok": true,
+              "what": "",
+              "note": "红框位于空白网格区域"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#equipment",
+          "note": "原生分辨率裁图 + 分层抽样（2 层）+ 批内重测对。原始精确率 0.000，语料加权 0.000（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 26 / 纠正 0 / 编造 0。"
+        }
+      }
+    }
+  ]
+}

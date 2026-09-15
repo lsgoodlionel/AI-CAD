@@ -117,7 +117,12 @@ def summarize(
     per_stratum_w = {s: (v[0], v[1]) for s, v in per_w.items()}
     wp, coverage = weighted_precision(per_stratum_w, weights)
     verdicts = {code: v for code, (v, _a) in resolved.items()}
-    issues = check_batch([{"id": c, "what": a.get("what") or str(v)}
+    # `confident` 与备注必须传进去：只传 id/what 时检查器按缺省把每格当成
+    # 「有把握、无备注」，这条闸对每一批都报，等于从未生效（col3 实测）。
+    # 批次命令里备注叫 `saw`，更早的批次叫 `note` —— 两个都认。
+    issues = check_batch([{"id": c, "what": a.get("what") or str(v),
+                           "confident": a.get("confident", True),
+                           "note": a.get("note") or a.get("saw") or ""}
                           for c, (v, a) in resolved.items()])
     return {
         "matched": counts["matched"],
