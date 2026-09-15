@@ -451,6 +451,18 @@ Query:`target_kind`(topology/naming/compliance/element/symbol)、`discipline`、
 **运维须知**:Docker VM 只有 8 GB,不要并行跑两个整层识别预演(实测把 VM 撑到重启,
 `cad_*` 容器停在 Exited 需手动 `docker start`)。
 
+### 6.7 按金标准收口(2026-09-15)
+
+六类批次判读(`docs/GOLD_STANDARD_REVIEW.md`「判读结果(2026-09-15)」)之后的三处处置:
+
+| 处置 | 做法 | 依据 |
+|---|---|---|
+| 管线/设备默认隐藏、标「未验证」 | `services/element_validation.py` 清单 + `GET /model` 附带 `element_validation`(与 scene 版本无关,回滚到旧版本也有);前端构件图层默认不勾选 | 管线 0/58、0/16,设备 0/16;`tests/test_element_validation.py` 对着金标准钉住清单 |
+| 兜底板不进算量 | `model_qto.FALLBACK_SLAB_BASES` 改读识别器 `SLAB_FALLBACK_BASES`(此前漏了数量最多的 `largest_polygon`);汇总合计与覆盖率分母排除兜底板,`fallback` 块单列并带 `excluded_from_totals` | slab3 精确率 3.9%,48 格里 21 格是整层外轮廓 |
+| 线上回到 v85 | 从 `project_models_bak_20260915` 整行恢复(v85 的装配实体仍在) | v86 柱 19574、设备 12931,绝大多数是误检 |
+
+柱 12% → 4.6% 的来源(09-10 图元配额按类分配)正在用 col3 判过的格子做配额前后对照。
+
 ---
 
 ## 7. 算量(QTO)口径
@@ -460,7 +472,7 @@ Query:`target_kind`(topology/naming/compliance/element/symbol)、`discipline`、
 - **混凝土**:毛体积 + 拓扑扣减净体积。柱=area×层高;墙=length×width×height(默认 width 0.2);梁=毛−Σ支承端(默认 width 0.3 / depth 0.6);板=毛−Σ支承梁(Liang-Barsky 线段裁剪)。
 - **模板**:接触模板面(侧+底)与自由面(顶/端)分列,板底扣梁顶。
 - **钢筋**:**只读复用** `core.economic.rebar_calculator.optimize_cutting`(GB50010,不改算法);无配筋输入则 `rebar_missing=True` 不臆造。默认标准长度 9000/10000/12000,钢价 4000/t,目标损耗率 1.5%。
-- **汇总**:按类型分桶 + measured/estimated/uncovered 计数(缺失构件不静默漏量);分楼层算量(层高优先取 story_tables 实测,缺省 4.5m)→ 项目/楼层/单体三级。
+- **汇总**:按类型分桶 + measured/estimated/uncovered 计数(缺失构件不静默漏量);**兜底板(`SLAB_FALLBACK_BASES`:最大多边形/轴网包络/柱包络)不计入合计与计数**,在 `fallback` 块单列(`excluded_from_totals`,2026-09-15 起;此前计入);分楼层算量(层高优先取 story_tables 实测,缺省 4.5m)→ 项目/楼层/单体三级。
 - **触发**:`GET /model/quantities` 从 scene **实时算**(不落库)。快照走 `model_quantities` 表(migration 022)。
 - **IFC 量集**:`write_concrete/formwork/rebar_quantities` 挂到 `Qto_*BaseQuantities`,写入失败不阻断算量。
 
@@ -767,3 +779,4 @@ Phase D 合并了多处同类入口(见 `docs/PHASE_D_BLUEPRINT.md` §0.3),前�
 | V1.8 | 2026-09-02 | 密排阵列剔除(座椅闸)的**量化与边界**:§6.4 新增判据依据(座椅比值 0.94~1.00 vs 真柱网 6.39~6.78)、识别器层面剔除量(29% 随机样本合计 8.1%、结构 1.2%)、误伤核验结论(结构侧删的是配筋大样钢筋/图框标题栏汉字/填充横条,**零例真柱**)、**场景级 A/B**(歌剧院同一份代码只关闸:柱 6615→5657 即 −958/−14.5%,其余构件类一字不差;场景级**高于**识别器层面,与 `d7002dc` 的「衰减 70 倍」相反)、scene 重建落库(歌剧院 v85 / 第二工程 v8,密排残留 662→0 / 420→5)、可见性字段 `FloorElements.dense_arrays`。**并更正一处口径**:`export_yolo_dataset.py` 中 scene 只用于**选图**,标注框来自实时 `recognize()`,识别器修好对训练标签直接生效,不必先重建 scene |
 | V1.9 | 2026-09-10 | 兜底板不再挑中图框(§6.5):`pick_fallback_slab_polygons` 接入既有 `is_non_component_layer`(判据未新造,`_find_slabs` 早就拿着 `poly_layers`、只是没往下递),排除**发生在包含判定之前**(否则被排除的框仍把候选套没)。实测 60 张平面图、39 张走兜底,**39/39 的最大多边形都在图框图层上**(`C-SHET-TTLB` 35 / `图框` 3 / xref 1),A/B 兜底板 52→**200**(不降反增——图框不再套住候选,正是「板 18→6」的反向)、折算方量 519,684→**58,653 m³**。**边界如实**:逐张画图核验 `S-2-32-004C` 保留的 12 块里 10 块是墙填充、1 块是说明文字,**没有一块是真楼板**——修的是「把纸当楼」不是「把楼认对」(金标准 `largest_polygon` 精确率仍是 3/25);部分图因此无板、降级到柱包络那种「图上无处可看」的兜底;`basis` 声明含义不变;板的**图层命中路径**未动(小样本 `classify=slab 且 non_component=True` 为 0);**存量 scene 需重建才生效**。探针 `scripts/model3d/probe_fallback_slab.py` 与 `probe_slab_frame_render.py` |
 | V2.0 | 2026-09-15 | §6.6 模型与图纸逐张对比查出的四处:①图框印刷比例(档案 OCR)进识别器,排在猜测之前、与可信落库值冲突时让位(全库一致率 92%/44%,缺省 1:100 为 7%/44%);②板配筋 `RBAR`/板洞 `HOLE` 入非构件闸,板的图层命中路径接闸(04C 139 块假板全来自这两类图层);③同层同系列的总图被分图替代(`floor.superseded_overviews`),分图间配准未修;④`set_capability` 按楼层结果只往下校。金标准/YOLO 脚本仍走旧比例路径(判读进行中,保持可比) |
+| V2.1 | 2026-09-15 | §6.7 按金标准收口:管线/设备默认隐藏标「未验证」(`element_validation`)、兜底板不进算量(兜底依据改读识别器定义,补上漏掉的 `largest_polygon`)、线上回到 v85;§7 汇总口径同步 |
