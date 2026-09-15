@@ -68,6 +68,10 @@ def _center_size(element: dict) -> tuple[float, float, float] | None:
     return (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, side
 
 
+#: 公开名：其它按「中心 + 较大边长」判的闸（`isolation_filter`）共用这一份。
+center_size = _center_size
+
+
 def _runs_along(
     nodes: list[tuple[int, float, float, float]], gap_ratio_max: float,
 ) -> list[list[tuple[int, float, float, float]]]:

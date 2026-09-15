@@ -40,6 +40,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from core.config import settings
 from core.model3d.element_recognizer import recognize
+from core.model3d.isolation_filter import find_crowded_flags
 from core.model3d.geometry_extractor import extract_pdf_geometry
 from core.model3d.gold.batch_codes import make_codes
 from core.model3d.render_budget import render_clip
@@ -266,6 +267,14 @@ def _find_blank(page, fe, rng, spec) -> tuple | None:
     return None
 
 
+def _gate_split(elems: list[dict], gate: float | None) -> tuple[list[int], list[int]]:
+    """候选下标 → (闸保留, 闸删掉)。不给闸就全部保留 —— 旧批次的抽样逐位不变。"""
+    if gate is None:
+        return list(range(len(elems))), []
+    flags = find_crowded_flags(elems, min_isolation=gate)
+    return ([i for i, f in enumerate(flags) if not f], [i for i, f in enumerate(flags) if f])
+
+
 async def _scan(db, strata, spec, args, rng):
     """逐层扫图：收候选、记每图候选数（加权要用）、顺手取空白对照。"""
     pool: list[Candidate] = []
@@ -296,24 +305,31 @@ async def _scan(db, strata, spec, args, rng):
             try:
                 page = doc[0]
                 elems = getattr(fe, spec["attr"])
-                counts.append(len(elems))
+                kept_idx, gated_idx = _gate_split(elems, getattr(args, "gate_isolation", None))
+                # 层权重与层内加权按**闸之后**的候选量 —— 那才是用户会看到的
+                counts.append(len(kept_idx))
                 # **每图先抽再渲染**：配额按类分配后一张图能有上千根柱，全渲染
                 # 就是上千张 480×480 图（一张图 690MB）。`stratify` 本就每图
                 # 至多取 PER_DRAWING 格，先在这里抽等价，且只渲染要用的。
                 as_poly = spec["mark"] == "poly"
                 marks = {i: m for i, el in enumerate(elems)
                          if (m := _mark_of(fe, el, as_poly=as_poly))}
-                for i in rng.sample(sorted(marks), min(PER_DRAWING, len(marks))):
-                    box = marks[i]
-                    crop = crop_box_pt(box.bbox, fe.scale, page_w=page.rect.width,
-                                       page_h=page.rect.height, rel=spec["rel"])
-                    rendered = _render_cell(page, crop, box)
-                    if rendered is None:
-                        continue
-                    pool.append(Candidate(stratum, did, f"{did}:{i}", {
-                        "box": box, "crop": crop, "title": row["title"],
-                        "image": rendered[0], "capped": rendered[1],
-                        "n_cands": len(elems)}))
+                # 闸保留组与闸删组各抽 PER_DRAWING 格；不给闸时闸删组为空、
+                # 保留组的抽样与旧版逐位相同（同一 rng 调用、同一排序键）
+                for group, idxs in (("kept", kept_idx), ("gated", gated_idx)):
+                    usable = sorted(i for i in idxs if i in marks)
+                    for i in rng.sample(usable, min(PER_DRAWING, len(usable))):
+                        box = marks[i]
+                        crop = crop_box_pt(box.bbox, fe.scale, page_w=page.rect.width,
+                                           page_h=page.rect.height, rel=spec["rel"])
+                        rendered = _render_cell(page, crop, box)
+                        if rendered is None:
+                            continue
+                        key = f"{did}:{i}" if group == "kept" else f"{did}:gated:{i}"
+                        pool.append(Candidate(stratum, did, key, {
+                            "box": box, "crop": crop, "title": row["title"],
+                            "image": rendered[0], "capped": rendered[1],
+                            "group": group, "n_cands": len(idxs)}))
                 if fe.scale and got_blank < per_blank_stratum and len(blanks) < args.blank:
                     found = _find_blank(page, fe, rng, spec)
                     if found:
@@ -453,7 +469,8 @@ def _write_outputs(out: Path, sheets, strata, scanned, weights, kind, spec, host
             "strata_drawings": {s: len(r) for s, r in strata.items()},
             "scanned_counts": scanned, "weights": weights,
             "groups": {g: sum(1 for sh in sheets for c in sh if c.group == g)
-                       for g in ("kept", "blank", "dup")}}
+                       for g in ("kept", "gated", "blank", "dup")},
+            "gate_isolation": getattr(args, "gate_isolation", None)}
     (out / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2),
                                    encoding="utf-8")
     return n_cells, meta
@@ -468,7 +485,11 @@ async def main() -> int:
     ap.add_argument("--seed", type=int, default=20260911)
     ap.add_argument("--out", default=None)
     ap.add_argument("--host-dir", required=True)
+    ap.add_argument("--gate-isolation", type=float, default=None,
+                    help="柱孤立度闸阈值：给了就额外抽「闸删掉的」一组，量误删率")
     args = ap.parse_args()
+    if args.gate_isolation is not None and args.kind != "columns":
+        ap.error("--gate-isolation 只用于柱（孤立度闸只作用于柱候选）")
     spec = KIND_SPEC[args.kind]
     out = Path(args.out or f"/tmp/gold_{args.batch}"); out.mkdir(parents=True, exist_ok=True)
     rng = random.Random(args.seed)
@@ -482,16 +503,24 @@ async def main() -> int:
         await db.disconnect()
 
     pool = [c for c in pool if c.payload.get("image") is not None]
-    picked = stratify(pool, per_stratum=args.per_stratum, per_drawing=PER_DRAWING,
-                      seed=args.seed)
-    codes = iter(make_codes(len(picked) + len(blanks) + 64, seed=args.seed))
+    picked = stratify([c for c in pool if c.payload.get("group", "kept") == "kept"],
+                      per_stratum=args.per_stratum, per_drawing=PER_DRAWING, seed=args.seed)
+    picked_gated = stratify([c for c in pool if c.payload.get("group") == "gated"],
+                            per_stratum=args.per_stratum, per_drawing=PER_DRAWING,
+                            seed=args.seed)
+    codes = iter(make_codes(len(picked) + len(picked_gated) + len(blanks) + 64,
+                            seed=args.seed))
     kept = [Cell(next(codes), "kept", c.stratum, c.drawing_id, c.payload["title"],
                  c.payload["crop"], c.payload["image"], capped=c.payload["capped"],
                  drawing_candidates=c.payload["n_cands"])
             for c in picked]
+    gated = [Cell(next(codes), "gated", c.stratum, c.drawing_id, c.payload["title"],
+                  c.payload["crop"], c.payload["image"], capped=c.payload["capped"],
+                  drawing_candidates=c.payload["n_cands"])
+             for c in picked_gated]
     for b in blanks:
         b.code = next(codes)
-    cells = kept + blanks
+    cells = kept + gated + blanks
     random.Random(args.seed).shuffle(cells)
     sheets = _layout(cells, [c.code for c in kept], args.seed, codes)
     weights = _weights(strata, scanned)

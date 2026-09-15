@@ -87,6 +87,7 @@ def summarize(
     fp_labels: collections.Counter = collections.Counter()
     cell_weight, within = _cell_weights(manifest)
     blank_neg = blank_n = 0
+    gated_true = gated_n = 0
     pairs: list[tuple[str, str]] = []
     for row in manifest:
         code, group = row["code"], row["group"]
@@ -99,6 +100,10 @@ def summarize(
         if group == "blank":
             blank_n += 1
             blank_neg += int(not verdict)
+        elif group == "gated":
+            # 闸删组：判读为真柱 = 误删（验证一道新闸用，见 tests/test_gold_gated_group.py）
+            gated_n += 1
+            gated_true += int(verdict)
         elif group == "kept":
             ok_n = per.setdefault(row["stratum"], [0, 0])
             ok_n[0] += int(verdict)
@@ -136,6 +141,8 @@ def summarize(
         "per_stratum_weighted": per_stratum_w,
         "coverage": coverage,
         "blank": (blank_neg, blank_n),
+        # 闸删组（判为真柱数, 格数）—— 前者就是新闸的误删
+        "gated": (gated_true, gated_n),
         "pair_agreement": pair_agreement(verdicts, pairs),
         "false_positive_labels": dict(fp_labels),
         "judge_issues": [f"{i.kind}: {i.detail}" for i in issues],

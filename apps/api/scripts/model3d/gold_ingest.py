@@ -71,11 +71,14 @@ def _gold_doc(batch: str, kind: str, rows: list[dict], answers: dict, field: str
             continue
         judged = bool(ans.get(field)) if isinstance(ans.get(field), bool) \
             else str(ans.get(field)).lower() == "true"
-        group = {"kept": "kept", "blank": "blank_control", "dup": "retest_dup"}[row["group"]]
-        # 空白对照组沿用 columns_final 的约定：ok = 仪器表现正确（判为「不是」）
-        ok = (not judged) if group == "blank_control" else judged
+        group = {"kept": "kept", "blank": "blank_control", "dup": "retest_dup",
+                 "gated": "dropped_by_gate"}[row["group"]]
+        # 空白对照与闸删组沿用 columns_final 的约定：ok = 判为「不是」
+        # （仪器表现正确 / 闸删对了）；闸删组 ok=False 就是误删
+        negative_is_ok = group in ("blank_control", "dropped_by_gate")
+        ok = (not judged) if negative_is_ok else judged
         raw_what = str(ans.get("what") or "").strip()
-        what = "" if ok else (raw_what if raw_what and group != "blank_control"
+        what = "" if ok else (raw_what if raw_what and not negative_is_ok
                               else _UNLABELED_WHAT)
         note = str(ans.get("saw") or ans.get("note") or "")
         if row.get("dup_of"):
@@ -116,6 +119,9 @@ def main() -> int:
     print(f"  编号：匹配 {summary['matched']} · 纠正 {summary['repaired']} · 编造 {summary['fabricated']}")
     print(f"  {blank_detail}")
     print(f"  重测一致率：{summary['pair_agreement']}")
+    gated_true, gated_n = summary.get("gated", (0, 0))
+    if gated_n:
+        print(f"  闸删组：{gated_true}/{gated_n} 判为真柱（误删）")
     for issue in summary["judge_issues"]:
         print(f"  ⚠ 判读健全性：{issue}")
     for s, (ok, tot) in sorted(summary["per_stratum"].items()):
