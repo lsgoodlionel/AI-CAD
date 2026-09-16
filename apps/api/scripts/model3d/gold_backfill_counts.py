@@ -31,15 +31,19 @@ COUNT_COL = "drawing_candidates"
 
 def merge_counts(header: list[str], rows: list[dict],
                  counts: dict[str, int]) -> tuple[list[str], list[dict]]:
-    """把计数并进 manifest：列序与生成器一致；已有该列时以新数为准（幂等）。"""
+    """把计数并进 manifest：列序与生成器一致；已有该列时以新数为准（幂等）。
+
+    生成器后来又加过列（`mark_pt`、`claim`）。旧批次没有的列**补空**而不是
+    省掉 —— 回收端与正对照采集都按列名取值，少一列会在别处才炸；空值本身
+    也是真话：那一批当时确实没记这个。
+    """
     target = MANIFEST_HEADER.split("\t")
-    new_header = ([c for c in target if c in header or c == COUNT_COL]
-                  + [c for c in header if c not in target])
+    new_header = target + [c for c in header if c not in target]
     merged = []
     for row in rows:
         n = counts.get(row.get("drawing_id"))
         value = str(n) if n is not None else row.get(COUNT_COL) or "-1"
-        merged.append({**row, COUNT_COL: value})
+        merged.append({**{c: "" for c in target}, **row, COUNT_COL: value})
     return new_header, merged
 
 

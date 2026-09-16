@@ -46,6 +46,9 @@ BUCKETS = {
     # 图纸级闸、标注过滤都不是同一件事 —— 桶按「该由谁去修」分，所以单列。
     # 板第一版判为板的 5 块里 4 块错在这里。
     "extent": "对象对、范围错",
+    # 位置找对了、读出来的值或身份错了（标高数值不符、锚点打在别的交点上）。
+    # 与「误检成了别的东西」不是一回事：前者修 OCR/配对，后者修构件判据。
+    "misread": "位置对、读数错",
 }
 
 #: 原始写法 → (归一标签, 桶)。
@@ -155,6 +158,19 @@ _TABLE: dict[str, tuple[str, str]] = {
     "legend": ("legend", "annotation"),
     "oversized": ("oversized", "extent"),
     "no_other": ("other", "unspecified"),
+
+    # ── 「系统读数」三类（elevations / axis_lines / world_anchors）──────
+    # 这几类问的是「系统读出的东西图上真有吗」，所以 `what` 里多出两种东西：
+    # ①红框压到的那类图面文字（房间号、说明、管径）——仍是图面标注；
+    # ②**读数本身错了**（数值不符、打在别的交点上）——那不是「误检成了什么」，
+    #   而是读数错，单列一个桶才能回答「错的是找错地方还是读错数」。
+    "room_no": ("text", "annotation"),
+    "note": ("text", "annotation"),
+    "pipe_spec": ("text", "annotation"),
+    "value_mismatch": ("value_mismatch", "misread"),
+    "wrong_intersection": ("wrong_intersection", "misread"),
+    "not_an_intersection": ("not_an_intersection", "misread"),
+    "no_axis_here": ("no_axis_here", "misread"),
 }
 
 

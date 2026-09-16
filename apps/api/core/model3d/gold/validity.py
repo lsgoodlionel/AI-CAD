@@ -64,3 +64,32 @@ def weighted_precision(
         return None, 0.0
     p = sum(w * per_stratum[s][0] / per_stratum[s][1] for s, w in covered.items()) / covered_w
     return p, coverage
+
+
+#: 正对照至少这么多格。与空白对照同一量级 —— 少于这个数，
+#: 「判读者一律答不是」与「这几格碰巧真不是」分不开。
+MIN_POSITIVE_CELLS = 6
+
+#: 正对照允许失手的格数。留一格给「这一格确实边界模糊」，不是给判读者放水。
+MAX_POSITIVE_MISSES = 1
+
+
+def positive_control_ok(*, n_pos: int, n_pos_judged_positive: int) -> tuple[bool, str]:
+    """正对照是否通过：判读者对「确实是该构件」的格子是否答了「是」。
+
+    **空白对照只能抓一个方向的失效。** col3（柱，2026-09-15）空白对照 8/8、
+    重测一致率 1.0、编号零编造，三项全过，却把轴线交点上带剖面填充的近方块
+    判成「细线区域·不是」—— 一律答「不是」的判读者能轻松通过空白对照。
+    同一批图纸、同一份代码、同一判据，col3 判出 1/13、col4 判出 12/21，
+    两者差九倍而仪器毫无反应。正对照就是补上另一个方向。
+
+    对照格来自**已双人核验**的历史格子（判读者判真 + 本人逐格看图复核），
+    出处记在 `data/model3d/gold/positives/*.tsv`。
+    """
+    if n_pos < MIN_POSITIVE_CELLS:
+        return False, f"正对照只有 {n_pos} 格，少于 {MIN_POSITIVE_CELLS}，证明不了仪器有效"
+    misses = n_pos - n_pos_judged_positive
+    if misses > MAX_POSITIVE_MISSES:
+        return False, (f"正对照 {n_pos_judged_positive}/{n_pos}，失手 {misses} 格"
+                       f"（上限 {MAX_POSITIVE_MISSES}）—— 判读者系统性少判，整批作废")
+    return True, f"正对照 {n_pos_judged_positive}/{n_pos} 通过"

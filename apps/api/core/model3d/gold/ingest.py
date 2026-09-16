@@ -87,6 +87,7 @@ def summarize(
     fp_labels: collections.Counter = collections.Counter()
     cell_weight, within = _cell_weights(manifest)
     blank_neg = blank_n = 0
+    pos_true = pos_n = 0
     gated_true = gated_n = 0
     pairs: list[tuple[str, str]] = []
     for row in manifest:
@@ -100,6 +101,10 @@ def summarize(
         if group == "blank":
             blank_n += 1
             blank_neg += int(not verdict)
+        elif group == "pos":
+            # 正对照：已核验为真的格子，判读为「不是」= 少判（见 validity.positive_control_ok）
+            pos_n += 1
+            pos_true += int(verdict)
         elif group == "gated":
             # 闸删组：判读为真柱 = 误删（验证一道新闸用，见 tests/test_gold_gated_group.py）
             gated_n += 1
@@ -141,6 +146,8 @@ def summarize(
         "per_stratum_weighted": per_stratum_w,
         "coverage": coverage,
         "blank": (blank_neg, blank_n),
+        # 正对照（判为「是」的格数, 格数）—— 后者不足或失手过多即整批作废
+        "positive": (pos_true, pos_n),
         # 闸删组（判为真柱数, 格数）—— 前者就是新闸的误删
         "gated": (gated_true, gated_n),
         "pair_agreement": pair_agreement(verdicts, pairs),

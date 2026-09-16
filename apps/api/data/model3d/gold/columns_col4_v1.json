@@ -1,0 +1,738 @@
+{
+  "version": 1,
+  "object_classes": [
+    "columns_col4"
+  ],
+  "units": [
+    {
+      "unit": "col4-kept",
+      "source": {
+        "group": "kept"
+      },
+      "classes": {
+        "columns_col4": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "4YAW",
+              "ok": true,
+              "what": "",
+              "note": "斜向边界与竖轴线相交处有带叉矩形块。"
+            },
+            {
+              "ref": "CLJV",
+              "ok": false,
+              "what": "other",
+              "note": "斜向条带交接处为细线交叉空心区域。"
+            },
+            {
+              "ref": "RMML",
+              "ok": false,
+              "what": "other",
+              "note": "灰色背景上有倾斜细线长矩形的一端。"
+            },
+            {
+              "ref": "NJPH",
+              "ok": true,
+              "what": "",
+              "note": "门洞旁墙交接处有实心黑色方块。"
+            },
+            {
+              "ref": "HNAV",
+              "ok": false,
+              "what": "other",
+              "note": "斜向带状构造交汇处是空心细线矩形。"
+            },
+            {
+              "ref": "FK3K",
+              "ok": false,
+              "what": "elevation_mark",
+              "note": "9.560标注下方的黑色V形符号。"
+            },
+            {
+              "ref": "FNWK",
+              "ok": true,
+              "what": "",
+              "note": "灰色方形截面位于轴线交点，旁有KZ8-D引注。"
+            },
+            {
+              "ref": "VYRA",
+              "ok": false,
+              "what": "dimension",
+              "note": "尺寸界线与粗竖线相接处的小黑点。"
+            },
+            {
+              "ref": "49VP",
+              "ok": false,
+              "what": "other",
+              "note": "斜向格状构造中的空心格及平行边线。"
+            },
+            {
+              "ref": "YX4N",
+              "ok": true,
+              "what": "",
+              "note": "楼梯间角部轴线交点有斜线填充方块。"
+            },
+            {
+              "ref": "L9AK",
+              "ok": true,
+              "what": "",
+              "note": "墙交接与轴线交点处为灰色方形截面。"
+            },
+            {
+              "ref": "YHEE",
+              "ok": true,
+              "what": "",
+              "note": "墙端轴线交点有灰色矩形截面。"
+            },
+            {
+              "ref": "VL33",
+              "ok": true,
+              "what": "",
+              "note": "横轴线上有独立灰色矩形并带外围轮廓。"
+            },
+            {
+              "ref": "JLL9",
+              "ok": true,
+              "what": "",
+              "note": "轴线交点的灰色截面内绘有工字形钢芯。"
+            },
+            {
+              "ref": "LEHV",
+              "ok": false,
+              "what": "dimension",
+              "note": "框中是尺寸界线、斜向线及钢筋示意细线。"
+            },
+            {
+              "ref": "Y4KA",
+              "ok": true,
+              "what": "",
+              "note": "卫生间门旁有实心黑色矩形柱块。"
+            },
+            {
+              "ref": "HKM4",
+              "ok": true,
+              "what": "",
+              "note": "外墙边有独立黑色矩形，与上方柱块对应。"
+            },
+            {
+              "ref": "WWUA",
+              "ok": false,
+              "what": "nothing",
+              "note": "粗竖线右侧的红框内基本空白，仅有浅灰残线。"
+            },
+            {
+              "ref": "FERY",
+              "ok": false,
+              "what": "text",
+              "note": "巨大黑色汉字横笔的左下缘。"
+            },
+            {
+              "ref": "AKR3",
+              "ok": false,
+              "what": "equipment",
+              "note": "带放射短线的圆形符号中心。"
+            },
+            {
+              "ref": "4XJ4",
+              "ok": false,
+              "what": "other",
+              "note": "多条管线与文字交叠处有小型空心线框。"
+            },
+            {
+              "ref": "EPHY",
+              "ok": true,
+              "what": "",
+              "note": "轴线穿过独立灰色矩形截面。"
+            },
+            {
+              "ref": "MHNC",
+              "ok": true,
+              "what": "",
+              "note": "斜边与竖轴相交处有小型带叉灰色矩形。"
+            },
+            {
+              "ref": "CFMU",
+              "ok": false,
+              "what": "other",
+              "note": "横竖结构线相交处的小型连接标记，未见柱截面。"
+            },
+            {
+              "ref": "FLRC",
+              "ok": false,
+              "what": "elevation_mark",
+              "note": "3HB文字上方为黑色实心三角标记。"
+            },
+            {
+              "ref": "MPMK",
+              "ok": false,
+              "what": "axis",
+              "note": "竖向断续粗线的短划段，下方另有灰色实体。"
+            },
+            {
+              "ref": "WFXU",
+              "ok": true,
+              "what": "",
+              "note": "横轴线上为独立灰色矩形截面，带外围细线。"
+            },
+            {
+              "ref": "WVKV",
+              "ok": true,
+              "what": "",
+              "note": "两组双线转角处有实心黑色方块。"
+            },
+            {
+              "ref": "VJ4Y",
+              "ok": true,
+              "what": "",
+              "note": "斜轴线位置有灰色矩形，附近标注柱高2.050。"
+            },
+            {
+              "ref": "4MYE",
+              "ok": true,
+              "what": "",
+              "note": "轴线交点处为旋转15度且内部带叉的灰色方块。"
+            },
+            {
+              "ref": "ANFU",
+              "ok": true,
+              "what": "",
+              "note": "竖轴线上有灰色矩形截面，内部有双线矩形钢芯轮廓。"
+            },
+            {
+              "ref": "WWYH",
+              "ok": true,
+              "what": "",
+              "note": "墙线和轴线交汇处有灰色方形实体。"
+            },
+            {
+              "ref": "HFXE",
+              "ok": false,
+              "what": "elevation_mark",
+              "note": "4.900标注下方为黑色V形标高符号。"
+            },
+            {
+              "ref": "UNHJ",
+              "ok": false,
+              "what": "other",
+              "note": "黑色实心三角连接斜向引线，旁边为折线符号。"
+            },
+            {
+              "ref": "9AVU",
+              "ok": false,
+              "what": "elevation_mark",
+              "note": "2.300结构标注下方的黑色V形符号。"
+            },
+            {
+              "ref": "APPA",
+              "ok": false,
+              "what": "other",
+              "note": "圆圈内嵌黑色方块的独立图形标记。"
+            },
+            {
+              "ref": "CNM4",
+              "ok": true,
+              "what": "",
+              "note": "走道边轴线交点有斜线填充方形柱块。"
+            },
+            {
+              "ref": "F434",
+              "ok": true,
+              "what": "",
+              "note": "楼梯间墙角轴线交点为填充方形截面。"
+            },
+            {
+              "ref": "VMAC",
+              "ok": true,
+              "what": "",
+              "note": "竖向轴线上有独立实心黑色横矩形。"
+            },
+            {
+              "ref": "93NJ",
+              "ok": false,
+              "what": "axis",
+              "note": "粗点划边界转角前的水平短划段。"
+            },
+            {
+              "ref": "E394",
+              "ok": false,
+              "what": "other",
+              "note": "窄长空心带叉矩形构造下部的空格。"
+            },
+            {
+              "ref": "AJ4F",
+              "ok": true,
+              "what": "",
+              "note": "白底上有孤立实心黑色方块，内部有一条浅水平线。"
+            },
+            {
+              "ref": "AHEK",
+              "ok": true,
+              "what": "",
+              "note": "竖向轴线上有灰色矩形截面及双层外轮廓。"
+            },
+            {
+              "ref": "JNKA",
+              "ok": false,
+              "what": "elevation_mark",
+              "note": "10.380与10.330结构标注左侧的黑色V形符号。"
+            },
+            {
+              "ref": "LAWC",
+              "ok": true,
+              "what": "",
+              "note": "楼梯间转角与横轴交点有斜线填充方块。"
+            },
+            {
+              "ref": "NNMK",
+              "ok": false,
+              "what": "text",
+              "note": "标高数值4.000中的数字4。"
+            },
+            {
+              "ref": "RWHN",
+              "ok": true,
+              "what": "",
+              "note": "框架与墙线交接处有灰色近方形柱块。"
+            },
+            {
+              "ref": "VEPJ",
+              "ok": false,
+              "what": "nothing",
+              "note": "设备下方的框内基本空白，仅右上缘有浅短线。"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#columns",
+          "note": "原生分辨率裁图 + 分层抽样（6 层）+ 批内重测对。原始精确率 0.521，语料加权 0.481（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 109 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "col4-dropped_by_gate",
+      "source": {
+        "group": "dropped_by_gate"
+      },
+      "classes": {
+        "columns_col4": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "JKXK",
+              "ok": true,
+              "what": "",
+              "note": "连接示意图中空心矩形标注LR72。"
+            },
+            {
+              "ref": "YMRX",
+              "ok": false,
+              "what": "other",
+              "note": "弧形边线上排列的实心黑色近方块，框中为其中一块。"
+            },
+            {
+              "ref": "YUP4",
+              "ok": false,
+              "what": "other",
+              "note": "墙端轴线交点有加宽灰色方块。"
+            },
+            {
+              "ref": "AMXF",
+              "ok": false,
+              "what": "other",
+              "note": "竖向连线上有独立实心黑色矩形块。"
+            },
+            {
+              "ref": "FKYJ",
+              "ok": true,
+              "what": "",
+              "note": "连续窗间有带斜线填充的短墙段。"
+            },
+            {
+              "ref": "VYVE",
+              "ok": false,
+              "what": "other",
+              "note": "外围轴线上有小型灰色矩形，与周边柱排列一致。"
+            },
+            {
+              "ref": "FPAV",
+              "ok": true,
+              "what": "",
+              "note": "6.500文字下方为黑色V形标高符号。"
+            },
+            {
+              "ref": "KFKX",
+              "ok": false,
+              "what": "other",
+              "note": "轴线交点处有斜线填充的近方形块。"
+            },
+            {
+              "ref": "3WJY",
+              "ok": true,
+              "what": "",
+              "note": "框内是带交叉线及无障碍图标的电梯轿厢。"
+            },
+            {
+              "ref": "AUJ3",
+              "ok": true,
+              "what": "",
+              "note": "圆圈内五角星的顶部笔画。"
+            },
+            {
+              "ref": "HNH3",
+              "ok": true,
+              "what": "",
+              "note": "灰色墙体凹口间的细长空心双线段。"
+            },
+            {
+              "ref": "H3PR",
+              "ok": true,
+              "what": "",
+              "note": "框内是斜向连续格状构造的空格和边线。"
+            },
+            {
+              "ref": "KNLE",
+              "ok": true,
+              "what": "",
+              "note": "红框截取连续粗黑水平墙带的上缘。"
+            },
+            {
+              "ref": "RMLK",
+              "ok": true,
+              "what": "",
+              "note": "粗点划线中的细长黑色划段。"
+            },
+            {
+              "ref": "E3RP",
+              "ok": true,
+              "what": "",
+              "note": "沿外墙布置的桌面，与旁边座椅配套。"
+            },
+            {
+              "ref": "FXYW",
+              "ok": true,
+              "what": "",
+              "note": "红框只覆盖旋转灰色带叉块上缘的狭长接合区域。"
+            },
+            {
+              "ref": "FVMH",
+              "ok": true,
+              "what": "",
+              "note": "黑色墙体旁有细线门扇轮廓，邻近800尺寸。"
+            },
+            {
+              "ref": "YCVP",
+              "ok": true,
+              "what": "",
+              "note": "0.310翻梁标注下的黑色V形符号。"
+            },
+            {
+              "ref": "JYFH",
+              "ok": true,
+              "what": "",
+              "note": "点划线中部为狭长黑色划段，右侧另有连续粗线。"
+            },
+            {
+              "ref": "APRC",
+              "ok": true,
+              "what": "",
+              "note": "框住普通承台区域的文字、标高数值及标高符号。"
+            },
+            {
+              "ref": "F3AA",
+              "ok": false,
+              "what": "other",
+              "note": "连续排列的旋转黑色矩形中有一块被框住。"
+            },
+            {
+              "ref": "WUEM",
+              "ok": true,
+              "what": "",
+              "note": "连续格状边带中的空心矩形格。"
+            },
+            {
+              "ref": "XCLF",
+              "ok": false,
+              "what": "other",
+              "note": "淋浴间墙角轴线交点处有大块灰色方形截面。"
+            },
+            {
+              "ref": "FHXE",
+              "ok": false,
+              "what": "other",
+              "note": "竖向细线串联的实心黑色近方形块。"
+            },
+            {
+              "ref": "RLKH",
+              "ok": true,
+              "what": "",
+              "note": "斜向长桌及两侧排列的座椅。"
+            },
+            {
+              "ref": "NH4R",
+              "ok": true,
+              "what": "",
+              "note": "卫生间隔间内有洁具轮廓及门开启弧。"
+            },
+            {
+              "ref": "E3VU",
+              "ok": false,
+              "what": "other",
+              "note": "外边线旁排列的倾斜实心黑色近方块。"
+            },
+            {
+              "ref": "EVNH",
+              "ok": true,
+              "what": "",
+              "note": "斜线填充区域内的小字标注，旁边黑色柱块在框外。"
+            },
+            {
+              "ref": "V3L3",
+              "ok": false,
+              "what": "other",
+              "note": "边界交接处有旋转成菱形的灰色方块。"
+            },
+            {
+              "ref": "M4V9",
+              "ok": true,
+              "what": "",
+              "note": "圆圈内黑色五角星的左下角笔画。"
+            },
+            {
+              "ref": "4FKL",
+              "ok": false,
+              "what": "other",
+              "note": "门与外边带附近的竖轴线上有独立灰色矩形。"
+            },
+            {
+              "ref": "X4VK",
+              "ok": true,
+              "what": "",
+              "note": "带对角线的设备框内标有KT08(D)。"
+            },
+            {
+              "ref": "ELER",
+              "ok": true,
+              "what": "",
+              "note": "办公桌上方连续柜体中的空心斜线矩形格。"
+            },
+            {
+              "ref": "N9KW",
+              "ok": true,
+              "what": "",
+              "note": "灰色柱块上方为连接粗引线的实心三角箭头。"
+            },
+            {
+              "ref": "UNVW",
+              "ok": true,
+              "what": "",
+              "note": "框内为ESQ2-3F一类设备文字标注。"
+            },
+            {
+              "ref": "W3PC",
+              "ok": true,
+              "what": "",
+              "note": "竖向点划线的狭长黑色划段。"
+            },
+            {
+              "ref": "WJXW",
+              "ok": false,
+              "what": "other",
+              "note": "竖向连接线上排列的实心矩形柱块。"
+            },
+            {
+              "ref": "U34L",
+              "ok": true,
+              "what": "",
+              "note": "粗黑汉字集的上部横笔。"
+            },
+            {
+              "ref": "KXMN",
+              "ok": true,
+              "what": "",
+              "note": "钢筋截面排布图内部的横向白色空隙。"
+            },
+            {
+              "ref": "3VXJ",
+              "ok": true,
+              "what": "",
+              "note": "斜线填充背景中有小型文字标签。"
+            },
+            {
+              "ref": "3U4L",
+              "ok": false,
+              "what": "other",
+              "note": "斜向点划线上有旋转的灰色近方形截面。"
+            },
+            {
+              "ref": "JNF3",
+              "ok": true,
+              "what": "",
+              "note": "墙边为实心黑色侧向三角标记，旁有GFHM文字。"
+            },
+            {
+              "ref": "KLJ4",
+              "ok": true,
+              "what": "",
+              "note": "楼梯平台旁有小型空心矩形设施轮廓。"
+            },
+            {
+              "ref": "49PL",
+              "ok": true,
+              "what": "",
+              "note": "砖砌式填充图案中的白色长方格。"
+            },
+            {
+              "ref": "JAPX",
+              "ok": false,
+              "what": "other",
+              "note": "9号轴线与横向构件相交处有带叉矩形截面。"
+            },
+            {
+              "ref": "NJH4",
+              "ok": true,
+              "what": "",
+              "note": "钢筋截面图内靠下方的横向白色空隙。"
+            },
+            {
+              "ref": "FVNJ",
+              "ok": true,
+              "what": "",
+              "note": "小圆形符号与下方斜粗线接合处的一小部分。"
+            },
+            {
+              "ref": "UH9X",
+              "ok": true,
+              "what": "",
+              "note": "粗黑汉字建的左下笔画。"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#columns",
+          "note": "原生分辨率裁图 + 分层抽样（6 层）+ 批内重测对。原始精确率 0.521，语料加权 0.481（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 109 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "col4-blank_control",
+      "source": {
+        "group": "blank_control"
+      },
+      "classes": {
+        "columns_col4": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "KF3K",
+              "ok": true,
+              "what": "",
+              "note": "红框位于水平黑线的上方空白处。"
+            },
+            {
+              "ref": "94MJ",
+              "ok": true,
+              "what": "",
+              "note": "红框内为空白，空心方框在其下方。"
+            },
+            {
+              "ref": "JUJE",
+              "ok": true,
+              "what": "",
+              "note": "红框内无可见图形。"
+            },
+            {
+              "ref": "3L9F",
+              "ok": true,
+              "what": "",
+              "note": "空白底上仅有一条斜向细线穿过。"
+            },
+            {
+              "ref": "NXRX",
+              "ok": true,
+              "what": "",
+              "note": "红框内完全空白，黑色小符号位于右上远处。"
+            },
+            {
+              "ref": "YJCE",
+              "ok": true,
+              "what": "",
+              "note": "红框内是纯白区域，没有图线或实体。"
+            },
+            {
+              "ref": "RCJ3",
+              "ok": true,
+              "what": "",
+              "note": "红框内无图线，右下角弧线在框外。"
+            },
+            {
+              "ref": "MVLM",
+              "ok": true,
+              "what": "",
+              "note": "框中纯白，下方轴号圆圈不在框内。"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#columns",
+          "note": "原生分辨率裁图 + 分层抽样（6 层）+ 批内重测对。原始精确率 0.521，语料加权 0.481（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 109 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "col4-retest_dup",
+      "source": {
+        "group": "retest_dup"
+      },
+      "classes": {
+        "columns_col4": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "4UM4",
+              "ok": true,
+              "what": "",
+              "note": "重测副本，原格 AHEK；竖向轴线上有独立灰色矩形柱截面。"
+            },
+            {
+              "ref": "CCFJ",
+              "ok": false,
+              "what": "nothing",
+              "note": "重测副本，原格 VEPJ；设备与尺寸线下方是空白，仅上缘有浅细线。"
+            },
+            {
+              "ref": "9P3K",
+              "ok": true,
+              "what": "",
+              "note": "重测副本，原格 WFXU；轴线上有灰色矩形截面，外围有双层细线轮廓。"
+            },
+            {
+              "ref": "99RN",
+              "ok": true,
+              "what": "",
+              "note": "重测副本，原格 WWYH；横竖轴线交点有灰色方形截面。"
+            },
+            {
+              "ref": "HACJ",
+              "ok": true,
+              "what": "",
+              "note": "重测副本，原格 YHEE；墙端轴线位置有带斜细线的灰色矩形块。"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#columns",
+          "note": "原生分辨率裁图 + 分层抽样（6 层）+ 批内重测对。原始精确率 0.521，语料加权 0.481（覆盖语料 100%）；空白对照 8/8 通过；重测一致率 1.0；编号 匹配 109 / 纠正 0 / 编造 0。"
+        }
+      }
+    }
+  ]
+}

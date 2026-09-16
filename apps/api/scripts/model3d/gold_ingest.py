@@ -24,7 +24,7 @@ from pathlib import Path
 
 from core.model3d.gold.batch_codes import repair_code
 from core.model3d.gold.ingest import summarize
-from core.model3d.gold.validity import blank_control_ok
+from core.model3d.gold.validity import blank_control_ok, positive_control_ok
 
 GOLD = Path(__file__).resolve().parents[2] / "data/model3d/gold"
 
@@ -54,7 +54,7 @@ _UNLABELED_WHAT = "other"
 
 
 def _gold_doc(batch: str, kind: str, rows: list[dict], answers: dict, field: str,
-              summary: dict, blank_detail: str) -> dict:
+              summary: dict, blank_detail: str, pos_detail: str = "") -> dict:
     """→ 与既有复测批同一约定的金标准文档（见 `walls_retest_v1.json`）。
 
     - 类名表头与单元一致：`{kind}_{batch}`（此前表头写 `kind`、单元写
@@ -72,7 +72,7 @@ def _gold_doc(batch: str, kind: str, rows: list[dict], answers: dict, field: str
         judged = bool(ans.get(field)) if isinstance(ans.get(field), bool) \
             else str(ans.get(field)).lower() == "true"
         group = {"kept": "kept", "blank": "blank_control", "dup": "retest_dup",
-                 "gated": "dropped_by_gate"}[row["group"]]
+                 "gated": "dropped_by_gate", "pos": "positive_control"}[row["group"]]
         # 空白对照与闸删组沿用 columns_final 的约定：ok = 判为「不是」
         # （仪器表现正确 / 闸删对了）；闸删组 ok=False 就是误删
         negative_is_ok = group in ("blank_control", "dropped_by_gate")
@@ -86,9 +86,10 @@ def _gold_doc(batch: str, kind: str, rows: list[dict], answers: dict, field: str
         units.setdefault(group, []).append(
             {"ref": row["code"], "ok": ok, "what": what, "note": note})
     sp = summary
+    controls = blank_detail + ("；" + pos_detail if pos_detail else "")
     note = (f"原生分辨率裁图 + 分层抽样（{len(sp['per_stratum'])} 层）+ 批内重测对。"
             f"原始精确率 {sp['raw_precision']:.3f}，语料加权 {sp['weighted_precision']:.3f}"
-            f"（覆盖语料 {sp['coverage']:.0%}）；{blank_detail}；"
+            f"（覆盖语料 {sp['coverage']:.0%}）；{controls}；"
             f"重测一致率 {sp['pair_agreement']}；编号 匹配 {sp['matched']} / "
             f"纠正 {sp['repaired']} / 编造 {sp['fabricated']}。")
     return {"version": 1, "object_classes": [cls_name], "units": [
@@ -115,9 +116,18 @@ def main() -> int:
 
     neg, n = summary["blank"]
     passed, blank_detail = blank_control_ok(n_blank=n, n_blank_judged_negative=neg)
+    pos_true, pos_n = summary.get("positive", (0, 0))
+    # 没有正对照组的批次（col4 及以前）不因此作废，但要说出来 —— 那一批只体检了
+    # 「多判」一个方向，`col3` 正是在这种情况下带着系统性少判通过了全部检查。
+    if pos_n:
+        pos_passed, pos_detail = positive_control_ok(
+            n_pos=pos_n, n_pos_judged_positive=pos_true)
+    else:
+        pos_passed, pos_detail = True, "正对照 —— 本批没有（只体检了多判一个方向）"
     print(f"── {meta['batch']}（{meta['kind']}）──")
     print(f"  编号：匹配 {summary['matched']} · 纠正 {summary['repaired']} · 编造 {summary['fabricated']}")
     print(f"  {blank_detail}")
+    print(f"  {pos_detail}")
     print(f"  重测一致率：{summary['pair_agreement']}")
     gated_true, gated_n = summary.get("gated", (0, 0))
     if gated_n:
@@ -130,15 +140,17 @@ def main() -> int:
     print(f"  语料加权 {summary['weighted_precision']}（覆盖 {summary['coverage']:.0%}）")
     print(f"  误检构成：{summary['false_positive_labels']}")
 
-    if not passed and not args.force:
-        print("\n✗ 空白对照未通过，拒绝落库（--force 可越过）")
+    if not (passed and pos_passed) and not args.force:
+        which = "空白对照" if not passed else "正对照"
+        print(f"\n✗ {which}未通过，拒绝落库（--force 可越过）")
         return 2
     by_code = {}
     for a in raw:
         code = repair_code(str(a.get("id") or "").strip().upper(), {r["code"] for r in rows})
         if code and code not in by_code:
             by_code[code] = a
-    doc = _gold_doc(meta["batch"], meta["kind"], rows, by_code, field, summary, blank_detail)
+    doc = _gold_doc(meta["batch"], meta["kind"], rows, by_code, field, summary,
+                    blank_detail, pos_detail if pos_n else "")
     out = GOLD / f"{meta['kind']}_{meta['batch']}_v1.json"
     out.write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (GOLD / "manifests").mkdir(exist_ok=True)
