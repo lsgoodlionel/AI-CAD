@@ -78,24 +78,40 @@ class _GraphRAGStage:
         return list(result.issues)
 
 
+def _plausibility_engine():
+    """现实合理性引擎（第 6 个）。构件由 `drawing_elements` 现场识别提供。
+
+    **一律追加在列表末尾**：`_build_engine_results` 是按下标取值的
+    （`parallel_results[0..3]`），插在中间会让 kg/rag/review 的计数整体串位 ——
+    这种错不会报警，只会让报表里的数字悄悄对不上。
+    """
+    from .plausibility_engine import PlausibilityEngine
+    from .drawing_elements import elements_for_review
+    return PlausibilityEngine(elements_provider=elements_for_review)
+
+
 def _build_parallel_engines(
     db, redis, graphrag_enabled: bool,
 ) -> tuple[list, "_GraphRAGStage | None"]:
     """构造第二阶段并行引擎列表。
 
-    灰度关闭（默认）：``[RulesEngine, KGEngine, RAGEngine, ReviewAuditEngine]``，
-    与灰度接入前逐字节一致。返回 ``(engines, None)``。
+    灰度关闭（默认）：``[RulesEngine, KGEngine, RAGEngine, ReviewAuditEngine,
+    PlausibilityEngine]``。前四个的**下标与顺序保持不变**，合理性引擎追加在末尾。
 
     灰度开启：KG+RAG 替换为单个 `_GraphRAGStage`（内部走 GraphRAG 融合），
     返回 ``(engines, stage)``，`stage.last_result` 供后续写 `engine_results`。
+
+    合理性引擎放在**并行阶段**是安全的：它只吃图纸本身（自己识别构件），
+    不依赖视觉引擎的产物；而视觉引擎本就在串行的第一阶段跑完了。
     """
     if not graphrag_enabled:
         return (
-            [RulesEngine(), KGEngine(), RAGEngine(db, redis), ReviewAuditEngine(redis)],
+            [RulesEngine(), KGEngine(), RAGEngine(db, redis), ReviewAuditEngine(redis),
+             _plausibility_engine()],
             None,
         )
     stage = _GraphRAGStage(db, redis, FusionConfig(enabled=True))
-    return [RulesEngine(), stage, ReviewAuditEngine(redis)], stage
+    return [RulesEngine(), stage, ReviewAuditEngine(redis), _plausibility_engine()], stage
 
 
 def _build_engine_results(
@@ -117,6 +133,8 @@ def _build_engine_results(
             "kg":     len(parallel_results[1]),
             "rag":    len(parallel_results[2]),
             "review": len(parallel_results[3]),
+            # 合理性引擎恒在末尾（见 `_build_parallel_engines`）
+            "plausibility": len(parallel_results[-1]) if len(parallel_results) > 4 else 0,
             "ocr_metadata": ctx.ocr_metadata,
         }
     stage_result = graphrag_stage.last_result
@@ -128,6 +146,7 @@ def _build_engine_results(
         "kg_count":  stage_result.kg_count if stage_result else 0,
         "rag_count": stage_result.rag_count if stage_result else 0,
         "review":   len(parallel_results[2]),
+        "plausibility": len(parallel_results[-1]) if len(parallel_results) > 3 else 0,
         "ocr_metadata": ctx.ocr_metadata,
     }
 

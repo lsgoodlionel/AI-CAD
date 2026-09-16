@@ -91,20 +91,29 @@ async def test_graphrag_stage_delegates_and_stores_last_result(monkeypatch):
 
 # ──────────────────────── ③ _build_parallel_engines ────────────────────────
 
-def test_build_parallel_engines_disabled_matches_pre_d18_engine_sequence():
+def test_build_parallel_engines_disabled_keeps_the_first_four_indices_stable():
+    """前四个引擎的**下标与顺序不许动**，合理性引擎只能追加在末尾。
+
+    `_build_engine_results` 是按下标取值的（`parallel_results[0..3]`），
+    在中间插一个引擎会让 kg/rag/review 的计数整体串位 —— 这种错不报警，
+    只会让报表里的数字悄悄对不上。这条断言就是拦它的。
+    """
     engines, stage = orch._build_parallel_engines(db=object(), redis=object(), graphrag_enabled=False)
 
     assert stage is None
-    assert [type(e) for e in engines] == [RulesEngine, KGEngine, RAGEngine, ReviewAuditEngine]
-    assert [e.engine_name for e in engines] == ["rules", "kg", "rag", "review"]
+    assert [type(e) for e in engines[:4]] == [RulesEngine, KGEngine, RAGEngine, ReviewAuditEngine]
+    assert [e.engine_name for e in engines[:4]] == ["rules", "kg", "rag", "review"]
+    assert engines[-1].engine_name == "plausibility"
+    assert len(engines) == 5
 
 
 def test_build_parallel_engines_enabled_replaces_kg_rag_with_graphrag_stage():
     engines, stage = orch._build_parallel_engines(db=object(), redis=object(), graphrag_enabled=True)
 
     assert isinstance(stage, orch._GraphRAGStage)
-    assert [type(e) for e in engines] == [RulesEngine, orch._GraphRAGStage, ReviewAuditEngine]
-    assert [e.engine_name for e in engines] == ["rules", "graphrag", "review"]
+    assert [type(e) for e in engines[:3]] == [RulesEngine, orch._GraphRAGStage, ReviewAuditEngine]
+    assert [e.engine_name for e in engines[:3]] == ["rules", "graphrag", "review"]
+    assert engines[-1].engine_name == "plausibility"
     assert stage._config.enabled is True
 
 
@@ -117,6 +126,7 @@ def test_build_engine_results_disabled_matches_pre_d18_shape():
         [AIIssue(engine="kg", severity=IssueSeverity.INFO, description="k")] * 2,
         [AIIssue(engine="rag", severity=IssueSeverity.INFO, description="g")] * 3,
         [AIIssue(engine="review", severity=IssueSeverity.INFO, description="a")] * 4,
+        [AIIssue(engine="plausibility", severity=IssueSeverity.CRITICAL, description="p")] * 6,
     ]
     ctx = _ctx()
     ctx.ocr_metadata = {"pages": 1}
@@ -124,9 +134,24 @@ def test_build_engine_results_disabled_matches_pre_d18_shape():
     result = orch._build_engine_results(vision_issues, parallel_results, None, ctx)
 
     assert result == {
-        "vision": 1, "rules": 1, "kg": 2, "rag": 3, "review": 4,
+        "vision": 1, "rules": 1, "kg": 2, "rag": 3, "review": 4, "plausibility": 6,
         "ocr_metadata": {"pages": 1},
     }
+
+
+def test_build_engine_results_does_not_mistake_review_for_plausibility():
+    """旧长度的结果列表（没有合理性引擎）不得把 review 的计数当成合理性。
+
+    `parallel_results[-1]` 在列表短一位时正好指向 review —— 少一道长度守卫，
+    报表里就会出现一个凭空相等的数字，而且**看起来完全正常**。
+    """
+    parallel_results = [[], [], [], [AIIssue(engine="review", severity=IssueSeverity.INFO,
+                                             description="a")] * 4]
+
+    result = orch._build_engine_results([], parallel_results, None, _ctx())
+
+    assert result["review"] == 4
+    assert result["plausibility"] == 0
 
 
 def test_build_engine_results_enabled_reports_graphrag_diagnostics():
@@ -135,6 +160,7 @@ def test_build_engine_results_enabled_reports_graphrag_diagnostics():
         [AIIssue(engine="rules", severity=IssueSeverity.INFO, description="r")],
         [AIIssue(engine="graphrag", severity=IssueSeverity.MAJOR, description="g")] * 2,
         [AIIssue(engine="review", severity=IssueSeverity.INFO, description="a")] * 5,
+        [AIIssue(engine="plausibility", severity=IssueSeverity.MAJOR, description="p")] * 2,
     ]
     ctx = _ctx()
 
@@ -149,7 +175,7 @@ def test_build_engine_results_enabled_reports_graphrag_diagnostics():
     assert result == {
         "vision": 0, "rules": 1, "graphrag": 2,
         "graphrag_mode": "fusion_degraded", "kg_count": 3, "rag_count": 4,
-        "review": 5, "ocr_metadata": {},
+        "review": 5, "plausibility": 2, "ocr_metadata": {},
     }
 
 
