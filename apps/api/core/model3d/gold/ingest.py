@@ -87,6 +87,7 @@ def summarize(
     fp_labels: collections.Counter = collections.Counter()
     cell_weight, within = _cell_weights(manifest)
     blank_neg = blank_n = 0
+    foil_neg = foil_n = 0
     pos_true = pos_n = 0
     gated_true = gated_n = 0
     pairs: list[tuple[str, str]] = []
@@ -101,6 +102,10 @@ def summarize(
         if group == "blank":
             blank_n += 1
             blank_neg += int(not verdict)
+        elif group == "foil":
+            # 偏移对照：标记被故意挪开，判读为「对」= 判读者没在看位置
+            foil_n += 1
+            foil_neg += int(not verdict)
         elif group == "pos":
             # 正对照：已核验为真的格子，判读为「不是」= 少判（见 validity.positive_control_ok）
             pos_n += 1
@@ -148,6 +153,8 @@ def summarize(
         "blank": (blank_neg, blank_n),
         # 正对照（判为「是」的格数, 格数）—— 后者不足或失手过多即整批作废
         "positive": (pos_true, pos_n),
+        # 偏移对照（判为「不是」的格数, 格数）—— 抓「一律答是」
+        "foil": (foil_neg, foil_n),
         # 闸删组（判为真柱数, 格数）—— 前者就是新闸的误删
         "gated": (gated_true, gated_n),
         "pair_agreement": pair_agreement(verdicts, pairs),

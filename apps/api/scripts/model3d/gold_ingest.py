@@ -24,7 +24,9 @@ from pathlib import Path
 
 from core.model3d.gold.batch_codes import repair_code
 from core.model3d.gold.ingest import summarize
-from core.model3d.gold.validity import blank_control_ok, positive_control_ok
+from core.model3d.gold.validity import (
+    blank_control_ok, foil_control_ok, positive_control_ok,
+)
 
 GOLD = Path(__file__).resolve().parents[2] / "data/model3d/gold"
 
@@ -54,7 +56,8 @@ _UNLABELED_WHAT = "other"
 
 
 def _gold_doc(batch: str, kind: str, rows: list[dict], answers: dict, field: str,
-              summary: dict, blank_detail: str, pos_detail: str = "") -> dict:
+              summary: dict, blank_detail: str, pos_detail: str = "",
+              foil_detail: str = "") -> dict:
     """→ 与既有复测批同一约定的金标准文档（见 `walls_retest_v1.json`）。
 
     - 类名表头与单元一致：`{kind}_{batch}`（此前表头写 `kind`、单元写
@@ -72,10 +75,11 @@ def _gold_doc(batch: str, kind: str, rows: list[dict], answers: dict, field: str
         judged = bool(ans.get(field)) if isinstance(ans.get(field), bool) \
             else str(ans.get(field)).lower() == "true"
         group = {"kept": "kept", "blank": "blank_control", "dup": "retest_dup",
-                 "gated": "dropped_by_gate", "pos": "positive_control"}[row["group"]]
+                 "gated": "dropped_by_gate", "pos": "positive_control",
+                 "foil": "shifted_control"}[row["group"]]
         # 空白对照与闸删组沿用 columns_final 的约定：ok = 判为「不是」
         # （仪器表现正确 / 闸删对了）；闸删组 ok=False 就是误删
-        negative_is_ok = group in ("blank_control", "dropped_by_gate")
+        negative_is_ok = group in ("blank_control", "dropped_by_gate", "shifted_control")
         ok = (not judged) if negative_is_ok else judged
         raw_what = str(ans.get("what") or "").strip()
         what = "" if ok else (raw_what if raw_what and not negative_is_ok
@@ -86,7 +90,9 @@ def _gold_doc(batch: str, kind: str, rows: list[dict], answers: dict, field: str
         units.setdefault(group, []).append(
             {"ref": row["code"], "ok": ok, "what": what, "note": note})
     sp = summary
-    controls = blank_detail + ("；" + pos_detail if pos_detail else "")
+    # 三种对照的说明按有什么写什么 —— 没有那一组时**留空而不是编一句**，
+    # 读 note 的人据此知道这一批体检了哪几个方向
+    controls = "；".join(x for x in (blank_detail, pos_detail, foil_detail) if x)
     note = (f"原生分辨率裁图 + 分层抽样（{len(sp['per_stratum'])} 层）+ 批内重测对。"
             f"原始精确率 {sp['raw_precision']:.3f}，语料加权 {sp['weighted_precision']:.3f}"
             f"（覆盖语料 {sp['coverage']:.0%}）；{controls}；"
@@ -124,10 +130,17 @@ def main() -> int:
             n_pos=pos_n, n_pos_judged_positive=pos_true)
     else:
         pos_passed, pos_detail = True, "正对照 —— 本批没有（只体检了多判一个方向）"
+    foil_neg, foil_n = summary.get("foil", (0, 0))
+    if foil_n:
+        foil_passed, foil_detail = foil_control_ok(
+            n_foil=foil_n, n_foil_judged_negative=foil_neg)
+    else:
+        foil_passed, foil_detail = True, "偏移对照 —— 本批没有"
     print(f"── {meta['batch']}（{meta['kind']}）──")
     print(f"  编号：匹配 {summary['matched']} · 纠正 {summary['repaired']} · 编造 {summary['fabricated']}")
     print(f"  {blank_detail}")
     print(f"  {pos_detail}")
+    print(f"  {foil_detail}")
     print(f"  重测一致率：{summary['pair_agreement']}")
     gated_true, gated_n = summary.get("gated", (0, 0))
     if gated_n:
@@ -140,8 +153,9 @@ def main() -> int:
     print(f"  语料加权 {summary['weighted_precision']}（覆盖 {summary['coverage']:.0%}）")
     print(f"  误检构成：{summary['false_positive_labels']}")
 
-    if not (passed and pos_passed) and not args.force:
-        which = "空白对照" if not passed else "正对照"
+    if not (passed and pos_passed and foil_passed) and not args.force:
+        which = ("空白对照" if not passed
+                 else "正对照" if not pos_passed else "偏移对照")
         print(f"\n✗ {which}未通过，拒绝落库（--force 可越过）")
         return 2
     by_code = {}
@@ -150,7 +164,8 @@ def main() -> int:
         if code and code not in by_code:
             by_code[code] = a
     doc = _gold_doc(meta["batch"], meta["kind"], rows, by_code, field, summary,
-                    blank_detail, pos_detail if pos_n else "")
+                    blank_detail, pos_detail if pos_n else "",
+                    foil_detail if foil_n else "")
     out = GOLD / f"{meta['kind']}_{meta['batch']}_v1.json"
     out.write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (GOLD / "manifests").mkdir(exist_ok=True)

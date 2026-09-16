@@ -283,7 +283,7 @@ def _render_cell(page, crop, mark: Mark) -> tuple[Image.Image, bool] | None:
 def _find_blank(page, fe, rng, spec) -> tuple | None:
     """找一处墨迹稀疏（非全白）的地方放**同形**标记，作空白对照。"""
     pr = page.rect
-    for _ in range(15):
+    for _ in range(40):
         cx = rng.uniform(pr.x0 + 0.15 * pr.width, pr.x0 + 0.70 * pr.width)
         cy = rng.uniform(pr.y0 + 0.15 * pr.height, pr.y0 + 0.70 * pr.height)
         if spec["mark"] == "line":
@@ -448,6 +448,19 @@ async def _scan(db, strata, spec, args, rng):
     return pool, scanned, blanks
 
 
+#: 偏移对照把标记挪开多远（按裁框边长的比例）。
+#:
+#: 0.35 的依据：裁框边长 = 标记尺寸 × rel，取 0.35 时标记落在裁框内
+#: **但明显偏离原位**——既不会挪出格子（判读者看不到就只能答「空白」，
+#: 那测的是另一回事），也不会近到与「标注本来就有几像素偏差」混淆。
+#:
+#: **已知局限**：锚点类的裁框约 336pt，0.35 即约 118pt；在 1:150 的图上
+#: 换算约 **6 米**，而柱网跨度 8~9 米 —— 偶尔会正好挪到**隔壁的另一个
+#: 交点**上。那一格判读者答「对」是合理的，不是他没在看。
+#: `MAX_FOIL_MISSES = 1` 正是给这种情况留的余地；若某批失手数逼近上限，
+#: 应先查是不是撞了邻近交点，而不是直接判定判读者失职。
+FOIL_SHIFT_RATIO = 0.35
+
 #: 「系统读数」类的空白对照尺寸（页面点）。与真格同形同量级 —— 否则判读者
 #: 一眼就能把对照组挑出来（旧生成器的教训，见模块文档）。
 BLANK_ELEV_PT = (26.0, 12.0)
@@ -456,6 +469,27 @@ BLANK_CROSS_PT = 28.0
 
 #: 红虚线的实线段 / 空档（像素）。空档要够宽，底下的点划线才看得出线型。
 _DASH_ON, _DASH_OFF = 14.0, 12.0
+
+
+def _foil_mark(mark: Mark, crop, rng) -> Mark:
+    """把标记沿随机方向挪开一段 —— 偏移对照用。
+
+    位置变了、形状与读数不变：判读者若答「对」，说明他没在看位置。
+    这是空白对照抓不到的那一档（红十字打在白纸上谁都能否掉，
+    打在图面上、周围有线、但不在声称的位置，才是真考验）。
+    """
+    side = min(crop[2] - crop[0], crop[3] - crop[1])
+    shift = side * FOIL_SHIFT_RATIO
+    angle = rng.uniform(0, 2 * math.pi)
+    dx, dy = shift * math.cos(angle), shift * math.sin(angle)
+    x0, y0, x1, y1 = mark.bbox
+    box = (x0 + dx, y0 + dy, x1 + dx, y1 + dy)
+    if mark.shape == "cross":
+        return Mark("cross", box, line=(((box[0] + box[2]) / 2, (box[1] + box[3]) / 2),) * 2)
+    if mark.shape in ("line", "dashed_line") and mark.line:
+        (ax, ay), (bx, by) = mark.line
+        return Mark(mark.shape, box, line=((ax + dx, ay + dy), (bx + dx, by + dy)))
+    return Mark(mark.shape, box)
 
 
 def _blank_claim(spec: dict, rng) -> str:
@@ -471,7 +505,7 @@ def _blank_claim(spec: dict, rng) -> str:
 def _find_blank_claim(page, rng, spec) -> tuple | None:
     """「系统读数」类的空白对照：同形标记打在墨迹稀疏处（页面点，不经比例）。"""
     pr = page.rect
-    for _ in range(15):
+    for _ in range(40):
         cx = rng.uniform(pr.x0 + 0.15 * pr.width, pr.x0 + 0.70 * pr.width)
         cy = rng.uniform(pr.y0 + 0.15 * pr.height, pr.y0 + 0.70 * pr.height)
         if spec["mark"] in ("line", "dashed_line"):
@@ -586,6 +620,7 @@ async def _scan_claims(db, strata, spec, args, rng):
     pool: list[Candidate] = []
     scanned: dict[str, list[int]] = {}
     blanks: list[Cell] = []
+    foil_pool: list[Cell] = []
     per_blank_stratum = max(1, math.ceil(args.blank / max(len(strata), 1)))
     have = {str(r["drawing_id"])
             for r in await db.fetch_all(_CLAIM_DRAWINGS_SQL[spec["claims"]])}
@@ -624,7 +659,27 @@ async def _scan_claims(db, strata, spec, args, rng):
                     OFF_PAGE_MARKS[spec["claims"]] = OFF_PAGE_MARKS.get(spec["claims"], 0) + off
                 counts.append(len(marks) - off)
                 marks = [(m, c) for m, c in marks if _mark_on_page(m, pw, ph)]
-                for i in rng.sample(range(len(marks)), min(args.per_drawing, len(marks))):
+                picks = rng.sample(range(len(marks)), min(args.per_drawing, len(marks)))
+                # 偏移格**单独攒池子、最后统一抽**：每图的读数常常被 kept 全部取走
+                # （锚点每图只有一两个），若从「没被取走的」里选，一格也选不出来。
+                # 池子里的每格都重新按**挪动后的位置**裁框，所以看到的是另一片
+                # 图面，不会与被测格长成同一张图。
+                if getattr(args, "foil", 0) and marks:
+                    fi = rng.randrange(len(marks))
+                    src_mark, src_claim = marks[fi]
+                    base_crop = crop_box_pt(src_mark.bbox, 1.0, page_w=pw, page_h=ph,
+                                            rel=spec["rel"])
+                    moved = _foil_mark(src_mark, base_crop, rng)
+                    if _mark_on_page(moved, pw, ph):
+                        fcrop = crop_box_pt(moved.bbox, 1.0, page_w=pw, page_h=ph,
+                                            rel=spec["rel"])
+                        frendered = _render_cell(page, fcrop, moved)
+                        if frendered is not None:
+                            foil_pool.append(Cell(
+                                "", "foil", stratum, did, meta["title"], fcrop,
+                                frendered[0], capped=frendered[1],
+                                mark_pt=tuple(moved.bbox), claim=src_claim))
+                for i in picks:
                     mark, claim = marks[i]
                     crop = crop_box_pt(mark.bbox, 1.0, page_w=pw, page_h=ph, rel=spec["rel"])
                     rendered = _render_cell(page, crop, mark)
@@ -651,7 +706,45 @@ async def _scan_claims(db, strata, spec, args, rng):
                 gc.collect()
         scanned[stratum] = counts
         print(f"  [{stratum}] {len(counts)} 张图 · 读数 {sum(counts)}", flush=True)
-    return pool, scanned, blanks
+
+    # **空白对照不必来自「有读数的图」**：它只是「同形标记打在空白处」，
+    # 任何一张合格图都能出。锚点类实测只有 18 张图带读数，从中找不够
+    # 6 格空白（下限），整批会被回收端拦下 —— 而拦下的理由与被测对象无关，
+    # 纯粹是取样来源被不必要地限死了。
+    if len(blanks) < args.blank:
+        spare = [r for rows_ in strata.values() for r in rows_
+                 if str(r["id"]) not in have]
+        rng.shuffle(spare)
+        for row in spare:
+            if len(blanks) >= args.blank:
+                break
+            try:
+                doc = fitz.open(stream=get_file_bytes(row["file_key"]), filetype="pdf")
+            except Exception:  # noqa: BLE001
+                continue
+            try:
+                found_blank = _find_blank_claim(doc[0], rng, spec)
+                if not found_blank:
+                    continue
+                rendered = _render_cell(doc[0], found_blank[1], found_blank[0])
+                if rendered:
+                    blanks.append(Cell("", "blank", "spare", str(row["id"]), row["title"],
+                                       found_blank[1], rendered[0], capped=rendered[1],
+                                       mark_pt=tuple(found_blank[0].bbox),
+                                       claim=_blank_claim(spec, rng)))
+            finally:
+                doc.close()
+                gc.collect()
+        print(f"  空白对照补到 {len(blanks)}/{args.blank} 格（从无读数的图上取）", flush=True)
+
+    foils: list[Cell] = []
+    if getattr(args, "foil", 0) and foil_pool:
+        rng.shuffle(foil_pool)
+        foils = foil_pool[:args.foil]
+    if getattr(args, "foil", 0):
+        print(f"  偏移对照 {len(foils)}/{args.foil} 格"
+              f"（候选池 {len(foil_pool)}）", flush=True)
+    return pool, scanned, blanks + foils
 
 
 # ── 排版与输出 ────────────────────────────────────────────────────
@@ -801,7 +894,7 @@ def _write_outputs(out: Path, sheets, strata, scanned, weights, kind, spec, host
             "strata_drawings": {s: len(r) for s, r in strata.items()},
             "scanned_counts": scanned, "weights": weights,
             "groups": {g: sum(1 for sh in sheets for c in sh if c.group == g)
-                       for g in ("kept", "gated", "blank", "dup", "pos")},
+                       for g in ("kept", "gated", "blank", "dup", "pos", "foil")},
             "gate_isolation": getattr(args, "gate_isolation", None)}
     (out / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2),
                                    encoding="utf-8")
@@ -811,6 +904,9 @@ def _write_outputs(out: Path, sheets, strata, scanned, weights, kind, spec, host
 async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--kind", default="columns", choices=sorted(KIND_SPEC))
+    ap.add_argument("--foil", type=int, default=0,
+                    help="偏移对照格数（仅「系统读数」类）：把标记挪开一段，"
+                         "判读者该答「不对」。抓的是空白对照抓不到的「一律答是」")
     ap.add_argument("--per-drawing", type=int, default=PER_DRAWING,
                     help=f"每张图至多取几格（缺省 {PER_DRAWING}）。总体很小的类"
                          f"（锚点全库 35 个）把它调大即可全数判读")

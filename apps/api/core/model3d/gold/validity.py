@@ -93,3 +93,31 @@ def positive_control_ok(*, n_pos: int, n_pos_judged_positive: int) -> tuple[bool
         return False, (f"正对照 {n_pos_judged_positive}/{n_pos}，失手 {misses} 格"
                        f"（上限 {MAX_POSITIVE_MISSES}）—— 判读者系统性少判，整批作废")
     return True, f"正对照 {n_pos_judged_positive}/{n_pos} 通过"
+
+
+#: 偏移对照至少这么多格。与空白对照同一量级。
+MIN_FOIL_CELLS = 6
+
+#: 偏移对照允许失手的格数（判读者把「挪开了的标记」仍答成对）。
+MAX_FOIL_MISSES = 1
+
+
+def foil_control_ok(*, n_foil: int, n_foil_judged_negative: int) -> tuple[bool, str]:
+    """偏移对照：把标记**故意挪开一段**，判读者该答「不对」。
+
+    **空白对照抓不住「一律答是」里最要命的那一种。** 红十字打在白纸上，
+    任何人都答得出「不是」；难的是打在图面上、周围确实有线、但**不在**
+    系统声称的那个位置 —— 实测锚点批 18/18 全判为对，而判据允许
+    「看不到轴号时只判位置」，这种答法与「一律答是」在结果上分不开。
+
+    偏移对照就是把这一档补上：同一张图、同一类标记，位置挪开一个明确的
+    距离。答「对」= 判读者没在看位置。它比空白对照贵（要构造），
+    但只有它能证伪「系统说在哪就在哪」。
+    """
+    if n_foil < MIN_FOIL_CELLS:
+        return False, f"偏移对照只有 {n_foil} 格，少于 {MIN_FOIL_CELLS}，证明不了仪器有效"
+    misses = n_foil - n_foil_judged_negative
+    if misses > MAX_FOIL_MISSES:
+        return False, (f"偏移对照 {n_foil_judged_negative}/{n_foil}，失手 {misses} 格"
+                       f"（上限 {MAX_FOIL_MISSES}）—— 判读者没在看位置，整批作废")
+    return True, f"偏移对照 {n_foil_judged_negative}/{n_foil} 通过"
