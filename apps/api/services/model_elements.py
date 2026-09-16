@@ -493,7 +493,14 @@ def _recognize_sync(
         elements["slabs"] = ensure_slab_from_columns(
             elements.get("columns") or [], elements.get("slabs") or []
         )
-    return {"elements": elements, "axes": result.axes}
+    # **把反算参数带回去**：米坐标 → 页面点要用识别器**自己算的**
+    # scale/origin_pt/page_h（不是 `drawing_transform`，那张表构件坐标压根不读）。
+    # 此前这三个值用完即弃，于是存量场景没有任何办法叠回图纸核对 ——
+    # 只能重跑识别，而识别代码一改（如 09-15 接入图框印刷比例）就再也对不准。
+    return {"elements": elements, "axes": result.axes,
+            "frame": {"scale_m_pt": result.scale,
+                      "origin_pt": list(result.origin_pt),
+                      "page_h": result.page_h}}
 
 
 # 桩包络补板参数(米):足量柱/桩才补,外扩边距,最小面积
@@ -1227,6 +1234,10 @@ async def build_floor_elements(
     # 本层超时的图。**显式传递而非模块级全局**：全局要靠「层间顺序调用」
     # 这个隐含前提才安全，一旦哪天改成并发就会互相清空且难以察觉。
     timeouts: list[str] = []
+    # 每张图的「反算参数」：米坐标 → 页面点。**必须连位移一起记** ——
+    # 构件在并入楼层前会被共识平移 / 成对配准 / 世界坐标摆放动过，
+    # 只记 scale/origin 反算出来的位置是识别当时的，不是场景里的。
+    frames: dict[str, dict] = {}
     for drawing, discipline, kinds in tasks:
         result = await _recognize_one(loop, executor, drawing, discipline,
                                       file_getter, transforms, timeouts)
@@ -1235,6 +1246,8 @@ async def build_floor_elements(
         axes = result.get("axes") or {}
         elevations.extend(axes.get("elevations") or [])
         part = result["elements"]
+        frame = dict(result.get("frame") or {})
+        frame.update({"shift_m": [0.0, 0.0], "placed": False})
         # A2：并入本图档案轴号(好标签,经该图变换转米,与识别轴号同坐标系)
         did = str(drawing.get("id") or "")
         if archive_axes_by_drawing and transforms and did in transforms:
@@ -1266,6 +1279,9 @@ async def build_floor_elements(
             from services.model_world_placement import place_elements
             part = place_elements(part, placement)
             placed += 1
+            # 世界坐标摆放是**旋转+平移**，不是纯位移：记下来但标明不可逆推，
+            # 免得有人拿 shift_m 去反算一张其实被转过的图。
+            frame["placed"] = True
 
         # **共识平移优先**:该图在本层共识里有解时,元素与轴网一起
         # 平移到共识坐标系(绝对摆放的图不动 —— 世界坐标是更强的真值)。
@@ -1278,6 +1294,8 @@ async def build_floor_elements(
                 abs(consensus_shift[0]) > 1e-9 or abs(consensus_shift[1]) > 1e-9):
             part = _shift_elements(part, *consensus_shift)
             consensus_aligned += 1
+            frame["shift_m"] = [frame["shift_m"][0] + float(consensus_shift[0]),
+                                frame["shift_m"][1] + float(consensus_shift[1])]
 
         # 轴号配准：共识覆盖不到的图仍走成对配准(以首张带轴号图为参考系)
         # 已绝对定位的图不再相对平移——否则会被拉离它的真实工程坐标
@@ -1302,10 +1320,14 @@ async def build_floor_elements(
                 part = _shift_elements(part, dx, dy)
                 aligned_axes = _shift_axes(axes, dx, dy)
                 registered += 1
+                frame["shift_m"] = [frame["shift_m"][0] + float(dx),
+                                    frame["shift_m"][1] + float(dy)]
             # E2 覆盖提升：聚合本层所有已识别图的轴网（对齐到同一坐标系）。
             # **外点的轴号不进聚合** —— 否则同名冲突卷土重来。
             if not is_consensus_outlier:
                 aggregated_axes = _merge_axes(aggregated_axes, aligned_axes)
+        if frame.get("scale_m_pt"):
+            frames[did] = frame
         _merge_elements(elements, part, kinds)
 
     yolo_count = await _yolo_supplement(loop, executor, picked["mep"], elements, file_getter)
@@ -1327,6 +1349,11 @@ async def build_floor_elements(
         # 先用本层可用图聚合，聚不出再退回构件循环里攒的那份。
         # 按共识平移的图数(与 registered 并列:后者是成对配准的兜底路径)
         "consensus_aligned": consensus_aligned,
+        # 每图的反算参数（米→页面点）。**没有它就没法把模型叠回图纸核对** ——
+        # 存量 v85 正是因此对不准：重跑识别时代码已经变过。
+        # 注意它给到的是「识别当时 + 已知位移」的位置，柱截面模数化对齐
+        # （见 model_builder）在此之后，所以精度到模数容差为止。
+        "frames": frames,
         "axes": _axes_scene_payload(
             _prefer_collected_axes(
                 axis_consensus.axes if axis_consensus is not None
@@ -1864,8 +1891,15 @@ def group_buildings(
             # 优先用该单体自己的标高；查不到才退回汇总值，
             # 且**不谎报 provenance** —— 退回来的值不属于这个单体。
             level = level_of.get((key, str(floor.get("key") or "")))
+            # 反算参数按本单体用到的图纸裁剪 —— 整层的 frames 挂到每个单体上
+            # 会让「这张图属于哪个单体」在数据里出现两种答案。
+            unit_frames = {k: v for k, v in (floor.get("element_frames") or {}).items()
+                           if k in src_ids}
             unit_floor = {
                 **{k: floor[k] for k in ("key", "label", "elevation", "order")},
+                # **必须显式挑**：这里是第二道「不挑就丢」的关口（第一道在
+                # model_builder 从 meta 挑进 floor）。丢了它，模型就再也叠不回图纸。
+                "element_frames": unit_frames,
                 "elevation_m": (float(level.elevation_m) if level is not None
                                 else floor.get("elevation_m")),
                 "drawings": entries,
