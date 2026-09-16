@@ -9,6 +9,7 @@ from __future__ import annotations
 import pytest
 
 from core.model3d.plausibility import codes
+from core.model3d.plausibility import formulas
 from core.model3d.plausibility import rules_quantity as rq
 from core.model3d.plausibility.model import Building, Element, Floor, PlausibilityModel
 from core.model3d.plausibility.types import RuleNotApplicable
@@ -113,6 +114,28 @@ def test_混凝土用量_图框被当成楼板时被抓到(filled):
     assert findings[0].evidence["fallback_slab_volume_m3"] == pytest.approx(450.0)
     # 分母没有被假板撑大：建筑面积只认非兜底板
     assert findings[0].evidence["total_area_m2"] == pytest.approx(400.0)
+
+
+@pytest.mark.unit
+def test_混凝土用量_依据回指面积与截面两个口径(filled):
+    """两个口径不同的理由（板用鞋带、柱用外接矩形）必须能从依据里看出来。
+
+    柱轮廓实测 31% 自交，鞋带面积会相消成 0 —— 这正是两边不用同一个公式的
+    原因，写进依据才不会被后人「统一」掉。
+    """
+    # Arrange
+    fake = _slab("fake", 60.0, 50.0, 0.15, basis="largest_polygon")
+    model = _model(_floor(*_normal_floor().elements, fake))
+
+    # Act
+    basis = list(rq.concrete_per_floor_area(model))[0].basis
+
+    # Assert
+    shoelace = formulas.formula("geometry.shoelace_area")
+    rect = formulas.formula("geometry.min_area_rect")
+    assert shoelace.expression in basis and shoelace.source in basis
+    assert rect.expression in basis and rect.source in basis
+    assert shoelace.conditions in basis
 
 
 @pytest.mark.unit

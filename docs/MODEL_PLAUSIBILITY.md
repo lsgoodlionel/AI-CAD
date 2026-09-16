@@ -45,6 +45,50 @@
 4. **截断要说出来**。落库每条规则只存前 50 条样例，但**计数完整**，
    被截断的规则列在 `truncated` 里 —— 不能让人以为只有这么多。
 
+## 二·补 · 规则清单（22 条，五族）
+
+| 族 | 规则 | 档 |
+|---|---|---|
+| 几何存在性 | `geom.self_intersecting_outline` 轮廓自交 | impossible |
+| | `geom.zero_area_with_extent` 面积为零却有两向跨度 | impossible |
+| | `geom.degenerate_outline` 退化环（相异顶点 <3 / 共线） | impossible |
+| | `geom.non_positive_size` 尺寸 ≤ 0 | impossible |
+| | `geom.absurd_extent` 单构件尺度超工程上限 | implausible |
+| | `geom.duplicate_element` 同层同类近乎完全重合（**命中数 = 冗余构件数**） | implausible |
+| | `geom.low_solidity` 实心度过低 | suspect |
+| 尺寸下限 | `dim.column_section_below_code` / `beam_width` / `slab_thickness` / `wall_thickness` | implausible |
+| | `dim.story_height_out_of_range` 层高越界 · `dim.non_positive_story_height` 层高 ≤ 0 | implausible / impossible |
+| | `dim.column_aspect_ratio` 长宽比 > 4 的「柱」其实是墙 | implausible |
+| 支承与重力 | `support.floating_column` 悬浮柱（整层过半时降级为「可能是转换层」） | impossible |
+| | `support.story_z_overlap` 相邻层 z 区间交叠 | impossible |
+| | `support.beam_without_support` 两端皆无支座 · `support.slab_without_edge_support` 板边无支承 | implausible |
+| | `support.beam_support_count` **恰好一端有支座**（ΣF=0 且 ΣM=0：简支至少两支座；悬挑与嵌固是例外） | suspect |
+| | `support.interpenetration` 异类构件互穿 | implausible |
+| | `support.isolated_element` 离群构件 | suspect |
+| 静力数量级 | `statics.column_axial_ratio` 轴压比 · `statics.column_slenderness` 长细比 · `statics.beam_span_depth` 高跨比 | implausible |
+| 量纲守恒 | `qty.concrete_per_floor_area` · `qty.rebar_per_concrete` · `qty.element_density` · `qty.floor_area_vs_envelope` | implausible / suspect |
+
+**两道降级闸，同一条纪律的前后两段**：限值未取证（`codes`）→ 结论降到 `suspect`；
+公式未取证（`formulas`）→ `impossible` 降到 `implausible`。规则级严重度是**意图**
+（import 期固定），真正落到结论上的是运行时那一道 —— 出处补上之后自动升回去，
+不用改代码。
+
+## 三·补 · 判据的出处：两张表，各管一半
+
+| | 管什么 | 在哪 | 查不到时 |
+|---|---|---|---|
+| `codes.py` | **规范限值**（柱最小截面、活载标准值…） | GB 55xxx 通用规范原文 | 标 `UNVERIFIED` 保留占位，只能出 `suspect` |
+| `formulas.py` | **数学/物理公式**（鞋带公式、静力平衡、惯性矩…） | 数理化教材（`docs/KNOWLEDGE_BASE_MATH_PHYSICS.md`） | 标 `UNCITED`，**不得用于 `impossible` 档** |
+
+两条纪律同源：一条判据若说不出「凭哪条条款/哪本书第几页」，它和拍脑袋的
+区别只是听起来更专业。而这一层的结论会被拿去**从算量里剔除构件** ——
+据一个记错的数字或一条没出处的公式去否定真构件，比不查更坏。
+
+`Formula` 里最容易被忽略、也最容易出事的一栏是 **`conditions`（成立条件）**：
+鞋带公式只对**简单多边形**成立（所以自交环算出的面积不可信，这正是
+`geom.self_intersecting_outline` 的立论基础）；Sutherland–Hodgman 裁剪只对
+**凸裁剪多边形**成立（所以重叠面积按凸包算会偏大，阈值必须定在明显量级）。
+
 ## 四、已知能被它抓住的真实缺陷（都是实测发生过的）
 
 | 现象 | 实测规模 | 对应规则族 |

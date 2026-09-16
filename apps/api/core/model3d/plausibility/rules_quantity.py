@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from core.model3d.plausibility import codes, geometry as geo, registry
+from core.model3d.plausibility import codes, formulas, geometry as geo, registry
 from core.model3d.plausibility.codes import Limit
 from core.model3d.plausibility.model import Floor, PlausibilityModel
 from core.model3d.plausibility.types import Finding, Rule, RuleNotApplicable
@@ -138,6 +138,71 @@ def basis_of(formula: str, *limits: Limit, extra: str = "") -> str:
     if any(not lim.verified for lim in limits):
         parts.append("限值待取证 —— 结论已降级为 suspect")
     return "；".join(parts)
+
+
+# ── 公式出处（全族共用；几何/尺寸/支承/力学四族都从这里取）──────────
+#
+# 与 `degrade` / `basis_of` 作伴，因为回答的是同一个问题：**凭据有多硬，
+# 结论的语气就该有多硬**。规范那一侧的规矩是「限值没取证就降级」，
+# 数学这一侧一模一样 —— 公式找不到出处，就不许用「不可能」这个词。
+#
+# **一律运行时读 `formulas.FORMULAS`**：出处正由取证任务逐条填，
+# import 时拼好的字符串会把「待取证」永久钉死在报告里（本仓库的
+# 「接线静默失效、整条通道从未生效」正是这么来的）。
+
+def cite_formulas(*keys: str) -> str:
+    """逐条公式的一行引用，**带成立条件**。
+
+    成立条件单列，是取证这一轮真正的产出：鞋带公式只对简单多边形成立、
+    Sutherland–Hodgman 只对凸裁剪多边形成立 —— 条件不满足时公式照样算得出
+    一个数，错的结论看上去仍然「有公式撑腰」，比没有公式更难发现。
+    """
+    return "；".join(
+        f"{formulas.cite(key)}，成立条件：{formulas.formula(key).conditions}"
+        for key in keys)
+
+
+def formula_severity(base: str, *keys: str) -> str:
+    """出处未落实 → `impossible` 降为 `implausible`。
+
+    `impossible` 的含义是「数学或物理上不可能」。凭一条找不到出处的公式说
+    「不可能」，是把没有依据说成了最强的依据。另两档不动 ——
+    `implausible` / `suspect` 本来就不自称定理。
+    """
+    if base != "impossible":
+        return base
+    return base if all(formulas.formula(key).cited for key in keys) else "implausible"
+
+
+def formula_basis(explanation: str, *keys: str, base: str = "") -> str:
+    """依据串 = 公式引用（含成立条件）+ 本规则自己的说明 + 降级说明。
+
+    两截都要：**出处回答「凭什么」，说明回答「所以怎么了」**。
+    只留出处，读报告的人不知道这条公式在这里被用来否定什么；
+    只留说明，就退回到这次取证之前 —— 判据只有名字，没有来处。
+    """
+    parts = [cite_formulas(*keys), explanation]
+    missing = [key for key in keys if not formulas.formula(key).cited]
+    if missing:
+        note = "公式出处待取证（" + "、".join(missing) + "）"
+        if base == "impossible":
+            note += " —— 结论已由 impossible 降为 implausible"
+        parts.append(note)
+    return "；".join(part for part in parts if part)
+
+
+def formula_ref(*keys: str) -> str:
+    """给 `Rule.basis` 用的**指针**，不是渲染好的引用。
+
+    `Rule` 在 import 时构造，此刻把出处渲染进去就是快照：取证任务后来填的
+    原文永远到不了规则级依据。所以规则级只回指 key，渲染留到 `check` 里。
+
+    只校验 key 存在（拼错当场 KeyError），不读它的 `source` —— 校验的是
+    「这条公式在不在表里」，那个事实不会被取证改写。
+    """
+    for key in keys:
+        formulas.formula(key)
+    return "见 formulas：" + "、".join(keys)
 
 
 def floor_target(floor: Floor) -> str:
@@ -294,15 +359,22 @@ def concrete_per_floor_area(model: PlausibilityModel) -> Iterable[Finding]:
     evidence.update({f"volume_{k}_m3": round(v, 2) for k, v in totals["by_kind"].items()})
     return [Finding(rule="qty.concrete_per_floor_area", severity=severity, kind="model",
                     target="model", detail=detail, evidence=evidence,
-                    basis=basis_of("r = ΣV / ΣA（m³/m²）；V 按柱=截面×层高、板=面积×厚、"
-                                   "墙=长×宽×层高、梁=长×宽×高估算", lim,
-                                   extra="兜底板计入分子不计入分母 —— 假板的指纹"))]
+                    basis=basis_of(
+                        formula_basis(
+                            "r = ΣV / ΣA（m³/m²）；V 按柱=截面×层高、板=面积×厚、"
+                            "墙=长×宽×层高、梁=长×宽×高估算。板面积用鞋带公式，"
+                            "柱截面用最小面积外接矩形（柱轮廓实测 31% 自交，"
+                            "鞋带面积会相消成 0，对自交免疫的只有外接矩形）",
+                            "geometry.shoelace_area", "geometry.min_area_rect"),
+                        lim,
+                        extra="兜底板计入分子不计入分母 —— 假板的指纹"))]
 
 
 registry.register(Rule(
     id="qty.concrete_per_floor_area", title="单位建筑面积混凝土用量",
     scope="model", severity="implausible",
-    basis="量纲守恒 + quantity.concrete_per_floor_area_m3_m2",
+    basis="量纲守恒 + quantity.concrete_per_floor_area_m3_m2（"
+          + formula_ref("geometry.shoelace_area", "geometry.min_area_rect") + "）",
     check=concrete_per_floor_area))
 
 
@@ -442,10 +514,14 @@ def floor_area_vs_envelope(model: PlausibilityModel) -> Iterable[Finding]:
                       "element_count": len(floor.elements),
                       "upper": FOOTPRINT_OVER_ENVELOPE_MAX,
                       "lower": FOOTPRINT_OVER_ENVELOPE_MIN},
-            basis="k = ΣA占地 / A包络；EMPIRICAL：构件本就压叠故 k>1 正常，"
-                  f"k>{FOOTPRINT_OVER_ENVELOPE_MAX} 只能是重复计数，"
-                  f"k<{FOOTPRINT_OVER_ENVELOPE_MIN} 只能是识别塌了；"
-                  "包络按凸包算，凹形楼层会偏大"))
+            basis=formula_basis(
+                "k = ΣA占地 / A包络；EMPIRICAL：构件本就压叠故 k>1 正常，"
+                f"k>{FOOTPRINT_OVER_ENVELOPE_MAX} 只能是重复计数，"
+                f"k<{FOOTPRINT_OVER_ENVELOPE_MIN} 只能是识别塌了。"
+                "包络取全部占地顶点的凸包，凹形（L 形、口字形）楼层的包络"
+                "会偏大、k 随之偏小 —— 对上限判据偏保守，对下限判据偏敏感，"
+                "故下限只给 suspect",
+                "geometry.convex_hull_monotone_chain", "geometry.shoelace_area")))
     if not checked:
         raise RuleNotApplicable("没有一层有占地构件（构件既无 outline 也无 path+width）")
     return findings
@@ -453,5 +529,8 @@ def floor_area_vs_envelope(model: PlausibilityModel) -> Iterable[Finding]:
 
 registry.register(Rule(
     id="qty.floor_area_vs_envelope", title="楼层占地与包络的比值",
-    scope="floor", severity="implausible", basis="面积守恒（EMPIRICAL 量级阈值）",
+    scope="floor", severity="implausible",
+    basis="面积守恒（EMPIRICAL 量级阈值；"
+          + formula_ref("geometry.convex_hull_monotone_chain",
+                        "geometry.shoelace_area") + "）",
     check=floor_area_vs_envelope))

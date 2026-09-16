@@ -1,0 +1,42 @@
+{
+  "source": {
+    "key": "math-for-ml",
+    "filename": "Mathematics for Machine Learning (Marc Peter Deisenroth, A. Aldo Faisal etc.) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
+    "std_no": "KB-math-for-ml",
+    "title": "Mathematics for Machine Learning (Deisenroth, Faisal & Ong)",
+    "kind": "textbook",
+    "discipline": "math",
+    "pages": 417,
+    "extract_method": "text_layer",
+    "identified_by": "文件名 + PDF 文本层抽样（本批为电子版，非扫描件时文本层可直取）",
+    "priority": 3,
+    "supersedes": null,
+    "superseded_by": null,
+    "notes": "概率、最优化、主成分。金标准的加权与抽样、离群判据可在此取证。"
+  },
+  "root": "/Users/lionel/work/02 book/数理化",
+  "evidence": {
+    "sample_chars": [
+      2004,
+      2487,
+      2849
+    ]
+  },
+  "stats": {
+    "extracted_pages": 417,
+    "declared_pages": 417,
+    "missing_pages": [],
+    "char_count": 883172,
+    "mean_confidence": null,
+    "low_confidence_pages": [],
+    "near_empty_pages": [
+      1,
+      5,
+      13,
+      15,
+      255,
+      411
+    ],
+    "ocr_dpi": 200
+  }
+}

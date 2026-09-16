@@ -1,0 +1,38 @@
+{
+  "source": {
+    "key": "strang-la",
+    "filename": "Introduction to Linear Algebra (Ed 5) (Gilbert Strang) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
+    "std_no": "KB-strang-la",
+    "title": "Introduction to Linear Algebra, 5th Edition (Gilbert Strang)",
+    "kind": "textbook",
+    "discipline": "math",
+    "pages": 584,
+    "extract_method": "text_layer",
+    "identified_by": "文件名 + PDF 文本层抽样（本批为电子版，非扫描件时文本层可直取）",
+    "priority": 1,
+    "supersedes": null,
+    "superseded_by": null,
+    "notes": "行列式即面积/体积（§5.3 Cramer's Rule, Inverses, and Volumes）—— 鞋带公式与自交环正负相消的上位依据；最小二乘是变换求解的依据。"
+  },
+  "root": "/Users/lionel/work/02 book/数理化",
+  "evidence": {
+    "sample_chars": [
+      2348,
+      1856,
+      2146
+    ]
+  },
+  "stats": {
+    "extracted_pages": 584,
+    "declared_pages": 584,
+    "missing_pages": [],
+    "char_count": 1161009,
+    "mean_confidence": null,
+    "low_confidence_pages": [],
+    "near_empty_pages": [
+      2,
+      3
+    ],
+    "ocr_dpi": 200
+  }
+}

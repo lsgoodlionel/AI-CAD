@@ -23,8 +23,8 @@ from typing import NamedTuple
 from core.model3d.plausibility import codes, registry
 from core.model3d.plausibility.model import PlausibilityModel
 from core.model3d.plausibility.rules_quantity import (
-    basis_of, beam_depth_m, degrade, floor_built_area_m2, limit_mapping,
-    limit_range, limit_scalar,
+    basis_of, beam_depth_m, degrade, floor_built_area_m2, formula_basis,
+    formula_ref, limit_mapping, limit_range, limit_scalar,
 )
 from core.model3d.plausibility.types import Finding, Rule, RuleNotApplicable
 
@@ -41,9 +41,19 @@ BEAM_ABSURD_SPAN_M = 60.0
 #: 那类坐标错乱才是这条要抓的。
 WALL_ABSURD_RUN_M = 500.0
 
-#: 矩形截面回转半径 i = b/√12（b 为短边）。PHYSICS：由 I = bh³/12、A = bh
-#: 代入 i = √(I/A) 得到，对绕短边方向弯曲取最小值。
+#: 矩形截面回转半径 i = b/√12（b 为短边）：由 I = bh³/12、A = bh 代入
+#: i = √(I/A) 得到，对绕短边方向弯曲取最小值。三条公式各自的出处与成立条件
+#: 见 `formulas.py`，本模块只回指 key，渲染留到 `check` 里（出处正被逐条取证）。
 _SQRT_12 = math.sqrt(12.0)
+
+#: 柱轴压比：轴力按从属面积法估。
+_AXIAL_FORMULAS = ("mechanics.tributary_area_load",)
+#: 梁高跨比：判据的物理含义来自简支梁跨中弯矩随跨度平方增长。
+_SPAN_DEPTH_FORMULAS = ("mechanics.simply_supported_udl_moment",)
+#: 柱长细比：惯性矩 → 回转半径 → 长细比，三步缺一不可。
+_SLENDERNESS_FORMULAS = ("mechanics.second_moment_rectangle",
+                         "mechanics.radius_of_gyration",
+                         "mechanics.slenderness_ratio")
 
 
 class _AxialRow(NamedTuple):
@@ -155,8 +165,12 @@ def column_axial_ratio(model: PlausibilityModel) -> Iterable[Finding]:
                     f"截面仅 {evidence['section_area_m2']} m²"),
             evidence=evidence,
             basis=basis_of(
-                "μN = N / (f_c·A_c)，N = A_trib × (g+q) × n_层；"
-                "A_trib = 楼层建筑面积 ÷ 本层柱数（粗估，边角柱误差可达数倍）",
+                formula_basis(
+                    "μN = N / (f_c·A_c)，N = A_trib × (g+q) × n_层；"
+                    "A_trib = 楼层建筑面积 ÷ 本层柱数 —— 这是**等分**近似，"
+                    "不是从属面积法原本的按跨中线划分：中柱低估约一倍、"
+                    "角柱高估约四倍，故只当数量级判据",
+                    *_AXIAL_FORMULAS),
                 *used,
                 extra="混凝土等级未知，f_c 按表中最小值假定 —— 结论已降级"
                       if evidence["fc_assumed"] else "")))
@@ -166,7 +180,8 @@ def column_axial_ratio(model: PlausibilityModel) -> Iterable[Finding]:
 registry.register(Rule(
     id="statics.column_axial_ratio", title="柱轴压比数量级校核",
     scope="element", severity="implausible",
-    basis="μN = N/(f_c·A_c) + column.max_axial_ratio",
+    basis="μN = N/(f_c·A_c) + column.max_axial_ratio（"
+          + formula_ref(*_AXIAL_FORMULAS) + "）",
     check=column_axial_ratio))
 
 
@@ -207,7 +222,13 @@ def beam_span_depth(model: PlausibilityModel) -> Iterable[Finding]:
                        if over else f"低于常用下限 {lo:.4f}（梁过于细柔，挠度不可能满足）")),
             evidence={"span_depth_ratio": round(ratio, 5), "span_m": round(span, 3),
                       "depth_m": round(depth, 3), "lower": round(lo, 5), "upper": round(hi, 5)},
-            basis=basis_of("k = h / l0；l0 取梁段路径长（未扣支座宽，短梁偏低约一成）", lim)))
+            basis=basis_of(
+                formula_basis(
+                    "k = h / l0；l0 取梁段路径长（未扣支座宽，短梁偏低约一成）。"
+                    "高跨比之所以是判据：跨中弯矩随跨度**平方**增长，而截面抗弯"
+                    "能力随梁高平方增长，两者要相称，h/l0 才落在常用区间",
+                    *_SPAN_DEPTH_FORMULAS),
+                lim)))
     if not checked:
         raise RuleNotApplicable("梁取不到截面高度：scene 的梁只有 path 与 width，"
                                 "上游未写 depth/height/thickness")
@@ -216,7 +237,8 @@ def beam_span_depth(model: PlausibilityModel) -> Iterable[Finding]:
 
 registry.register(Rule(
     id="statics.beam_span_depth", title="梁高跨比",
-    scope="element", severity="implausible", basis="h/l0 + beam.span_depth_ratio",
+    scope="element", severity="implausible",
+    basis="h/l0 + beam.span_depth_ratio（" + formula_ref(*_SPAN_DEPTH_FORMULAS) + "）",
     check=beam_span_depth))
 
 
@@ -269,8 +291,13 @@ def column_slenderness(model: PlausibilityModel) -> Iterable[Finding]:
                           "clear_height_m": round(height, 3),
                           "short_side_m": round(sides[1], 4),
                           "radius_gyration_m": round(radius, 5), "limit": max_lambda},
-                basis=basis_of("λ = l0 / i，i = b短/√12（矩形截面，由 I=bh³/12、A=bh 得）；"
-                               "l0 按层高取（μ=1，两端约束未知）", lim)))
+                basis=basis_of(
+                    formula_basis(
+                        "λ = l0 / i，i = b短/√12（矩形截面，由 I=bh³/12、A=bh 代入"
+                        "i=√(I/A) 得）；l0 按层高取 —— 真实 l0=μ·H，μ 随两端约束在"
+                        "0.5~2.0 间，取 μ=1 对无侧移框架高估、对悬臂柱低估一倍",
+                        *_SLENDERNESS_FORMULAS),
+                    lim)))
     if checked:
         return findings
     if not floors_with_height:
@@ -280,7 +307,9 @@ def column_slenderness(model: PlausibilityModel) -> Iterable[Finding]:
 
 registry.register(Rule(
     id="statics.column_slenderness", title="柱长细比",
-    scope="element", severity="implausible", basis="λ = l0/i + column.max_slenderness",
+    scope="element", severity="implausible",
+    basis="λ = l0/i + column.max_slenderness（"
+          + formula_ref(*_SLENDERNESS_FORMULAS) + "）",
     check=column_slenderness))
 
 

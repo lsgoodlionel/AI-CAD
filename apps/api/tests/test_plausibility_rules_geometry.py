@@ -10,13 +10,45 @@
 from __future__ import annotations
 
 import time
+from dataclasses import replace
 
 import pytest
 
-from core.model3d.plausibility import codes
+from core.model3d.plausibility import codes, formulas
 from core.model3d.plausibility import rules_geometry as rg
 from core.model3d.plausibility.model import Building, Element, Floor, PlausibilityModel
 from core.model3d.plausibility.types import RuleNotApplicable
+
+
+# ── 公式出处：两个方向都由用例自己造 ────────────────────────────────
+#
+# **不要把 `formulas.py` 当下的状态写进断言**：出处正由另一条工作线逐条填，
+# 今天全是 `UNCITED` 占位，明天可能就有原文了。若用例依赖当下取值，
+# 这一批会随那条工作线莫名其妙地红/绿，而失败原因与被测逻辑无关。
+# 所以「已取证」与「未取证」各造一次，断言的是**行为**不是字面。
+
+@pytest.fixture
+def cite(monkeypatch):
+    """把指定公式的出处「填上」。"""
+    def _cite(*keys: str) -> None:
+        for key in keys:
+            monkeypatch.setitem(
+                formulas.FORMULAS, key,
+                replace(formulas.formula(key), source="用例注入出处 p.1",
+                        quote="（用例注入的原文抽取样）"))
+    return _cite
+
+
+@pytest.fixture
+def uncite(monkeypatch):
+    """把指定公式的出处抹掉，模拟「查过了但没找到」。"""
+    def _uncite(*keys: str) -> None:
+        for key in keys:
+            monkeypatch.setitem(
+                formulas.FORMULAS, key,
+                replace(formulas.formula(key),
+                        source=f"{formulas.UNCITED}:用例注入", quote=""))
+    return _uncite
 
 
 # ── 构造工具 ────────────────────────────────────────────────────────
@@ -43,8 +75,9 @@ def _run(rule_id: str, model: PlausibilityModel) -> list:
 # ── geom.self_intersecting_outline ─────────────────────────────────
 
 @pytest.mark.unit
-def test_自交轮廓被判为不可能():
+def test_自交轮廓被判为不可能(cite):
     # Arrange：蝴蝶结 —— 两瓣符号相反，鞋带面积恰好相消为 0
+    cite(*rg._SELF_INTERSECT_FORMULAS)
     bowtie = [(0.0, 0.0), (1.0, 1.0), (1.0, 0.0), (0.0, 1.0)]
     model = _model(_element("columns", {"outline": bowtie}, uid="c1"))
 
@@ -57,6 +90,43 @@ def test_自交轮廓被判为不可能():
     assert findings[0].target == "c1"
     assert findings[0].evidence["area_m2"] == pytest.approx(0.0, abs=1e-9)
     assert findings[0].basis
+
+
+@pytest.mark.unit
+def test_自交轮廓的依据回指鞋带公式并点明面积不可信(cite):
+    # Arrange
+    cite(*rg._SELF_INTERSECT_FORMULAS)
+    bowtie = [(0.0, 0.0), (1.0, 1.0), (1.0, 0.0), (0.0, 1.0)]
+
+    # Act
+    basis = _run("geom.self_intersecting_outline",
+                 _model(_element("columns", {"outline": bowtie})))[0].basis
+
+    # Assert：出处回答「凭什么」—— 公式的表达式与来处都要在场，
+    # 而不是只留一个「鞋带公式」的名字
+    shoelace = formulas.formula("geometry.shoelace_area")
+    assert shoelace.expression in basis
+    assert shoelace.source in basis
+    # 成立条件是这次取证的重点产出，必须落到结论里
+    assert shoelace.conditions in basis
+    assert "面积不可信" in basis
+
+
+@pytest.mark.unit
+def test_公式出处未落实时自交结论从不可能降为不合理(uncite):
+    """凭一条找不到出处的公式说「不可能」，是把没有依据说成了最强的依据。"""
+    # Arrange：只抹掉两条里的一条，降级就该发生
+    uncite("geometry.shoelace_area")
+    bowtie = [(0.0, 0.0), (1.0, 1.0), (1.0, 0.0), (0.0, 1.0)]
+
+    # Act
+    finding = _run("geom.self_intersecting_outline",
+                   _model(_element("columns", {"outline": bowtie})))[0]
+
+    # Assert
+    assert finding.severity == "implausible"
+    assert "公式出处待取证" in finding.basis
+    assert "geometry.shoelace_area" in finding.basis
 
 
 @pytest.mark.unit
@@ -78,8 +148,9 @@ def test_没有任何面状构件时自交规则报缺数据而不是返回空()
 # ── geom.zero_area_with_extent ─────────────────────────────────────
 
 @pytest.mark.unit
-def test_回描轮廓面积为零但有两向跨度被判为不可能():
+def test_回描轮廓面积为零但有两向跨度被判为不可能(cite):
     # A→B→A→C：没有真正穿越（所以自交判据碰不到），但鞋带正负相消
+    cite(*rg._ZERO_AREA_FORMULAS)
     retrace = [(0.0, 0.0), (1.0, 1.0), (0.0, 0.0), (1.0, 0.0)]
     model = _model(_element("slabs", {"outline": retrace}, uid="s1"))
 
@@ -273,6 +344,27 @@ def test_同层同类两个几乎完全重合的构件被判为重复():
     assert findings[0].severity == "implausible"
     assert findings[0].evidence["overlap_ratio"] > rg.DUPLICATE_OVERLAP_RATIO
     assert {findings[0].target, findings[0].evidence["duplicate_of"]} == {"c1", "c2"}
+
+
+@pytest.mark.unit
+def test_重复判据的依据写明凸包裁剪会高估重叠():
+    """Sutherland–Hodgman 只对凸裁剪多边形成立，实现里先取凸包再裁。
+
+    高估会让重叠比偏大，所以阈值必须定在明显的量级上 —— 这层关系不写进
+    依据，读报告的人就会拿它当精确面积用。
+    """
+    # Arrange
+    model = _model(_element("columns", {"outline": _square(0.0, 0.0, 0.6)}, uid="c1"),
+                   _element("columns", {"outline": _square(0.01, 0.01, 0.6)}, uid="c2"))
+
+    # Act
+    basis = _run("geom.duplicate_element", model)[0].basis
+
+    # Assert
+    clipping = formulas.formula("geometry.polygon_clipping_convex_requirement")
+    assert clipping.expression in basis
+    assert clipping.conditions in basis
+    assert "高估" in basis
 
 
 @pytest.mark.unit

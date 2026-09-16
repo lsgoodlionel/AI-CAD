@@ -114,6 +114,29 @@
 > 兜底板把图框当楼板（519,684 m³）、总图与分图重复计数、离群图把包络撑到 4.8 公里。
 > **抓不到漏检** —— 没建出来的构件在这一层是隐形的。
 
+> **数理化教材已知识化（2026-09-16）**：`/Users/lionel/work/02 book/数理化` 的
+> 9 份资料系统性入库 —— 7 份技术书登记在 `core/knowledge/math_sources.py`
+> （复用识图标准那套管线，`KnowledgeSource` 加 `root` 字段服务两批资料），
+> 2 份科普**明确排除并写明理由**；6 份直取文本层（648 万字）+ Knight《Physics》
+> 定向 OCR 四节（29 页、平均置信 0.96）。入库 `regulation_books.doc_kind='textbook'`
+> ——**教材不是审图判据**，RAG 检索到「梁的挠曲微分方程」必须知道它来自教材。
+> 数据卡 `docs/KNOWLEDGE_BASE_MATH_PHYSICS.md`。
+>
+> **用途是给合理性判据补出处**：`core/model3d/plausibility/formulas.py` 是
+> 数学/物理公式的单一真相源，18 条，每条带 `expression`（规范化公式）、
+> `symbols`（符号与单位）、**`conditions`（成立条件）**、`source`（`<书 key> p.<PDF 页>`
+> / `DERIVED` / `UNCITED:<查过什么>`）、`quote`（抽取原样）。
+> **带 `UNCITED` 的公式不得用于 `impossible` 档结论** —— 凭一条找不到出处的公式
+> 说「数学上不可能」，是把没有依据说成了最强的依据。
+>
+> **三件实测出来的事**：①Knight 是扫描件（抽样三页 0 字符），1450 页全量 OCR
+> 不划算，改为先 OCR 目录拿印刷页码、再用抽样页算出**印刷页→PDF 页偏移 +32**，
+> 只扫四节；②EPUB 按 **spine 节数**登记而不是 fitz 重排的页数，否则统计报
+> 「缺页 376」的假警报；③数学排版的文本层抽取不干净（`det A`→`<let A`），
+> 故 `quote` 存抽取原样、`expression` 另写规范形式，两者不互相冒充。
+> **这批书补不上 `codes.py` 里那四条 `UNVERIFIED`**（轴压比、长细比、跨厚比、
+> fc 表在 GB 50010/50017/50011，通用教材里没有）——那是知识库的缺口，不是这批书的错。
+
 > **识图标准资料已知识化（2026-09-01）**：`/Users/lionel/work/识图标准` 的
 > 14 份国家建筑标准设计图集与识图教材（1851 页）已全量识别入库，
 > 详见 `docs/KNOWLEDGE_BASE_DRAWING_STANDARDS.md`。

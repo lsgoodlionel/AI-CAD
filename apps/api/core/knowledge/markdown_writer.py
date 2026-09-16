@@ -182,8 +182,12 @@ def write_book(source, pages: list, out_root: Path) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "book.md").write_text(
         render_markdown(source, pages, stats), encoding="utf-8")
+    # `root` 是 `Path`，json 序列化不了；单独转字符串而不是丢掉 ——
+    # 同一份清单现在服务两批资料（识图标准 / 数理化），少了根目录
+    # 就说不清这本书是从哪儿抽的。
     meta = {"source": {k: v for k, v in asdict(source).items()
-                       if k not in ("evidence",)},
+                       if k not in ("evidence", "root")},
+            "root": str(getattr(source, "root", "")),
             "evidence": source.evidence, "stats": stats}
     (out_dir / "meta.json").write_text(
         json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")

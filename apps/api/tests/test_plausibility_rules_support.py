@@ -10,14 +10,43 @@
 from __future__ import annotations
 
 import time
+from dataclasses import replace
 
 import pytest
 
+from core.model3d.plausibility import formulas
 from core.model3d.plausibility import rules_support as rs
 from core.model3d.plausibility.model import Building, Element, Floor, PlausibilityModel
 from core.model3d.plausibility.types import RuleNotApplicable
 
 pytestmark = pytest.mark.unit
+
+
+# ── 公式出处：两个方向都由用例自己造 ──────────────────────────────────
+#
+# 出处正由另一条工作线逐条填。把它当下的状态写进断言，这批用例就会随那条
+# 工作线红/绿，而失败原因与被测逻辑无关 —— 所以「已取证」「未取证」各造一次。
+
+@pytest.fixture
+def cite(monkeypatch):
+    def _cite(*keys: str) -> None:
+        for key in keys:
+            monkeypatch.setitem(
+                formulas.FORMULAS, key,
+                replace(formulas.formula(key), source="用例注入出处 p.1",
+                        quote="（用例注入的原文抽取样）"))
+    return _cite
+
+
+@pytest.fixture
+def uncite(monkeypatch):
+    def _uncite(*keys: str) -> None:
+        for key in keys:
+            monkeypatch.setitem(
+                formulas.FORMULAS, key,
+                replace(formulas.formula(key),
+                        source=f"{formulas.UNCITED}:用例注入", quote=""))
+    return _uncite
 
 
 # ── 构造辅助 ──────────────────────────────────────────────────────────
@@ -75,8 +104,9 @@ def _ids(findings) -> list[str]:
 
 # ── support.floating_column ───────────────────────────────────────────
 @pytest.mark.unit
-def test_floating_column_reports_column_with_nothing_underneath():
+def test_floating_column_reports_column_with_nothing_underneath(cite):
     # Arrange：一层四根柱，二层四根柱 —— 其中一根平移到 50 米外，下方空无一物
+    cite(*rs._FLOATING_FORMULAS)
     below = _floor("F1", 0, [_col(f"c{i}", i * 8.0, 0.0) for i in range(4)])
     above = _floor("F2", 1, [_col("u0", 0.0, 0.0), _col("u1", 8.0, 0.0),
                              _col("u2", 16.0, 0.0), _col("u3", 50.0, 50.0)])
@@ -125,8 +155,9 @@ def test_floating_column_downgrades_to_suspect_when_whole_floor_is_discontinuous
 
 
 @pytest.mark.unit
-def test_floating_column_still_impossible_when_only_a_minority_floats():
+def test_floating_column_still_impossible_when_only_a_minority_floats(cite):
     # Arrange：10 根柱里只有 2 根悬空 —— 低于转换层比例，不该被降级
+    cite(*rs._FLOATING_FORMULAS)
     below = _floor("F1", 0, [_col(f"c{i}", i * 8.0, 0.0) for i in range(10)])
     above = _floor("F2", 1, [_col(f"u{i}", i * 8.0, 0.0) for i in range(8)]
                    + [_col("x0", 500.0, 500.0), _col("x1", 600.0, 600.0)])
@@ -137,6 +168,43 @@ def test_floating_column_still_impossible_when_only_a_minority_floats():
     # Assert
     assert sorted(_ids(findings)) == ["x0", "x1"]
     assert {f.severity for f in findings} == {"impossible"}
+
+
+@pytest.mark.unit
+def test_floating_column_degrades_to_implausible_when_formula_is_uncited(uncite):
+    """凭一条找不到出处的公式说「不可能」，是把没有依据说成了最强的依据。"""
+    # Arrange：只抹掉静力平衡这一条的出处
+    uncite("mechanics.static_equilibrium")
+    below = _floor("F1", 0, [_col(f"c{i}", i * 8.0, 0.0) for i in range(4)])
+    above = _floor("F2", 1, [_col("u0", 0.0, 0.0), _col("u1", 8.0, 0.0),
+                             _col("u2", 16.0, 0.0), _col("u3", 50.0, 50.0)])
+
+    # Act
+    findings = list(rs.RULE_FLOATING_COLUMN.check(_model(below, above)))
+
+    # Assert
+    assert _ids(findings) == ["u3"]
+    assert findings[0].severity == "implausible"
+    assert "公式出处待取证" in findings[0].basis
+    assert "mechanics.static_equilibrium" in findings[0].basis
+
+
+@pytest.mark.unit
+def test_floating_column_basis_cites_static_equilibrium_with_its_conditions(cite):
+    # Arrange
+    cite(*rs._FLOATING_FORMULAS)
+    below = _floor("F1", 0, [_col(f"c{i}", i * 8.0, 0.0) for i in range(4)])
+    above = _floor("F2", 1, [_col("u0", 0.0, 0.0), _col("u1", 8.0, 0.0),
+                             _col("u2", 16.0, 0.0), _col("u3", 50.0, 50.0)])
+
+    # Act
+    basis = list(rs.RULE_FLOATING_COLUMN.check(_model(below, above)))[0].basis
+
+    # Assert：公式的表达式、来处、成立条件三样都要在场
+    equilibrium = formulas.formula("mechanics.static_equilibrium")
+    assert equilibrium.expression in basis
+    assert equilibrium.source in basis
+    assert equilibrium.conditions in basis
 
 
 @pytest.mark.unit
@@ -187,6 +255,80 @@ def test_beam_rule_not_applicable_without_any_beam_path():
     # Act & Assert
     with pytest.raises(RuleNotApplicable):
         list(rs.RULE_BEAM_WITHOUT_SUPPORT.check(_model(floor)))
+
+
+# ── support.beam_support_count ────────────────────────────────────────
+@pytest.mark.unit
+def test_beam_support_count_reports_beam_with_only_one_end_supported():
+    # Arrange：梁起端搭在柱上，终端 1 米内什么都没有
+    floor = _floor("F1", 0, [_col("c0", 0.0, 0.0),
+                             _beam("b0", (0.0, 0.0), (6.0, 0.0))])
+
+    # Act
+    findings = list(rs.RULE_BEAM_SUPPORT_COUNT.check(_model(floor)))
+
+    # Assert：只存疑不否定 —— 悬挑梁合法，嵌固端在平面图上看不出来
+    assert _ids(findings) == ["b0"]
+    assert findings[0].severity == "suspect"
+    assert findings[0].evidence["supported_ends"] == 1
+    assert findings[0].evidence["required_ends"] == 2
+    assert "悬挑" in findings[0].detail and "缺支座" in findings[0].detail
+
+
+@pytest.mark.unit
+def test_beam_support_count_accepts_beam_supported_at_both_ends():
+    # Arrange：两端各有一根柱 —— 简支，静定
+    floor = _floor("F1", 0, [_col("c0", 0.0, 0.0), _col("c1", 8.0, 0.0),
+                             _beam("b0", (0.0, 0.0), (8.0, 0.0))])
+
+    # Act & Assert
+    assert list(rs.RULE_BEAM_SUPPORT_COUNT.check(_model(floor))) == []
+
+
+@pytest.mark.unit
+def test_beam_support_count_leaves_fully_unsupported_beam_to_the_other_rule():
+    """两端皆无支承是 `support.beam_without_support` 的射程。
+
+    两条规则都报，报告里同一根梁就有两条「独立证据」，而它们其实是同一件事。
+    """
+    # Arrange
+    floor = _floor("F1", 0, [_col("c0", 0.0, 0.0), _col("c1", 8.0, 0.0),
+                             _beam("b_bad", (100.0, 100.0), (108.0, 100.0))])
+
+    # Act
+    counted = list(rs.RULE_BEAM_SUPPORT_COUNT.check(_model(floor)))
+    without = list(rs.RULE_BEAM_WITHOUT_SUPPORT.check(_model(floor)))
+
+    # Assert
+    assert counted == []
+    assert _ids(without) == ["b_bad"]
+
+
+@pytest.mark.unit
+def test_beam_support_count_basis_cites_static_equilibrium(cite):
+    # Arrange
+    cite(*rs._BEAM_FORMULAS)
+    floor = _floor("F1", 0, [_col("c0", 0.0, 0.0),
+                             _beam("b0", (0.0, 0.0), (6.0, 0.0))])
+
+    # Act
+    basis = list(rs.RULE_BEAM_SUPPORT_COUNT.check(_model(floor)))[0].basis
+
+    # Assert
+    equilibrium = formulas.formula("mechanics.static_equilibrium")
+    assert equilibrium.expression in basis
+    assert equilibrium.source in basis
+    assert "两个支座" in basis
+
+
+@pytest.mark.unit
+def test_beam_support_count_not_applicable_without_any_beam_path():
+    # Arrange：有柱没梁 —— 缺数据不是「查过了没问题」
+    floor = _floor("F1", 0, [_col("c0", 0.0, 0.0)])
+
+    # Act & Assert
+    with pytest.raises(RuleNotApplicable):
+        list(rs.RULE_BEAM_SUPPORT_COUNT.check(_model(floor)))
 
 
 # ── support.slab_without_edge_support ─────────────────────────────────
@@ -243,6 +385,26 @@ def test_interpenetration_reports_equipment_sharing_a_column_footprint():
     assert findings[0].severity == "implausible"
     assert set(findings[0].evidence["pair"]) == {"c0", "e0"}
     assert findings[0].evidence["overlap_ratio"] > rs.INTERPENETRATION_MIN_RATIO
+
+
+@pytest.mark.unit
+def test_interpenetration_basis_says_convex_clipping_overestimates_overlap():
+    """Sutherland–Hodgman 只对凸裁剪多边形成立，实现里先取凸包再裁。
+
+    高估会让重叠比偏大，所以阈值必须定在明显的量级上 —— 这层关系不写进依据，
+    读报告的人就会拿它当精确面积用。
+    """
+    # Arrange
+    floor = _floor("F1", 0, [_col("c0", 0.0, 0.0, 0.8), _equip("e0", 0.0, 0.0, 1.0)])
+
+    # Act
+    basis = list(rs.RULE_INTERPENETRATION.check(_model(floor)))[0].basis
+
+    # Assert
+    clipping = formulas.formula("geometry.polygon_clipping_convex_requirement")
+    assert clipping.expression in basis
+    assert clipping.conditions in basis
+    assert "高估" in basis
 
 
 @pytest.mark.unit
@@ -420,6 +582,7 @@ def test_all_support_rules_are_registered_with_a_basis():
 
     # Assert
     assert ids == {"support.floating_column", "support.beam_without_support",
+                   "support.beam_support_count",
                    "support.slab_without_edge_support", "support.interpenetration",
                    "support.isolated_element", "support.story_z_overlap"}
     assert all(rule.basis for rule in rs.RULES)

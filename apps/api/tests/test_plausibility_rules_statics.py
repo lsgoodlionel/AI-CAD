@@ -13,6 +13,7 @@ import math
 import pytest
 
 from core.model3d.plausibility import codes
+from core.model3d.plausibility import formulas
 from core.model3d.plausibility import registry
 from core.model3d.plausibility import rules_statics as rs
 from core.model3d.plausibility.model import Building, Element, Floor, PlausibilityModel
@@ -312,6 +313,45 @@ def test_柱长细比_细柱超限时报出(filled):
     # Assert
     assert len(findings) == 1
     assert findings[0].evidence["slenderness"] == pytest.approx(3.0 / (0.3 / math.sqrt(12)))
+
+
+@pytest.mark.unit
+def test_柱长细比_依据回指惯性矩与回转半径而不只写i等于b除根号十二(filled):
+    """`i = b/√12` 从前只是一行字：没说它从哪来，也没说它什么时候成立。
+
+    断言的是**行为**（依据里出现公式表里那三条的表达式与出处），
+    不是某个具体的出处字符串 —— 出处正由另一条工作线逐条填。
+    """
+    # Arrange
+    model = _model(_column("c1", 0.0, 0.0, 0.3, 0.3), height_m=3.0)
+
+    # Act
+    basis = list(rs.column_slenderness(model))[0].basis
+
+    # Assert
+    for key in rs._SLENDERNESS_FORMULAS:
+        item = formulas.formula(key)
+        assert item.expression in basis, key
+        assert item.source in basis, key
+    # 成立条件（矩形截面、绕形心轴、受压构件）必须一并落进依据
+    assert formulas.formula("mechanics.second_moment_rectangle").conditions in basis
+
+
+@pytest.mark.unit
+def test_柱轴压比_依据回指从属面积法并写明等分近似的误差方向(filled):
+    # Arrange：截面小到必然超限（0.2×0.2 m），保证有结论可查
+    model = _model(_column("c1", 0.0, 0.0, 0.2, 0.2), _slab("s1", 20.0, 20.0, 0.12),
+                   height_m=3.0)
+
+    # Act
+    findings = list(rs.column_axial_ratio(model))
+
+    # Assert
+    assert findings, "截面 200×200 承担整层荷载，轴压比必然超限"
+    tributary = formulas.formula("mechanics.tributary_area_load")
+    assert tributary.expression in findings[0].basis
+    assert tributary.source in findings[0].basis
+    assert "等分" in findings[0].basis
 
 
 @pytest.mark.unit

@@ -22,10 +22,33 @@ from collections import defaultdict
 from core.model3d.plausibility import geometry as geo
 from core.model3d.plausibility.model import ELEMENT_KINDS, Element, Floor
 from core.model3d.plausibility.registry import register
+# 公式出处的拼装与降级统一在 rules_quantity（`degrade`/`basis_of` 的老家）。
+from core.model3d.plausibility.rules_quantity import (
+    formula_basis, formula_ref, formula_severity,
+)
 from core.model3d.plausibility.types import Finding, Rule, RuleNotApplicable
 
 Ring = list
 Box = tuple
+
+# ── 各规则回指的公式（`formulas.py` 的 key）──────────────────────────
+#
+# 只写 key，渲染留到 `check` 里：出处正由取证任务逐条填，在这里拼成字符串
+# 等于快照，后来填好的原文永远到不了报告。
+
+#: 柱悬空：传力路径来自静力平衡；「下方有没有东西托住」用重叠面积量。
+_FLOATING_FORMULAS = ("mechanics.static_equilibrium",
+                      "geometry.polygon_clipping_convex_requirement")
+#: 梁的支承（两端皆无 / 只有一端）：同为静力平衡；找支承用射线法判点在轮廓内。
+_BEAM_FORMULAS = ("mechanics.static_equilibrium",
+                  "geometry.jordan_curve_ray_casting")
+#: 板整圈无支承：同上。
+_SLAB_FORMULAS = _BEAM_FORMULAS
+#: 互穿：重叠面积用 Sutherland–Hodgman 裁剪算，面积仍是鞋带。
+_INTERPENETRATION_FORMULAS = ("geometry.polygon_clipping_convex_requirement",
+                              "geometry.shoelace_area")
+#: 离群：构件位置取多边形形心。
+_ISOLATION_FORMULAS = ("geometry.polygon_centroid",)
 
 # ── 阈值 ──────────────────────────────────────────────────────────────
 
@@ -195,11 +218,15 @@ def _support_overlap(ring: Ring, box: Box, area: float, grid: _Grid) -> float:
 
 
 # ── support.floating_column ───────────────────────────────────────────
-_FLOATING_BASIS = (
-    "静力平衡：重力荷载必须有连续传递路径直至基础。柱脚正下方没有任何竖向"
-    f"构件（柱/墙）与之重叠，即无传力路径。重叠比例阈值 {COLUMN_SUPPORT_MIN_RATIO:.0%}"
-    "（占柱自身占地）为上下层配准误差留量。"
-)
+def _floating_basis() -> str:
+    """柱悬空的依据。**运行时拼**，出处才跟得上取证进度。"""
+    return formula_basis(
+        "重力荷载必须有连续传递路径直至基础，这是 ΣF=0 的直接推论。柱脚正下方"
+        "没有任何竖向构件（柱/墙）与之重叠，即无传力路径。"
+        f"重叠比例阈值 {COLUMN_SUPPORT_MIN_RATIO:.0%}（占柱自身占地）为上下层"
+        "配准误差留量。重叠面积按凸包裁剪（Sutherland–Hodgman 只对凸裁剪多边形"
+        "成立）会**高估**覆盖 —— 方向是「更难报出来」，对 impossible 这一档正合适。",
+        *_FLOATING_FORMULAS, base="impossible")
 _TRANSFER_BASIS = (
     "统计判据（非条款）：转换层（梁式/桁架转换）本就允许竖向构件不连续。"
     f"当一层里超过 {TRANSFER_FLOOR_RATIO:.0%} 的柱都对不上下层时，"
@@ -250,7 +277,9 @@ def _check_floating_column(model) -> list[Finding]:
             continue
         for element, area, ratio in floating:
             findings.append(Finding(
-                rule="support.floating_column", severity="impossible", kind="columns",
+                rule="support.floating_column",
+                severity=formula_severity("impossible", *_FLOATING_FORMULAS),
+                kind="columns",
                 target=element.uid,
                 detail=(f"{upper.label} 层这根柱的正下方（{lower.label} 层）"
                         f"没有柱也没有墙 —— 荷载无处可去"),
@@ -259,19 +288,20 @@ def _check_floating_column(model) -> list[Finding]:
                           "footprint_m2": round(area, 3),
                           "lower_floor": _floor_target(lower),
                           "lower_candidates": len(support.entries)},
-                basis=_FLOATING_BASIS))
+                basis=_floating_basis()))
     return findings
 
 
 # ── support.beam_without_support ──────────────────────────────────────
-_BEAM_BASIS = (
-    "静力平衡：受弯构件至少要有一个支座才谈得上传力。一端悬挑合法，"
-    "**两端都**在柱/墙的搜索半径内找不到东西，则这根梁没有任何传力路径。"
-    f"半径 {SUPPORT_SEARCH_RADIUS_M} m 取常见柱截面 0.4~1.0 m 的量级"
-    "（EMPIRICAL，非规范限值）。"
-    "支承候选只算柱与墙，不算梁：两根都悬空的梁会互相「支承」，"
-    "把彼此的错误洗白。"
-)
+def _beam_basis() -> str:
+    return formula_basis(
+        "受弯构件至少要有一个支座才谈得上传力（ΣF=0）。一端悬挑合法，"
+        "**两端都**在柱/墙的搜索半径内找不到东西，则这根梁没有任何传力路径。"
+        f"半径 {SUPPORT_SEARCH_RADIUS_M} m 取常见柱截面 0.4~1.0 m 的量级"
+        "（EMPIRICAL，非规范限值）；「梁端是否落在支承轮廓内」用射线法判。"
+        "支承候选只算柱与墙，不算梁：两根都悬空的梁会互相「支承」，"
+        "把彼此的错误洗白。",
+        *_BEAM_FORMULAS)
 
 
 def _check_beam_without_support(model) -> list[Finding]:
@@ -298,18 +328,78 @@ def _check_beam_without_support(model) -> list[Finding]:
                           "length_m": round(beam.length_m() or 0.0, 3),
                           "search_radius_m": SUPPORT_SEARCH_RADIUS_M,
                           "supports_on_floor": len(support.entries)},
-                basis=_BEAM_BASIS))
+                basis=_beam_basis()))
+    if checked == 0:
+        raise RuleNotApplicable("模型里没有带两端坐标（path）的梁")
+    return findings
+
+
+# ── support.beam_support_count ────────────────────────────────────────
+#
+# 与上一条的分工：`beam_without_support` 打的是「两端都没有」，为悬挑梁留了
+# 余地；本条补的是「**恰好只有一端有**」这一档。两条都从 ΣF=0 且 ΣM=0 出发，
+# 但结论的硬度差很远 —— 一端有支座的梁可能是合法的悬挑，也可能是另一端的
+# 支座根本没建模，而平面图上看不出有没有嵌固。判不出就说判不出：`suspect`。
+
+
+def _beam_support_count_basis() -> str:
+    return formula_basis(
+        "静定性：一根平面受弯构件有三个自由度，要 ΣF=0 且 ΣM=0 同时成立，"
+        "简支梁**至少需要两个支座**；只有一个支座且无嵌固时它是机构，不是结构。"
+        "但反过来不成立 —— 悬挑梁靠嵌固端提供的力矩约束就能平衡，"
+        "而嵌固在平面图上看不出来。故本条只出 suspect，不否定构件。"
+        f"两端各按 {SUPPORT_SEARCH_RADIUS_M} m 半径找柱/墙，"
+        "判据与 support.beam_without_support 同一套（**复用同一个搜索**，"
+        "两条规则的口径分开写必然漂移）。",
+        *_BEAM_FORMULAS)
+
+
+def _check_beam_support_count(model) -> list[Finding]:
+    checked = 0
+    findings: list[Finding] = []
+    for floor in model.floors():
+        beams = [e for e in floor.of_kind("beams") if len(e.path) >= 2]
+        if not beams:
+            continue
+        support = _Grid(_entries_of(floor, ("columns", "walls")))
+        for beam in beams:
+            checked += 1
+            path = beam.path
+            ends = (path[0], path[-1])
+            supported = [_has_support_near(p, support, SUPPORT_SEARCH_RADIUS_M)
+                         for p in ends]
+            # 两端皆无 → 归 support.beam_without_support，本条不抢；
+            # 两端皆有 → 静定，正常。只剩「恰好一端」这一档。
+            if sum(supported) != 1:
+                continue
+            free = 1 if supported[0] else 0
+            findings.append(Finding(
+                rule="support.beam_support_count", severity="suspect", kind="beams",
+                target=beam.uid,
+                detail=(f"梁只有一端找得到支座（{'终' if free else '起'}端 "
+                        f"{SUPPORT_SEARCH_RADIUS_M} m 内无柱无墙）—— "
+                        f"可能是悬挑（嵌固端在平面图上看不出来），"
+                        f"也可能是缺支座，需人工判"),
+                evidence={"supported_ends": 1, "required_ends": 2,
+                          "free_end_x": round(ends[free][0], 3),
+                          "free_end_y": round(ends[free][1], 3),
+                          "length_m": round(beam.length_m() or 0.0, 3),
+                          "search_radius_m": SUPPORT_SEARCH_RADIUS_M,
+                          "supports_on_floor": len(support.entries)},
+                basis=_beam_support_count_basis()))
     if checked == 0:
         raise RuleNotApplicable("模型里没有带两端坐标（path）的梁")
     return findings
 
 
 # ── support.slab_without_edge_support ─────────────────────────────────
-_SLAB_BASIS = (
-    "板是受弯构件，荷载经边界传给梁/墙/柱。沿轮廓等弧长取样，"
-    f"**每一个**采样点 {SUPPORT_SEARCH_RADIUS_M} m 内都没有支承构件，"
-    "则这块板整圈悬空。只要有一点落在支承上就不报 —— 判据刻意偏宽。"
-)
+def _slab_basis() -> str:
+    return formula_basis(
+        "板是受弯构件，荷载经边界传给梁/墙/柱（ΣF=0）。沿轮廓等弧长取样，"
+        f"**每一个**采样点 {SUPPORT_SEARCH_RADIUS_M} m 内都没有支承构件，"
+        "则这块板整圈悬空；采样点是否落在支承轮廓内用射线法判。"
+        "只要有一点落在支承上就不报 —— 判据刻意偏宽。",
+        *_SLAB_FORMULAS)
 
 
 def _sample_ring(ring: Ring) -> list[tuple[float, float]]:
@@ -370,20 +460,25 @@ def _check_slab_without_edge_support(model) -> list[Finding]:
                 kind="slabs", target=slab.uid,
                 detail=(f"板轮廓上 {len(samples)} 个采样点附近都没有梁/墙/柱 —— "
                         f"整圈边界无支承"),
-                evidence=evidence, basis=_SLAB_BASIS))
+                evidence=evidence, basis=_slab_basis()))
     if checked == 0:
         raise RuleNotApplicable("模型里没有带闭合轮廓的板")
     return findings
 
 
 # ── support.interpenetration ──────────────────────────────────────────
-_INTERPENETRATION_BASIS = (
-    "固体不可互穿（物理）。只查竖向确实同占一段高度的两类："
-    + "、".join(f"{a}×{b}" for a, b in INTERPENETRATION_PAIRS)
-    + f"；占地重叠超过较小者 {INTERPENETRATION_MIN_RATIO:.0%} 即同一块楼面"
-    "被两个实体占满。其余跨类组合（柱穿板、梁压墙、管线绕柱）在竖向错开，"
-    "属正常，故用白名单而非黑名单。同类重复归 geom.duplicate_element。"
-)
+def _interpenetration_basis() -> str:
+    return formula_basis(
+        "固体不可互穿（物理，公式表里暂无对应条目，见模块说明）。只查竖向确实"
+        "同占一段高度的两类："
+        + "、".join(f"{a}×{b}" for a, b in INTERPENETRATION_PAIRS)
+        + f"；占地重叠超过较小者 {INTERPENETRATION_MIN_RATIO:.0%} 即同一块楼面"
+        "被两个实体占满。其余跨类组合（柱穿板、梁压墙、管线绕柱）在竖向错开，"
+        "属正常，故用白名单而非黑名单。同类重复归 geom.duplicate_element。"
+        "重叠面积先取凸包再裁剪，**按凸包裁剪会高估重叠**，"
+        f"故阈值定在明显的量级（{INTERPENETRATION_MIN_RATIO:.0%}「大部分重合」），"
+        "不拿它做精确面积。",
+        *_INTERPENETRATION_FORMULAS)
 
 
 def _check_interpenetration(model) -> list[Finding]:
@@ -424,7 +519,7 @@ def _check_interpenetration(model) -> list[Finding]:
                                   "area_b_m2": round(area_b, 4),
                                   "overlap_ratio": round(ratio, 3),
                                   "min_ratio": INTERPENETRATION_MIN_RATIO},
-                        basis=_INTERPENETRATION_BASIS))
+                        basis=_interpenetration_basis()))
     if checked == 0:
         raise RuleNotApplicable(
             "没有一层同时具备白名单里的两类构件（"
@@ -433,12 +528,14 @@ def _check_interpenetration(model) -> list[Finding]:
 
 
 # ── support.isolated_element ──────────────────────────────────────────
-_ISOLATION_BASIS = (
-    "统计离群，分布取自本模型内部（不是外部标准）：同层构件最近邻距离的中位数"
-    f"是柱网量级，离群项要同时超过「中位数 × {ISOLATION_FACTOR:g}」和 "
-    f"{ISOLATION_FLOOR_MIN_M:g} m 两道线。下限的出处是实测教训 —— "
-    "曾有 2 张离群图把场景包络从 760 m 撑到 4.8 km。"
-)
+def _isolation_basis() -> str:
+    return formula_basis(
+        "统计离群，分布取自本模型内部（不是外部标准）：同层构件最近邻距离的中位数"
+        f"是柱网量级，离群项要同时超过「中位数 × {ISOLATION_FACTOR:g}」和 "
+        f"{ISOLATION_FLOOR_MIN_M:g} m 两道线。下限的出处是实测教训 —— "
+        "曾有 2 张离群图把场景包络从 760 m 撑到 4.8 km。"
+        "构件位置取面积加权形心（不是顶点平均），否则顶点密的一侧会把位置拉偏。",
+        *_ISOLATION_FORMULAS)
 
 
 def _center(ring: Ring, box: Box) -> tuple[float, float]:
@@ -516,7 +613,7 @@ def _check_isolated_element(model) -> list[Finding]:
                           "factor": ISOLATION_FACTOR,
                           "floor_elements": len(points),
                           "x": round(x, 2), "y": round(y, 2)},
-                basis=_ISOLATION_BASIS))
+                basis=_isolation_basis()))
     if usable_floors == 0:
         raise RuleNotApplicable(
             f"没有一层的构件数达到 {ISOLATION_MIN_SAMPLE} —— 「主群」无从谈起，"
@@ -587,29 +684,46 @@ def _check_story_z_overlap(model) -> list[Finding]:
 
 
 # ── 注册 ──────────────────────────────────────────────────────────────
+# **规则级 basis 只回指 key**：`Rule` 在 import 时构造，此刻渲染出处等于快照，
+# 取证任务后来填的原文就到不了这里。渲染留在各 `check` 里。
 RULE_FLOATING_COLUMN = register(Rule(
     id="support.floating_column", title="柱悬空（下层无竖向支承）",
-    scope="element", severity="impossible", basis=_FLOATING_BASIS,
+    scope="element", severity="impossible",
+    basis="重力必须有连续传力路径直至基础；"
+          + formula_ref(*_FLOATING_FORMULAS),
     check=_check_floating_column))
 
 RULE_BEAM_WITHOUT_SUPPORT = register(Rule(
     id="support.beam_without_support", title="梁两端皆无支座",
-    scope="element", severity="implausible", basis=_BEAM_BASIS,
+    scope="element", severity="implausible",
+    basis="受弯构件至少要有一个支座；" + formula_ref(*_BEAM_FORMULAS),
     check=_check_beam_without_support))
+
+RULE_BEAM_SUPPORT_COUNT = register(Rule(
+    id="support.beam_support_count", title="梁只有一端有支座（静定性存疑）",
+    scope="element", severity="suspect",
+    basis="简支梁至少需要两个支座（ΣF=0 且 ΣM=0）；悬挑梁与嵌固端是例外，"
+          "故只存疑不否定。" + formula_ref(*_BEAM_FORMULAS),
+    check=_check_beam_support_count))
 
 RULE_SLAB_WITHOUT_EDGE_SUPPORT = register(Rule(
     id="support.slab_without_edge_support", title="板整圈边界无支承",
-    scope="element", severity="implausible", basis=_SLAB_BASIS,
+    scope="element", severity="implausible",
+    basis="板的荷载经边界传出；" + formula_ref(*_SLAB_FORMULAS),
     check=_check_slab_without_edge_support))
 
 RULE_INTERPENETRATION = register(Rule(
     id="support.interpenetration", title="跨类构件互穿（同占一块楼面）",
-    scope="element", severity="implausible", basis=_INTERPENETRATION_BASIS,
+    scope="element", severity="implausible",
+    basis="固体不可互穿；重叠面积按凸包裁剪会偏大（"
+          + formula_ref(*_INTERPENETRATION_FORMULAS) + "）",
     check=_check_interpenetration))
 
 RULE_ISOLATED_ELEMENT = register(Rule(
     id="support.isolated_element", title="构件离群（撑大场景包络）",
-    scope="element", severity="suspect", basis=_ISOLATION_BASIS,
+    scope="element", severity="suspect",
+    basis="统计离群，分布取自本模型内部；位置取形心（"
+          + formula_ref(*_ISOLATION_FORMULAS) + "）",
     check=_check_isolated_element))
 
 RULE_STORY_Z_OVERLAP = register(Rule(
@@ -618,5 +732,5 @@ RULE_STORY_Z_OVERLAP = register(Rule(
     check=_check_story_z_overlap))
 
 RULES = (RULE_FLOATING_COLUMN, RULE_BEAM_WITHOUT_SUPPORT,
-         RULE_SLAB_WITHOUT_EDGE_SUPPORT, RULE_INTERPENETRATION,
-         RULE_ISOLATED_ELEMENT, RULE_STORY_Z_OVERLAP)
+         RULE_BEAM_SUPPORT_COUNT, RULE_SLAB_WITHOUT_EDGE_SUPPORT,
+         RULE_INTERPENETRATION, RULE_ISOLATED_ELEMENT, RULE_STORY_Z_OVERLAP)

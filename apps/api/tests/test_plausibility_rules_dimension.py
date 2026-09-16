@@ -13,6 +13,7 @@ from __future__ import annotations
 import pytest
 
 from core.model3d.plausibility import codes
+from core.model3d.plausibility import formulas
 from core.model3d.plausibility import rules_dimension as rd
 from core.model3d.plausibility.model import Building, Element, Floor, PlausibilityModel
 from core.model3d.plausibility.types import RuleNotApplicable
@@ -80,6 +81,28 @@ def test_柱短边低于规范下限被判为不合理(set_limit):
     assert findings[0].severity == "implausible"
     assert findings[0].evidence["short_side_mm"] == pytest.approx(180.0)
     assert findings[0].evidence["limit_mm"] == pytest.approx(300.0)
+
+
+@pytest.mark.unit
+def test_柱截面依据同时回指规范限值与截面量法(set_limit):
+    """截面短边是量出来的，量法本身也要有出处。
+
+    「最小面积外接矩形」这一步不是可有可无的实现细节：标高符号那条 `∨`
+    斜笔画按轴对齐包围盒量是 0.52×0.59 m 的近方形，正好落在柱窗口正中，
+    量法换成外接矩形才还原出它真实的 0.7×0.12 m。
+    """
+    # Arrange
+    set_limit("column.min_section_mm", 300.0)
+    model = _model(_element("columns", {"outline": _rect(0.6, 0.18)}, uid="c1"))
+
+    # Act
+    basis = _run("dim.column_section_below_code", model)[0].basis
+
+    # Assert：规范那一侧的出处与数学这一侧的出处都在
+    rect = formulas.formula("geometry.min_area_rect")
+    assert rect.expression in basis
+    assert rect.source in basis
+    assert "GB 50010" in basis
 
 
 @pytest.mark.unit

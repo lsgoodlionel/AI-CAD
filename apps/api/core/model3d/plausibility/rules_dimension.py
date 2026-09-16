@@ -25,10 +25,16 @@ from __future__ import annotations
 from core.model3d.plausibility import codes
 from core.model3d.plausibility.model import PlausibilityModel
 from core.model3d.plausibility.registry import register
+# 公式出处的拼装与降级统一在 rules_quantity（`degrade`/`basis_of` 的老家）。
+from core.model3d.plausibility.rules_quantity import formula_basis, formula_ref
 from core.model3d.plausibility.types import Finding, Rule, RuleNotApplicable
 
 #: 米 → 毫米
 MM_PER_M = 1000.0
+
+#: 柱截面（短边、长宽比）都量自**最小面积外接矩形**，判据的凭据落在它身上。
+#: 只写 key，渲染留到 `check` 里 —— 出处正由取证任务逐条填。
+_SECTION_FORMULAS = ("geometry.min_area_rect",)
 
 #: 「柱」的最小外接矩形长宽比上限。超过它的竖向构件不是柱，是墙肢或条带。
 #: 依据：识别器猜测路径本身用的就是 4:1 窗口（`element_recognizer._is_column_size`），
@@ -152,8 +158,12 @@ def check_column_section(model: PlausibilityModel) -> list[Finding]:
             evidence={"short_side_mm": short_mm, "long_side_mm": long_m * MM_PER_M,
                       "limit_mm": ceiling_mm, "limit_tier": tier,
                       "limit_verified": limit.verified},
-            basis=basis + "。截面按**最小面积外接矩形**量，不按轴对齐包围盒 ——"
-                          "斜置构件的包围盒是它的影子，会把短边量大。"))
+            basis=formula_basis(
+                basis + "。截面按**最小面积外接矩形**量，不按轴对齐包围盒 ——"
+                        "斜置构件的包围盒是它的影子，会把短边量大（标高符号"
+                        "那条 `∨` 斜笔画就是这么被量成 0.52×0.59 m 近方形、"
+                        "混进柱里的）。",
+                *_SECTION_FORMULAS)))
     return findings
 
 
@@ -255,10 +265,13 @@ def check_column_aspect_ratio(model: PlausibilityModel) -> list[Finding]:
                    f"{long_m / short_m:.1f} > {COLUMN_MAX_ASPECT}，实为墙肢或条带",
             evidence={"aspect_ratio": long_m / short_m, "limit": COLUMN_MAX_ASPECT,
                       "long_side_m": long_m, "short_side_m": short_m},
-            basis=f"长宽比上限 {COLUMN_MAX_ASPECT}：识别器猜测路径用的即是 4:1 窗口，"
-                  "图层路径放宽到 8:1，两条路径落库同一张表，4~8 的那一批是靠图层名"
-                  "混进来的墙；短肢剪力墙的构造分界也在这个量级。"
-                  "阈值见模块常量 COLUMN_MAX_ASPECT。"))
+            basis=formula_basis(
+                f"长宽比上限 {COLUMN_MAX_ASPECT}：识别器猜测路径用的即是 4:1 窗口，"
+                "图层路径放宽到 8:1，两条路径落库同一张表，4~8 的那一批是靠图层名"
+                "混进来的墙；短肢剪力墙的构造分界也在这个量级。"
+                "长短边同样取自最小面积外接矩形，斜置构件不会被包围盒量胖。"
+                "阈值见模块常量 COLUMN_MAX_ASPECT。",
+                *_SECTION_FORMULAS)))
     return findings
 
 
@@ -269,7 +282,8 @@ RULES: dict[str, Rule] = {
         register(Rule(
             id="dim.column_section_below_code", title="柱截面短边低于规范下限",
             scope="element", severity="implausible",
-            basis="codes: column.min_section_mm（未取证时降级 suspect）",
+            basis="codes: column.min_section_mm（未取证时降级 suspect）；"
+                  "截面口径 " + formula_ref(*_SECTION_FORMULAS),
             check=check_column_section)),
         register(Rule(
             id="dim.beam_width_below_code", title="梁宽低于规范下限",
@@ -299,7 +313,8 @@ RULES: dict[str, Rule] = {
         register(Rule(
             id="dim.column_aspect_ratio", title="柱长宽比过大（其实是墙肢）",
             scope="element", severity="implausible",
-            basis=f"长宽比上限 {COLUMN_MAX_ASPECT}，见模块常量 COLUMN_MAX_ASPECT",
+            basis=f"长宽比上限 {COLUMN_MAX_ASPECT}，见模块常量 COLUMN_MAX_ASPECT；"
+                  "长短边口径 " + formula_ref(*_SECTION_FORMULAS),
             check=check_column_aspect_ratio)),
     )
 }

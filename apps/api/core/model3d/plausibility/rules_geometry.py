@@ -20,6 +20,11 @@ from __future__ import annotations
 from core.model3d.plausibility import geometry as geo
 from core.model3d.plausibility.model import Element, PlausibilityModel
 from core.model3d.plausibility.registry import register
+# 公式出处的拼装与降级与限值那一侧同源，统一放在 rules_quantity（`degrade`/
+# `basis_of` 的老家）—— 两套「凭据不硬就降级」的规矩分开写必然漂移。
+from core.model3d.plausibility.rules_quantity import (
+    formula_basis, formula_ref, formula_severity,
+)
 from core.model3d.plausibility.types import Finding, Rule, RuleNotApplicable
 
 # ── 阈值 ────────────────────────────────────────────────────────────
@@ -76,6 +81,27 @@ DUPLICATE_OVERLAP_RATIO = 0.9
 #: 柱没有 `width` 是正常的，不是缺数据。
 SIZE_FIELDS = ("width", "thickness", "height")
 
+# ── 各规则回指的公式（`formulas.py` 的 key）──────────────────────────
+#
+# 只写 key，渲染留到 `check` 里：出处正由取证任务逐条填，
+# 在这里拼成字符串等于快照，填好的原文永远到不了报告。
+
+#: 自交轮廓：鞋带公式的成立条件 + 自交时两瓣面积相消。
+_SELF_INTERSECT_FORMULAS = ("geometry.shoelace_area",
+                            "geometry.signed_area_cancellation")
+#: 面积为零却有两向跨度：面积由鞋带算，跨度由最小面积外接矩形量。
+_ZERO_AREA_FORMULAS = ("geometry.shoelace_area", "geometry.min_area_rect")
+#: 共线退化：短边取自最小面积外接矩形，而它建在凸包上。
+_COLLINEAR_FORMULAS = ("geometry.min_area_rect",
+                       "geometry.convex_hull_monotone_chain")
+#: 单构件尺度：同上，长边口径。
+_EXTENT_FORMULAS = ("geometry.min_area_rect",)
+#: 实心度：定义式 + 分母的凸包。
+_SOLIDITY_FORMULAS = ("geometry.solidity", "geometry.convex_hull_monotone_chain")
+#: 重复落库：重叠面积用 Sutherland–Hodgman 裁剪算，面积仍是鞋带。
+_DUPLICATE_FORMULAS = ("geometry.polygon_clipping_convex_requirement",
+                       "geometry.shoelace_area")
+
 
 # ── 小工具 ──────────────────────────────────────────────────────────
 
@@ -127,7 +153,8 @@ def check_self_intersecting(model: PlausibilityModel) -> list[Finding]:
         if not geo.is_self_intersecting(ring):
             continue
         findings.append(Finding(
-            rule="geom.self_intersecting_outline", severity="impossible",
+            rule="geom.self_intersecting_outline",
+            severity=formula_severity("impossible", *_SELF_INTERSECT_FORMULAS),
             kind=element.kind, target=element.uid,
             detail=f"轮廓自交（{len(_distinct(ring))} 个相异顶点），"
                    f"鞋带面积 {geo.polygon_area(ring):.4f} m² 不可信",
@@ -138,9 +165,12 @@ def check_self_intersecting(model: PlausibilityModel) -> list[Finding]:
                 "signed_area_m2": geo.signed_area(ring),
                 "hull_area_m2": _hull_area(ring),
             },
-            basis="鞋带（Gauss 面积）公式只对简单多边形成立；自交环被交点分成的"
-                  "两瓣绕向相反、贡献等值反号，面积相消。实测存量 3166/10170 根柱"
-                  "（31.1%）、69/514 块板因此混凝土量算成 0。"))
+            basis=formula_basis(
+                "鞋带公式的成立条件里写着「简单多边形」，自交环不满足它 ——"
+                "环被交点分成的两瓣绕向相反、贡献等值反号，**因此自交环算出的"
+                "面积不可信**（本例 0 只是相消的结果，不是它真实的大小）。"
+                "实测存量 3166/10170 根柱（31.1%）、69/514 块板因此混凝土量算成 0。",
+                *_SELF_INTERSECT_FORMULAS, base="impossible")))
     return findings
 
 
@@ -167,7 +197,8 @@ def check_zero_area_with_extent(model: PlausibilityModel) -> list[Finding]:
         if area > AREA_EPS_M2:
             continue
         findings.append(Finding(
-            rule="geom.zero_area_with_extent", severity="impossible",
+            rule="geom.zero_area_with_extent",
+            severity=formula_severity("impossible", *_ZERO_AREA_FORMULAS),
             kind=element.kind, target=element.uid,
             detail=f"面积算成 {area:.3e} m²，但真实跨度有 "
                    f"{rect[0]:.3f}×{rect[1]:.3f} m",
@@ -175,9 +206,13 @@ def check_zero_area_with_extent(model: PlausibilityModel) -> list[Finding]:
                 "area_m2": area, "long_side_m": rect[0], "short_side_m": rect[1],
                 "hull_area_m2": _hull_area(ring), "points": len(ring),
             },
-            basis="简单多边形在两个方向都有跨度时面积必然为正；面积为零只能是"
-                  "环序坏了（原路回描 A→B→A→C，鞋带正负相消）。"
-                  "同 `ring_order._has_zero_area_with_2d_extent` 判据，无阈值。"))
+            basis=formula_basis(
+                "满足鞋带公式成立条件（简单多边形）的环，两个方向都有跨度时"
+                "面积必然为正；面积为零只能是环序坏了（原路回描 A→B→A→C，"
+                "正负相消）。跨度用最小面积外接矩形量而不是轴对齐包围盒 ——"
+                "斜置构件的包围盒是它的影子，会把短边量大。"
+                "同 `ring_order._has_zero_area_with_2d_extent` 判据，无阈值。",
+                *_ZERO_AREA_FORMULAS, base="impossible")))
     return findings
 
 
@@ -207,13 +242,20 @@ def check_degenerate_outline(model: PlausibilityModel) -> list[Finding]:
         short = 0.0 if rect is None else rect[1]
         if short <= DEGENERATE_SHORT_M:
             findings.append(Finding(
-                rule="geom.degenerate_outline", severity="impossible",
+                rule="geom.degenerate_outline",
+                # 这一支的短边量自最小面积外接矩形，所以它的凭据硬不硬
+                # 取决于那两条公式；上面「相异顶点不足 3」那一支只用多边形的
+                # 定义，不经过公式表，故不随之降级。
+                severity=formula_severity("impossible", *_COLLINEAR_FORMULAS),
                 kind=element.kind, target=element.uid,
                 detail=f"轮廓上 {len(distinct)} 个点全部共线（短边 {short:.2e} m）",
                 evidence={"distinct_points": len(distinct), "short_side_m": short,
                           "threshold_m": DEGENERATE_SHORT_M},
-                basis="共线点列的凸包退化成线段，围不出面积。"
-                      f"门槛 {DEGENERATE_SHORT_M} m = 1 毫米，低于图纸与落库坐标的精度。"))
+                basis=formula_basis(
+                    "共线点列的凸包退化成线段，最小面积外接矩形的短边随之为零，"
+                    "围不出面积。"
+                    f"门槛 {DEGENERATE_SHORT_M} m = 1 毫米，低于图纸与落库坐标的精度。",
+                    *_COLLINEAR_FORMULAS, base="impossible")))
 
     for element in line_like:
         length = element.length_m() or 0.0
@@ -279,10 +321,13 @@ def check_absurd_extent(model: PlausibilityModel) -> list[Finding]:
             detail=f"跨度 {extent:.2f} m，超出 {element.kind} 的工程上限 {ceiling} m",
             evidence={"long_side_m": extent, "limit_m": ceiling,
                       "ratio": extent / ceiling},
-            basis=f"{element.kind} 的单构件尺度上限 {ceiling} m 取自工程量级"
-                  "（codes.extent.max_by_kind_m，EMPIRICAL，逐条依据见该条 note）。这是量级判断不是规范条款，"
-                  "故只出 implausible：超限的通常是图框线、总图轮廓，"
-                  "或坐标变换出错把一张图摊到公里级。"))
+            basis=formula_basis(
+                f"{element.kind} 的单构件尺度上限 {ceiling} m 取自工程量级"
+                "（codes.extent.max_by_kind_m，EMPIRICAL，逐条依据见该条 note）。"
+                "面状构件的跨度按最小面积外接矩形的长边量，线状按路径长。"
+                "这是量级判断不是规范条款，故只出 implausible："
+                "超限的通常是图框线、总图轮廓，或坐标变换出错把一张图摊到公里级。",
+                *_EXTENT_FORMULAS)))
     return findings
 
 
@@ -307,9 +352,12 @@ def check_low_solidity(model: PlausibilityModel) -> list[Finding]:
             detail=f"实心度 {ratio:.2f} < {MIN_SOLIDITY}，轮廓被撕成异形",
             evidence={"solidity": ratio, "threshold": MIN_SOLIDITY,
                       "area_m2": geo.polygon_area(ring), "hull_area_m2": _hull_area(ring)},
-            basis="实心度 = 面积 ÷ 凸包面积。最凹的标准截面（肢厚 0.3 倍边长的"
-                  "L 形柱、十字形柱）实心度约 0.51，取 0.35 留余量。"
-                  "这是形态统计不是定理，故只出 suspect。"))
+            basis=formula_basis(
+                "最凹的标准截面（肢厚 0.3 倍边长的 L 形柱、十字形柱）实心度约 0.51，"
+                f"取 {MIN_SOLIDITY} 留余量。低于它的轮廓不对应任何标准截面形式。"
+                "自交环的面积本身不可信，已在上游排除，不进这条判据。"
+                "这是形态统计不是定理，故只出 suspect。",
+                *_SOLIDITY_FORMULAS)))
     return findings
 
 
@@ -383,9 +431,14 @@ def check_duplicate_element(model: PlausibilityModel) -> list[Finding]:
                               "overlap_m2": overlap, "area_a_m2": area_a,
                               "area_b_m2": area_b,
                               "threshold": DUPLICATE_OVERLAP_RATIO},
-                    basis="两个实体不能占据同一块平面位置。实测总图与分图画同一区域时"
-                          "同一根柱会被落库几遍，算量因此翻倍。"
-                          "重叠面积按凸包裁剪（偏大），故阈值取 0.9 这一明显量级。"))
+                    basis=formula_basis(
+                        "两个实体不能占据同一块平面位置。实测总图与分图画同一区域时"
+                        "同一根柱会被落库几遍，算量因此翻倍。"
+                        "Sutherland–Hodgman 只对**凸**裁剪多边形成立，而构件轮廓偶有"
+                        "凹形，实现里先取凸包再裁 —— **按凸包裁剪会高估重叠**，"
+                        f"故阈值定在明显的量级（{DUPLICATE_OVERLAP_RATIO:.0%}，"
+                        "意味着两者几乎是同一个形状），不拿它做精确面积。",
+                        *_DUPLICATE_FORMULAS)))
     return findings
 
 
@@ -396,17 +449,20 @@ RULES: dict[str, Rule] = {
         register(Rule(
             id="geom.self_intersecting_outline", title="轮廓自交（蝴蝶结）",
             scope="element", severity="impossible",
-            basis="鞋带公式只对简单多边形成立；自交环两瓣等值反号相消",
+            basis="鞋带公式只对简单多边形成立；自交环两瓣等值反号相消（"
+                  + formula_ref(*_SELF_INTERSECT_FORMULAS) + "）",
             check=check_self_intersecting)),
         register(Rule(
             id="geom.zero_area_with_extent", title="面积为零却有两向跨度",
             scope="element", severity="impossible",
-            basis="简单多边形两向有跨度则面积必为正",
+            basis="简单多边形两向有跨度则面积必为正（"
+                  + formula_ref(*_ZERO_AREA_FORMULAS) + "）",
             check=check_zero_area_with_extent)),
         register(Rule(
             id="geom.degenerate_outline", title="轮廓退化（点数不足或全共线）",
             scope="element", severity="impossible",
-            basis="多边形至少需要 3 个不共线的相异顶点",
+            basis="多边形至少需要 3 个不共线的相异顶点；共线判据取自最小面积"
+                  "外接矩形的短边（" + formula_ref(*_COLLINEAR_FORMULAS) + "）",
             check=check_degenerate_outline)),
         register(Rule(
             id="geom.non_positive_size", title="宽/厚/高非正",
@@ -416,17 +472,20 @@ RULES: dict[str, Rule] = {
         register(Rule(
             id="geom.absurd_extent", title="单构件尺度超出工程量级",
             scope="element", severity="implausible",
-            basis="按类的工程尺度上限（MAX_EXTENT_M，量纲/量级分析）",
+            basis="按类的工程尺度上限（codes.extent.max_by_kind_m，量级分析）；"
+                  "跨度口径 " + formula_ref(*_EXTENT_FORMULAS),
             check=check_absurd_extent)),
         register(Rule(
             id="geom.low_solidity", title="实心度过低（轮廓被撕成异形）",
             scope="element", severity="suspect",
-            basis="最凹的标准截面（L 形/十字形柱）实心度约 0.51",
+            basis="最凹的标准截面（L 形/十字形柱）实心度约 0.51（"
+                  + formula_ref(*_SOLIDITY_FORMULAS) + "）",
             check=check_low_solidity)),
         register(Rule(
             id="geom.duplicate_element", title="同层同类构件近乎完全重合",
             scope="element", severity="implausible",
-            basis="两个实体不能占据同一块平面位置；实测总图与分图重复落库",
+            basis="两个实体不能占据同一块平面位置；实测总图与分图重复落库。"
+                  "重叠面积按凸包裁剪会偏大（" + formula_ref(*_DUPLICATE_FORMULAS) + "）",
             check=check_duplicate_element)),
     )
 }

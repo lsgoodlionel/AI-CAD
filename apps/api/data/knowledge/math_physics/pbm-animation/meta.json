@@ -1,0 +1,38 @@
+{
+  "source": {
+    "key": "pbm-animation",
+    "filename": "Foundations of Physically Based Modeling and Animation (Donald H. House, John C. Keyser) (z-library.sk, 1lib.sk, z-lib.sk).epub",
+    "std_no": "KB-pbm-animation",
+    "title": "Foundations of Physically Based Modeling and Animation (House & Keyser)",
+    "kind": "textbook",
+    "discipline": "physics",
+    "pages": 36,
+    "extract_method": "epub",
+    "identified_by": "文件名 + PDF 文本层抽样（本批为电子版，非扫描件时文本层可直取）",
+    "priority": 1,
+    "supersedes": null,
+    "superseded_by": null,
+    "notes": "刚体、碰撞检测与相互穿透、数值积分 —— `support.interpenetration` 与几何核的上位依据。**按 EPUB spine 的「节」引用而不是页** ——EPUB 没有固定页，fitz 重排出来的页码随版面设置变，引不住。登记页数记 **36 节**（spine 实测）而不是 fitz 的 412 页 —— 按 412 登记会让统计报出「缺页 376」这种假警报。"
+  },
+  "root": "/Users/lionel/work/02 book/数理化",
+  "evidence": {
+    "sample_chars": [
+      972,
+      1646,
+      2525
+    ],
+    "container": "epub",
+    "fitz_reflowed_pages": 412,
+    "spine_sections": 36
+  },
+  "stats": {
+    "extracted_pages": 36,
+    "declared_pages": 36,
+    "missing_pages": [],
+    "char_count": 759680,
+    "mean_confidence": null,
+    "low_confidence_pages": [],
+    "near_empty_pages": [],
+    "ocr_dpi": 200
+  }
+}
