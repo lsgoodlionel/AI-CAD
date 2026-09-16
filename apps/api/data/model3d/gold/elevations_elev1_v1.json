@@ -1,0 +1,540 @@
+{
+  "version": 1,
+  "object_classes": [
+    "elevations_elev1"
+  ],
+  "units": [
+    {
+      "unit": "elev1-blank_control",
+      "source": {
+        "group": "blank_control"
+      },
+      "classes": {
+        "elevations_elev1": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "KP9X",
+              "ok": true,
+              "what": "",
+              "note": "红框内为空白，轴线交点在右侧。"
+            },
+            {
+              "ref": "YCVP",
+              "ok": true,
+              "what": "",
+              "note": "红框内没有数字或图形。"
+            },
+            {
+              "ref": "UURX",
+              "ok": true,
+              "what": "",
+              "note": "红框压在竖向轴线上，标高数字在左上方框外。"
+            },
+            {
+              "ref": "JXRR",
+              "ok": true,
+              "what": "",
+              "note": "红框内没有数值或图线。"
+            },
+            {
+              "ref": "H3EF",
+              "ok": true,
+              "what": "",
+              "note": "红框内空白，轴号5在上方框外。"
+            },
+            {
+              "ref": "HWXV",
+              "ok": true,
+              "what": "",
+              "note": "红框内穿过水平点划线，没有标高数字。"
+            },
+            {
+              "ref": "EJCM",
+              "ok": true,
+              "what": "",
+              "note": "红框内完全空白。"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#elevations",
+          "note": "原生分辨率裁图 + 分层抽样（7 层）+ 批内重测对。原始精确率 0.536，语料加权 0.862（覆盖语料 100%）；空白对照 7/7 通过；正对照 6/7 通过；重测一致率 1.0；编号 匹配 76 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "elev1-kept",
+      "source": {
+        "group": "kept"
+      },
+      "classes": {
+        "elevations_elev1": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "93WP",
+              "ok": true,
+              "what": "",
+              "note": "红框内可读4.800，旁有结构板文字及V形标高符号。"
+            },
+            {
+              "ref": "W4RF",
+              "ok": false,
+              "what": "note",
+              "note": "红框主要压在RJMJ1说明及引线上，下方标高为-5.850。"
+            },
+            {
+              "ref": "RHNH",
+              "ok": false,
+              "what": "other",
+              "note": "红框主要位于数值上方，仅截到31.366的上部笔画。"
+            },
+            {
+              "ref": "EAFJ",
+              "ok": true,
+              "what": "",
+              "note": "框内为14.900，下邻14.800（结构）并有标高符号。"
+            },
+            {
+              "ref": "N9LX",
+              "ok": false,
+              "what": "nothing",
+              "note": "红框处为空白，附近只有竖向虚线。"
+            },
+            {
+              "ref": "XCJC",
+              "ok": true,
+              "what": "",
+              "note": "梁配筋说明旁框内为竖排（+0.100）标高。"
+            },
+            {
+              "ref": "KEFR",
+              "ok": true,
+              "what": "",
+              "note": "框内为3.000，左上有三角形标高符号及引线。"
+            },
+            {
+              "ref": "YUHU",
+              "ok": false,
+              "what": "note",
+              "note": "框内是做法说明文字，下方墙身标高-3.900在框外。"
+            },
+            {
+              "ref": "CUJ4",
+              "ok": true,
+              "what": "",
+              "note": "红框内为10.900，下方有V形标高符号。"
+            },
+            {
+              "ref": "CVCX",
+              "ok": true,
+              "what": "",
+              "note": "框内为5.180，下方另列4.900并有标高符号。"
+            },
+            {
+              "ref": "AFFK",
+              "ok": true,
+              "what": "",
+              "note": "框内为49.540，下方有空心倒三角及引线。"
+            },
+            {
+              "ref": "EY93",
+              "ok": true,
+              "what": "",
+              "note": "绘景间文字下框内为5.400，配V形标高符号。"
+            },
+            {
+              "ref": "393V",
+              "ok": false,
+              "what": "nothing",
+              "note": "红框内空白，右侧为柱及结构线。"
+            },
+            {
+              "ref": "UCAV",
+              "ok": false,
+              "what": "other",
+              "note": "红框内只有水平构件轮廓线，没有数值。"
+            },
+            {
+              "ref": "E3ML",
+              "ok": true,
+              "what": "",
+              "note": "框内为-3.400，成组数值下写有软景库平台标高。"
+            },
+            {
+              "ref": "34RK",
+              "ok": true,
+              "what": "",
+              "note": "红框内为±0.000，左下有标高符号。"
+            },
+            {
+              "ref": "YKEH",
+              "ok": true,
+              "what": "",
+              "note": "框内为26.850，下有标高三角和大厅34.800说明。"
+            },
+            {
+              "ref": "U93M",
+              "ok": true,
+              "what": "",
+              "note": "框内为13.300，下方引线连接空心标高三角。"
+            },
+            {
+              "ref": "YXK3",
+              "ok": true,
+              "what": "",
+              "note": "框内为10.800，下方另列10.700（结构）。"
+            },
+            {
+              "ref": "WVVA",
+              "ok": true,
+              "what": "",
+              "note": "红框内为13.000，配有倒三角标高符号。"
+            },
+            {
+              "ref": "XAYR",
+              "ok": false,
+              "what": "value_mismatch",
+              "note": "框内属于洞顶标高20.790的数值，非0.790。"
+            },
+            {
+              "ref": "XAH9",
+              "ok": true,
+              "what": "",
+              "note": "框内清楚写8.800，左下有V形标高符号。"
+            },
+            {
+              "ref": "YH33",
+              "ok": false,
+              "what": "nothing",
+              "note": "框内空白，右侧9300尺寸数字在框外。"
+            },
+            {
+              "ref": "34YR",
+              "ok": false,
+              "what": "value_mismatch",
+              "note": "框内为-0.020标高，与+0.020正负号相反。"
+            },
+            {
+              "ref": "XHA9",
+              "ok": false,
+              "what": "nothing",
+              "note": "红框位于37.485标高上方，只有下边缘擦到数字顶部。"
+            },
+            {
+              "ref": "XFEA",
+              "ok": false,
+              "what": "nothing",
+              "note": "红框内空白，17.985及（17.900）标高位于右下方。"
+            },
+            {
+              "ref": "YWKY",
+              "ok": true,
+              "what": "",
+              "note": "红框内为18.600，下面是18.500（结构）及标高符号。"
+            },
+            {
+              "ref": "KCNY",
+              "ok": false,
+              "what": "note",
+              "note": "框内主要为走道文字，37.500标高在框下方。"
+            },
+            {
+              "ref": "LEXH",
+              "ok": true,
+              "what": "",
+              "note": "框内58.150对应下方空心三角标高引线。"
+            },
+            {
+              "ref": "ANLY",
+              "ok": false,
+              "what": "value_mismatch",
+              "note": "红框内清楚写-0.600，与右上角+0.600不同。"
+            },
+            {
+              "ref": "XAUL",
+              "ok": false,
+              "what": "note",
+              "note": "红框压在竣工图印章的项目负责人栏。"
+            },
+            {
+              "ref": "VHE9",
+              "ok": true,
+              "what": "",
+              "note": "框内为-0.020，并连接空心标高符号。"
+            },
+            {
+              "ref": "VFYU",
+              "ok": false,
+              "what": "dimension",
+              "note": "框内主要是1000尺寸的水平尺寸线，58.200标高在下方框外。"
+            },
+            {
+              "ref": "VL33",
+              "ok": true,
+              "what": "",
+              "note": "红框内为8.000，下方为7.900（结构）。"
+            },
+            {
+              "ref": "9WUJ",
+              "ok": true,
+              "what": "",
+              "note": "框内26.320配有标高符号，上方说明雨棚翻边标高。"
+            },
+            {
+              "ref": "PLFA",
+              "ok": false,
+              "what": "nothing",
+              "note": "红框内空白，9300尺寸在右下方框外。"
+            },
+            {
+              "ref": "9YWN",
+              "ok": false,
+              "what": "other",
+              "note": "红框压在管井边缘的重复小格构造上，22.500在右下框外。"
+            },
+            {
+              "ref": "REVK",
+              "ok": false,
+              "what": "other",
+              "note": "红框内为设备基础轮廓及引线，-17.100标高在右下框外。"
+            },
+            {
+              "ref": "9CWW",
+              "ok": true,
+              "what": "",
+              "note": "红框内可辨0.410及檐口文字，下有V形标高符号。"
+            },
+            {
+              "ref": "FFYE",
+              "ok": true,
+              "what": "",
+              "note": "框内2.900与上方空心三角形标高符号对应。"
+            },
+            {
+              "ref": "XMVY",
+              "ok": false,
+              "what": "value_mismatch",
+              "note": "红框内为-18.200，右上读数为+18.200。"
+            },
+            {
+              "ref": "XKMN",
+              "ok": true,
+              "what": "",
+              "note": "框内0.000前有缺字方框，旁有空心三角标高符号。"
+            },
+            {
+              "ref": "A9XW",
+              "ok": true,
+              "what": "",
+              "note": "框内2.680配有上方空心三角形及引线。"
+            },
+            {
+              "ref": "3FEE",
+              "ok": false,
+              "what": "value_mismatch",
+              "note": "完整引注为板顶标高-13.400，非+13.400。"
+            },
+            {
+              "ref": "L4W9",
+              "ok": true,
+              "what": "",
+              "note": "框内3.600前标F+，下方有标高符号。"
+            },
+            {
+              "ref": "HR9W",
+              "ok": false,
+              "what": "note",
+              "note": "红框内为女卫文字，5.985标高在右侧框外。"
+            },
+            {
+              "ref": "KVLK",
+              "ok": true,
+              "what": "",
+              "note": "框内为14.500，下方另列14.400（结构）。"
+            },
+            {
+              "ref": "FJ9L",
+              "ok": false,
+              "what": "nothing",
+              "note": "框内基本空白，46.485标高位于右侧框外。"
+            },
+            {
+              "ref": "FL9N",
+              "ok": false,
+              "what": "value_mismatch",
+              "note": "框边可读6.100，图上没有负号，与-6.100不同。"
+            },
+            {
+              "ref": "KM4U",
+              "ok": false,
+              "what": "note",
+              "note": "框内为柱顶标高文字，30.600数值在下方框外。"
+            },
+            {
+              "ref": "AXLE",
+              "ok": true,
+              "what": "",
+              "note": "表格中心标高栏内为-15.300，与红字一致。"
+            },
+            {
+              "ref": "MWCF",
+              "ok": false,
+              "what": "nothing",
+              "note": "红框内空白，9300尺寸数字在下方。"
+            },
+            {
+              "ref": "NA9M",
+              "ok": true,
+              "what": "",
+              "note": "机械控制机室框内为28.300，下方另有28.200（结构）。"
+            },
+            {
+              "ref": "EYLJ",
+              "ok": true,
+              "what": "",
+              "note": "框内0.000与上方空心三角形标高符号相连，前缀显示缺字方框。"
+            },
+            {
+              "ref": "PXAJ",
+              "ok": false,
+              "what": "nothing",
+              "note": "红框主要为空白，仅下边缘擦到-0.350数字顶部。"
+            },
+            {
+              "ref": "HLL4",
+              "ok": true,
+              "what": "",
+              "note": "框内16.100与+16.1等值，下方另列15.500（结构）。"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#elevations",
+          "note": "原生分辨率裁图 + 分层抽样（7 层）+ 批内重测对。原始精确率 0.536，语料加权 0.862（覆盖语料 100%）；空白对照 7/7 通过；正对照 6/7 通过；重测一致率 1.0；编号 匹配 76 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "elev1-retest_dup",
+      "source": {
+        "group": "retest_dup"
+      },
+      "classes": {
+        "elevations_elev1": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "PENC",
+              "ok": true,
+              "what": "",
+              "note": "重测副本，原格 WVVA；框内为13.000，下方连接倒三角标高符号。"
+            },
+            {
+              "ref": "9KAJ",
+              "ok": true,
+              "what": "",
+              "note": "重测副本，原格 KEFR；红框内3.000对应左上方三角形标高引线。"
+            },
+            {
+              "ref": "VM34",
+              "ok": false,
+              "what": "nothing",
+              "note": "重测副本，原格 393V；框内是空白，结构线及带叉柱块位于框外。"
+            },
+            {
+              "ref": "E4LL",
+              "ok": false,
+              "what": "note",
+              "note": "重测副本，原格 W4RF；红框主要压在RJMJ1说明引线上，-5.850标高在下缘之外。"
+            },
+            {
+              "ref": "VR4E",
+              "ok": false,
+              "what": "value_mismatch",
+              "note": "重测副本，原格 ANLY；框内为-0.600，与+0.600符号相反。"
+            },
+            {
+              "ref": "PW4E",
+              "ok": true,
+              "what": "",
+              "note": "重测副本，原格 XAH9；框内8.800清晰，左下连接V形标高符号。"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#elevations",
+          "note": "原生分辨率裁图 + 分层抽样（7 层）+ 批内重测对。原始精确率 0.536，语料加权 0.862（覆盖语料 100%）；空白对照 7/7 通过；正对照 6/7 通过；重测一致率 1.0；编号 匹配 76 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "elev1-positive_control",
+      "source": {
+        "group": "positive_control"
+      },
+      "classes": {
+        "elevations_elev1": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "EPXL",
+              "ok": true,
+              "what": "",
+              "note": "框内为4.000，左侧有空心三角形标高符号。"
+            },
+            {
+              "ref": "UY3J",
+              "ok": true,
+              "what": "",
+              "note": "红框内为23.600，下方另列23.500（结构）。"
+            },
+            {
+              "ref": "FXLJ",
+              "ok": true,
+              "what": "",
+              "note": "屋面上空文字下框内为26.200，配V形标高符号。"
+            },
+            {
+              "ref": "WJPN",
+              "ok": true,
+              "what": "",
+              "note": "框内2.800对应上方空心三角形标高符号。"
+            },
+            {
+              "ref": "AF3A",
+              "ok": true,
+              "what": "",
+              "note": "控制室文字下框内为4.800，配V形标高符号。"
+            },
+            {
+              "ref": "9JX9",
+              "ok": false,
+              "what": "dimension",
+              "note": "框内写9300，无小数点，位于水平尺寸线上。"
+            },
+            {
+              "ref": "MNWR",
+              "ok": true,
+              "what": "",
+              "note": "框内34.900对应右下方V形标高符号。"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#elevations",
+          "note": "原生分辨率裁图 + 分层抽样（7 层）+ 批内重测对。原始精确率 0.536，语料加权 0.862（覆盖语料 100%）；空白对照 7/7 通过；正对照 6/7 通过；重测一致率 1.0；编号 匹配 76 / 纠正 0 / 编造 0。"
+        }
+      }
+    }
+  ]
+}
