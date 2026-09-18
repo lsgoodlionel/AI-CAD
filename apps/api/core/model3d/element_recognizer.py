@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import re
 
+from .dedupe import merge_collinear, merge_overlapping
 from .dense_array_filter import find_dense_array_flags
 from .drawing_conventions import shows_plan_cut_sections
 from .geometry_extractor import MAX_PRIMITIVES, budget_for
@@ -634,10 +635,20 @@ def _downsample_ring(poly: list, limit: int) -> list:
     return repair_ring([poly[i] for i in sorted(keep)[:limit]])
 
 
-#: 做去重的类别。**板不在其内**：`_slab_from_columns` 造的包络板本就
-#: 套着真实板，那是合理嵌套。实测重复率——柱 44%/32%、设备 38%/43%、
-#: 板 19%/14%（大歌剧院/轨道交通），只对有证据的两类动手。
-_DEDUPE_KINDS = ("columns", "equipment")
+#: 做去重的类别 → 去重方式。**板不在其内**：`_slab_from_columns` 造的
+#: 包络板本就套着真实板，那是合理嵌套。实测重复率——柱 44%/32%、设备
+#: 38%/43%、板 19%/14%（大歌剧院/轨道交通），只对有证据的类动手。
+#:
+#: **梁、墙是 2026-09-18 补的**：它们只有中心线没有轮廓，按轮廓取范围时
+#: 全部原样放行 —— 歌剧院 v86 的 5555 根梁里 3037 根与同图另一根重合，
+#: 同一条中心线叠 4/8/16 份（边线在 PDF 里被重画几遍，配对就配出几根）。
+#: 见 `tests/test_linear_dedupe.py`。
+_DEDUPE_KINDS = {
+    "columns": merge_overlapping,
+    "equipment": merge_overlapping,
+    "beams": merge_collinear,
+    "walls": merge_collinear,
+}
 
 
 #: 埋件布置图：图上画的是预埋钢板，方形预埋件正好落在柱的尺寸区间。
@@ -661,12 +672,10 @@ def _drop_duplicate_elements(result: "FloorElements") -> None:
     `services/model_qto.py` 是 `for column in columns` 逐个累加体积的，
     同一根柱出现 N 次，混凝土量与模板面积就乘 N，而算量喂给创效提案。
     """
-    from .dedupe import merge_overlapping
-
-    for kind in _DEDUPE_KINDS:
+    for kind, merge in _DEDUPE_KINDS.items():
         items = getattr(result, kind, None)
         if items:
-            setattr(result, kind, merge_overlapping(items))
+            setattr(result, kind, merge(items))
 
 
 def _find_columns(
