@@ -1,0 +1,110 @@
+code	group	stratum	drawing_id	drawing_candidates	sheet	dup_of	capped	crop_pt	title
+4YAW	kept	第二工程·structure	51f8f9ed-c0e6-4e40-b371-c4d16c9d4423	15	S1		0	685.3,627.5,1128.6,1070.8	屋顶结构平面图
+JKXK	gated	第二工程·structure	51f8f9ed-c0e6-4e40-b371-c4d16c9d4423	2	S1		0	1000.2,1257.8,1454.4,1712.0	屋顶结构平面图
+YMRX	gated	第二工程·general	a2961455-ab8d-4206-880b-f2f40b49dcde	129	S1		0	1495.2,1381.6,1637.0,1523.4	定位放大平面图一
+YUP4	gated	第二工程·decoration	95f0fe7b-f066-439b-a7bd-89568c83450a	14	S1		0	863.8,580.9,1014.1,731.2	4F平面布置图
+CLJV	kept	歌剧院·structure	b2ec6f33-91a2-4fdd-b0e1-45e084d4fb48	2	S1		0	1429.9,289.2,1571.6,430.9	05 第二阶段工况平面图
+AMXF	gated	第二工程·architecture	057cd70f-45f1-4cd0-80a8-091812f794f5	822	S1		1	423.0,904.7,463.0,944.7	七层防火分区平面图
+RMML	kept	歌剧院·architecture	645fbe73-4c4f-44fa-b058-d48d3165487a	91	S1		0	1371.6,1258.3,1513.4,1400.1	建筑-竣工图--一层防火分区图
+KF3K	blank	第二工程·structure	25b20a96-9b16-4b39-b487-12a59c9418be	-1	S1		1	924.4,628.1,964.4,668.1	底板换撑平面布置图
+NJPH	kept	第二工程·general	a2961455-ab8d-4206-880b-f2f40b49dcde	17	S1		0	1090.1,251.2,1231.9,392.9	定位放大平面图一
+FKYJ	gated	第二工程·architecture	372a5f7f-350a-4b7a-abd8-92018a3a0552	109	S1		0	979.4,257.1,1121.2,398.8	八层平面图
+4UM4	dup	第二工程·decoration	cb8ac229-59c9-4aa9-8fe0-1a5a8d8efba2	50	S1	AHEK	0	1891.8,1148.2,2033.5,1289.9	5F平面布置图
+HNAV	kept	歌剧院·structure	b2ec6f33-91a2-4fdd-b0e1-45e084d4fb48	2	S1		0	1471.3,326.8,1613.0,468.6	05 第二阶段工况平面图
+VYVE	gated	第二工程·structure	8c63dfc5-3263-4930-bb0b-e175ff5776ec	4	S2		0	66.9,488.7,633.8,1055.7	围护体平面布置图
+94MJ	blank	歌剧院·architecture	0fc2b9d0-1101-41e5-a726-7cd2a34922fc	-1	S2		0	995.0,624.1,1136.8,765.8	建筑-竣工图--四层隔声隔振平面图（二）
+FPAV	gated	歌剧院·architecture	1302ab12-e473-47eb-96ba-e040c2d29914	80	S2		0	1967.9,820.2,2109.6,961.9	建筑-竣工图--三层隔声隔振平面图（二）
+FK3K	kept	歌剧院·architecture	0599d70b-b3b9-431f-9565-6570a96abbea	95	S2		0	2037.0,918.9,2178.7,1060.6	建筑-竣工图--扇形屋盖排水组织平面图（五）
+KFKX	gated	第二工程·architecture	612b6efa-546d-43cc-b523-f2b0cfefbeb0	2	S2		0	185.7,396.6,327.5,538.3	S--九层平面图
+3WJY	gated	第二工程·general	2d548e18-bbb2-4602-8f79-88bb97ec57d3	47	S2		0	598.2,716.3,739.9,858.0	下木配置平面图
+FNWK	kept	歌剧院·structure	9cb85984-6716-47b3-b836-90c709c0bffc	28	S2		0	1963.5,127.9,2105.3,269.7	结构-竣工图--北区（小歌剧厅）地下二层墙柱平面分区图 （二）
+VYRA	kept	第二工程·structure	25b20a96-9b16-4b39-b487-12a59c9418be	20	S2		1	1169.5,1221.8,1209.5,1261.8	底板换撑平面布置图
+49VP	kept	歌剧院·architecture	efd4f65a-455f-4ce6-8edb-a35be65bc25f	29	S2		0	714.3,2124.3,856.0,2266.0	建筑-竣工图--四层平面图(三)
+YX4N	kept	第二工程·architecture	47e2d5c9-a23f-4236-87d6-993fbfbea45a	42	S2		0	185.7,422.8,327.4,564.5	S--五层平面图
+CCFJ	dup	第二工程·architecture	372a5f7f-350a-4b7a-abd8-92018a3a0552	122	S2	VEPJ	0	2740.4,890.6,2882.2,1032.4	八层平面图
+AUJ3	gated	第二工程·structure	a0e03f61-c58b-448e-a74d-37fd903d9434	91	S2		1	1513.2,581.4,1553.2,621.4	第三道支撑平面布置图
+L9AK	kept	第二工程·decoration	8eb82252-5dbf-4c2b-9f13-2e28e717fa52	57	S3		0	1382.4,815.8,1532.7,966.1	6F平面布置图
+HNH3	gated	第二工程·structure	ddbeab1f-a2f3-4945-aa21-162474617514	87	S3		0	517.3,465.0,659.0,606.7	底板结构平面图
+YHEE	kept	歌剧院·structure	7a7a01a4-0d23-40e2-b98d-6b875bab7c81	66	S3		0	1529.2,1272.9,1671.0,1414.7	结构-竣工图--南区（大、中歌剧厅）一层楼座结构平面图
+VL33	kept	第二工程·decoration	8eb82252-5dbf-4c2b-9f13-2e28e717fa52	57	S3		0	2266.3,1174.2,2416.6,1324.5	6F平面布置图
+H3PR	gated	歌剧院·structure	b2ec6f33-91a2-4fdd-b0e1-45e084d4fb48	16	S3		0	948.9,974.2,1112.6,1138.0	05 第二阶段工况平面图
+JLL9	kept	第二工程·structure	ddbeab1f-a2f3-4945-aa21-162474617514	57	S3		0	1760.0,680.8,1901.7,822.6	底板结构平面图
+LEHV	kept	歌剧院·structure	f9467861-1908-45c5-a374-d819f1fed223	63	S3		0	503.7,1101.1,645.4,1242.8	结构-竣工图--南区（大、中歌剧厅）三层楼座结构平面图
+JUJE	blank	歌剧院·structure	7a7a01a4-0d23-40e2-b98d-6b875bab7c81	-1	S3		0	973.6,676.0,1115.4,817.7	结构-竣工图--南区（大、中歌剧厅）一层楼座结构平面图
+Y4KA	kept	第二工程·general	419ebf3e-03bc-45a4-8030-894810a3abac	60	S3		0	1004.1,946.9,1145.8,1088.6	上木配置平面图
+HKM4	kept	第二工程·general	419ebf3e-03bc-45a4-8030-894810a3abac	60	S3		0	573.2,872.0,714.9,1013.7	上木配置平面图
+KNLE	gated	第二工程·decoration	2ebf8820-e4ca-4287-8bac-be1129202265	75	S3		1	1947.2,201.7,1987.2,241.7	负3F卫生间平面放大图
+WWUA	kept	第二工程·general	9c2d458f-7c24-4180-843a-8638642ce379	4	S4		1	63.3,282.2,103.3,322.2	灯具放大平面图二
+RMLK	gated	第二工程·general	9c2d458f-7c24-4180-843a-8638642ce379	3	S4		1	2085.2,1566.4,2125.2,1606.4	灯具放大平面图二
+E3RP	gated	歌剧院·architecture	742f2841-0f11-4150-b4ea-73719538655c	58	S4		0	1528.3,384.5,1670.0,526.3	建筑-竣工图--二层平面图(四)
+FERY	kept	第二工程·structure	25b20a96-9b16-4b39-b487-12a59c9418be	20	S4		1	2101.3,1138.9,2141.3,1178.9	底板换撑平面布置图
+9P3K	dup	第二工程·decoration	95f0fe7b-f066-439b-a7bd-89568c83450a	69	S4	WFXU	0	2505.3,1187.8,2655.5,1338.1	4F平面布置图
+FXYW	gated	歌剧院·structure	53955b6e-a29e-43fa-b180-70e538533f24	15	S4		0	1738.2,2041.3,1832.7,2135.8	结构-竣工图--北区（小歌剧厅）二层墙柱平面图
+3L9F	blank	歌剧院·mep	efaec02d-4163-4636-aa01-240318581590	-1	S4		0	952.0,406.3,1093.7,548.0	给排水-竣工图--五层喷淋抗震支架平面图（一）
+FVMH	gated	第二工程·architecture	372a5f7f-350a-4b7a-abd8-92018a3a0552	109	S4		0	815.7,624.1,957.4,765.9	八层平面图
+AKR3	kept	第二工程·general	9c2d458f-7c24-4180-843a-8638642ce379	4	S4		1	2042.4,1578.8,2082.4,1618.8	灯具放大平面图二
+4XJ4	kept	第二工程·decoration	2a3a3a59-b53c-4708-99a9-30d88ecbd2ae	96	S4		0	2995.5,518.1,3137.2,659.8	8F钢结构转换支架平面图
+YCVP	gated	歌剧院·architecture	0599d70b-b3b9-431f-9565-6570a96abbea	9	S4		0	1558.9,940.1,1700.6,1081.8	建筑-竣工图--扇形屋盖排水组织平面图（五）
+JYFH	gated	第二工程·general	376379fa-a86f-4e38-bf2b-e287498b3ee8	3	S4		1	2085.2,203.4,2125.2,243.4	灯具放大平面图一
+APRC	gated	第二工程·structure	8c63dfc5-3263-4930-bb0b-e175ff5776ec	4	S5		0	592.1,250.6,1159.0,817.6	围护体平面布置图
+EPHY	kept	第二工程·decoration	2a3a3a59-b53c-4708-99a9-30d88ecbd2ae	96	S5		0	3136.5,1166.5,3278.3,1308.2	8F钢结构转换支架平面图
+MHNC	kept	第二工程·structure	194f877d-cf7a-466a-8376-c10fbda0baff	52	S5		0	50.9,695.3,523.3,1167.7	九层结构平面图
+F3AA	gated	第二工程·general	e3875c84-33b6-46f6-b4ef-3826124c3a78	180	S5		0	2019.0,579.9,2101.7,662.6	灯具放大平面图三
+WUEM	gated	第二工程·decoration	4c8d46c3-fcf4-4edf-863d-0c38e57ff9b9	514	S5		0	1544.9,833.6,1686.6,975.4	7F平面布置图
+XCLF	gated	第二工程·decoration	8eb82252-5dbf-4c2b-9f13-2e28e717fa52	382	S5		0	3858.9,567.3,4009.1,717.6	6F平面布置图
+FHXE	gated	第二工程·general	a2961455-ab8d-4206-880b-f2f40b49dcde	129	S5		0	44.0,815.9,185.7,957.6	定位放大平面图一
+RLKH	gated	歌剧院·architecture	6b446732-1ded-4e95-bc5f-38c93cc029de	161	S5		0	2127.9,368.0,2269.6,509.7	建筑-竣工图--一层完整平面图
+CFMU	kept	第二工程·architecture	34402d80-a408-4f21-b8fe-b3ab79d3a7c2	37	S5		0	336.4,367.1,478.1,508.8	二层埋件布置图
+FLRC	kept	歌剧院·architecture	742f2841-0f11-4150-b4ea-73719538655c	81	S5		0	1421.1,781.0,1562.9,922.8	建筑-竣工图--二层平面图(四)
+MPMK	kept	第二工程·decoration	7ffab564-ad5f-4ef0-86c0-fea242d48c9f	4	S6		1	1882.6,1178.0,1923.0,1218.4	8F电梯厅-前厅平面放大图
+NH4R	gated	歌剧院·architecture	6b446732-1ded-4e95-bc5f-38c93cc029de	161	S6		0	2205.1,1740.5,2346.8,1882.2	建筑-竣工图--一层完整平面图
+WFXU	kept	第二工程·decoration	95f0fe7b-f066-439b-a7bd-89568c83450a	69	S6		0	2505.3,1187.8,2655.5,1338.1	4F平面布置图
+E3VU	gated	第二工程·architecture	daa18df0-8f45-47bf-9e8e-26b01668f61e	125	S6		0	2061.5,336.4,2144.1,419.0	竖向放大平面图三
+WVKV	kept	第二工程·general	376379fa-a86f-4e38-bf2b-e287498b3ee8	13	S6		1	1154.8,1295.8,1194.8,1335.8	灯具放大平面图一
+EVNH	gated	第二工程·decoration	6ea40b15-3a0f-4a3f-ad2a-0cc16e57d6b7	3	S6		0	1790.7,96.8,1932.4,238.5	负3F转换梯门厅平面放大图
+V3L3	gated	歌剧院·structure	0ca8f4ae-68a7-478c-833b-144b78e30e92	70	S6		0	657.4,1075.8,751.9,1170.3	结构-竣工图--南区（大、中歌剧厅）一层结构平面图（三）
+VJ4Y	kept	歌剧院·structure	0ca8f4ae-68a7-478c-833b-144b78e30e92	211	S6		0	1862.2,682.6,1956.7,777.1	结构-竣工图--南区（大、中歌剧厅）一层结构平面图（三）
+4MYE	kept	歌剧院·structure	53955b6e-a29e-43fa-b180-70e538533f24	64	S6		0	941.9,1832.0,1036.3,1926.5	结构-竣工图--北区（小歌剧厅）二层墙柱平面图
+99RN	dup	歌剧院·structure	f9467861-1908-45c5-a374-d819f1fed223	63	S6	WWYH	0	2840.1,838.0,2981.8,979.7	结构-竣工图--南区（大、中歌剧厅）三层楼座结构平面图
+M4V9	gated	第二工程·structure	8411a4be-ed45-4fd1-b9dd-9df1fa4cd2e1	57	S6		1	1026.3,828.2,1066.3,868.2	第四道支撑平面布置图
+ANFU	kept	第二工程·structure	ddbeab1f-a2f3-4945-aa21-162474617514	57	S7		0	677.7,914.2,819.4,1055.9	底板结构平面图
+WWYH	kept	歌剧院·structure	f9467861-1908-45c5-a374-d819f1fed223	63	S7		0	2840.1,838.0,2981.8,979.7	结构-竣工图--南区（大、中歌剧厅）三层楼座结构平面图
+HFXE	kept	歌剧院·architecture	6b446732-1ded-4e95-bc5f-38c93cc029de	86	S7		0	1824.2,87.2,1965.9,228.9	建筑-竣工图--一层完整平面图
+4FKL	gated	第二工程·decoration	2a3a3a59-b53c-4708-99a9-30d88ecbd2ae	6	S7		0	1116.2,990.8,1257.9,1132.6	8F钢结构转换支架平面图
+X4VK	gated	歌剧院·architecture	742f2841-0f11-4150-b4ea-73719538655c	58	S7		0	2511.7,1118.8,2653.4,1260.6	建筑-竣工图--二层平面图(四)
+ELER	gated	第二工程·decoration	cb8ac229-59c9-4aa9-8fe0-1a5a8d8efba2	522	S7		0	3187.0,968.4,3328.7,1110.1	5F平面布置图
+UNHJ	kept	第二工程·general	e3875c84-33b6-46f6-b4ef-3826124c3a78	54	S7		0	1601.6,787.0,1684.2,869.6	灯具放大平面图三
+N9KW	gated	歌剧院·structure	f9467861-1908-45c5-a374-d819f1fed223	20	S7		0	1153.2,143.1,1295.0,284.8	结构-竣工图--南区（大、中歌剧厅）三层楼座结构平面图
+9AVU	kept	歌剧院·architecture	742f2841-0f11-4150-b4ea-73719538655c	81	S7		0	1110.5,1469.7,1252.2,1611.4	建筑-竣工图--二层平面图(四)
+APPA	kept	第二工程·structure	a0e03f61-c58b-448e-a74d-37fd903d9434	39	S7		1	1399.2,691.4,1439.2,731.4	第三道支撑平面布置图
+CNM4	kept	第二工程·architecture	80311035-37c4-465d-8450-7b25e693dbca	43	S8		0	316.8,358.7,458.6,500.4	S--四层平面图
+NXRX	blank	第二工程·general	9c2d458f-7c24-4180-843a-8638642ce379	-1	S8		1	852.5,1049.6,892.5,1089.6	灯具放大平面图二
+UNVW	gated	歌剧院·architecture	efd4f65a-455f-4ce6-8edb-a35be65bc25f	34	S8		0	622.1,1862.3,763.8,2004.0	建筑-竣工图--四层平面图(三)
+F434	kept	第二工程·architecture	47e2d5c9-a23f-4236-87d6-993fbfbea45a	42	S8		0	185.7,358.7,327.4,500.4	S--五层平面图
+VMAC	kept	第二工程·general	e3875c84-33b6-46f6-b4ef-3826124c3a78	54	S8		0	1468.1,663.1,1590.6,785.6	灯具放大平面图三
+W3PC	gated	第二工程·general	376379fa-a86f-4e38-bf2b-e287498b3ee8	3	S8		1	2085.2,193.0,2125.2,233.0	灯具放大平面图一
+WJXW	gated	第二工程·general	e3875c84-33b6-46f6-b4ef-3826124c3a78	180	S8		0	74.5,745.7,157.1,828.3	灯具放大平面图三
+93NJ	kept	第二工程·architecture	057cd70f-45f1-4cd0-80a8-091812f794f5	29	S8		1	803.1,816.6,843.1,856.6	七层防火分区平面图
+E394	kept	歌剧院·architecture	6b446732-1ded-4e95-bc5f-38c93cc029de	86	S8		0	1502.8,1246.8,1644.5,1388.5	建筑-竣工图--一层完整平面图
+YJCE	blank	第二工程·decoration	6ea40b15-3a0f-4a3f-ad2a-0cc16e57d6b7	-1	S8		0	1193.9,445.2,1335.6,586.9	负3F转换梯门厅平面放大图
+HACJ	dup	歌剧院·structure	7a7a01a4-0d23-40e2-b98d-6b875bab7c81	66	S8	YHEE	0	1529.2,1272.9,1671.0,1414.7	结构-竣工图--南区（大、中歌剧厅）一层楼座结构平面图
+U34L	gated	第二工程·structure	25b20a96-9b16-4b39-b487-12a59c9418be	32	S9		1	2217.7,1138.2,2257.7,1178.2	底板换撑平面布置图
+AJ4F	kept	第二工程·architecture	2fdd53e7-d62b-42bd-a51b-bfade845db23	33	S9		0	1310.8,1200.1,1393.4,1282.7	索引放大平面图三
+KXMN	gated	歌剧院·structure	bde4bd42-d65f-45a1-b946-f51f70fe4a8b	2	S9		0	2189.0,1109.8,2283.4,1204.3	结构-竣工图--南区（大、中歌剧厅）大歌剧厅四~四夹层大歌剧厅墙配筋平面图
+AHEK	kept	第二工程·decoration	cb8ac229-59c9-4aa9-8fe0-1a5a8d8efba2	50	S9		0	1891.8,1148.2,2033.5,1289.9	5F平面布置图
+JNKA	kept	歌剧院·architecture	1302ab12-e473-47eb-96ba-e040c2d29914	85	S9		0	1679.3,1496.4,1821.0,1638.1	建筑-竣工图--三层隔声隔振平面图（二）
+3VXJ	gated	第二工程·decoration	6ea40b15-3a0f-4a3f-ad2a-0cc16e57d6b7	3	S9		0	1790.7,107.2,1932.4,249.0	负3F转换梯门厅平面放大图
+RCJ3	blank	第二工程·mep	d9949438-0b8c-4f76-b071-f8edef3514a3	-1	S9		0	1027.1,398.0,1168.8,539.7	二层电力平面图
+3U4L	gated	歌剧院·structure	7a7a01a4-0d23-40e2-b98d-6b875bab7c81	10	S9		0	1277.3,384.3,1419.1,526.0	结构-竣工图--南区（大、中歌剧厅）一层楼座结构平面图
+LAWC	kept	第二工程·architecture	612b6efa-546d-43cc-b523-f2b0cfefbeb0	28	S9		0	185.7,332.5,327.5,474.2	S--九层平面图
+NNMK	kept	第二工程·decoration	7ffab564-ad5f-4ef0-86c0-fea242d48c9f	4	S9		1	1583.2,211.7,1623.5,252.1	8F电梯厅-前厅平面放大图
+JNF3	gated	歌剧院·architecture	645fbe73-4c4f-44fa-b058-d48d3165487a	292	S10		0	1544.2,614.4,1685.9,756.1	建筑-竣工图--一层防火分区图
+KLJ4	gated	第二工程·architecture	612b6efa-546d-43cc-b523-f2b0cfefbeb0	2	S10		0	180.8,381.3,322.5,523.0	S--九层平面图
+49PL	gated	第二工程·architecture	2fdd53e7-d62b-42bd-a51b-bfade845db23	189	S10		0	1353.3,463.5,1436.0,546.1	索引放大平面图三
+JAPX	gated	第二工程·architecture	34402d80-a408-4f21-b8fe-b3ab79d3a7c2	3	S10		0	378.0,424.0,519.7,565.8	二层埋件布置图
+RWHN	kept	第二工程·structure	194f877d-cf7a-466a-8376-c10fbda0baff	52	S10		0	1984.1,456.2,2456.6,928.6	九层结构平面图
+MVLM	blank	第二工程·architecture	47e2d5c9-a23f-4236-87d6-993fbfbea45a	-1	S10		0	156.5,160.1,298.2,301.8	S--五层平面图
+VEPJ	kept	第二工程·architecture	372a5f7f-350a-4b7a-abd8-92018a3a0552	122	S10		0	2740.4,890.6,2882.2,1032.4	八层平面图
+NJH4	gated	歌剧院·structure	bde4bd42-d65f-45a1-b946-f51f70fe4a8b	2	S10		0	2189.0,1156.4,2283.4,1250.9	结构-竣工图--南区（大、中歌剧厅）大歌剧厅四~四夹层大歌剧厅墙配筋平面图
+FVNJ	gated	歌剧院·structure	d3cb117c-bc71-4dbc-8edb-7eb955f587d4	84	S10		1	686.0,1891.5,726.0,1931.5	结构-竣工图--南区（大、中歌剧厅）地下二层夹层（-10.3m）结构图（三）
+UH9X	gated	第二工程·structure	a0e03f61-c58b-448e-a74d-37fd903d9434	91	S10		1	2184.3,1151.1,2224.3,1191.1	第三道支撑平面布置图

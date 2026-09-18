@@ -23,6 +23,7 @@ from services import (
     model_story_manual,
 )
 from services.element_validation import element_validation
+from services import model_plausibility
 from services.model_qto import compute_rebar_quantities
 from services.model_semantics import SemanticHierarchyError, SemanticVersionConflict
 from tasks.model_build import build_project_model
@@ -411,6 +412,43 @@ async def get_model_quantities(
         else {"project": model_qto_summary.summarize([]), "by_floor": [], "by_building": []}
     )
     return {"success": True, "data": data, "error": None, "meta": {"scope": "scene"}}
+
+
+@router.get("/{project_id}/model/plausibility")
+async def get_model_plausibility(
+    project_id: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """现实合理性分析的**最近一次**结果（数学/物理/几何/规范下限）。
+
+    只读，不即时重算 —— 重算走 POST。这样两次打开页面看到的是同一份数，
+    也不会让一个 GET 悄悄做重活。没跑过时 `data` 为 null，由前端提示去跑。
+    """
+    data = await model_plausibility.latest_report(db, project_id)
+    return {"success": True, "data": data, "error": None,
+            "meta": {"analyzed": data is not None}}
+
+
+@router.post("/{project_id}/model/plausibility/run", status_code=201)
+async def run_model_plausibility(
+    project_id: str,
+    request: Request,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """对当前模型跑一遍合理性分析并落库。模型未构建时 404。"""
+    data = await model_plausibility.run_for_project(db, project_id)
+    if data is None:
+        raise HTTPException(404, "MODEL_NOT_BUILT")
+    await write_audit(
+        db, user_id=current_user["id"], action="model.plausibility.run",
+        resource="project_model", resource_id=project_id,
+        new_state={"counts": data.get("counts"), "model_version": data.get("model_version"),
+                   "rules": len(data.get("rules") or [])},
+        ip_address=request.client.host if request.client else None,
+    )
+    return {"success": True, "data": data, "error": None, "meta": None}
 
 
 class QtoToProposalBody(BaseModel):

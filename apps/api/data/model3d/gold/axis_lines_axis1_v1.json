@@ -1,0 +1,479 @@
+{
+  "version": 1,
+  "object_classes": [
+    "axis_lines_axis1"
+  ],
+  "units": [
+    {
+      "unit": "axis1-kept",
+      "source": {
+        "group": "kept"
+      },
+      "classes": {
+        "axis_lines_axis1": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "WJKJ",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与贯穿房间、两端经过柱块的细竖向点划线重合。"
+            },
+            {
+              "ref": "HFYF",
+              "ok": false,
+              "what": "hatch",
+              "note": "红虚线与密集斜向填充线重合。"
+            },
+            {
+              "ref": "AECF",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与从图边延伸的竖向点划轴线重合。"
+            },
+            {
+              "ref": "WVVA",
+              "ok": true,
+              "what": "",
+              "note": "红虚线压在标有12的竖向轴线和轴号圆圈上。"
+            },
+            {
+              "ref": "HR9W",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与B轴的横向点划线重合，轴号圆圈在左侧。"
+            },
+            {
+              "ref": "FPAV",
+              "ok": true,
+              "what": "",
+              "note": "红虚线沿建筑内部竖向点划线贯穿，墙柱沿线排列。"
+            },
+            {
+              "ref": "RLPM",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与横向细点划轴线重合，穿过柱和结构线。"
+            },
+            {
+              "ref": "A9XW",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与竖向点划轴线对齐，穿过墙柱布置。"
+            },
+            {
+              "ref": "R3WE",
+              "ok": false,
+              "what": "other",
+              "note": "红虚线压在斜向网格细线，未显示轴线端头或构件沿线排列。"
+            },
+            {
+              "ref": "X9NF",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与贯穿多层构件的竖向点划线重合。"
+            },
+            {
+              "ref": "RHNH",
+              "ok": true,
+              "what": "",
+              "note": "红虚线压在贯穿图面的竖向点划轴线，柱墙沿线设置。"
+            },
+            {
+              "ref": "VJMK",
+              "ok": false,
+              "what": "other",
+              "note": "红虚线沿一条斜向细线，缺少轴号及轴网特征。"
+            },
+            {
+              "ref": "RNUU",
+              "ok": false,
+              "what": "wall",
+              "note": "红虚线压在粗灰色墙体的竖边。"
+            },
+            {
+              "ref": "XYWJ",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与贯穿会议室、桌椅排列两侧的竖向点划线重合。"
+            },
+            {
+              "ref": "3FEE",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与图中竖向点划轴线重合，向上下延伸。"
+            },
+            {
+              "ref": "EUME",
+              "ok": false,
+              "what": "nothing",
+              "note": "红虚线斜穿白色空白区，附近没有对应图线。"
+            },
+            {
+              "ref": "34RK",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与纵向点划轴线重合，贯穿上空区域。"
+            },
+            {
+              "ref": "9JX9",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与竖向点划轴线重合，贯穿灰色构件上下。"
+            },
+            {
+              "ref": "CUJ4",
+              "ok": false,
+              "what": "dimension",
+              "note": "红虚线压在横向尺寸线及其短刻度线上。"
+            },
+            {
+              "ref": "9KAJ",
+              "ok": true,
+              "what": "",
+              "note": "红虚线沿竖向点划轴线，经过轴号5圆圈并延伸出建筑。"
+            },
+            {
+              "ref": "AFFK",
+              "ok": false,
+              "what": "hatch",
+              "note": "红虚线压在大范围斜向填充图案上。"
+            },
+            {
+              "ref": "AF3A",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与贯穿电梯及墙体排列的竖向轴线重合。"
+            },
+            {
+              "ref": "VKJH",
+              "ok": true,
+              "what": "",
+              "note": "红虚线压在标有9的竖向点划轴线。"
+            },
+            {
+              "ref": "VL33",
+              "ok": true,
+              "what": "",
+              "note": "红虚线沿建筑分区的竖向点划轴线，穿过墙柱。"
+            },
+            {
+              "ref": "PXAJ",
+              "ok": false,
+              "what": "wall",
+              "note": "红虚线压在灰色设备房墙体内部，不是细轴线。"
+            },
+            {
+              "ref": "93WP",
+              "ok": false,
+              "what": "wall",
+              "note": "红虚线沿粗实心黑色竖墙线。"
+            },
+            {
+              "ref": "RAPC",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与贯穿设备和座椅区域的竖向点划线重合。"
+            },
+            {
+              "ref": "EML3",
+              "ok": true,
+              "what": "",
+              "note": "红虚线为贯穿前厅的竖向细点划轴线，柱沿线设置。"
+            },
+            {
+              "ref": "NA9M",
+              "ok": false,
+              "what": "frame",
+              "note": "红虚线位于图纸最下边框附近，横向压在图框线处。"
+            },
+            {
+              "ref": "FL9N",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与顶端轴号圆圈下的竖向点划线重合。"
+            },
+            {
+              "ref": "XKMN",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与竖向点划轴线对齐，穿过灰色建筑轮廓并经柱块。"
+            },
+            {
+              "ref": "F9FJ",
+              "ok": false,
+              "what": "dimension",
+              "note": "红虚线压在横向尺寸线与尺寸界线交汇处。"
+            },
+            {
+              "ref": "KEFR",
+              "ok": true,
+              "what": "",
+              "note": "红虚线对应9与10轴号间的竖向点划定位轴线。"
+            },
+            {
+              "ref": "U4HW",
+              "ok": false,
+              "what": "pipe",
+              "note": "红虚线压在DN25等管线标注及竖向管线附近。"
+            },
+            {
+              "ref": "VR4E",
+              "ok": false,
+              "what": "other",
+              "note": "红虚线虽竖直但贴着构造边线，未见完整贯穿轴线。"
+            },
+            {
+              "ref": "YHFF",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与标有1的竖向点划轴线重合，上方有轴号圆圈。"
+            },
+            {
+              "ref": "AXLE",
+              "ok": false,
+              "what": "other",
+              "note": "红虚线压在斜向构件底边及多个三角端点上。"
+            },
+            {
+              "ref": "XRR3",
+              "ok": false,
+              "what": "dimension",
+              "note": "红虚线压在构造大样的竖向尺寸界线。"
+            },
+            {
+              "ref": "XFMK",
+              "ok": false,
+              "what": "other",
+              "note": "红虚线斜压在场地图的斜向虚线网格上，未见构件沿线排列。"
+            },
+            {
+              "ref": "EJCM",
+              "ok": false,
+              "what": "other",
+              "note": "红虚线穿过建筑细部与说明线，未见清晰贯穿的点划轴线。"
+            },
+            {
+              "ref": "VM34",
+              "ok": false,
+              "what": "hatch",
+              "note": "红虚线压在扇形区域的密集弧形填充线。"
+            },
+            {
+              "ref": "E4LL",
+              "ok": false,
+              "what": "hatch",
+              "note": "红虚线与圆形楼梯的放射状踏步填充线相交。"
+            },
+            {
+              "ref": "YKEH",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与连接柱块、标有7至9轴号的横向轴线重合。"
+            },
+            {
+              "ref": "REVK",
+              "ok": false,
+              "what": "other",
+              "note": "红虚线压在楼梯和构件轮廓的中部，未见贯穿轴线。"
+            },
+            {
+              "ref": "49YV",
+              "ok": false,
+              "what": "nothing",
+              "note": "红虚线斜穿白色空白区域，没有对应线。"
+            },
+            {
+              "ref": "EAFJ",
+              "ok": false,
+              "what": "other",
+              "note": "红虚线穿过设备表与图面分隔区域，不具备轴线特征。"
+            },
+            {
+              "ref": "EY93",
+              "ok": false,
+              "what": "other",
+              "note": "红虚线压在菱形构件的边线附近，不是贯穿轴网。"
+            },
+            {
+              "ref": "KVLK",
+              "ok": false,
+              "what": "other",
+              "note": "红虚线经过局部旋转构造和细线，未见定位轴线端头。"
+            },
+            {
+              "ref": "FRYP",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与贯穿楼梯及构件排列的竖向点划轴线一致。"
+            },
+            {
+              "ref": "9CWW",
+              "ok": false,
+              "what": "wall",
+              "note": "红虚线压在粗灰色墙体的竖边上。"
+            },
+            {
+              "ref": "JFFR",
+              "ok": false,
+              "what": "hatch",
+              "note": "红虚线覆盖大面积斜线填充区域，未见清晰轴线。"
+            },
+            {
+              "ref": "MNWR",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与贯穿墙柱布置的竖向点划轴线重合。"
+            },
+            {
+              "ref": "EPXL",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与12号定位轴线的竖向点划线重合。"
+            },
+            {
+              "ref": "UY3J",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与11号竖向点划轴线一致，贯穿上部尺寸线和建筑。"
+            },
+            {
+              "ref": "KP9X",
+              "ok": true,
+              "what": "",
+              "note": "红虚线压在带12号圆圈的竖向点划定位轴线。"
+            },
+            {
+              "ref": "NLXR",
+              "ok": true,
+              "what": "",
+              "note": "红虚线与1号圆圈对应的竖向点划轴线重合。"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#axis_lines",
+          "note": "原生分辨率裁图 + 分层抽样（7 层）+ 批内重测对。原始精确率 0.536，语料加权 0.462（覆盖语料 100%）；空白对照 6/7 通过；重测一致率 1.0；编号 匹配 69 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "axis1-blank_control",
+      "source": {
+        "group": "blank_control"
+      },
+      "classes": {
+        "axis_lines_axis1": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "393V",
+              "ok": false,
+              "what": "other",
+              "note": "红虚线压在斜向贯穿的细点划轴线上，灰色柱沿线布置。"
+            },
+            {
+              "ref": "KMRJ",
+              "ok": true,
+              "what": "",
+              "note": "红虚线位于白色空白处，没有可见线条。"
+            },
+            {
+              "ref": "XHA9",
+              "ok": true,
+              "what": "",
+              "note": "红虚线在图纸下部空白区域，实际轴线在上方远处。"
+            },
+            {
+              "ref": "EYLJ",
+              "ok": true,
+              "what": "",
+              "note": "红虚线在空白区域，底部的墙线与其不重合。"
+            },
+            {
+              "ref": "XCJC",
+              "ok": true,
+              "what": "",
+              "note": "红虚线落在空白区域，图名文字在右上方。"
+            },
+            {
+              "ref": "JNEY",
+              "ok": true,
+              "what": "",
+              "note": "红虚线位于空白区域，没有任何对应图线。"
+            },
+            {
+              "ref": "MWCF",
+              "ok": true,
+              "what": "",
+              "note": "红虚线落在空白处，仅有一条不重合的斜向细线。"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#axis_lines",
+          "note": "原生分辨率裁图 + 分层抽样（7 层）+ 批内重测对。原始精确率 0.536，语料加权 0.462（覆盖语料 100%）；空白对照 6/7 通过；重测一致率 1.0；编号 匹配 69 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "axis1-retest_dup",
+      "source": {
+        "group": "retest_dup"
+      },
+      "classes": {
+        "axis_lines_axis1": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "YWKY",
+              "ok": false,
+              "what": "other",
+              "note": "重测副本，原格 VJMK；红虚线压在室内斜向细线，未见贯穿轴网特征。"
+            },
+            {
+              "ref": "AWWM",
+              "ok": false,
+              "what": "hatch",
+              "note": "重测副本，原格 HFYF；红虚线与密集斜向填充线重叠。"
+            },
+            {
+              "ref": "34NH",
+              "ok": false,
+              "what": "nothing",
+              "note": "重测副本，原格 49YV；红虚线在白色空白区域斜向通过。"
+            },
+            {
+              "ref": "LLJ9",
+              "ok": true,
+              "what": "",
+              "note": "重测副本，原格 UY3J；红虚线与贯穿厨房及上方尺寸标注的竖向点划轴线一致。"
+            },
+            {
+              "ref": "ULPN",
+              "ok": false,
+              "what": "hatch",
+              "note": "重测副本，原格 AFFK；红虚线压在密集斜向填充图案上。"
+            },
+            {
+              "ref": "JXRR",
+              "ok": true,
+              "what": "",
+              "note": "重测副本，原格 VKJH；红虚线与9号轴线的竖向点划线完全重合。"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#axis_lines",
+          "note": "原生分辨率裁图 + 分层抽样（7 层）+ 批内重测对。原始精确率 0.536，语料加权 0.462（覆盖语料 100%）；空白对照 6/7 通过；重测一致率 1.0；编号 匹配 69 / 纠正 0 / 编造 0。"
+        }
+      }
+    }
+  ]
+}

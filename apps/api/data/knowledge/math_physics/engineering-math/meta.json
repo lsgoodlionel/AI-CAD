@@ -1,0 +1,60 @@
+{
+  "source": {
+    "key": "engineering-math",
+    "filename": "Modern Engineering Mathematics (Abul Hasan Siddiqi, Mohamed Al-Lawati etc.) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
+    "std_no": "KB-engineering-math",
+    "title": "Modern Engineering Mathematics (Siddiqi & Al-Lawati)",
+    "kind": "textbook",
+    "discipline": "math",
+    "pages": 851,
+    "extract_method": "text_layer",
+    "identified_by": "文件名 + PDF 文本层抽样（本批为电子版，非扫描件时文本层可直取）",
+    "priority": 2,
+    "supersedes": null,
+    "superseded_by": null,
+    "notes": "向量分析、微分方程、数值方法。梁的挠曲微分方程与量纲分析可在此取证。"
+  },
+  "root": "/Users/lionel/work/02 book/数理化",
+  "evidence": {
+    "sample_chars": [
+      1510,
+      1650,
+      962
+    ]
+  },
+  "stats": {
+    "extracted_pages": 851,
+    "declared_pages": 851,
+    "missing_pages": [],
+    "char_count": 1143125,
+    "mean_confidence": null,
+    "low_confidence_pages": [],
+    "near_empty_pages": [
+      0,
+      1,
+      2,
+      6,
+      20,
+      22,
+      24,
+      136,
+      138,
+      272,
+      358,
+      360,
+      412,
+      466,
+      468,
+      544,
+      622,
+      650,
+      674,
+      756,
+      794,
+      824,
+      826,
+      846
+    ],
+    "ocr_dpi": 200
+  }
+}

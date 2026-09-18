@@ -272,10 +272,10 @@ def test_real_gold_dir_passes_schema_check(real_files):
 
 @pytest.mark.unit
 def test_real_totals_match_the_blueprint(real_files):
-    """1358 条裁决 —— 盘点文档的总数（09-15 并入六类批次后；此前 22 个文件 / 1096 条）。"""
+    """1650 条裁决（09-16 并入 col4 / elev1 / axis1 / anch2 后；此前 1358 条）。"""
     rep = build_report(real_files)
-    assert rep.total_verdicts == 1358
-    assert rep.total_files == 28
+    assert rep.total_verdicts == 1650
+    assert rep.total_files == 32
 
 
 @pytest.mark.unit
@@ -310,6 +310,22 @@ def test_real_class_rates_match_the_blueprint(real_files):
     assert got["pipes_pipe3"] == (3, 26, 0, 18)
     assert got["equipment_equip3"] == (3, 26, 0, 18)
     assert got["slabs_slab3"] == (3, 61, 4, 53)
+    # 2026-09-16 柱孤立度闸的验证批：主组 29/53 = 55%，与 col3 的 2/53 差九倍 ——
+    # **两批不可比**，col3 是系统性少判（见 GOLD_STANDARD_REVIEW 第五节）。
+    # 闸的结论只在本批内部比：闸保留 25/48，闸删组 14/48 被判为真柱（误删）。
+    assert got["columns_col4"] == (4, 109, 29, 53)
+    # 2026-09-16 标高批：**首批两个方向都验到**（空白对照 7/7 + 正对照 6/7）。
+    # 主组 33/62；样本内 30/56 = 54%，语料加权 86%，但 71% 的权重压在一个
+    # 只有 8 格的层上，且两个层受红框偏移混淆 —— 见 GOLD_STANDARD_REVIEW 第七节。
+    assert got["elevations_elev1"] == (4, 76, 33, 62)
+    # 2026-09-16 轴线批：**没有正对照**，只体检了「多判」一个方向；
+    # 而 26 条否定里 13 条判读者自称没把握、且**无一条判成轴线** ——
+    # 数字系统性偏低。可引用区间 46%~70%，见 GOLD_STANDARD_REVIEW 第八节。
+    assert got["axis_lines_axis1"] == (3, 69, 32, 62)
+    # 2026-09-16 坐标锚点：18/18，**首批带偏移对照**（8 格挪开的标记全被否掉，
+    # 其中 2 格是靠轴号识破的「隔壁交点」）。n=18 是全库可用总体的**全部**，
+    # 不是抽样；验的是位置，身份只在轴号可见时验到。见 REVIEW 第九节。
+    assert got["world_anchors_anch2"] == (4, 38, 20, 20)
 
 
 @pytest.mark.unit
@@ -320,16 +336,16 @@ def test_blueprint_table_is_missing_the_walls_v1_row(real_files):
     表是不全的。补表之前，任何按那张表求和的结论都会少 47 条。
     """
     rated = [r for r in class_reports(real_files) if r.has_rate]
-    # 09-15 并入六类批次后为 1358 / 1311（此前 1096 / 1049）
-    assert sum(r.verdicts for r in rated) == 1358
-    assert sum(r.verdicts for r in rated if r.object_class != "walls") == 1311
+    # 09-16 并入 col4 + elev1 + axis1 + anch2 后为 1650 / 1603（09-15 是 1358 / 1311）
+    assert sum(r.verdicts for r in rated) == 1650
+    assert sum(r.verdicts for r in rated if r.object_class != "walls") == 1603
 
 
 @pytest.mark.unit
 def test_real_misdetection_total(real_files):
-    """727 条误检（09-15 并入六类批次后；此前 559）—— 与盘点文档一致。"""
+    """826 条误检（锚点批零误检，故与并入 axis1 后持平；09-15 是 727）。"""
     summary = taxonomy_summary(real_files)
-    assert summary.total == 727
+    assert summary.total == 826
     assert summary.unmapped == {}, f"未登记的 what 写法：{summary.unmapped}"
 
 
@@ -360,18 +376,18 @@ def test_markdown_report_renders_the_standing_metrics(real_files):
     md = render_markdown(build_report(real_files))
     for heading in ("分类汇总", "图纸级两极分化", "误检归一", "判据回指"):
         assert heading in md
-    assert "1358" in md
+    assert "1650" in md
 
 
 @pytest.mark.unit
 def test_patch_sheet_is_declared_and_not_double_counted(real_files):
     """`patch_verdicts_v1.json` 的 120 行已逐条并入 `verdicts_v1.json`。
 
-    把它当成金标准文件再数一遍，总数会从 1358 虚增到 1478。
+    把它当成金标准文件再数一遍，总数会从 1650 虚增到 1770。
     """
     raw = json.loads((gold_dir() / "patch_verdicts_v1.json").read_text("utf-8"))
     assert raw["kind"] == "raw_judgement_sheet"
     assert raw["materialized_in"] == "verdicts_v1.json"
     assert "patch_verdicts_v1.json" in RAW_SHEETS
     assert len(raw["results"]) == 120
-    assert build_report(real_files).total_verdicts == 1358
+    assert build_report(real_files).total_verdicts == 1650

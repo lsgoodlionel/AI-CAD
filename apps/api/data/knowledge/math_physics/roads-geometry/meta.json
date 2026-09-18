@@ -1,0 +1,44 @@
+{
+  "source": {
+    "key": "roads-geometry",
+    "filename": "Roads to Geometry, 3rd Edition (Edward C. Wallace, Stephen F. West) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
+    "std_no": "KB-roads-geometry",
+    "title": "Roads to Geometry, 3rd Edition (Wallace & West)",
+    "kind": "textbook",
+    "discipline": "geometry",
+    "pages": 532,
+    "extract_method": "text_layer",
+    "identified_by": "文件名 + PDF 文本层抽样（本批为电子版，非扫描件时文本层可直取）",
+    "priority": 1,
+    "supersedes": null,
+    "superseded_by": null,
+    "notes": "公理几何 + 解析几何。凸性、点与多边形的关系、度量的定义在此。"
+  },
+  "root": "/Users/lionel/work/02 book/数理化",
+  "evidence": {
+    "sample_chars": [
+      1269,
+      1913,
+      2073
+    ]
+  },
+  "stats": {
+    "extracted_pages": 532,
+    "declared_pages": 532,
+    "missing_pages": [],
+    "char_count": 937269,
+    "mean_confidence": null,
+    "low_confidence_pages": [],
+    "near_empty_pages": [
+      0,
+      2,
+      3,
+      7,
+      13,
+      17,
+      528,
+      531
+    ],
+    "ocr_dpi": 200
+  }
+}

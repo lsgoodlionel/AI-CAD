@@ -1,0 +1,312 @@
+{
+  "version": 1,
+  "object_classes": [
+    "world_anchors_anch2"
+  ],
+  "units": [
+    {
+      "unit": "anch2-shifted_control",
+      "source": {
+        "group": "shifted_control"
+      },
+      "classes": {
+        "world_anchors_anch2": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "VR3C",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心落在红色图签表格附近，不是轴线交点。"
+            },
+            {
+              "ref": "AF3A",
+              "ok": true,
+              "what": "",
+              "note": "红十字主要压在一条竖向线附近，中心没有两条轴线相交。"
+            },
+            {
+              "ref": "MWY4",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心落在红色图签区域内，不是建筑轴线交点。"
+            },
+            {
+              "ref": "JUPL",
+              "ok": true,
+              "what": "",
+              "note": "红十字落在结构轴网附近的另一处交会位置，不是右上角标注的 45xB 交点。"
+            },
+            {
+              "ref": "JKFW",
+              "ok": true,
+              "what": "",
+              "note": "红十字附近有轴网线交会，但不是右上角标注的 2xB 交点。"
+            },
+            {
+              "ref": "LR4Y",
+              "ok": true,
+              "what": "",
+              "note": "红十字在图签和建筑平面线附近，中心没有明确轴线交点。"
+            },
+            {
+              "ref": "NHUJ",
+              "ok": true,
+              "what": "",
+              "note": "红十字压在构件/墙边附近，中心没有两条定位轴线相交。"
+            },
+            {
+              "ref": "AN4L",
+              "ok": true,
+              "what": "",
+              "note": "红十字在房间和墙体附近，中心未见明确轴线交点。"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#world_anchors",
+          "note": "原生分辨率裁图 + 分层抽样（5 层）+ 批内重测对。原始精确率 1.000，语料加权 1.000（覆盖语料 92%）；空白对照 10/10 通过；偏移对照 8/8 通过；重测一致率 1.0；编号 匹配 38 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "anch2-kept",
+      "source": {
+        "group": "kept"
+      },
+      "classes": {
+        "world_anchors_anch2": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "4XCW",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心位于平面图内两条轴线交会处，格内看不到清晰轴号。"
+            },
+            {
+              "ref": "NVY4",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心落在水平轴线与竖向轴线交点处，格内看不到清晰轴号。"
+            },
+            {
+              "ref": "HAJN",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心落在水平轴线与斜向轴线交点处，周围可见结构轴网。"
+            },
+            {
+              "ref": "3JVX",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心落在结构轴网交点处，周围可见斜向和正交轴网线。"
+            },
+            {
+              "ref": "3NFN",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心压在水平轴线与竖向轴线交点处，交点被构件局部覆盖。"
+            },
+            {
+              "ref": "CEFK",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心压在结构轴网交点上，附近能看到斜向轴网和构件。"
+            },
+            {
+              "ref": "4U3L",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心落在水平轴线和竖向轴线的交点上，交点被柱/墙线部分覆盖。"
+            },
+            {
+              "ref": "XU9K",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心落在水平轴线与竖向轴线交点处，交点被矩形构件覆盖。"
+            },
+            {
+              "ref": "YKKM",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心落在水平轴线和竖向轴线交点上，格内看不到清晰轴号。"
+            },
+            {
+              "ref": "LKPF",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心落在水平轴线与竖向轴线交点处，格内看不到清晰轴号。"
+            },
+            {
+              "ref": "X4LA",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心位于结构轴网交点处，周围可见轴线和构件沿线排列。"
+            },
+            {
+              "ref": "CUYN",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心落在水平轴线与竖向轴线交点处，格内看不到清晰轴号。"
+            },
+            {
+              "ref": "L3FL",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心位于水平轴线和斜向轴线的交点上。"
+            },
+            {
+              "ref": "XF93",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心压在水平轴线与竖向轴线交点处，格内看不到清晰轴号。"
+            },
+            {
+              "ref": "NH3P",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心落在两条轴线的交点处，交点附近有墙柱覆盖。"
+            },
+            {
+              "ref": "EEEK",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心落在桩位轴网交点处，交点被圆形桩位符号覆盖。"
+            },
+            {
+              "ref": "P3WC",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心压在水平轴线和竖向轴线交点上，图签边线覆盖在附近。"
+            },
+            {
+              "ref": "KMKA",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心压在水平轴线与竖向轴线交点处，格内看不到清晰轴号。"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#world_anchors",
+          "note": "原生分辨率裁图 + 分层抽样（5 层）+ 批内重测对。原始精确率 1.000，语料加权 1.000（覆盖语料 92%）；空白对照 10/10 通过；偏移对照 8/8 通过；重测一致率 1.0；编号 匹配 38 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "anch2-blank_control",
+      "source": {
+        "group": "blank_control"
+      },
+      "classes": {
+        "world_anchors_anch2": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "X9YP",
+              "ok": true,
+              "what": "",
+              "note": "红十字附近只有很淡的网格线，未见明确的定位轴线交点。"
+            },
+            {
+              "ref": "J3Y4",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心在空白处，远处有斜线和水平线但没有在中心相交。"
+            },
+            {
+              "ref": "HARX",
+              "ok": true,
+              "what": "",
+              "note": "红十字落在几乎空白的区域，中心没有轴线或交点。"
+            },
+            {
+              "ref": "C34Y",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心在空白区域，附近只有边界线，没有轴线交点。"
+            },
+            {
+              "ref": "UWAK",
+              "ok": true,
+              "what": "",
+              "note": "红十字落在空白处，中心没有轴线交点。"
+            },
+            {
+              "ref": "Y9MF",
+              "ok": true,
+              "what": "",
+              "note": "红十字靠近一条竖向轴线，但中心没有水平轴线与之相交。"
+            },
+            {
+              "ref": "VELE",
+              "ok": true,
+              "what": "",
+              "note": "红十字附近有边界线和斜向线，但中心没有明确两条轴线交点。"
+            },
+            {
+              "ref": "RLUP",
+              "ok": true,
+              "what": "",
+              "note": "红十字中心在空白区域，旁边只有远离中心的斜线和虚线。"
+            },
+            {
+              "ref": "XFEA",
+              "ok": true,
+              "what": "",
+              "note": "红十字压在竖向轴线和轴号圈附近，但中心不在两条轴线交点上。"
+            },
+            {
+              "ref": "3KVY",
+              "ok": true,
+              "what": "",
+              "note": "红十字落在空白区域，中心没有轴线或轴线交点。"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#world_anchors",
+          "note": "原生分辨率裁图 + 分层抽样（5 层）+ 批内重测对。原始精确率 1.000，语料加权 1.000（覆盖语料 92%）；空白对照 10/10 通过；偏移对照 8/8 通过；重测一致率 1.0；编号 匹配 38 / 纠正 0 / 编造 0。"
+        }
+      }
+    },
+    {
+      "unit": "anch2-retest_dup",
+      "source": {
+        "group": "retest_dup"
+      },
+      "classes": {
+        "world_anchors_anch2": {
+          "method": "verdicts",
+          "verdicts": [
+            {
+              "ref": "3P3H",
+              "ok": true,
+              "what": "",
+              "note": "重测副本，原格 CEFK；红十字中心位于结构轴网交点处，旁边可见轴网和构件沿线布置。"
+            },
+            {
+              "ref": "F3KK",
+              "ok": true,
+              "what": "",
+              "note": "重测副本，原格 L3FL；红十字中心位于水平轴线和斜向轴线交点处，周边构件沿轴网布置。"
+            }
+          ],
+          "confidence": 1.0,
+          "verified_by": [
+            "gpt"
+          ],
+          "criteria": "CRITERIA.md#world_anchors",
+          "note": "原生分辨率裁图 + 分层抽样（5 层）+ 批内重测对。原始精确率 1.000，语料加权 1.000（覆盖语料 92%）；空白对照 10/10 通过；偏移对照 8/8 通过；重测一致率 1.0；编号 匹配 38 / 纠正 0 / 编造 0。"
+        }
+      }
+    }
+  ]
+}

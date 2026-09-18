@@ -1,6 +1,10 @@
 /**
  * 审校模式右栏面板（D-13/D-14）：审校收件箱（符号+成果审校合并，默认展开）
  * + 语义树候选 + 楼层归属 + 楼层标高校正。四个常驻面板，逐项对应原两个队列的全部动作。
+ *
+ * 另加「现实合理性」：前几个面板看的是**与图纸比对得对不对**（要人判读、有滞后），
+ * 它看的是**在现实世界里立不立得住**（纯计算、建完模当场就有）。两者互补，
+ * 所以并排放在审校模式里，而不是塞进质量面板的某个角落。
  */
 import { Tag } from 'antd'
 import HelpTip from '@/components/HelpTip'
@@ -10,6 +14,7 @@ import UnifiedReviewInbox from '../review/UnifiedReviewInbox'
 import SemanticCandidateQueue from '../review/SemanticCandidateQueue'
 import FloorAssignmentQueue from '../review/FloorAssignmentQueue'
 import ComponentReviewQueue from '../ComponentReviewQueue'
+import PlausibilityPanel from '../PlausibilityPanel'
 import ReviewHub from '@/components/ReviewHub'
 import type { SymbolDrawingOption } from '../review/reviewInbox'
 import type {
@@ -56,6 +61,11 @@ export default function ReviewModePanels({
   return (
     <>
       <ReviewHub projectId={projectId} compact />
+      <CollapsiblePanel
+        title={<>现实合理性<HelpTip content="用数学/物理/几何与规范下限检查模型能不能在现实里存在：轮廓自交、构件悬浮、层高为负、方量超出工程量级等。纯计算，每次建模后自动跑一次。跑不了的规则会单独列出——缺数据不等于通过。" anchor="现实合理性" /></>}
+      >
+        <PlausibilityPanel projectId={projectId} />
+      </CollapsiblePanel>
       <CollapsiblePanel
         title={<>构件核对<HelpTip content="实体中心装配(Phase H)产出的低置信构件按置信升序排队,显示来源图纸/识别途径,人工确认/否定/改类。人审动作翻转 review_state 并写埋点,驱动模型收敛(auto→confirmed 单调上升)。" anchor="H-构件核对" /></>}
         defaultOpen

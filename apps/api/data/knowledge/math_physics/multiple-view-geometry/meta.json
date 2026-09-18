@@ -1,0 +1,35 @@
+{
+  "source": {
+    "key": "multiple-view-geometry",
+    "filename": "Multiple View Geometry in Computer Vision (Richard Hartley) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
+    "std_no": "KB-multiple-view-geometry",
+    "title": "Multiple View Geometry in Computer Vision (Hartley & Zisserman)",
+    "kind": "textbook",
+    "discipline": "geometry",
+    "pages": 672,
+    "extract_method": "text_layer",
+    "identified_by": "文件名 + PDF 文本层抽样（本批为电子版，非扫描件时文本层可直取）",
+    "priority": 2,
+    "supersedes": null,
+    "superseded_by": null,
+    "notes": "射影/仿射变换、RANSAC、鲁棒估计 —— 图纸配准（相似变换 + RANSAC，实测 19% 粗差下最小二乘 RMSE 72.5m）那条链路的上位依据。"
+  },
+  "root": "/Users/lionel/work/02 book/数理化",
+  "evidence": {
+    "sample_chars": [
+      2687,
+      1483,
+      506
+    ]
+  },
+  "stats": {
+    "extracted_pages": 672,
+    "declared_pages": 672,
+    "missing_pages": [],
+    "char_count": 1598421,
+    "mean_confidence": null,
+    "low_confidence_pages": [],
+    "near_empty_pages": [],
+    "ocr_dpi": 200
+  }
+}

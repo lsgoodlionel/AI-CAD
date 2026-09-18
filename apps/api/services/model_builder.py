@@ -977,6 +977,13 @@ async def _attach_floor_elements(
         floor["consensus_aligned"] = int(meta.get("consensus_aligned") or 0)
         # 被同层分图替代、没参与识别的总图（services.sheet_series）
         floor["superseded_overviews"] = list(meta.get("superseded_overviews") or [])
+        # **每图的反算参数**（米坐标 → 页面点：scale_m_pt / origin_pt / page_h
+        # + 已施加的位移 shift_m + 是否被世界坐标摆放过）。
+        # 没有它，模型就叠不回图纸核对 —— 存量 v85 正是如此：重跑识别时
+        # 识别代码已经变过（09-15 接入图框印刷比例），反算出来整体错位。
+        # 这里必须**显式挑**进 floor：meta 的字段不挑等于没算（本文件上方
+        # 那条注释记的就是这个坑）。
+        floor["element_frames"] = dict(meta.get("frames") or {})
         # 层内坐标系矛盾（用户第 3 项）：补上楼层名后挂到楼层，供 scene.quality
         # 汇总与前端展示 —— **降级必须可见**，不能默默退回局部。
         floor["_recognize_timeouts"] = int(meta.get("timeouts") or 0)

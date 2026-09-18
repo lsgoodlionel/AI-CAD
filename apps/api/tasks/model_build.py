@@ -169,6 +169,20 @@ async def _do_build(project_id: str) -> dict:
         except Exception as exc:  # noqa: BLE001 — 装配失败仅告警,不影响建模
             logger.warning("H4 实体装配/入库失败: %s", exc)
 
+        # ── 现实合理性分析 —— 建完就体检一次 ───────────────────────
+        # 为什么放在这里：它是**纯计算**（数学/物理/几何/规范下限），不需要
+        # 人判读，也不需要外部服务，所以每次建模都能跑；识别精确率要等金标准
+        # 判读回来才知道，而「这根柱轮廓自交、这块板方量是真实量级的十倍」
+        # 当场就能算出来。失败只告警：它是体检，不是建模主流程。
+        try:
+            from services.model_plausibility import run_for_project
+            result = await run_for_project(db, project_id)
+            if result is not None:
+                logger.info("合理性分析: project_id=%s version=%s 结论=%s",
+                            project_id, version, result.get("counts"))
+        except Exception as exc:  # noqa: BLE001 — 体检失败仅告警，不影响建模
+            logger.warning("合理性分析失败: %s", exc)
+
         # ── 发射 model.built 管线事件（D-08） ──────────────────────
         # try/except 包裹：事件编排层是自动化增强，发射失败绝不能影响建模主流程。
         try:

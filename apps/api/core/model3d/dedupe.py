@@ -8,6 +8,7 @@
 可以远低于阈值而逃脱。实测柱框有 14%~20% 被更大的框实质包含，
 最严重一图 95%（381/400）。判据必须同时看 IoU 与包含。
 """
+from typing import Callable
 
 #: 小框有九成面积落在大框内即视为同一构件
 CONTAINED_FRACTION = 0.9
@@ -48,17 +49,52 @@ def _bbox(outline) -> tuple | None:
     return (min(xs), min(ys), max(xs), max(ys))
 
 
-def merge_overlapping(elements: list | None, **thresholds) -> list:
-    """合并指向同一构件的重复项，**保留面积最大的那个真实轮廓**。
+#: 中心线端点在另一方向上的偏差不超过这个值才算「轴对齐」（米）。
+#: 平行线配对产出的梁/墙恒轴对齐；斜的另有来源，不拿包围盒判。
+AXIS_ALIGNED_TOL_M = 0.01
+
+
+def outline_box(element) -> tuple | None:
+    """柱、设备：按真实轮廓取包围盒。"""
+    return _bbox(element.get("outline") if isinstance(element, dict) else None)
+
+
+def segment_box(element) -> tuple | None:
+    """梁、墙：中心线 `path` 按 `width` 加厚后的范围。
+
+    **只认轴对齐的**：斜构件的轴对齐包围盒远大于它本身，两根交叉的
+    斜梁包围盒几乎重合 —— 拿它判会把两根不同的梁合成一根。斜的返回
+    None，照「轮廓残缺」原样放行。
+    """
+    if not isinstance(element, dict):
+        return None
+    path = [p for p in (element.get("path") or []) if p is not None and len(p) >= 2]
+    width = element.get("width")
+    if len(path) != 2 or width is None or float(width) <= 0:
+        return None
+    (x0, y0), (x1, y1) = ((float(p[0]), float(p[1])) for p in path)
+    half = float(width) / 2
+    if abs(y0 - y1) <= AXIS_ALIGNED_TOL_M:
+        y = (y0 + y1) / 2
+        return (min(x0, x1), y - half, max(x0, x1), y + half)
+    if abs(x0 - x1) <= AXIS_ALIGNED_TOL_M:
+        x = (x0 + x1) / 2
+        return (x - half, min(y0, y1), x + half, max(y0, y1))
+    return None
+
+
+def merge_overlapping(elements: list | None, *,
+                      box_of: Callable[[dict], tuple | None] = outline_box,
+                      **thresholds) -> list:
+    """合并指向同一构件的重复项，**保留面积最大的那个真实几何**。
 
     保留真实轮廓而非合成包围盒：算量吃的是轮廓，把八边形柱换成
-    外接矩形会让面积抬高约 27%。
+    外接矩形会让面积抬高约 27%。线状构件留最长的那根（面积最大）。
 
-    轮廓残缺（点数 < 3）的构件原样保留 —— 去重不该顺手丢数据。
+    `box_of` 取不出范围（轮廓残缺、斜构件）的原样保留 —— 去重不该顺手丢数据。
     """
     items = list(elements or [])
-    boxes = [_bbox(e.get("outline") if isinstance(e, dict) else None)
-             for e in items]
+    boxes = [box_of(e) for e in items]
     usable = [i for i, b in enumerate(boxes) if b is not None]
 
     parent = {i: i for i in usable}
@@ -91,3 +127,17 @@ def merge_overlapping(elements: list | None, **thresholds) -> list:
                  for members in groups.values()}
     return [e for i, e in enumerate(items)
             if boxes[i] is None or i in survivors]
+
+
+def merge_collinear(elements: list | None) -> list:
+    """梁、墙去重：**只合并被另一根几乎整段包住的那根**，不看 IoU。
+
+    柱的判据里「IoU > 0.1」对线状构件是错的：同一轴线上部分重叠的两段
+    （0~8m 与 4~12m，IoU = 1/3）会被合成一段、丢掉 4 米长度。真正的
+    重复 —— 同一条中心线叠几份、短段落在整跨里、两次配对中线偏几毫米
+    —— 都满足包含判据。部分重叠的那几米仍会重复计算，但那要拼接
+    成并集才能消掉，不在这里做。
+    """
+    return merge_overlapping(elements, box_of=segment_box,
+                             iou_threshold=float("inf"))
+

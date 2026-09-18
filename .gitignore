@@ -106,6 +106,10 @@ gold_sheets/
 # 它们都可再生：原件在 MinIO `atlases` 桶，OCR 缓存在 ~/.cache/cad-knowledge。
 # 仓库里保留的是**管线代码 + 元数据 + 清单 + 数据卡**，那才是可复用的部分。
 apps/api/data/knowledge/drawing_standards/*/book.md
+# 数理化教材（core.knowledge.math_sources）同一条纪律：原件在用户本地，
+# 派生全文只落本地缓存与数据库，**不进版本库**。仓库里留清单、管线与
+# 公式引用（短摘录 + 页码），那才是可复用的部分。
+apps/api/data/knowledge/math_physics/*/book.md
 apps/api/data/model3d/dataset/reference/symbols/
 
 # ── apps/api 根目录的一次性探针脚本 ─────────────────────────

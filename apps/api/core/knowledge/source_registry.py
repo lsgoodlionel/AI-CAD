@@ -43,10 +43,14 @@ class KnowledgeSource:
     superseded_by: str | None = None  # 本清单内被谁替代
     notes: str = ""
     evidence: dict = field(default_factory=dict)
+    #: 资料根目录。缺省是识图标准那批；数理化教材（`math_sources`）用自己的根。
+    #: 加这个字段是为了让**同一套登记结构**服务多批资料 —— 复制一份 dataclass
+    #: 只会让两边的字段慢慢长歪。
+    root: Path = SOURCE_ROOT
 
     @property
     def path(self) -> Path:
-        return SOURCE_ROOT / self.filename
+        return self.root / self.filename
 
     @property
     def is_scanned(self) -> bool:
